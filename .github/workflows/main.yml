@@ -1,0 +1,85 @@
+name: workflow
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+  
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Print .NET SDK version
+      run: dotnet --version
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+
+    - name: Install modules
+      run: yarn --prefer-offline
+
+    - name: Test and generate coverage report
+      run: |
+        dotnet test --configuration Release --no-build REPONAME.Test/REPONAME.Test.csproj /p:CollectCoverage=true /p:CoverletOutputFormat="opencover" --verbosity normal
+        dotnet tool install -g dotnet-reportgenerator-globaltool
+        reportgenerator "-reports:REPONAME.Test/coverage.opencover.xml" "-targetdir:./coverage/" "-reporttypes:Badges;Html;TextSummary"
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v1
+      with:
+          path: './coverage/'
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      if: github.ref == 'refs/heads/main'
+      uses: actions/deploy-pages@v1
+            
+    - name: Create Test Coverage Badge
+      uses: simon-k/dotnet-code-coverage-badge@v1.0.0
+      id: create_coverage_badge
+      if: github.ref == 'refs/heads/main'
+      with:
+        label: Unit Test Coverage
+        color: brightgreen
+        path: ./REPONAME.Test/coverage.opencover.xml
+        gist-filename: code-coverage.json
+        gist-id: ${{ secrets.GIST_ID }}
+        gist-auth-token: ${{ secrets.GIST_AUTH_TOKEN }}       
+
+    - name: Print badge data
+      if: github.ref == 'refs/heads/main'    
+      run: echo "Badge data ${{steps.test_step.outputs.badge}}"
+
+    - name: Nuget set access
+      if: github.ref == 'refs/heads/main'    
+      run: dotnet nuget add source --username ${{ github.actor }} --password ${{ github.token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/garethbirduk/index.json"
+
+    - name: Nuget deploy Package
+      if: github.ref == 'refs/heads/main'
+      run:
+        dotnet nuget push ./REPONAME/bin/Release/**/*.nupkg --source "github" --api-key ${{ secrets.GH_APIKEY }} --skip-duplicate

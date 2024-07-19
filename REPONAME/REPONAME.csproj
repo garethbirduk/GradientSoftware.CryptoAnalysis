@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>GradientSoftware.$(AssemblyName)</Title>
+    <Description>A utility library for dotnet 8 and above.</Description>
+    <Copyright>© 2024 Gareth Bird</Copyright>
+    <ErrorReport>none</ErrorReport>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType></RepositoryType>
+    <PackageTags>utils; gradient; software</PackageTags>
+    <RepositoryUrl>https://github.com/garethbirduk/GradientSoftware.REPONAME</RepositoryUrl>
+    <PackageId>GradientSoftware.$(AssemblyName)</PackageId>
+    <Version>0.0.2</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\resources\icon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>

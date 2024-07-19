@@ -1,0 +1,7 @@
+**/*/obj/**/*
+**/*/bin/**/*
+.vs/
+coverage/
+TestResults/
+
+**/*/coverage.opencover.xml
