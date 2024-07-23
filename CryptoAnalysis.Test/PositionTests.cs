@@ -39,14 +39,8 @@ namespace Gradient.CryptoAnalysis.Tests
         {
             var positionRules = new PositionRules();
 
-            var isGoodDay = new Condition();
-            isGoodDay.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(6));
-
-            var isBadDay = new Condition();
-            isBadDay.AndConditions.Add(new IsSuccessiveRedCandlesCondition(6));
-
-            positionRules.Conditions.OrSubConditions.Add(isGoodDay);
-            positionRules.Conditions.OrSubConditions.Add(isBadDay);
+            positionRules.Conditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(6));
+            positionRules.Conditions.AndConditions.Add(new IsPriceIncreaseRateCondition(25, 6));
 
             var csvHelper = new CsvReaderHelper();
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
