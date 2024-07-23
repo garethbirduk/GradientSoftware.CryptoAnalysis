@@ -49,7 +49,7 @@
             };
 
             // Act
-            bool result = data.HasIncreasedByPercentage(percentageIncrease, 0, 3);
+            bool result = data.HasIncreasedByPercentage(percentageIncrease);
 
             // Assert
             Assert.AreEqual(expectedResult, result);
@@ -70,7 +70,7 @@
             };
 
             // Act
-            double percentageChange = data.PercentageChange(0, 3);
+            double percentageChange = data.PercentageChangeCloseToClose();
 
             // Assert
             Assert.AreEqual(Math.Round(expectedPercentageChange, 2), Math.Round(percentageChange, 2));

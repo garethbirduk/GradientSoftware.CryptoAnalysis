@@ -2,21 +2,17 @@
 {
     public static class PriceExtensions
     {
-        internal static double PercentageChange(this IEnumerable<Price> data, int skip = 0, int take = 0)
+        internal static double PercentageChangeCloseToClose(this IEnumerable<Price> data)
         {
-            data = data.Skip(skip);
-            if (take > 0)
-                data = data.Take(take);
-
-            var initialOpen = data.First().Open;
+            var initialOpen = data.First().Close;
             var finalClose = data.Last().Close;
 
             return ((finalClose - initialOpen) / initialOpen) * 100;
         }
 
-        public static bool HasIncreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease, int skip = 0, int take = 0)
+        public static bool HasIncreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease)
         {
-            var change = PercentageChange(data, skip, take);
+            var change = PercentageChangeCloseToClose(data);
 
             if (change < 0 && percentageIncrease < 0)
                 return change <= percentageIncrease;

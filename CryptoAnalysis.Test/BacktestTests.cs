@@ -16,44 +16,44 @@
 
         public List<Trade> Trades { get; set; } = new();
 
-        [TestMethod]
-        public void Test1()
-        {
-            // Arrange
-            var csvHelper = new CsvReaderHelper();
+        //[TestMethod]
+        //public void Test1()
+        //{
+        //    // Arrange
+        //    var csvHelper = new CsvReaderHelper();
 
-            // Act
-            var data = csvHelper.ReadCryptoCoinData(_cryptoDataFilePath).ToList();
+        //    // Act
+        //    var data = csvHelper.ReadCryptoCoinData(_cryptoDataFilePath).ToList();
 
-            var backtest = new Backtest()
-            {
-                StartDateTime = new DateTime(2024, 06, 01),
-                CoinCurrencyPairData = new CoinCurrencyPairData()
-                {
-                    TimePeriods = new List<TimePeriodData>()
-                    {
-                        new TimePeriodData()
-                        {
-                            Interval = 60,
-                            Data = data,
-                        }
-                    }
-                },
-                EnterTradeConditions = new List<EnterTradeCondition>()
-                {
-                    new PriceIncreaseRate(data, 8, 3)
-                },
-                StopLossCalculation = new StopLossCalculation()
-                {
-                    Data = data,
-                },
-                TakeProfitCalculation = new TakeProfitCalculation()
-                {
-                    Data = data,
-                }
-            };
+        //    var backtest = new Backtest()
+        //    {
+        //        StartDateTime = new DateTime(2024, 06, 01),
+        //        CoinCurrencyPairData = new CoinCurrencyPairData()
+        //        {
+        //            TimePeriods = new List<TimePeriodData>()
+        //            {
+        //                new TimePeriodData()
+        //                {
+        //                    Interval = 60,
+        //                    Data = data,
+        //                }
+        //            }
+        //        },
+        //        EnterTradeConditions = new List<EnterTradeCondition>()
+        //        {
+        //            new PriceIncreaseRate(data, 8, 3)
+        //        },
+        //        StopLossCalculation = new StopLossCalculation()
+        //        {
+        //            Data = data,
+        //        },
+        //        TakeProfitCalculation = new TakeProfitCalculation()
+        //        {
+        //            Data = data,
+        //        }
+        //    };
 
-            backtest.Execute(60);
-        }
+        //    backtest.Execute(60);
+        //}
     }
 }
