@@ -26,8 +26,8 @@ namespace Gradient.CryptoAnalysis.Tests
             isInJanuary.AndConditions.Add(new IsAfterDateCondition(new DateTime(2024, 01, 01)));
             isInJanuary.AndConditions.Add(new IsBeforeDateCondition(new DateTime(2024, 02, 01)));
 
-            position.Conditions.AndSubConditions.Add(isGoodWeekdayOrIsBadWeekend);
-            position.Conditions.AndSubConditions.Add(isInJanuary);
+            position.PreConditions.AndSubConditions.Add(isGoodWeekdayOrIsBadWeekend);
+            position.PreConditions.AndSubConditions.Add(isInJanuary);
 
             var data = TestHelper.CreatePriceData(new DateTime(2024, 01, 01), 60, 100 * 24);
 
@@ -39,13 +39,13 @@ namespace Gradient.CryptoAnalysis.Tests
         {
             var positionRules = new PositionRules();
 
-            positionRules.Conditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(6));
-            positionRules.Conditions.AndConditions.Add(new IsPriceIncreaseRateCondition(25, 6));
+            //positionRules.PreConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(6));
+            positionRules.PreConditions.AndConditions.Add(new IsPriceIncreaseRateCondition(25, 10, true));
 
             var csvHelper = new CsvReaderHelper();
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
             var _cryptoDataFilePath = Path.Combine(baseDir, "TestData", "COINBASE_SPAUSD, 60.csv");
-            var backtest = new Backtest2()
+            var backtest = new Backtest()
             {
                 PositionRules = positionRules,
                 StartDateTime = new DateTime(2023, 12, 25),
