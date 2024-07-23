@@ -45,9 +45,9 @@ jobs:
 
     - name: Test and generate coverage report
       run: |
-        dotnet test --configuration Release --no-build REPONAME.Test/REPONAME.Test.csproj /p:CollectCoverage=true /p:CoverletOutputFormat="opencover" --verbosity normal
+        dotnet test --configuration Release --no-build CryptoAnalysis.Test/CryptoAnalysis.Test.csproj /p:CollectCoverage=true /p:CoverletOutputFormat="opencover" --verbosity normal
         dotnet tool install -g dotnet-reportgenerator-globaltool
-        reportgenerator "-reports:REPONAME.Test/coverage.opencover.xml" "-targetdir:./coverage/" "-reporttypes:Badges;Html;TextSummary"
+        reportgenerator "-reports:CryptoAnalysis.Test/coverage.opencover.xml" "-targetdir:./coverage/" "-reporttypes:Badges;Html;TextSummary"
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v1
@@ -66,7 +66,7 @@ jobs:
       with:
         label: Unit Test Coverage
         color: brightgreen
-        path: ./REPONAME.Test/coverage.opencover.xml
+        path: ./CryptoAnalysis.Test/coverage.opencover.xml
         gist-filename: code-coverage.json
         gist-id: ${{ secrets.GIST_ID }}
         gist-auth-token: ${{ secrets.GIST_AUTH_TOKEN }}       
@@ -82,4 +82,4 @@ jobs:
     - name: Nuget deploy Package
       if: github.ref == 'refs/heads/main'
       run:
-        dotnet nuget push ./REPONAME/bin/Release/**/*.nupkg --source "github" --api-key ${{ secrets.GH_APIKEY }} --skip-duplicate
+        dotnet nuget push ./CryptoAnalysis/bin/Release/**/*.nupkg --source "github" --api-key ${{ secrets.GH_APIKEY }} --skip-duplicate

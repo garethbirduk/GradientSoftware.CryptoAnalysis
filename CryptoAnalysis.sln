@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34525.116
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "REPONAME", "REPONAME\REPONAME.csproj", "{CAAC96EB-67C8-4C57-974A-BC63DCA0EDB4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CryptoAnalysis", "CryptoAnalysis\CryptoAnalysis.csproj", "{CAAC96EB-67C8-4C57-974A-BC63DCA0EDB4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "REPONAME.Test", "REPONAME.Test\REPONAME.Test.csproj", "{B6AA484C-44A6-4476-BBE9-F5A21F7D56C6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CryptoAnalysis.Test", "CryptoAnalysis.Test\CryptoAnalysis.Test.csproj", "{B6AA484C-44A6-4476-BBE9-F5A21F7D56C6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

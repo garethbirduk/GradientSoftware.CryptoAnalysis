@@ -14,7 +14,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType></RepositoryType>
     <PackageTags>utils; gradient; software</PackageTags>
-    <RepositoryUrl>https://github.com/garethbirduk/GradientSoftware.REPONAME</RepositoryUrl>
+    <RepositoryUrl>https://github.com/garethbirduk/GradientSoftware.CryptoAnalysis</RepositoryUrl>
     <PackageId>GradientSoftware.$(AssemblyName)</PackageId>
     <Version>0.0.2</Version>
   </PropertyGroup>
@@ -32,6 +32,12 @@
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CsvHelper" Version="33.0.1" />
+    <PackageReference Include="GradientSoftware.GoogleServices" Version="1.0.0" />
+    <PackageReference Include="GradientSoftware.Utils" Version="0.3.2" />
   </ItemGroup>
 
 </Project>

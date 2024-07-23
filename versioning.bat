@@ -11,7 +11,7 @@ echo Current branch: %branch%
 git clone --single-branch --branch main https://github.com/%GITHUB_USERNAME%/GradientSoftware.GithubScripts.git
 
 :: Run the script from the cloned repository
-dotnet script ./GradientSoftware.GithubScripts/.github/scripts/update-version.csx %GITHUB_USERNAME% GradientSoftware.REPONAME %GITHUB_APIKEY% .\REPONAME\REPONAME.csproj %branch%
+dotnet script ./GradientSoftware.GithubScripts/.github/scripts/update-version.csx %GITHUB_USERNAME% GradientSoftware.CryptoAnalysis %GITHUB_APIKEY% .\CryptoAnalysis\CryptoAnalysis.csproj %branch%
 
 :: remove the cloned repository
 rd /s /q GradientSoftware.GithubScripts
