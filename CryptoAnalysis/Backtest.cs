@@ -1,60 +1,42 @@
 ﻿using CryptoAnalysis;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Gradient.CryptoAnalysis
 {
-    //public class Backtest
-    //{
-    //    public string Coin { get; set; }
-    //    public CoinCurrencyPairData CoinCurrencyPairData { get; set; }
-    //    public DateTime EndDateTime { get; set; }
-    //    public List<EnterTradeCondition> EnterTradeConditions { get; set; } = new();
-    //    public PositionRules PositionRules { get; set; } = new();
-    //    public DateTime StartDateTime { get; set; }
-    //    public StopLossCalculation StopLossCalculation { get; set; } = new();
-    //    public TakeProfitCalculation TakeProfitCalculation { get; set; } = new();
-    //    public List<Trade> Trades { get; set; } = new();
+    public static class ResultExtensions
+    {
+        public static void SaveToJson(this IEnumerable<Result> results, string filePath)
+        {
+            var folder = Path.GetDirectoryName(filePath);
+            if (!Path.Exists(folder))
+            {
+                Directory.CreateDirectory(folder);
+            }
 
-    //    public void Execute(int interval)
-    //    {
-    //        var data = CoinCurrencyPairData.TimePeriods.SingleOrDefault(x => x.Interval == interval)?.Data;
-    //        if (data == null)
-    //            return;
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Converters =
+            {
+                new JsonStringEnumConverter()
+            }
+            };
 
-    //        var index = data.FindIndex(x => x.Time >= StartDateTime);
+            string jsonString = JsonSerializer.Serialize(results, options);
+            File.WriteAllText(filePath, jsonString);
+        }
+    }
 
-    //        while (index > -1 && index < data.Count())
-    //        {
-    //            var d = data[index];
-    //            var dateTime = d.Time.ToUniversalTime();
+    public class Analysis
+    {
+        internal void Analyse()
+        {
+            var xxxxx = Results.Select(x => x.Value).OrderBy(x => x.Select(y => y.Profit)).ToList();
+        }
 
-    //            if (PositionRules.IsMet(data, dateTime))
-    //            {
-    //                // enterTrade
-    //            }
-
-    //            if (EnterTradeConditions.All(x => x.IsMet(index)))
-    //            {
-    //                var xxx = EnterTradeConditions.All(x => x.IsMet(index));
-    //                Trades.Add(new Trade(Coin, d.Open, d.Time, StopLossCalculation.Calculate(index), TakeProfitCalculation.Calculate(index)));
-    //            }
-
-    //            foreach (var trade in Trades.Where(x => x.ExitDateTime == null &&
-    //                (x.StopLoss >= d.Close || x.TakeProfit <= d.Close)))
-    //            {
-    //                trade.Close(d.Time, d.Close);
-    //            }
-
-    //            index++;
-    //        }
-
-    //        var closed = Trades.Where(x => x.ExitDateTime != null).ToList();
-
-    //        var bought = closed.Select(x => x.ExitPrice - x.EntryPrice).ToList();
-
-    //        var dates = closed.Select(x => $"{x.EntryDateTime}\t{x.ExitDateTime}").ToList();
-    //        var profit = bought.Sum();
-    //    }
-    //}
+        public Dictionary<string, List<Result>> Results { get; } = new();
+    }
 
     public class Backtest
     {
@@ -65,7 +47,7 @@ namespace Gradient.CryptoAnalysis
 
         public List<Trade> Trades { get; set; } = new();
 
-        public void Execute()
+        public List<Result> Execute()
         {
             var met = new List<DateTime>();
 
@@ -76,7 +58,10 @@ namespace Gradient.CryptoAnalysis
                 var d = Prices[index];
                 var dateTime = d.Time.ToUniversalTime();
 
-                foreach (var trade in Trades.Where(x => x.TradeStatus == EnumTradeStatus.Open)) { }
+                foreach (var trade in Trades)
+                {
+                    trade.Update(dateTime);
+                }
 
                 if (PositionRules.PreConditions.IsMet(Prices, dateTime))
                 {
@@ -84,17 +69,91 @@ namespace Gradient.CryptoAnalysis
                         PositionRules.ConfirmationConditions, PositionRules.TakeProfitConditions,
                         PositionRules.StopLossConditions, PositionRules.ExpireConditions);
 
-                    //, StopLossCalculation.Calculate(index), TakeProfitCalculation.Calculate(index))
-
                     Trades.Add(trade);
-
-                    met.Add(dateTime);
                 }
 
                 index++;
             }
 
-            var bp = 1;
+            var completed = Trades.Where(x => x.TradeStatus == EnumTradeStatus.Completed).ToList();
+            var won = completed.Where(x => x.PriceClose > x.PriceOpen).Select(x => new { x.Id, x.DateTimeOpen, x.DateTimeClose, x.PriceOpen, x.PriceClose, x.TakeProfitTarget, x.StopLossTarget }).ToList();
+            var lost = completed.Where(x => x.PriceClose < x.PriceOpen).Select(x => new { x.Id, x.DateTimeOpen, x.DateTimeClose, x.PriceOpen, x.PriceClose, x.TakeProfitTarget, x.StopLossTarget }).ToList();
+
+            var profits = completed.Sum(x => x.PriceClose - x.PriceOpen);
+
+            return Trades.Where(x => x.TradeStatus == EnumTradeStatus.Completed).Select(x => new Result(x)).ToList();
         }
+    }
+
+    public class BacktestLauncher
+    {
+        private Analysis Analysis { get; set; } = new Analysis();
+        private Dictionary<string, List<Result>> Results { get; set; } = new Dictionary<string, List<Result>>();
+
+        public void Launch()
+        {
+            for (int g1 = 3; g1 < 6; g1++)
+            {
+                for (int g2 = 3; g2 < 6; g2++)
+                {
+                    for (int r1 = 3; r1 < 6; r1++)
+                    {
+                        var positionRules = new PositionRules();
+
+                        positionRules.PreConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(g1));
+                        positionRules.ConfirmationConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(g2));
+                        positionRules.ExpireConditions.AndConditions.Add(new IsSuccessiveRedCandlesCondition(r1));
+                        positionRules.StopLossConditions.AndConditions.Add(new IsPriceLowLessThanOrEqualCondition(0.0));
+                        positionRules.TakeProfitConditions.AndConditions.Add(new IsPriceHighGreaterThanOrEqualCondition(100.0));
+
+                        var csvHelper = new CsvReaderHelper();
+                        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                        var _cryptoDataFilePath = Path.Combine(baseDir, "TestData", "COINBASE_SPAUSD, 60.csv");
+                        var backtest = new Backtest()
+                        {
+                            PositionRules = positionRules,
+                            StartDateTime = new DateTime(2023, 05, 01),
+                            Prices = csvHelper.ReadCryptoCoinData(_cryptoDataFilePath).ToList()
+                        };
+
+                        var results = backtest.Execute();
+
+                        var folder = Path.Combine("c:\\", "temp", "results");
+                        var filename = $"g1_g2_r1 {g1}_{g2}_{r1} COINBASE_SPAUSD, 60.json";
+                        results.SaveToJson(Path.Combine(folder, filename));
+
+                        Analysis.Results.Add($"g1_g2_r1: {g1}_{g2}_{r1}", results);
+                    }
+                }
+            }
+
+            Analysis.Analyse();
+        }
+    }
+
+    public class RankedFile
+    {
+        public string FilePath { get; set; }
+        public List<Result> Results { get; set; }
+        public double TotalProfit { get; set; }
+    }
+
+    public class Result
+    {
+        public Result()
+        {
+        }
+
+        public Result(Trade trade)
+        {
+            DateTimeClose = trade.DateTimeClose;
+            DateTimeOpen = trade.DateTimeOpen;
+            Profit = trade.PriceClose - trade.PriceOpen;
+        }
+
+        public DateTime DateTimeClose { get; set; }
+        public DateTime DateTimeOpen { get; set; }
+        public Guid Id { get; } = Guid.NewGuid();
+        public double Profit { get; set; }
     }
 }

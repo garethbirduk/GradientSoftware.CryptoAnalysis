@@ -16,20 +16,27 @@
             if (IsExpired)
                 return false;
 
-            var periods = new List<int>() { SuccessiveCandles };
-            if (PeriodsToTakeIsMaxPeriodsNotAbsolute)
+            try
             {
-                periods = Enumerable.Range(1, SuccessiveCandles).Reverse().ToList();
-            }
+                var periods = new List<int>() { SuccessiveCandles };
+                if (PeriodsToTakeIsMaxPeriodsNotAbsolute)
+                {
+                    periods = Enumerable.Range(1, SuccessiveCandles).Reverse().ToList();
+                }
 
-            foreach (var period in periods)
+                foreach (var period in periods)
+                {
+                    var data = Prices.TakePreviousPrices(period, CurrentIndex);
+                    if (data.HasIncreasedByPercentage(PercentageIncrease))
+                        return true;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
             {
-                var data = Prices.TakePreviousPrices(period, CurrentIndex);
-                if (data.HasIncreasedByPercentage(PercentageIncrease))
-                    return true;
+                return false;
             }
-
-            return false;
         }
     }
 }

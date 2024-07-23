@@ -7,11 +7,16 @@
             TargetPrice = targetPrice;
         }
 
-        public double TargetPrice { get; }
+        public double TargetPrice { get; protected set; }
 
         public override bool IsMet()
         {
             return Price.Low <= TargetPrice;
+        }
+
+        public void SetTargetPrice(double targetPrice)
+        {
+            TargetPrice = targetPrice;
         }
     }
 }

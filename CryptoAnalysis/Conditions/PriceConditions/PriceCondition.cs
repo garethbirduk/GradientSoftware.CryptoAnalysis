@@ -28,7 +28,7 @@ namespace Gradient.CryptoAnalysis
 
         public void SetPrice(DateTime dateTime)
         {
-            Price = Prices.Single(x => x.Time == dateTime);
+            Price = Prices.First(x => x.Time == dateTime);
         }
 
         public void SetPrice(int index)
