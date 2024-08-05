@@ -1,4 +1,4 @@
-﻿using CryptoAnalysis.Conditions.DateConditions;
+﻿using Gradient.CryptoAnalysis.Conditions.DateConditions;
 
 namespace Gradient.CryptoAnalysis.Tests
 {

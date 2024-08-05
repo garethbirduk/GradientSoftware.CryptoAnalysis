@@ -1,4 +1,4 @@
-﻿namespace CryptoAnalysis.Conditions.DateConditions
+﻿namespace Gradient.CryptoAnalysis.Conditions.DateConditions
 {
     public class IsDateOnCondition : DateCondition
     {

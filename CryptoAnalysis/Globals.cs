@@ -7,6 +7,6 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("CryptoAnalysis.Test")]
 
-namespace CryptoAnalysis
+namespace Gradient.CryptoAnalysis
 {
 }

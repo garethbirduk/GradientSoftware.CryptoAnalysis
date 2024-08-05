@@ -1,4 +1,4 @@
-﻿using CryptoAnalysis;
+﻿using Gradient.CryptoAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 

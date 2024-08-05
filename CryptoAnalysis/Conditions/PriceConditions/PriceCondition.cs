@@ -1,4 +1,4 @@
-﻿using CryptoAnalysis.Conditions.PriceConditions;
+﻿using Gradient.CryptoAnalysis.Conditions.PriceConditions;
 
 namespace Gradient.CryptoAnalysis
 {

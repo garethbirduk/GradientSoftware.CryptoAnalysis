@@ -1,6 +1,6 @@
 ﻿using Gradient.CryptoAnalysis.Conditions;
 
-namespace CryptoAnalysis
+namespace Gradient.CryptoAnalysis
 {
     public class PositionRules
     {

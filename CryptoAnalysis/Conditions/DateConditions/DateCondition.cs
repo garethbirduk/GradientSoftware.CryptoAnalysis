@@ -1,6 +1,4 @@
-﻿using Gradient.CryptoAnalysis;
-
-namespace CryptoAnalysis.Conditions.DateConditions
+﻿namespace Gradient.CryptoAnalysis.Conditions.DateConditions
 {
     public abstract class DateCondition : ICondition, IDateCondition
     {

@@ -1,4 +1,4 @@
-﻿using CryptoAnalysis;
+﻿using Gradient.CryptoAnalysis;
 using System.Text.Json;
 
 namespace Gradient.CryptoAnalysis.Tests

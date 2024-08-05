@@ -1,6 +1,6 @@
 ﻿using Gradient.CryptoAnalysis;
 
-namespace CryptoAnalysis.Conditions.PriceConditions
+namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
 {
     public interface IPriceCondition
     {

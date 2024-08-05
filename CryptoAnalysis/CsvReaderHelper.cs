@@ -98,12 +98,13 @@ namespace Gradient.CryptoAnalysis
     {
         public PriceClassMap()
         {
-            Map(m => m.Close);
-            Map(m => m.High);
-            Map(m => m.Low);
-            Map(m => m.Open);
-            Map(m => m.DateTime);
-            Map(m => m.Indicators).TypeConverter<IndicatorsConverter>();
+            AutoMap(CultureInfo.InvariantCulture);
+            Map(m => m.Close).Name("close").NameIndex(0).Validate(args => !string.IsNullOrEmpty(args.Field));
+            Map(m => m.High).Name("high").NameIndex(0).Validate(args => !string.IsNullOrEmpty(args.Field));
+            Map(m => m.Low).Name("low").NameIndex(0).Validate(args => !string.IsNullOrEmpty(args.Field));
+            Map(m => m.Open).Name("open").NameIndex(0).Validate(args => !string.IsNullOrEmpty(args.Field));
+            Map(m => m.DateTime).Name("time").NameIndex(0).Validate(args => !string.IsNullOrEmpty(args.Field));
+            Map(m => m.Indicators).TypeConverter<IndicatorsConverter>().Optional();
         }
     }
 }

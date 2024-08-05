@@ -1,7 +1,7 @@
 ﻿using Gradient.CryptoAnalysis;
 using Gradient.CryptoAnalysis.Conditions;
 
-namespace CryptoAnalysis.Conditions.DateConditions
+namespace Gradient.CryptoAnalysis.Conditions.DateConditions
 {
     public class NeverExpireCondition : Condition, ICondition
     {

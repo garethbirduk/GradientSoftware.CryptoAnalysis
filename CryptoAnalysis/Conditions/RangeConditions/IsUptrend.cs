@@ -1,6 +1,6 @@
 ﻿using Gradient.CryptoAnalysis;
 
-namespace CryptoAnalysis.Conditions.RangeConditions
+namespace Gradient.CryptoAnalysis.Conditions.RangeConditions
 {
     public class IsUptrend : RangeCondition
     {

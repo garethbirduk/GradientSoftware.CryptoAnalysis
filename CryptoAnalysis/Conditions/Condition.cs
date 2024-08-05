@@ -1,5 +1,5 @@
-﻿using CryptoAnalysis.Conditions.DateConditions;
-using CryptoAnalysis.Conditions.PriceConditions;
+﻿using Gradient.CryptoAnalysis.Conditions.DateConditions;
+using Gradient.CryptoAnalysis.Conditions.PriceConditions;
 
 namespace Gradient.CryptoAnalysis.Conditions
 {

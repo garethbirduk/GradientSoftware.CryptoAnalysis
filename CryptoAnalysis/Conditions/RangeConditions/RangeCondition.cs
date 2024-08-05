@@ -1,4 +1,4 @@
-﻿using CryptoAnalysis.Conditions.RangeConditions;
+﻿using Gradient.CryptoAnalysis.Conditions.RangeConditions;
 
 namespace Gradient.CryptoAnalysis
 {
