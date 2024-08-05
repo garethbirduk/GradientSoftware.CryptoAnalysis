@@ -1,6 +1,4 @@
-﻿using Gradient.CryptoAnalysis;
-
-namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
+﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
 {
     public interface IPriceCondition
     {
@@ -12,5 +10,9 @@ namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
         public void SetPrice(int index);
 
         public void SetPrices(List<Price> prices);
+
+        public void SetPriceToFirst();
+
+        public void SetPriceToLast();
     }
 }

@@ -11,6 +11,9 @@
             if (IsExpired)
                 return false;
 
+            if (SuccessiveCandles < 2)
+                return false;
+
             var data = Prices.TakePreviousPrices(SuccessiveCandles, CurrentIndex);
 
             if (data.Count() < MinDataSize)

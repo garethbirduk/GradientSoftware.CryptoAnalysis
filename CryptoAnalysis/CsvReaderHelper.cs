@@ -10,8 +10,8 @@ namespace Gradient.CryptoAnalysis
         public BacktestResultMap()
         {
             Map(m => m.Coin).Name("Coin");
-            Map(m => m.EntryDateTime).Name("Entry Date & DateTime");
-            Map(m => m.ExitDateTime).Name("Exit Date & DateTime");
+            Map(m => m.EntryDateTime).Name("Entry Date & Time");
+            Map(m => m.ExitDateTime).Name("Exit Date & Time");
             Map(m => m.Direction).Name("Direction");
             Map(m => m.Entry).Name("Entry");
             Map(m => m.StopLoss).Name("Stop Loss");
@@ -34,14 +34,16 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public IEnumerable<Price> ReadCryptoCoinData(string filePath)
+        public IEnumerable<TClass> ReadData<TClass, TClassMap>(string filePath)
+            where TClass : class
+            where TClassMap : ClassMap
         {
             using (var reader = new StreamReader(filePath))
             using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
             {
-                csv.Context.RegisterClassMap<PriceClassMap>();
-                var records = csv.GetRecords<Price>();
-                return new List<Price>(records);
+                csv.Context.RegisterClassMap<TClassMap>();
+                var records = csv.GetRecords<TClass>();
+                return new List<TClass>(records);
             }
         }
 

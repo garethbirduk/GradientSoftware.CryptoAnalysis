@@ -2,17 +2,6 @@
 
 namespace Gradient.CryptoAnalysis
 {
-    public enum EnumTradeStatus
-    {
-        None,
-        AwaitingConfirmation,
-        Confirmed,
-        Open,
-        Completed,
-        Cancelled,
-        Expired
-    }
-
     public class Trade
     {
         private void TransitionAwaitingConfirmationToClosed(DateTime dateTime)

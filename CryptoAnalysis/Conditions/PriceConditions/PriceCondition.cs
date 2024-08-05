@@ -39,6 +39,17 @@ namespace Gradient.CryptoAnalysis
         public virtual void SetPrices(List<Price> data)
         {
             Prices = data;
+            SetPriceToLast();
+        }
+
+        public void SetPriceToFirst()
+        {
+            Price = Prices.First();
+        }
+
+        public void SetPriceToLast()
+        {
+            Price = Prices.Last();
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using Gradient.CryptoAnalysis;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace Gradient.CryptoAnalysis.Tests
 {
@@ -19,8 +18,8 @@ namespace Gradient.CryptoAnalysis.Tests
                 // Read the file content
                 var jsonString = File.ReadAllText(file);
 
-                // Deserialize the JSON content to IEnumerable<Result>
-                var results = JsonSerializer.Deserialize<IEnumerable<Result>>(jsonString);
+                // Deserialize the JSON content to IEnumerable<TradeResult>
+                var results = JsonSerializer.Deserialize<IEnumerable<TradeResult>>(jsonString);
 
                 if (results != null)
                 {
@@ -90,7 +89,7 @@ namespace Gradient.CryptoAnalysis.Tests
             {
                 PositionRules = positionRules,
                 StartDateTime = new DateTime(2023, 12, 27),
-                Prices = csvHelper.ReadCryptoCoinData(_cryptoDataFilePath).ToList()
+                Prices = csvHelper.ReadData<Price, PriceClassMap>(_cryptoDataFilePath).ToList()
             };
             backtest.Execute();
         }

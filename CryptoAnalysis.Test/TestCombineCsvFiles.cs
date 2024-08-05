@@ -23,7 +23,7 @@
             Assert.AreEqual(lines.Count(), lines.Distinct().Count()); // Ensure no duplicate rows
 
             var reader = new CsvReaderHelper();
-            var data = reader.ReadCryptoCoinData(outputFilePath);
+            var data = reader.ReadData<Price, PriceClassMap>(outputFilePath);
             Assert.AreEqual(lines.Count() - 1, data.Count()); // Ensure output can be read
         }
     }

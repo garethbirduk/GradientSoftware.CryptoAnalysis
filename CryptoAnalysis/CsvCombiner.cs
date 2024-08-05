@@ -29,7 +29,7 @@
             var csvHelper = new CsvReaderHelper();
             foreach (var file in files)
             {
-                var fileRecords = csvHelper.ReadCryptoCoinData(file).ToList();
+                var fileRecords = csvHelper.ReadData<Price, PriceClassMap>(file).ToList();
                 records.AddRange(fileRecords);
             }
             return records;

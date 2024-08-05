@@ -1,7 +1,7 @@
 ﻿namespace Gradient.CryptoAnalysis.Tests
 {
     [TestClass]
-    public class CryptoCoinDataExtensionsTest
+    public class PriceExtensionsTests
     {
         public static List<Price> CreateData(DateTime startDateTime, int interval, int count)
         {
