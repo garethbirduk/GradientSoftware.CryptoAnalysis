@@ -10,6 +10,15 @@
             return ((finalClose - initialOpen) / initialOpen) * 100;
         }
 
+        public static bool HasDecreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease)
+        {
+            var change = PercentageChangeCloseToClose(data);
+
+            if (change < 0 && percentageIncrease < 0)
+                return change >= percentageIncrease;
+            return change <= percentageIncrease;
+        }
+
         public static bool HasIncreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease)
         {
             var change = PercentageChangeCloseToClose(data);

@@ -51,12 +51,12 @@ namespace Gradient.CryptoAnalysis
         {
             var met = new List<DateTime>();
 
-            var index = Prices.FindIndex(x => x.Time >= StartDateTime);
+            var index = Prices.FindIndex(x => x.DateTime >= StartDateTime);
 
             while (index > -1 && index < Prices.Count())
             {
                 var d = Prices[index];
-                var dateTime = d.Time.ToUniversalTime();
+                var dateTime = d.DateTime.ToUniversalTime();
 
                 foreach (var trade in Trades)
                 {

@@ -11,19 +11,12 @@
             if (IsExpired)
                 return false;
 
-            try
-            {
-                var data = Prices.TakePreviousPrices(SuccessiveCandles, CurrentIndex);
+            var data = Prices.TakePreviousPrices(SuccessiveCandles, CurrentIndex);
 
-                if (data.Count() < MinDataSize)
-                    throw new NotSupportedException($"Prices Size of {Prices.Count} < Minimum Prices Size of {MinDataSize}");
-
-                return data.All(x => x.Close > x.Open);
-            }
-            catch (Exception ex)
-            {
+            if (data.Count() < MinDataSize)
                 return false;
-            }
+
+            return data.All(x => x.Close > x.Open);
         }
     }
 }

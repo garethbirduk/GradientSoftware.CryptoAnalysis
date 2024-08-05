@@ -41,7 +41,7 @@
             var csvHelper = new CsvReaderHelper();
             try
             {
-                csvHelper.WriteData<Price, CryptoCoinDataMap>(outputFilePath, records);
+                csvHelper.WriteData<Price, PriceClassMap>(outputFilePath, records);
             }
             catch (IOException ex)
             {

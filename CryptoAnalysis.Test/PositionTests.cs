@@ -107,5 +107,15 @@ namespace Gradient.CryptoAnalysis.Tests
         {
             var results = GetResults(Path.Combine("c:\\", "temp", "results"));
         }
+
+        [TestMethod]
+        public void TestRange()
+        {
+            var position = new PositionRules();
+
+            var isGoodWeekday = new Condition();
+            isGoodWeekday.AndConditions.Add(new IsWeekdayCondition());
+            isGoodWeekday.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(3));
+        }
     }
 }

@@ -15,7 +15,7 @@ namespace Gradient.CryptoAnalysis
 
             foreach (var data in cryptoData)
             {
-                dataTable.Rows.Add(data.Time, data.Open, data.High, data.Low, data.Close);
+                dataTable.Rows.Add(data.DateTime, data.Open, data.High, data.Low, data.Close);
             }
 
             return dataTable;

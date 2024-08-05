@@ -20,7 +20,7 @@ namespace Gradient.CryptoAnalysis.Tests
             if (!File.Exists(_backtestResultsFilePath))
             {
                 var csvContent =
-@"Coin,Entry Date & Time,Exit Date & Time,Direction,Entry,Stop Loss,Exit,Returns,Win / Loss
+@"Coin,Entry Date & DateTime,Exit Date & DateTime,Direction,Entry,Stop Loss,Exit,Returns,Win / Loss
 BTCUSD,2022-01-01 21:00:00,2022-01-01 22:00:00,Long,47444.00,47301.00,47301.00,-1,Loss
 BTCUSD,2022-01-06 16:00:00,2022-01-06 17:00:00,Long,42940.47,42751.26,42751.26,-1,Loss
 BTCUSD,2022-01-11 15:00:00,2022-01-11 16:00:00,Long,41645.64,41592.47,42396.73,14.12619898,Win";
@@ -83,7 +83,7 @@ BTCUSD,2022-01-11 15:00:00,2022-01-11 16:00:00,Long,41645.64,41592.47,42396.73,1
             Assert.IsNotNull(data);
             Assert.IsTrue(data.Count > 0);
             var expectedTime = DateTime.SpecifyKind(new DateTime(2024, 7, 7, 7, 0, 0), DateTimeKind.Utc);
-            Assert.AreEqual(expectedTime, data[0].Time.ToUniversalTime());
+            Assert.AreEqual(expectedTime, data[0].DateTime.ToUniversalTime());
             Assert.AreEqual(0.00703, data[0].Open);
             Assert.AreEqual(0.007064, data[0].High);
             Assert.AreEqual(0.007, data[0].Low);

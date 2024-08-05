@@ -7,12 +7,12 @@
         public void TestCombineCsvFiles()
         {
             // Arrange
-            string inputFilePath = @"C:\dev\GitHub\Gradient\CryptoAnalysis\Prices\COINBASE_SPAUSD, 60.csv";
-            string outputFilePath = @"C:\dev\GitHub\Gradient\CryptoAnalysis\Prices\Combined.csv";
+            string inputFilePath = @"C:\dev\GitHub\Gradient\CryptoAnalysis\Data\COINBASE_BTCUSD, 60.csv";
+            string outputFilePath = @"C:\dev\GitHub\Gradient\CryptoAnalysis\Data\Combined.csv";
             var combiner = new CsvCombiner();
 
             // Act
-            combiner.CombineCsvFiles(inputFilePath, outputFilePath, x => x.Time, x => x.Time);
+            combiner.CombineCsvFiles(inputFilePath, outputFilePath, x => x.DateTime, x => x.DateTime);
 
             // Assert
             Assert.IsTrue(File.Exists(outputFilePath));

@@ -31,7 +31,7 @@ namespace Gradient.CryptoAnalysis
         {
             TradeStatus = EnumTradeStatus.Open;
             DateTimeOpen = dateTime;
-            PriceOpen = Prices.First(x => x.Time == dateTime).Open;
+            PriceOpen = Prices.First(x => x.DateTime == dateTime).Open;
 
             var tp = 1.1 * PriceOpen;
             var sl = 0.9 * PriceOpen;
@@ -45,11 +45,6 @@ namespace Gradient.CryptoAnalysis
             TradeStatus = EnumTradeStatus.Completed;
             DateTimeClose = dateTime;
             PriceClose = price;
-        }
-
-        private void TransitionPreconditionedToAwaitingConfirmation(DateTime dateTime)
-        {
-            TradeStatus = EnumTradeStatus.AwaitingConfirmation;
         }
 
         public Trade(List<Price> prices, Condition confirmationCondition,

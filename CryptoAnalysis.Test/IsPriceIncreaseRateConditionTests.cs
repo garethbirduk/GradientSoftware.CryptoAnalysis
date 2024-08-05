@@ -22,10 +22,10 @@
             var increase10pc = new Condition();
             increase10pc.AndConditions.Add(new IsPriceIncreaseRateCondition(10, 5));
 
-            Assert.ThrowsException<ArgumentException>(() => increase10pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => increase10pc.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => increase10pc.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => increase10pc.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
+            Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
+            Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
+            Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
+            Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 04, 00, 00)));
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 05, 00, 00)));
             Assert.AreEqual(true, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 06, 00, 00)));
@@ -36,8 +36,8 @@
             var increase4pc = new Condition();
             increase4pc.AndConditions.Add(new IsPriceIncreaseRateCondition(4.5, 3));
 
-            Assert.ThrowsException<ArgumentException>(() => increase4pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => increase4pc.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
+            Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
+            Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
             Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
             Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
             Assert.AreEqual(true, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 04, 00, 00)));
@@ -67,10 +67,10 @@
             var increase10pc = new Condition();
             increase10pc.AndConditions.Add(new IsPriceIncreaseRateCondition(10, 5, true));
 
-            Assert.ThrowsException<ArgumentException>(() => increase10pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => increase10pc.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => increase10pc.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => increase10pc.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
+            Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
+            Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
+            Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
+            Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 04, 00, 00)));
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 05, 00, 00)));
             Assert.AreEqual(true, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 06, 00, 00)));
@@ -81,8 +81,8 @@
             var increase4pc = new Condition();
             increase4pc.AndConditions.Add(new IsPriceIncreaseRateCondition(4.5, 3, true));
 
-            Assert.ThrowsException<ArgumentException>(() => increase4pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => increase4pc.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
+            Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
+            Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
             Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
             Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
             Assert.AreEqual(true, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 04, 00, 00)));
@@ -90,6 +90,7 @@
             Assert.AreEqual(true, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 06, 00, 00)));
             Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 07, 00, 00)));
             Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 08, 00, 00)));
+
             Assert.AreEqual(true, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 09, 00, 00)));
         }
     }

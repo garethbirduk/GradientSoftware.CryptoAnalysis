@@ -18,7 +18,7 @@
 
                 var cryptoData = new Price
                 {
-                    Time = startDateTime.AddMinutes(i * interval),
+                    DateTime = startDateTime.AddMinutes(i * interval),
                     Open = open,
                     Close = close,
                     High = high,
