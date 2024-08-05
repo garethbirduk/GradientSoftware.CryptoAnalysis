@@ -1,42 +1,5 @@
-﻿using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace Gradient.CryptoAnalysis
+﻿namespace Gradient.CryptoAnalysis
 {
-    public static class ResultExtensions
-    {
-        public static void SaveToJson(this IEnumerable<TradeResult> results, string filePath)
-        {
-            var folder = Path.GetDirectoryName(filePath);
-            if (!Path.Exists(folder))
-            {
-                Directory.CreateDirectory(folder);
-            }
-
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                Converters =
-            {
-                new JsonStringEnumConverter()
-            }
-            };
-
-            string jsonString = JsonSerializer.Serialize(results, options);
-            File.WriteAllText(filePath, jsonString);
-        }
-    }
-
-    public class Analysis
-    {
-        internal void Analyse()
-        {
-            var xxxxx = Results.Select(x => x.Value).OrderBy(x => x.Select(y => y.Profit)).ToList();
-        }
-
-        public Dictionary<string, List<TradeResult>> Results { get; } = new();
-    }
-
     public class Backtest
     {
         public PositionRules PositionRules { get; set; } = new();
