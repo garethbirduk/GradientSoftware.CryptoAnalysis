@@ -21,9 +21,9 @@ namespace Gradient.CryptoAnalysis.Tests
 
             Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 00, 00, 00)));
             Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 01, 00, 00)));
-            Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 02, 00, 00)));
+            Assert.IsTrue(condition.IsMet(data, new DateTime(2024, 05, 05, 02, 00, 00)));
             Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 03, 00, 00)));
-            Assert.IsTrue(condition.IsMet(data, new DateTime(2024, 05, 05, 04, 00, 00)));
+            Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 04, 00, 00)));
         }
     }
 }

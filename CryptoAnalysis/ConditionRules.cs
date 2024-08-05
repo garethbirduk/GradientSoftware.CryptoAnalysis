@@ -2,7 +2,7 @@
 
 namespace Gradient.CryptoAnalysis
 {
-    public class PositionRules
+    public class ConditionRules
     {
         public Condition ConfirmationConditions { get; set; } = new Condition();
         public Condition ExpireConditions { get; set; } = new Condition();

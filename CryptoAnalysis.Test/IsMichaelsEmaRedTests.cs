@@ -1,6 +1,4 @@
-﻿using Gradient.CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions;
-
-namespace Gradient.CryptoAnalysis.Tests
+﻿namespace Gradient.CryptoAnalysis.Tests
 {
     [TestClass]
     public class IsMichaelsEmaRedTests
@@ -18,10 +16,10 @@ namespace Gradient.CryptoAnalysis.Tests
             var condition = new Condition();
             condition.AndConditions.Add(new IsMichaelsEmaRedCondition());
 
-            Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 00, 00, 00)));
-            Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 01, 00, 00)));
-            Assert.IsTrue(condition.IsMet(data, new DateTime(2024, 05, 05, 02, 00, 00)));
-            Assert.IsTrue(condition.IsMet(data, new DateTime(2024, 05, 05, 03, 00, 00)));
+            Assert.IsTrue(condition.IsMet(data, new DateTime(2024, 05, 05, 00, 00, 00)));
+            Assert.IsTrue(condition.IsMet(data, new DateTime(2024, 05, 05, 01, 00, 00)));
+            Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 02, 00, 00)));
+            Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 03, 00, 00)));
         }
     }
 }

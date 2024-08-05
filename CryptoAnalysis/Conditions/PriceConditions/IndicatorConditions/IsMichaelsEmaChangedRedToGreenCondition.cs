@@ -1,6 +1,4 @@
-﻿using Gradient.CryptoAnalysis;
-
-namespace Gradient.CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions
+﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions
 {
     public class IsMichaelsEmaChangedRedToGreenCondition : IndicatorCondition
     {
@@ -13,8 +11,8 @@ namespace Gradient.CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions
 
         public override bool IsMet()
         {
-            IsMichaelsEmaGreenCondition.SetPrices(Prices);
-            IsMichaelsEmaRedCondition.SetPrices(Prices);
+            IsMichaelsEmaGreenCondition.SetPrices(Prices, Cursor.Last);
+            IsMichaelsEmaRedCondition.SetPrices(Prices, Cursor.Last);
 
             var currentIndex = CurrentIndex;
             if (currentIndex == 0)

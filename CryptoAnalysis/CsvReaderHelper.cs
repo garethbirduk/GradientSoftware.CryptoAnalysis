@@ -38,8 +38,14 @@ namespace Gradient.CryptoAnalysis
             where TClass : class
             where TClassMap : ClassMap
         {
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HeaderValidated = null, // Ignore missing headers
+                MissingFieldFound = null, // Ignore missing fields
+            };
+
             using (var reader = new StreamReader(filePath))
-            using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+            using (var csv = new CsvReader(reader, config))
             {
                 csv.Context.RegisterClassMap<TClassMap>();
                 var records = csv.GetRecords<TClass>();
@@ -56,6 +62,8 @@ namespace Gradient.CryptoAnalysis
             where TClass : class
             where TClassMap : ClassMap
         {
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+
             using (var writer = new StreamWriter(filePath))
             using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
             {
@@ -105,8 +113,60 @@ namespace Gradient.CryptoAnalysis
             Map(m => m.High).Name("high").NameIndex(0).Validate(args => !string.IsNullOrEmpty(args.Field));
             Map(m => m.Low).Name("low").NameIndex(0).Validate(args => !string.IsNullOrEmpty(args.Field));
             Map(m => m.Open).Name("open").NameIndex(0).Validate(args => !string.IsNullOrEmpty(args.Field));
-            Map(m => m.DateTime).Name("time").NameIndex(0).Validate(args => !string.IsNullOrEmpty(args.Field));
-            Map(m => m.Indicators).TypeConverter<IndicatorsConverter>().Optional();
+            Map(m => m.DateTime).Name("time").TypeConverter<UniversalTimeConverter>();
+            Map(m => m.Indicators).TypeConverter<IndicatorsConverter>();
+        }
+    }
+
+    public class Test1
+    {
+        public int id { get; set; }
+
+        public Thing? thing { get; set; } = null;
+    }
+
+    public class Thing
+    {
+        public int a { get; set; }
+        public int b { get; set; }
+    }
+
+    public class TradeMap : ClassMap<Trade>
+    {
+        public TradeMap()
+        {
+            Map(m => m.DateTimeOpen).Name("time").TypeConverter<UniversalTimeConverter>();
+        }
+    }
+
+    public class TradeResultMap : ClassMap<TradeResult>
+    {
+        public TradeResultMap()
+        {
+            Map(m => m.DateTimeOpen).Name("time").TypeConverter<UniversalTimeConverter>();
+        }
+    }
+
+    public class UniversalTimeConverter : ITypeConverter
+    {
+        public object ConvertFromString(string text, IReaderRow row, MemberMapData memberMapData)
+        {
+            if (DateTime.TryParse(text, null, DateTimeStyles.RoundtripKind, out DateTime dateTime))
+            {
+                return dateTime;
+            }
+            throw new TypeConverterException(this, memberMapData, text, row.Context, "Invalid date format.");
+        }
+
+        public string ConvertToString(object value, IWriterRow row, MemberMapData memberMapData)
+        {
+            if (value is DateTime dateTime)
+            {
+                // Ensure the dateTime is in UTC
+                var s = dateTime.ToString("o", CultureInfo.InvariantCulture);
+                return s;
+            }
+            throw new TypeConverterException(this, memberMapData, value, row.Context, "Invalid date format.");
         }
     }
 }

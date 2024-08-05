@@ -33,7 +33,7 @@
                 throw new ArgumentOutOfRangeException(nameof(periods), "Periods must be greater than zero.");
 
             if (currentIndex - periods + 1 < 0)
-                throw new ArgumentException("Not enough periods in the prices to take.");
+                return new List<Price>();
 
             int start = currentIndex - periods + 1;
             return prices.Skip(start).Take(periods);

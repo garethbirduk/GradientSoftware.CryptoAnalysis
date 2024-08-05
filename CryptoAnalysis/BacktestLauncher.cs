@@ -13,7 +13,7 @@
                 {
                     for (int r1 = 3; r1 < 6; r1++)
                     {
-                        var positionRules = new PositionRules();
+                        var positionRules = new ConditionRules();
 
                         positionRules.PreConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(g1));
                         positionRules.ConfirmationConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(g2));

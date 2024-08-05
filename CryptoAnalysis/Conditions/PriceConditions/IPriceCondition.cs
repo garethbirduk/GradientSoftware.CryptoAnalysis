@@ -1,5 +1,12 @@
 ﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
 {
+    public enum Cursor
+    {
+        None,
+        First,
+        Last,
+    }
+
     public interface IPriceCondition
     {
         public Price Price { get; }
@@ -9,7 +16,7 @@
 
         public void SetPrice(int index);
 
-        public void SetPrices(List<Price> prices);
+        public void SetPrices(List<Price> prices, Cursor newCursor);
 
         public void SetPriceToFirst();
 

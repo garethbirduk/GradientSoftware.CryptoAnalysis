@@ -49,7 +49,7 @@ namespace Gradient.CryptoAnalysis
 
         public Condition ConfirmationCondition { get; }
         public DateTime DateTimeClose { get; private set; }
-        public DateTime DateTimeOpen { get; private set; }
+        public DateTime DateTimeOpen { get; set; }
         public Condition ExpireCondition { get; }
         public Guid Id { get; } = Guid.NewGuid();
         public double PriceClose { get; private set; }

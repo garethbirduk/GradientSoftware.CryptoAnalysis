@@ -35,8 +35,8 @@
             var c3InARow = new Condition();
             c3InARow.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(3));
 
-            Assert.ThrowsException<ArgumentException>(() => c3InARow.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => c3InARow.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
+            Assert.AreEqual(false, c3InARow.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
+            Assert.AreEqual(false, c3InARow.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
             Assert.AreEqual(false, c3InARow.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
             Assert.AreEqual(false, c3InARow.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
             Assert.AreEqual(false, c3InARow.IsMet(data, new DateTime(2024, 01, 01, 04, 00, 00)));
@@ -50,9 +50,9 @@
             var c4InARow = new Condition();
             c4InARow.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(4));
 
-            Assert.ThrowsException<ArgumentException>(() => c4InARow.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => c4InARow.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
-            Assert.ThrowsException<ArgumentException>(() => c4InARow.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
+            Assert.AreEqual(false, c4InARow.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
+            Assert.AreEqual(false, c4InARow.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
+            Assert.AreEqual(false, c4InARow.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
             Assert.AreEqual(false, c4InARow.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
             Assert.AreEqual(false, c4InARow.IsMet(data, new DateTime(2024, 01, 01, 04, 00, 00)));
             Assert.AreEqual(false, c4InARow.IsMet(data, new DateTime(2024, 01, 01, 05, 00, 00)));

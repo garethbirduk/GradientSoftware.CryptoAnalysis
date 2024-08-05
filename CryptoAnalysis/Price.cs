@@ -13,7 +13,6 @@ namespace Gradient.CryptoAnalysis
         [Name("high")]
         public double High { get; set; }
 
-        [Ignore]
         public Gradient.CryptoAnalysis.OtherData.Indicators Indicators { get; set; } = new();
 
         [Name("low")]

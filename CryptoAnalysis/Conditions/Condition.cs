@@ -21,7 +21,7 @@ namespace Gradient.CryptoAnalysis.Conditions
 
                 if (condition.GetType().GetInterfaces().Contains(typeof(IPriceCondition)))
                 {
-                    ((IPriceCondition)condition).SetPrices(prices);
+                    ((IPriceCondition)condition).SetPrices(prices, Cursor.None);
                     ((IPriceCondition)condition).SetPrice(dateTime);
                 }
             }

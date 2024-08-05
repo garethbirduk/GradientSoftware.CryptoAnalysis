@@ -125,10 +125,10 @@
 
             // Act
             var result = data.TakePreviousPrices(1, 1).ToList();
+            CollectionAssert.AreEqual(new List<Price>(), result);
         }
 
         [TestMethod]
-        [ExpectedException(typeof(ArgumentException))]
         public void TakePreviousPeriods_ThrowsException_WhenNotEnoughPeriods()
         {
             // Arrange
@@ -141,6 +141,7 @@
 
             // Act
             var result = data.TakePreviousPrices(4, 2).ToList();
+            CollectionAssert.AreEqual(new List<Price>(), result);
         }
 
         [TestMethod]

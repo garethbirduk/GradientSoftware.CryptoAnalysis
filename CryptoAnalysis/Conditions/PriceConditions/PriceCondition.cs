@@ -36,10 +36,27 @@ namespace Gradient.CryptoAnalysis
             Price = Prices[index];
         }
 
-        public virtual void SetPrices(List<Price> data)
+        public virtual void SetPrices(List<Price> data, Cursor newCursor)
         {
             Prices = data;
-            SetPriceToLast();
+            switch (newCursor)
+            {
+                case Cursor.First:
+                    {
+                        SetPriceToFirst();
+                        break;
+                    }
+                case Cursor.Last:
+                    {
+                        SetPriceToLast();
+                        break;
+                    }
+                case Cursor.None:
+                default:
+                    {
+                        break;
+                    }
+            }
         }
 
         public void SetPriceToFirst()

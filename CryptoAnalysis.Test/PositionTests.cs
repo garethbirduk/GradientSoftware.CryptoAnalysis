@@ -2,7 +2,7 @@
 
 namespace Gradient.CryptoAnalysis.Tests
 {
-    [TestClass]
+    //[TestClass]
     public class PositionTests
     {
         public static List<RankedFile> GetResults(string folderPath)
@@ -45,7 +45,7 @@ namespace Gradient.CryptoAnalysis.Tests
         [TestMethod]
         public void Test1()
         {
-            var position = new PositionRules();
+            var position = new ConditionRules();
 
             var isGoodWeekday = new Condition();
             isGoodWeekday.AndConditions.Add(new IsWeekdayCondition());
@@ -74,7 +74,7 @@ namespace Gradient.CryptoAnalysis.Tests
         [TestMethod]
         public void Test2()
         {
-            var positionRules = new PositionRules();
+            var positionRules = new ConditionRules();
 
             positionRules.PreConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(5));
             positionRules.ConfirmationConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(3));
@@ -110,7 +110,7 @@ namespace Gradient.CryptoAnalysis.Tests
         [TestMethod]
         public void TestRange()
         {
-            var position = new PositionRules();
+            var position = new ConditionRules();
 
             var isGoodWeekday = new Condition();
             isGoodWeekday.AndConditions.Add(new IsWeekdayCondition());

@@ -1,6 +1,4 @@
-﻿using Gradient.CryptoAnalysis;
-
-namespace Gradient.CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions
+﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions
 {
     public class IsMichaelsEmaGreenCondition : IndicatorCondition
     {
@@ -13,7 +11,9 @@ namespace Gradient.CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions
             if (Price.Indicators.MichaelsEma == null)
                 return false;
 
-            return Price.Indicators.MichaelsEma.EMABig > Price.Indicators.MichaelsEma.EMASmall;
+            var big = Price.Indicators.MichaelsEma.EMABig;
+            var small = Price.Indicators.MichaelsEma.EMASmall;
+            return small > big;
         }
     }
 }
