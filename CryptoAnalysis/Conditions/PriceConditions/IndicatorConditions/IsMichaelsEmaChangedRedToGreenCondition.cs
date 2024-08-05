@@ -2,9 +2,9 @@
 
 namespace CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions
 {
-    public class IsMichaelsEmaChangedGreenToRedCondition : IndicatorCondition
+    public class IsMichaelsEmaChangedRedToGreenCondition : IndicatorCondition
     {
-        public IsMichaelsEmaChangedGreenToRedCondition()
+        public IsMichaelsEmaChangedRedToGreenCondition()
         {
         }
 
@@ -24,8 +24,8 @@ namespace CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions
 
             var previousIndex = currentIndex - 1;
 
-            IsMichaelsEmaGreenCondition.SetPrice(previousIndex);
-            IsMichaelsEmaRedCondition.SetPrice(currentIndex);
+            IsMichaelsEmaRedCondition.SetPrice(previousIndex);
+            IsMichaelsEmaGreenCondition.SetPrice(currentIndex);
 
             return IsMichaelsEmaGreenCondition.IsMet() && IsMichaelsEmaRedCondition.IsMet();
         }

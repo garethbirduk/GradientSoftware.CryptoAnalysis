@@ -3,10 +3,10 @@
 namespace Gradient.CryptoAnalysis.Tests
 {
     [TestClass]
-    public class IsMichaelsEmaGreenTests
+    public class IsMichaelsEmaChangedGreenToRedTests
     {
         [TestMethod]
-        public void TestIsMichaelsEmaGreen()
+        public void TestIsMichaelsEmaChangedGreenToRed()
         {
             var data = TestHelper.CreatePriceData(new DateTime(2024, 05, 05), 60, 4);
 
@@ -16,11 +16,11 @@ namespace Gradient.CryptoAnalysis.Tests
             data[3].Indicators.MichaelsEma = new MichaelsEma { EMABig = 100, EMASmall = 150 };
 
             var condition = new Condition();
-            condition.AndConditions.Add(new IsMichaelsEmaGreenCondition());
+            condition.AndConditions.Add(new IsMichaelsEmaChangedGreenToRedCondition());
 
-            Assert.IsTrue(condition.IsMet(data, new DateTime(2024, 05, 05, 00, 00, 00)));
-            Assert.IsTrue(condition.IsMet(data, new DateTime(2024, 05, 05, 01, 00, 00)));
-            Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 02, 00, 00)));
+            Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 00, 00, 00)));
+            Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 01, 00, 00)));
+            Assert.IsTrue(condition.IsMet(data, new DateTime(2024, 05, 05, 02, 00, 00)));
             Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 03, 00, 00)));
         }
     }
