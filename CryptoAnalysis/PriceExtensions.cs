@@ -12,11 +12,7 @@
 
         public static bool HasDecreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease)
         {
-            var change = PercentageChangeCloseToClose(data);
-
-            if (change < 0 && percentageIncrease < 0)
-                return change >= percentageIncrease;
-            return change <= percentageIncrease;
+            return HasIncreasedByPercentage(data, -percentageIncrease);
         }
 
         public static bool HasIncreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease)
@@ -41,27 +37,6 @@
 
             int start = currentIndex - periods + 1;
             return prices.Skip(start).Take(periods);
-        }
-    }
-
-    public class StopLossCalculation
-    {
-        public List<Price> Data { get; set; }
-
-        public double Calculate(int index)
-        {
-            return Data[index].Open / 2.0;
-        }
-    }
-
-    public class TakeProfitCalculation
-    {
-        public List<Price> Data { get; set; }
-
-        public double Calculate(int index)
-        {
-            var tp = Data[index].Open * 1.5;
-            return tp;
         }
     }
 }
