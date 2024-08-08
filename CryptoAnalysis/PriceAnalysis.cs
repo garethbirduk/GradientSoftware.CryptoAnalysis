@@ -42,17 +42,16 @@ namespace Gradient.CryptoAnalysis
             NextPrice = nextPrice;
         }
 
-        public Price? ConfirmedBreakOfStructurePrice
+        public Price? ConfirmedBreakOfStructure
         {
             get
             {
                 var price = Prices.FirstOrDefault(x => x.Close > InitialPrice.Close);
+
+                if (price != null && price.Close > InitialPrice.Close)
+                    return price;
                 if (price == null && NextPrice != null)
                     return NextPrice;
-                if (price == null)
-                    return null;
-                if (price.Close > InitialPrice.Close)
-                    return price;
                 return null;
             }
         }
@@ -91,6 +90,14 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
+        public List<Swing> InterimSwings
+        {
+            get
+            {
+                return Prices.ToList().ToSwings();
+            }
+        }
+
         public Price? NextPrice { get; }
         public Price? PreviousHigh { get; }
         public Price? PreviousLow { get; }
@@ -102,14 +109,6 @@ namespace Gradient.CryptoAnalysis
             get
             {
                 return Prices.First(x => x.Close == Prices.Min(x => x.Close));
-            }
-        }
-
-        public List<Swing> Swings
-        {
-            get
-            {
-                return Prices.Skip(1).ToList().ToSwings();
             }
         }
     }

@@ -1,7 +1,7 @@
 ﻿namespace Gradient.CryptoAnalysis.Tests
 {
     [TestClass]
-    public class PriceAnalysisTests
+    public class SwingsTests
     {
         private readonly List<Price> _prices = new List<Price>
         {
@@ -79,8 +79,26 @@
             // Assert
             Assert.AreEqual(6, actual.Count);
 
-            var subBos = actual[2];
-            Assert.AreEqual(3, subBos.Swings.Count);
+            Assert.AreEqual(14, actual[0].ConfirmedBreakOfStructure.Close);
+            Assert.IsNull(actual[0].ConfirmedMarketStructureBreak);
+
+            Assert.AreEqual(21, actual[1].ConfirmedBreakOfStructure.Close);
+            Assert.IsNull(actual[1].ConfirmedMarketStructureBreak);
+
+            Assert.AreEqual(30, actual[2].ConfirmedBreakOfStructure.Close);
+            Assert.IsNull(actual[2].ConfirmedMarketStructureBreak);
+
+            Assert.AreEqual(31, actual[3].ConfirmedBreakOfStructure.Close);
+            Assert.IsNull(actual[3].ConfirmedMarketStructureBreak);
+
+            Assert.AreEqual(35, actual[4].ConfirmedBreakOfStructure.Close);
+            Assert.IsNull(actual[4].ConfirmedMarketStructureBreak);
+
+            Assert.IsNull(actual[5].ConfirmedBreakOfStructure);
+            Assert.AreEqual(20, actual[5].ConfirmedMarketStructureBreak.Close);
+
+            var swing2 = actual[2];
+            Assert.AreEqual(1, swing2.InterimSwings.Count);
         }
     }
 }
