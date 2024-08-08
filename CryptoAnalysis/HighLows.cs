@@ -67,7 +67,7 @@ namespace Gradient.CryptoAnalysis
             Console.WriteLine("Sawtooth Pattern:");
             foreach (var row in sawtoothPattern)
             {
-                Console.WriteLine($"{row["time"]}, Open: {row["open"]}, High: {row["high"]}, Low: {row["low"]}, Close: {row["close"]}");
+                Console.WriteLine($"{row["time"]}, Open: {row["open"]}, InitialHigh: {row["high"]}, Low: {row["low"]}, Close: {row["close"]}");
             }
         }
     }
