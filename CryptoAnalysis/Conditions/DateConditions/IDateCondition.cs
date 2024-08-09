@@ -6,7 +6,5 @@
         public DateTime DateTimeCondition { get; }
 
         public void SetDateTimeCandidate(DateTime dateTime);
-
-        public void SetDateTimeCondition(DateTime dateTime);
     }
 }

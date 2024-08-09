@@ -1,24 +1,10 @@
-﻿using Gradient.CryptoAnalysis.Conditions.RangeConditions;
-
-namespace Gradient.CryptoAnalysis
+﻿namespace Gradient.CryptoAnalysis
 {
-    public interface IRangeCondition
-    {
-        public List<Price> Highs { get; }
-        public List<Price> Lows { get; }
-
-        public void SetPrice(DateTime dateTime);
-
-        public void SetPrice(int index);
-
-        public void SetPrices(List<Price> prices);
-    }
-
-    public abstract class RangeCondition : ICondition, IRangeCondition
+    public abstract class IsRangeCondition : ICondition, IRangeCondition
     {
         public readonly int MinDataSize = 2;
 
-        public RangeCondition(int successiveCandles)
+        public IsRangeCondition(int successiveCandles)
         {
             SuccessiveCandles = successiveCandles;
         }

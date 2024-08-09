@@ -1,4 +1,6 @@
-﻿namespace Gradient.CryptoAnalysis.Tests
+﻿using CryptoAnalysis.Csv;
+
+namespace Gradient.CryptoAnalysis.Tests
 {
     [TestClass]
     public class CsvReaderHelperTests

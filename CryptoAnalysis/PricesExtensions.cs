@@ -12,6 +12,48 @@ namespace Gradient.CryptoAnalysis
             return ((finalClose - initialOpen) / initialOpen) * 100;
         }
 
+        public static List<Price> CreateSubset(this List<Price> prices, Price from, Price to, bool inclusive = false)
+        {
+            var fromIndex = prices.IndexOf(from);
+            var toIndex = prices.IndexOf(to);
+            return CreateSubsetByIndex(prices, fromIndex, toIndex, inclusive);
+        }
+
+        public static List<Price> CreateSubsetByCount(this List<Price> prices, Price from, int count, bool inclusive = false)
+        {
+            var fromIndex = prices.IndexOf(from);
+            var toIndex = fromIndex + count;
+            return CreateSubsetByIndex(prices, fromIndex, toIndex, inclusive);
+        }
+
+        public static List<Price> CreateSubsetByCount(this List<Price> prices, int count, Price to, bool inclusive = false)
+        {
+            var toIndex = prices.IndexOf(to);
+            var fromIndex = toIndex - count;
+            return CreateSubsetByIndex(prices, fromIndex, toIndex, inclusive);
+        }
+
+        public static List<Price> CreateSubsetByIndex(this List<Price> prices, Price from, int toIndex, bool inclusive = false)
+        {
+            var fromIndex = prices.IndexOf(from);
+            return CreateSubsetByIndex(prices, fromIndex, toIndex, inclusive);
+        }
+
+        public static List<Price> CreateSubsetByIndex(this List<Price> prices, int fromIndex, Price to, bool inclusive = false)
+        {
+            var toIndex = prices.IndexOf(to);
+            return CreateSubsetByIndex(prices, fromIndex, toIndex, inclusive);
+        }
+
+        public static List<Price> CreateSubsetByIndex(this List<Price> prices, int fromIndex, int toIndex, bool inclusive = false)
+        {
+            if (!inclusive)
+                toIndex = toIndex - 1;
+            if (fromIndex < 0)
+                fromIndex = 0;
+            return prices.Skip(fromIndex).Take(toIndex - fromIndex + 1).ToList();
+        }
+
         public static List<List<Price>> GetSegments(this List<Price> prices)
         {
             if (prices == null || !prices.Any())
@@ -87,21 +129,6 @@ namespace Gradient.CryptoAnalysis
             }
 
             return list;
-        }
-
-        public static IEnumerable<Price> TakePreviousPrices(this List<Price> prices, int periods, int currentIndex)
-        {
-            if (currentIndex < 0 || currentIndex >= prices.Count)
-                throw new ArgumentOutOfRangeException(nameof(currentIndex), "Current index is out of range.");
-
-            if (periods <= 0)
-                throw new ArgumentOutOfRangeException(nameof(periods), "Periods must be greater than zero.");
-
-            if (currentIndex - periods + 1 < 0)
-                return new List<Price>();
-
-            int start = currentIndex - periods + 1;
-            return prices.Skip(start).Take(periods);
         }
 
         public static List<Swing> ToSwings(this List<Price> prices)

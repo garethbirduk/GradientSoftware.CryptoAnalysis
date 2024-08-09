@@ -12,10 +12,5 @@
         {
             DateTimeCandidate = dateTime;
         }
-
-        public void SetDateTimeCondition(DateTime dateTime)
-        {
-            DateTimeCondition = dateTime;
-        }
     }
 }

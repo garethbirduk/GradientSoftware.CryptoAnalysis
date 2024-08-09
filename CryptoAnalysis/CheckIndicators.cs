@@ -1,4 +1,6 @@
-﻿namespace Gradient.CryptoAnalysis
+﻿using CryptoAnalysis.Csv;
+
+namespace Gradient.CryptoAnalysis
 {
     public class CheckIndicators
     {

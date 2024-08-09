@@ -26,7 +26,7 @@
 
                 foreach (var period in periods)
                 {
-                    var data = Prices.TakePreviousPrices(period, CurrentIndex);
+                    var data = Prices.CreateSubsetByCount(period - 1, Price, true);
                     if (data.HasIncreasedByPercentage(PercentageIncrease))
                         return true;
                 }

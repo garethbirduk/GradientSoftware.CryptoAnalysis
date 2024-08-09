@@ -14,9 +14,12 @@
             if (SuccessiveCandles < 2)
                 return false;
 
-            var data = Prices.TakePreviousPrices(SuccessiveCandles, CurrentIndex);
+            var data = Prices.CreateSubsetByCount(SuccessiveCandles - 1, Price, true);
 
             if (data.Count() < MinDataSize)
+                return false;
+
+            if (data.Count() < SuccessiveCandles)
                 return false;
 
             return data.All(x => x.Close > x.Open);

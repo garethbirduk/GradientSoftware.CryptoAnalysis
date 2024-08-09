@@ -1,4 +1,6 @@
-﻿namespace Gradient.CryptoAnalysis
+﻿using Gradient.CryptoAnalysis;
+
+namespace CryptoAnalysis.Csv
 {
     public class CsvCombiner
     {

@@ -1,4 +1,5 @@
-﻿using Gradient.CryptoAnalysis;
+﻿using CryptoAnalysis.Csv;
+using Gradient.CryptoAnalysis;
 
 namespace CryptoAnalysis.Test.Scenarios
 {
