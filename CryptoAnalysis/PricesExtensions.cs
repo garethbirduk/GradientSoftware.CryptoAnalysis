@@ -74,6 +74,12 @@ namespace Gradient.CryptoAnalysis
                 }
                 var segment = prices.Skip(startIndex).Take(endIndex - startIndex).ToList();
                 list.Add(segment);
+
+                if (i == highs.Count - 1 && endIndex < prices.Count())
+                {
+                    // add any prices at the end that are not in a swing yet
+                    list.Add(prices.Skip(endIndex + 1).ToList());
+                }
             }
 
             return list;
