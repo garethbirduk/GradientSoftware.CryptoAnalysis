@@ -61,28 +61,28 @@ namespace Gradient.CryptoAnalysis
 
             var highs = prices.HighCloses();
 
-            var list = new List<List<Price>>();
+            var segments = new List<List<Price>>();
 
             for (int i = 0; i < highs.Count; i++)
             {
                 var high = highs[i];
                 var startIndex = prices.IndexOf(high);
-                var endIndex = startIndex;
-                if (i < highs.Count - 1)
+
+                var endIndex = prices.IndexOf(prices.Last()) + 1;
+                if (high != highs.Last())
                 {
                     endIndex = prices.IndexOf(highs[i + 1]);
                 }
-                var segment = prices.Skip(startIndex).Take(endIndex - startIndex).ToList();
-                list.Add(segment);
 
-                if (i == highs.Count - 1 && endIndex < prices.Count())
-                {
-                    // add any prices at the end that are not in a swing yet
-                    list.Add(prices.Skip(endIndex + 1).ToList());
-                }
+                var skip = startIndex;
+                var take = endIndex - startIndex;
+
+                var segment = prices.Skip(skip).Take(take).ToList();
+                if (segment.Count() > 1)
+                    segments.Add(segment);
             }
 
-            return list;
+            return segments;
         }
 
         public static bool HasDecreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease)
@@ -137,26 +137,32 @@ namespace Gradient.CryptoAnalysis
             return list;
         }
 
-        public static List<Swing> ToSwings(this List<Price> prices)
+        public static List<Upswing> ToSwings(this List<Price> prices)
         {
-            var list = new List<Swing>();
+            var swings = new List<Upswing>();
             if (prices.Count() == 0)
-                return list;
+                return swings;
 
-            var allSegments = prices.GetSegments();
-            var segments = allSegments.ConcatenateSegments();
-            foreach (var segmentPrices in segments)
+            var segments = prices.GetSegments();
+            foreach (var segment in segments.Where(x => x.Count() > 1))
             {
                 Price? next = null;
-                if (segmentPrices != segments.Last())
+                if (segment != segments.Last())
                 {
-                    var index = segments.IndexOf(segmentPrices);
+                    var index = segments.IndexOf(segment);
                     next = segments[index + 1].First();
                 }
-                list.Add(new Swing(segmentPrices, list.LastOrDefault(), next));
+
+                var swing = new Upswing(segment, swings.LastOrDefault(), next);
+                swings.Add(swing);
+
+                if (swing.Prices.Last() == prices.Last())
+                    continue;
+                else
+                    swing.BreakOfStructurePrice = prices[prices.IndexOf(swing.Prices.Last()) + 1];
             }
 
-            return list;
+            return swings;
         }
     }
 }

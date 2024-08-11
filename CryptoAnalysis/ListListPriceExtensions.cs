@@ -11,7 +11,7 @@
 
             foreach (var segment in segments.Skip(1))
             {
-                if (segment.Count < 2)
+                if (false && segment.Count < 2)
                 {
                     list.Last().AddRange(segment);
                 }

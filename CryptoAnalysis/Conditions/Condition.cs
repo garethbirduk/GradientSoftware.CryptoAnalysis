@@ -24,6 +24,12 @@ namespace Gradient.CryptoAnalysis.Conditions
                     ((IPriceCondition)condition).SetPrices(prices, Cursor.None);
                     ((IPriceCondition)condition).SetPrice(dateTime);
                 }
+
+                if (condition.GetType().GetInterfaces().Contains(typeof(IAdjustableCandles)))
+                {
+                    ((IAdjustableCandles)condition).SetSuccessiveCandles(200);
+                    //                    ((IAdjustableCandles)condition).SetSuccessiveCandles(prices.Count());
+                }
             }
 
             var m1 = AndConditions.All(x => x.IsMet());

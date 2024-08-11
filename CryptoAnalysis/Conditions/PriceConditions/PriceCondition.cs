@@ -22,7 +22,7 @@ namespace Gradient.CryptoAnalysis
         public bool IsExpired { get; set; }
         public Price Price { get; protected set; } = new();
         public List<Price> Prices { get; protected set; } = new();
-        public int SuccessiveCandles { get; }
+        public int SuccessiveCandles { get; protected set; }
 
         public abstract bool IsMet();
 

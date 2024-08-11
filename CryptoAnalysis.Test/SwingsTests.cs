@@ -101,7 +101,7 @@
             Assert.AreEqual(20, actual[5].ConfirmedMarketStructureBreak.Close);
 
             var swing2 = actual[2];
-            Assert.AreEqual(2, swing2.InterimSwings.Count);
+            Assert.AreEqual(2, swing2.InterimUpswings.Count);
         }
     }
 }

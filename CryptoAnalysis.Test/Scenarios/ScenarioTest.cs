@@ -6,9 +6,25 @@ namespace CryptoAnalysis.Test.Scenarios
     [TestClass]
     public class IndicatorTests
     {
-        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "Scenarios", "Indicators", "BITSTAMP_BTCUSD, 60.csv");
+        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "Scenarios", "Indicators", "COINBASE_BTCUSD (2024), 60.csv");
 
         public List<Price> _prices { get; private set; }
+
+        [TestMethod]
+        public void TestBreakOfStructure()
+        {
+            var positionRules = new ConditionRules();
+
+            positionRules.PreConditions.AndConditions.Add(new IsBreakOfStructureCondition(0));
+
+            var check = new CheckIndicators()
+            {
+                PositionRules = positionRules,
+                Prices = _prices.ToList(),
+                OutputFilepath = Path.Combine("c:\\", "temp", "output", $"IsBreakOfStructureCondition.csv")
+            };
+            check.Execute();
+        }
 
         [TestInitialize]
         public void TestInitialize()

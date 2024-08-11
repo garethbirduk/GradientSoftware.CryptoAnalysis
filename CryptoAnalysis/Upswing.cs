@@ -1,15 +1,18 @@
-﻿using PostSharp.Patterns.Contracts;
+﻿using Newtonsoft.Json;
+using PostSharp.Patterns.Contracts;
 
 namespace Gradient.CryptoAnalysis
 {
-    public class Swing
+    public class Upswing
     {
-        public Swing([Required] IEnumerable<Price> prices, Swing? previousSwing, Price? nextPrice)
+        public Upswing([Required] IEnumerable<Price> prices, Upswing? previousUpswing, Price? nextPrice)
         {
             Prices = prices.ToList();
-            PreviousSwing = previousSwing;
+            PreviousUpswing = previousUpswing;
             NextPrice = nextPrice;
         }
+
+        public Price? BreakOfStructurePrice { get; internal set; }
 
         public Price? ConfirmedBreakOfStructure
         {
@@ -29,9 +32,11 @@ namespace Gradient.CryptoAnalysis
         {
             get
             {
-                if (PreviousSwing == null)
+                if (PreviousUpswing == null)
                     return null;
-                return Prices.FirstOrDefault(x => x.Close < PreviousSwing.SwingLow.Close);
+                if (PreviousUpswing.SwingLow == null)
+                    return null;
+                return Prices.FirstOrDefault(x => x.Close < PreviousUpswing.SwingLow.Close);
             }
         }
 
@@ -59,7 +64,7 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public List<Swing> InterimSwings
+        public List<Upswing> InterimUpswings
         {
             get
             {
@@ -67,17 +72,19 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
+        public List<Price> NextInterswingPrices { get; set; } = new List<Price>();
         public Price? NextPrice { get; }
         public Price? PreviousHigh { get; }
+        public List<Price> PreviousInterswingPrices { get; set; } = new List<Price>();
         public Price? PreviousLow { get; }
-        public Swing? PreviousSwing { get; }
+        public Upswing? PreviousUpswing { get; }
         public List<Price> Prices { get; set; } = new();
 
-        public Price SwingLow
+        public Price? SwingLow
         {
             get
             {
-                return Prices.First(x => x.Close == Prices.Min(x => x.Close));
+                return Prices.FirstOrDefault(x => x.Close == Prices.Min(x => x.Close));
             }
         }
     }
