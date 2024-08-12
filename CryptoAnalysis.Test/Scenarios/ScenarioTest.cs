@@ -10,8 +10,14 @@ namespace CryptoAnalysis.Test.Scenarios
 
         public List<Price> _prices { get; private set; }
 
+        [TestInitialize]
+        public void TestInitialize()
+        {
+            _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(_cryptoDataFilePath).ToList();
+        }
+
         [TestMethod]
-        public void TestBreakOfStructure()
+        public void TestIsBreakOfStructureCondition()
         {
             var positionRules = new ConditionRules();
 
@@ -26,10 +32,20 @@ namespace CryptoAnalysis.Test.Scenarios
             check.Execute();
         }
 
-        [TestInitialize]
-        public void TestInitialize()
+        [TestMethod]
+        public void TestIsMarketStructureBreakCondition()
         {
-            _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(_cryptoDataFilePath).ToList();
+            var positionRules = new ConditionRules();
+
+            positionRules.PreConditions.AndConditions.Add(new IsMarketStructureBreakCondition(0));
+
+            var check = new CheckIndicators()
+            {
+                PositionRules = positionRules,
+                Prices = _prices.ToList(),
+                OutputFilepath = Path.Combine("c:\\", "temp", "output", $"IsMarketStructureBreakCondition.csv")
+            };
+            check.Execute();
         }
 
         [TestMethod]

@@ -12,9 +12,7 @@ namespace Gradient.CryptoAnalysis
             NextPrice = nextPrice;
         }
 
-        public Price? BreakOfStructurePrice { get; internal set; }
-
-        public Price? ConfirmedBreakOfStructure
+        public Price? BreakOfStructure
         {
             get
             {
@@ -25,18 +23,6 @@ namespace Gradient.CryptoAnalysis
                 if (price == null && NextPrice != null)
                     return NextPrice;
                 return null;
-            }
-        }
-
-        public Price? ConfirmedMarketStructureBreak
-        {
-            get
-            {
-                if (PreviousUpswing == null)
-                    return null;
-                if (PreviousUpswing.SwingLow == null)
-                    return null;
-                return Prices.FirstOrDefault(x => x.Close < PreviousUpswing.SwingLow.Close);
             }
         }
 
@@ -69,6 +55,18 @@ namespace Gradient.CryptoAnalysis
             get
             {
                 return Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToSwings();
+            }
+        }
+
+        public Price? MarketStructureBreak
+        {
+            get
+            {
+                if (PreviousUpswing == null)
+                    return null;
+                if (PreviousUpswing.SwingLow == null)
+                    return null;
+                return Prices.FirstOrDefault(x => x.Close < PreviousUpswing.SwingLow.Close);
             }
         }
 

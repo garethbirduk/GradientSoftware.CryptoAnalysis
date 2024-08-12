@@ -4,9 +4,10 @@ namespace Gradient.CryptoAnalysis
 {
     public abstract class PriceCondition : ICondition, IPriceCondition
     {
+        public const int MaxSuccessiveCandles = 100;
         public readonly int MinDataSize = 2;
 
-        public PriceCondition(int successiveCandles)
+        public PriceCondition(int successiveCandles = MaxSuccessiveCandles)
         {
             SuccessiveCandles = successiveCandles;
         }

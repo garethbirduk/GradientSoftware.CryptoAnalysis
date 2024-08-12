@@ -7,6 +7,7 @@ namespace Gradient.CryptoAnalysis
         public string OutputFilepath { get; set; }
         public ConditionRules PositionRules { get; set; } = new();
         public List<Price> Prices { get; set; } = new();
+        public List<Price> PricesWhereConditionIsMet { get; set; } = new();
 
         public DateTime StartDateTime { get; set; }
 
@@ -19,22 +20,18 @@ namespace Gradient.CryptoAnalysis
 
             while (index > -1 && index < Prices.Count())
             {
-                var d = Prices[index];
-                var dateTime = d.DateTime;
+                var p = Prices[index];
+                var dateTime = p.DateTime;
 
                 if (PositionRules.PreConditions.IsMet(Prices, dateTime))
                 {
-                    var trade = new Trade(Prices,
-                        PositionRules.ConfirmationConditions, PositionRules.TakeProfitConditions,
-                        PositionRules.StopLossConditions, PositionRules.ExpireConditions);
-                    trade.DateTimeOpen = dateTime;
-                    Trades.Add(trade);
+                    PricesWhereConditionIsMet.Add(p);
                 }
                 index++;
             }
 
             var helper = new CsvReaderHelper();
-            helper.WriteData<Trade, TradeMap>(OutputFilepath, Trades);
+            helper.WriteData<Price, PriceClassMap>(OutputFilepath, PricesWhereConditionIsMet);
 
             return Trades;
         }
