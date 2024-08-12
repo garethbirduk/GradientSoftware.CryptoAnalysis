@@ -68,7 +68,7 @@ namespace Gradient.CryptoAnalysis
         {
             get
             {
-                return Prices.ToList().ToSwings();
+                return Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToSwings();
             }
         }
 

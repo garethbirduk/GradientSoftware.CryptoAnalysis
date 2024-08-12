@@ -80,28 +80,38 @@
             var actual = TestData.SwingsPrices.ToSwings();
 
             // Assert
-            Assert.AreEqual(6, actual.Count);
+            Assert.AreEqual(5, actual.Count);
 
-            Assert.AreEqual(14, actual[0].ConfirmedBreakOfStructure.Close);
+            Assert.AreEqual(21, actual[0].ConfirmedBreakOfStructure.Close);
             Assert.IsNull(actual[0].ConfirmedMarketStructureBreak);
 
-            Assert.AreEqual(21, actual[1].ConfirmedBreakOfStructure.Close);
+            Assert.AreEqual(30, actual[1].ConfirmedBreakOfStructure.Close);
             Assert.IsNull(actual[1].ConfirmedMarketStructureBreak);
 
-            Assert.AreEqual(30, actual[2].ConfirmedBreakOfStructure.Close);
+            Assert.AreEqual(31, actual[2].ConfirmedBreakOfStructure.Close);
             Assert.IsNull(actual[2].ConfirmedMarketStructureBreak);
 
-            Assert.AreEqual(31, actual[3].ConfirmedBreakOfStructure.Close);
+            Assert.AreEqual(35, actual[3].ConfirmedBreakOfStructure.Close);
             Assert.IsNull(actual[3].ConfirmedMarketStructureBreak);
 
-            Assert.AreEqual(35, actual[4].ConfirmedBreakOfStructure.Close);
-            Assert.IsNull(actual[4].ConfirmedMarketStructureBreak);
+            Assert.AreEqual(50, actual[4].ConfirmedBreakOfStructure.Close);
+            Assert.AreEqual(20, actual[4].ConfirmedMarketStructureBreak.Close);
 
-            Assert.IsNull(actual[5].ConfirmedBreakOfStructure);
-            Assert.AreEqual(20, actual[5].ConfirmedMarketStructureBreak.Close);
+            var interim2 = actual[2].InterimUpswings;
 
-            var swing2 = actual[2];
-            Assert.AreEqual(2, swing2.InterimUpswings.Count);
+            Assert.AreEqual(4, interim2.Count);
+
+            Assert.AreEqual(26, interim2[0].ConfirmedBreakOfStructure.Close);
+            Assert.IsNull(interim2[0].ConfirmedMarketStructureBreak);
+
+            Assert.AreEqual(29, interim2[1].ConfirmedBreakOfStructure.Close);
+            Assert.IsNull(interim2[1].ConfirmedMarketStructureBreak);
+
+            Assert.AreEqual(30, interim2[2].ConfirmedBreakOfStructure.Close);
+            Assert.IsNull(interim2[2].ConfirmedMarketStructureBreak);
+
+            Assert.AreEqual(31, interim2[3].ConfirmedBreakOfStructure.Close);
+            Assert.AreEqual(16, interim2[3].ConfirmedMarketStructureBreak.Close);
         }
     }
 }

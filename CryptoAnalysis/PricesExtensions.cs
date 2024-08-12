@@ -147,19 +147,11 @@ namespace Gradient.CryptoAnalysis
             foreach (var segment in segments.Where(x => x.Count() > 1))
             {
                 Price? next = null;
-                if (segment != segments.Last())
-                {
-                    var index = segments.IndexOf(segment);
-                    next = segments[index + 1].First();
-                }
+                if (segment.Last() != prices.Last())
+                    next = prices[prices.IndexOf(segment.Last()) + 1];
 
                 var swing = new Upswing(segment, swings.LastOrDefault(), next);
                 swings.Add(swing);
-
-                if (swing.Prices.Last() == prices.Last())
-                    continue;
-                else
-                    swing.BreakOfStructurePrice = prices[prices.IndexOf(swing.Prices.Last()) + 1];
             }
 
             return swings;
