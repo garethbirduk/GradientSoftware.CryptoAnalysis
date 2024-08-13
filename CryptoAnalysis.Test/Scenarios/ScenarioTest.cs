@@ -6,7 +6,7 @@ namespace CryptoAnalysis.Test.Scenarios
     [TestClass]
     public class IndicatorTests
     {
-        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "Scenarios", "Indicators", "COINBASE_BTCUSD (2024), 60.csv");
+        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "Scenarios", "Indicators", "COINBASE_BTCUSD, 60.csv");
 
         public List<Price> _prices { get; private set; }
 
@@ -126,6 +126,35 @@ namespace CryptoAnalysis.Test.Scenarios
                 OutputFilepath = Path.Combine("c:\\", "temp", "output", $"IsSuccessiveRedCandlesConditionWithMichaelsEma{successive}.csv")
             };
             check.Execute();
+        }
+
+        [DataTestMethod]
+        [DataRow(5, 0)]
+        [DataRow(5, 1)]
+        [DataRow(5, 2)]
+        [DataRow(10, 0)]
+        [DataRow(10, 1)]
+        [DataRow(15, 2)]
+        public void TestIsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(int minSwings, int maxMsb)
+        {
+            var positionRules = new ConditionRules();
+
+            for (minSwings = 10; minSwings < 20; minSwings++)
+            {
+                for (maxMsb = 0; maxMsb < 3; maxMsb++)
+                {
+                    positionRules.PreConditions.AndConditions.Add(new IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(0, minSwings, maxMsb));
+
+                    var check = new CheckIndicators()
+                    {
+                        PositionRules = positionRules,
+                        Prices = _prices,
+                        //Prices = _prices.Where(x => x.DateTime > new DateTime(2024, 07, 12)).ToList(),
+                        OutputFilepath = Path.Combine("c:\\", "temp", "output", $"IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition_{minSwings}_{maxMsb}.csv")
+                    };
+                    check.Execute();
+                }
+            }
         }
     }
 }

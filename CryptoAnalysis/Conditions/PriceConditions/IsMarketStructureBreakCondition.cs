@@ -47,6 +47,8 @@
             var swings = data.ToSwings();
             if (swings.Count < MinimumUpswings)
                 return false;
+            swings = swings.TakeLast(MinimumUpswings).ToList();
+
             if (swings.Count(x => x.MarketStructureBreak != null) > MaxMarketStructureBreaks)
                 return false;
 
