@@ -4,13 +4,10 @@
     {
         protected override bool IsMet()
         {
-            if (SuccessiveCandles < 2)
-                return false;
-
             var data = Prices.CreateSubsetByCount(SuccessiveCandles - 1, Price, true);
 
             if (data.Count() < MinDataSize)
-                return false;
+                return true;
 
             if (data.Count() < SuccessiveCandles)
                 return false;
@@ -20,6 +17,7 @@
 
         public IsSuccessiveGreenCandlesCondition(int successiveCandles = DefaultSuccessiveCandles) : base(successiveCandles)
         {
+            MinDataSize = 1;
         }
     }
 }
