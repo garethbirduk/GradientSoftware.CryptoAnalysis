@@ -76,10 +76,10 @@ namespace CryptoAnalysis.Test.PriceExtensions
         public void TestFindBreaksOfStructures()
         {
             // Act
-            var actual = _prices.ToSwings();
+            var actual = _prices.ToUpswings();
 
             // Assert
-            CollectionAssert.AreEqual(new List<Upswing>(), new List<Price>().ToSwings());
+            CollectionAssert.AreEqual(new List<Upswing>(), new List<Price>().ToUpswings());
 
             Assert.AreEqual(5, actual.Count);
 

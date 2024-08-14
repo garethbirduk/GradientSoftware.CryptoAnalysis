@@ -6,7 +6,7 @@
         {
             var data = Prices.CreateSubsetByCount(SuccessiveCandles - 1, Price, true);
 
-            var swings = data.ToSwings();
+            var swings = data.ToUpswings();
             if (swings.Count < MinimumUpswings)
                 return false;
             swings = swings.TakeLast(MinimumUpswings).ToList();

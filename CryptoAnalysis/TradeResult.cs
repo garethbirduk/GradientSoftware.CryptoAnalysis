@@ -2,10 +2,6 @@
 {
     public class TradeResult
     {
-        public TradeResult()
-        {
-        }
-
         public TradeResult(Trade trade)
         {
             DateTimeClose = trade.DateTimeClose;

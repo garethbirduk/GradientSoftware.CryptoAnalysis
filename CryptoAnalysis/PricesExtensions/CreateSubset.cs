@@ -1,8 +1,6 @@
-﻿using Microsoft.IdentityModel.Tokens;
-
-namespace Gradient.CryptoAnalysis
+﻿namespace Gradient.CryptoAnalysis
 {
-    public static partial class Segments
+    public static partial class PricesExtensions_CreateSubset
     {
         public static List<Price> CreateSubset(this List<Price> prices, Price from, Price to, bool inclusive = false)
         {

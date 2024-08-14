@@ -1,8 +1,8 @@
 ﻿namespace Gradient.CryptoAnalysis
 {
-    public static partial class Segments
+    public static partial class PricesExtensions_Upswings
     {
-        public static List<Upswing> ToSwings(this List<Price> prices)
+        public static List<Upswing> ToUpswings(this List<Price> prices)
         {
             var swings = new List<Upswing>();
             if (prices.Count() == 0)

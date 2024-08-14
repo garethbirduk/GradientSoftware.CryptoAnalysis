@@ -1,5 +1,4 @@
 ﻿using CryptoAnalysis.Conditions;
-using Gradient.CryptoAnalysis.Conditions;
 
 namespace Gradient.CryptoAnalysis
 {

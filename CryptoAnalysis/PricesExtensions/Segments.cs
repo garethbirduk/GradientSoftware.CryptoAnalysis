@@ -1,6 +1,6 @@
 ﻿namespace Gradient.CryptoAnalysis
 {
-    public static partial class Segments
+    public static partial class PricesExtensions_Segments
     {
         public static List<List<Price>> ToSegments(this List<Price> prices)
         {

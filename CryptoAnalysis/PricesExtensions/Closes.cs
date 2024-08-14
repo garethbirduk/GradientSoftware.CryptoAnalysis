@@ -2,7 +2,7 @@
 
 namespace Gradient.CryptoAnalysis
 {
-    public static partial class Segments
+    public static partial class PricesExtensions_Closes
     {
         public static bool HasDecreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease)
         {

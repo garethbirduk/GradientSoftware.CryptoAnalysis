@@ -10,7 +10,7 @@
         protected override bool IsMet()
         {
             var data = Prices.CreateSubsetByCount(SuccessiveCandles - 1, Price, true);
-            var swings = data.ToSwings();
+            var swings = data.ToUpswings();
             var swing = swings.LastOrDefault();
             if (swing == null)
                 return false;
