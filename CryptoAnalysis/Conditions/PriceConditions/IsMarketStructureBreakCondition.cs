@@ -2,7 +2,7 @@
 {
     public class IsMarketStructureBreakCondition : PriceCondition, IAdjustableCandles
     {
-        public IsMarketStructureBreakCondition(int successiveCandles) : base(successiveCandles)
+        public IsMarketStructureBreakCondition(int successiveCandles = MaxSuccessiveCandles) : base(successiveCandles)
         {
         }
 

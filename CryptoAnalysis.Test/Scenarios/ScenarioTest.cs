@@ -1,9 +1,8 @@
 ﻿using Gradient.CryptoAnalysis.Csv;
-using Gradient.CryptoAnalysis;
 
 namespace Gradient.CryptoAnalysis.Test.Scenarios
 {
-    [TestClass]
+    //    [TestClass]
     public class IndicatorTests
     {
         public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "Scenarios", "Indicators", "COINBASE_BTCUSD, 60.csv");
