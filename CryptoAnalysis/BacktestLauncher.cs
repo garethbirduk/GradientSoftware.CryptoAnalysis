@@ -1,4 +1,4 @@
-﻿using CryptoAnalysis.Csv;
+﻿using Gradient.CryptoAnalysis.Csv;
 
 namespace Gradient.CryptoAnalysis
 {

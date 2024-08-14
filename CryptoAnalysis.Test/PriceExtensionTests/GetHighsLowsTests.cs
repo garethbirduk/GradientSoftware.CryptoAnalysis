@@ -1,7 +1,7 @@
-﻿using CryptoAnalysis.Csv;
+﻿using Gradient.CryptoAnalysis.Csv;
 using Gradient.CryptoAnalysis;
 
-namespace CryptoAnalysis.Test.PriceExtensionTests
+namespace Gradient.CryptoAnalysis.Test.PriceExtensionTests
 {
     [TestClass]
     public class GetHighsLowsTests

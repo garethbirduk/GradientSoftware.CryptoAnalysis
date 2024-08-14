@@ -1,6 +1,7 @@
-﻿using Gradient.CryptoAnalysis.Conditions.DateConditions;
+﻿using Gradient.CryptoAnalysis;
+using Gradient.CryptoAnalysis.Conditions.DateConditions;
 
-namespace Gradient.CryptoAnalysis.Tests
+namespace Gradient.CryptoAnalysis.Test.Conditions.DateConditions
 {
     [TestClass]
     public class IsDateOnConditionTests

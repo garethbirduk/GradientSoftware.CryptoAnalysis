@@ -1,6 +1,6 @@
 ﻿using Gradient.CryptoAnalysis;
 
-namespace CryptoAnalysis.Test.PriceExtensionTests
+namespace Gradient.CryptoAnalysis.Test.PriceExtensionTests
 {
     [TestClass]
     public class GetSubsetTests

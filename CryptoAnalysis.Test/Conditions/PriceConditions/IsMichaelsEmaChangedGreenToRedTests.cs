@@ -1,4 +1,7 @@
-﻿namespace Gradient.CryptoAnalysis.Tests
+﻿using Gradient.CryptoAnalysis.Conditions.PriceConditions;
+using Gradient.CryptoAnalysis.Tests;
+
+namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
 {
     [TestClass]
     public class IsMichaelsEmaChangedGreenToRedTests

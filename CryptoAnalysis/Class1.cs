@@ -1,4 +1,4 @@
-﻿namespace CryptoAnalysis
+﻿namespace Gradient.CryptoAnalysis
 {
     public static class CollectionExtensions
     {

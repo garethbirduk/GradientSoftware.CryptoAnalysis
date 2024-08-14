@@ -1,8 +1,11 @@
-﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions.IndicatorConditions
+﻿using Gradient.CryptoAnalysis;
+using Gradient.CryptoAnalysis.Conditions.PriceConditions;
+
+namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
 {
-    public class IsMichaelsEmaChangedGreenToRedCondition : IndicatorCondition
+    public class IsMichaelsEmaChangedRedToGreenCondition : PriceCondition
     {
-        public IsMichaelsEmaChangedGreenToRedCondition()
+        public IsMichaelsEmaChangedRedToGreenCondition()
         {
         }
 
@@ -22,8 +25,8 @@
 
             var previousIndex = currentIndex - 1;
 
-            IsMichaelsEmaGreenCondition.SetPrice(previousIndex);
-            IsMichaelsEmaRedCondition.SetPrice(currentIndex);
+            IsMichaelsEmaRedCondition.SetPrice(previousIndex);
+            IsMichaelsEmaGreenCondition.SetPrice(currentIndex);
 
             return IsMichaelsEmaGreenCondition.IsMet() && IsMichaelsEmaRedCondition.IsMet();
         }

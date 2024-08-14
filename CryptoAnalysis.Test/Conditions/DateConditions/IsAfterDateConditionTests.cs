@@ -1,4 +1,6 @@
-﻿namespace Gradient.CryptoAnalysis.Tests
+﻿using Gradient.CryptoAnalysis;
+
+namespace Gradient.CryptoAnalysis.Test.Conditions.DateConditions
 {
     [TestClass]
     public class IsAfterDateConditionTests

@@ -7,7 +7,7 @@
 
     public class IsBreakOfStructureCondition : PriceCondition, IAdjustableCandles
     {
-        public IsBreakOfStructureCondition(int successiveCandles) : base(successiveCandles)
+        public IsBreakOfStructureCondition(int successiveCandles = MaxSuccessiveCandles) : base(successiveCandles)
         {
         }
 

@@ -4,7 +4,7 @@ using CsvHelper.TypeConversion;
 using Gradient.CryptoAnalysis;
 using System.Globalization;
 
-namespace CryptoAnalysis.Csv
+namespace Gradient.CryptoAnalysis.Csv
 {
     public class BacktestResultMap : ClassMap<BacktestResult>
     {

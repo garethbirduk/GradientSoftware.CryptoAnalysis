@@ -1,7 +1,7 @@
-﻿using CryptoAnalysis.Csv;
+﻿using Gradient.CryptoAnalysis.Csv;
 using Gradient.CryptoAnalysis;
 
-namespace CryptoAnalysis.Test.Scenarios
+namespace Gradient.CryptoAnalysis.Test.Scenarios
 {
     [TestClass]
     public class IndicatorTests
