@@ -11,10 +11,5 @@
         {
             DateTimeCondition = dateTimeCondition;
         }
-
-        public void Expire()
-        {
-            IsExpired = true;
-        }
     }
 }

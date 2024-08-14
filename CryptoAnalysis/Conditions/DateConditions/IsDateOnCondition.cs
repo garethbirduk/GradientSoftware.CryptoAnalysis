@@ -13,10 +13,5 @@
         }
 
         public List<DateTime> DateTimeConditions { get; set; }
-
-        public void Expire()
-        {
-            IsExpired = true;
-        }
     }
 }

@@ -65,4 +65,19 @@
             Price = Prices.Last();
         }
     }
+
+    public abstract class TargetPriceCondition : PriceCondition
+    {
+        public TargetPriceCondition(double targetPrice, int successiveCandles = DefaultSuccessiveCandles) : base(successiveCandles)
+        {
+            TargetPrice = targetPrice;
+        }
+
+        public double TargetPrice { get; protected set; }
+
+        public void SetTargetPrice(double targetPrice)
+        {
+            TargetPrice = targetPrice;
+        }
+    }
 }

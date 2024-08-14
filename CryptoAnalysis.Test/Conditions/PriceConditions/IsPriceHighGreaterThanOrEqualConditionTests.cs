@@ -21,19 +21,32 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             data[8].High = 101.0;
             data[9].High = 105.0;
 
-            var condition = new ConditionSet();
-            condition.AndConditions.Add(new IsPriceHighGreaterThanOrEqualCondition(105.0));
+            var conditionSet = new ConditionSet();
+            conditionSet.AndConditions.Add(new IsPriceHighGreaterThanOrEqualCondition(105.0));
 
-            Assert.AreEqual(false, condition.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
-            Assert.AreEqual(false, condition.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
-            Assert.AreEqual(false, condition.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
-            Assert.AreEqual(false, condition.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
-            Assert.AreEqual(true, condition.IsMet(data, new DateTime(2024, 01, 01, 04, 00, 00)));
-            Assert.AreEqual(true, condition.IsMet(data, new DateTime(2024, 01, 01, 05, 00, 00)));
-            Assert.AreEqual(true, condition.IsMet(data, new DateTime(2024, 01, 01, 06, 00, 00)));
-            Assert.AreEqual(false, condition.IsMet(data, new DateTime(2024, 01, 01, 07, 00, 00)));
-            Assert.AreEqual(false, condition.IsMet(data, new DateTime(2024, 01, 01, 08, 00, 00)));
-            Assert.AreEqual(true, condition.IsMet(data, new DateTime(2024, 01, 01, 09, 00, 00)));
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 04, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 05, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 06, 00, 00)));
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 07, 00, 00)));
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 08, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 09, 00, 00)));
+
+            ((TargetPriceCondition)conditionSet.AndConditions.First()).SetTargetPrice(102.0);
+
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 01, 00, 00)));
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 02, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 03, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 04, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 05, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 06, 00, 00)));
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 07, 00, 00)));
+            Assert.AreEqual(false, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 08, 00, 00)));
+            Assert.AreEqual(true, conditionSet.IsMet(data, new DateTime(2024, 01, 01, 09, 00, 00)));
         }
     }
 }
