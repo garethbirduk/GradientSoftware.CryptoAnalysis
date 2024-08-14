@@ -1,6 +1,4 @@
-﻿using Gradient.CryptoAnalysis.Conditions.PriceConditions;
-
-namespace Gradient.CryptoAnalysis
+﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
 {
     public abstract class PriceCondition : ICondition, IPriceCondition
     {

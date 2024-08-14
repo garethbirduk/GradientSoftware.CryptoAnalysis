@@ -1,5 +1,4 @@
-﻿using Gradient.CryptoAnalysis;
-using Gradient.CryptoAnalysis.Tests;
+﻿using Gradient.CryptoAnalysis.Tests;
 
 namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
 {

@@ -1,7 +1,4 @@
-﻿using Gradient.CryptoAnalysis;
-using Gradient.CryptoAnalysis.Conditions.PriceConditions;
-
-namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
+﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
 {
     public class IsMichaelsEmaChangedRedToGreenCondition : PriceCondition
     {

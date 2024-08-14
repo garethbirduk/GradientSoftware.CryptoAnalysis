@@ -1,4 +1,4 @@
-﻿namespace Gradient.CryptoAnalysis
+﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
 {
     public class IsMarketStructureBreakCondition : PriceCondition, IAdjustableCandles
     {

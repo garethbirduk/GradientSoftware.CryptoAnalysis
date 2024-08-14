@@ -1,5 +1,6 @@
-﻿using System.Text.Json;
-using Gradient.CryptoAnalysis.Csv;
+﻿using Gradient.CryptoAnalysis.Csv;
+
+using System.Text.Json;
 
 namespace Gradient.CryptoAnalysis.Tests
 {

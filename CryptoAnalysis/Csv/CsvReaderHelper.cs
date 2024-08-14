@@ -1,7 +1,6 @@
 ﻿using CsvHelper;
 using CsvHelper.Configuration;
 using CsvHelper.TypeConversion;
-using Gradient.CryptoAnalysis;
 using System.Globalization;
 
 namespace Gradient.CryptoAnalysis.Csv

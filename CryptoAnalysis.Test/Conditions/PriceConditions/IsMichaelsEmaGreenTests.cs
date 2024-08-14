@@ -5,8 +5,18 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
     [TestClass]
     public class IsMichaelsEmaGreenTests
     {
+        public List<Price> _prices = TestHelper.CreatePriceData(new DateTime(2024, 05, 05), 60, 4);
+
         [TestMethod]
-        public void TestIsMichaelsGreenCondition()
+        public void TestIsMichaelsGreenCondition_Null()
+        {
+            var condition = new Condition();
+            condition.AndConditions.Add(new IsMichaelsEmaGreenCondition());
+            Assert.IsFalse(condition.IsMet(_prices, new DateTime(2024, 05, 05, 00, 00, 00)));
+        }
+
+        [TestMethod]
+        public void TestIsMichaelsGreenCondition_Ok()
         {
             var data = TestHelper.CreatePriceData(new DateTime(2024, 05, 05), 60, 4);
 
