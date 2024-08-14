@@ -79,6 +79,8 @@ namespace CryptoAnalysis.Test.PriceExtensions
             var actual = _prices.ToSwings();
 
             // Assert
+            CollectionAssert.AreEqual(new List<Upswing>(), new List<Price>().ToSwings());
+
             Assert.AreEqual(5, actual.Count);
 
             Assert.AreEqual(21, actual[0].BreakOfStructure.Close);

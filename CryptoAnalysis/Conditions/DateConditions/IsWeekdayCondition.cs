@@ -1,4 +1,4 @@
-﻿namespace Gradient.CryptoAnalysis
+﻿namespace Gradient.CryptoAnalysis.Conditions.DateConditions
 {
     public class IsWeekdayCondition : DateCondition
     {

@@ -1,7 +1,9 @@
-﻿namespace Gradient.CryptoAnalysis.Tests
+﻿using Gradient.CryptoAnalysis;
+
+namespace CryptoAnalysis.Test.PriceExtensions
 {
     [TestClass]
-    public class PriceExtensionsTests
+    public class ClosesTests
     {
         [DataTestMethod]
         [DataRow(100, 100, 95, 95, 70, 70, 20, true)]

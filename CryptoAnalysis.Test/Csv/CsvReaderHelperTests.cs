@@ -1,7 +1,8 @@
 ﻿using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis;
 using Gradient.CryptoAnalysis.Csv;
 
-namespace Gradient.CryptoAnalysis.Tests
+namespace CryptoAnalysis.Test.Csv
 {
     [TestClass]
     public class CsvReaderHelperTests
