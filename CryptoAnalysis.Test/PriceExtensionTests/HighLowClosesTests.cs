@@ -1,18 +1,19 @@
-﻿using Gradient.CryptoAnalysis.Csv;
-using Gradient.CryptoAnalysis;
-using CryptoAnalysis.Csv.ClassMaps;
+﻿using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis.Csv;
 
 namespace Gradient.CryptoAnalysis.Test.PriceExtensionTests
 {
     [TestClass]
-    public class GetHighsLowsTests
+    public class HighLowClosesTests
     {
         private List<Price> _prices;
-        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "GetHighsLowsTests", "TestData.csv");
+        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "HighLowClosesTests", "TestData.csv");
 
         [TestMethod]
         public void TestGetHighs()
         {
+            CollectionAssert.AreEqual(new List<Price>(), new List<Price>().HighCloses());
+
             var highs = _prices.HighCloses();
             Assert.AreEqual(16, highs.Count);
             var i = 0;
@@ -27,6 +28,8 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensionTests
         [TestMethod]
         public void TestGetLows()
         {
+            CollectionAssert.AreEqual(new List<Price>(), new List<Price>().LowCloses());
+
             var lows = _prices.LowCloses();
             Assert.AreEqual(4, lows.Count);
             var i = 0;

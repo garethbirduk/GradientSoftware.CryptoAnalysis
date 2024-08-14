@@ -62,7 +62,7 @@ namespace Gradient.CryptoAnalysis
 
         public static List<Price> HighCloses(this IEnumerable<Price> prices)
         {
-            if (prices == null || !prices.Any())
+            if (!prices.Any())
                 return new List<Price>();
 
             var list = new List<Price>
