@@ -1,8 +1,11 @@
-﻿namespace Gradient.CryptoAnalysis.Tests
+﻿using Gradient.CryptoAnalysis;
+
+namespace CryptoAnalysis.Test.PriceExtensions
 {
-    public static class TestData
+    [TestClass]
+    public class ToSwingsTests
     {
-        public static readonly List<Price> SwingsPrices = new List<Price>
+        private static List<Price> _prices = new List<Price>
         {
             new Price { Close = 10, DateTime = new DateTime(2010, 01, 01).AddDays(-62) },
             new Price { Close = 14, DateTime = new DateTime(2010, 01, 01).AddDays(-61) },
@@ -68,16 +71,12 @@
             new Price { Close = 36, DateTime = new DateTime(2010, 01, 01).AddDays(-1) },
             new Price { Close = 50, DateTime = new DateTime(2010, 01, 01) }
         };
-    }
 
-    [TestClass]
-    public class SwingsTests
-    {
         [TestMethod]
         public void TestFindBreaksOfStructures()
         {
             // Act
-            var actual = TestData.SwingsPrices.ToSwings();
+            var actual = _prices.ToSwings();
 
             // Assert
             Assert.AreEqual(5, actual.Count);

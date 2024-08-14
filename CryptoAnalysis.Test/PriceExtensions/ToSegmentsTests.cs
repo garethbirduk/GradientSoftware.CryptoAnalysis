@@ -1,7 +1,7 @@
 ﻿using CryptoAnalysis.Csv.ClassMaps;
 using Gradient.CryptoAnalysis.Csv;
 
-namespace Gradient.CryptoAnalysis.Test.PriceExtensionTests
+namespace Gradient.CryptoAnalysis.Test.PriceExtensions
 {
     [TestClass]
     public class ToSegmentsTests

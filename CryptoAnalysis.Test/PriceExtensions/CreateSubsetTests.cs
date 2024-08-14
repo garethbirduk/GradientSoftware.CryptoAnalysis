@@ -1,7 +1,7 @@
-﻿namespace Gradient.CryptoAnalysis.Test.PriceExtensionTests
+﻿namespace Gradient.CryptoAnalysis.Test.PriceExtensions
 {
     [TestClass]
-    public class GetSubsetTests
+    public class CreateSubsetTests
     {
         private List<Price> _data = new List<Price>
         {
@@ -18,7 +18,7 @@
         };
 
         [TestMethod]
-        public void TestGetSubsetByCountFromExclusive()
+        public void TestCreateSubsetByCountFromExclusive()
         {
             var result = _data.CreateSubsetByCount(_data[1], 5);
             Assert.AreEqual(5, result.Count());
@@ -30,7 +30,7 @@
         }
 
         [TestMethod]
-        public void TestGetSubsetByCountFromInclusive()
+        public void TestCreateSubsetByCountFromInclusive()
         {
             var result = _data.CreateSubsetByCount(_data[1], 5, true);
             Assert.AreEqual(6, result.Count());
@@ -43,7 +43,7 @@
         }
 
         [TestMethod]
-        public void TestGetSubsetByCountFromInclusive_NotEnough()
+        public void TestCreateSubsetByCountFromInclusive_NotEnough()
         {
             var result = _data.CreateSubsetByCount(_data[1], 100, true);
             Assert.AreEqual(9, result.Count());
@@ -59,7 +59,7 @@
         }
 
         [TestMethod]
-        public void TestGetSubsetByIndexFromExclusive()
+        public void TestCreateSubsetByIndexFromExclusive()
         {
             var result = _data.CreateSubsetByIndex(_data[1], 5);
             Assert.AreEqual(4, result.Count());
@@ -70,7 +70,7 @@
         }
 
         [TestMethod]
-        public void TestGetSubsetByIndexFromInclusive()
+        public void TestCreateSubsetByIndexFromInclusive()
         {
             var result = _data.CreateSubsetByIndex(_data[1], 5, true);
             Assert.AreEqual(5, result.Count());
@@ -82,7 +82,7 @@
         }
 
         [TestMethod]
-        public void TestGetSubsetByIndexToExclusive()
+        public void TestCreateSubsetByIndexToExclusive()
         {
             var result = _data.CreateSubsetByIndex(0, _data[4]);
             Assert.AreEqual(4, result.Count());
@@ -93,7 +93,7 @@
         }
 
         [TestMethod]
-        public void TestGetSubsetByIndexToInclusive()
+        public void TestCreateSubsetByIndexToInclusive()
         {
             var result = _data.CreateSubsetByIndex(0, _data[4], true);
             Assert.AreEqual(5, result.Count());
@@ -105,7 +105,7 @@
         }
 
         [TestMethod]
-        public void TestGetSubsetExclusive()
+        public void TestCreateSubsetExclusive()
         {
             var result = _data.CreateSubset(_data[1], _data[5]);
             Assert.AreEqual(4, result.Count());
@@ -116,7 +116,7 @@
         }
 
         [TestMethod]
-        public void TestGetSubsetInclusive()
+        public void TestCreateSubsetInclusive()
         {
             var result = _data.CreateSubset(_data[1], _data[5], true);
             Assert.AreEqual(5, result.Count());
