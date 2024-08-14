@@ -21,7 +21,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             data[8].Low = 101.0;
             data[9].Low = 105.0;
 
-            var condition = new Condition();
+            var condition = new ConditionSet();
             condition.AndConditions.Add(new IsPriceLowLessThanOrEqualCondition(105.0));
 
             Assert.AreEqual(true, condition.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));

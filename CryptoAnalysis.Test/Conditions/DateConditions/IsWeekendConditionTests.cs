@@ -15,7 +15,7 @@ namespace Gradient.CryptoAnalysis.Tests
         [DataRow(7, true)]
         public void TestIsWeekendCondition(int day, bool expected)
         {
-            var c1 = new Condition();
+            var c1 = new ConditionSet();
             c1.AndConditions.Add(new IsWeekendCondition());
 
             Assert.AreEqual(expected, c1.IsMet(null, new DateTime(2024, 01, day)));

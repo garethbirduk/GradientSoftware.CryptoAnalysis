@@ -1,11 +1,12 @@
-﻿using Gradient.CryptoAnalysis.Csv;
+﻿using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis.Csv;
 
 namespace Gradient.CryptoAnalysis
 {
     public class CheckIndicators
     {
         public string OutputFilepath { get; set; }
-        public ConditionRules PositionRules { get; set; } = new();
+        public BacktestConditionRules PositionRules { get; set; } = new();
         public List<Price> Prices { get; set; } = new();
         public List<Price> PricesWhereConditionIsMet { get; set; } = new();
 

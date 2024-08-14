@@ -2,16 +2,13 @@
 {
     public class IsUptrendCondition : IsRangeCondition
     {
-        public IsUptrendCondition(int successiveCandles) : base(successiveCandles)
+        protected override bool IsMet()
         {
+            throw new NotImplementedException();
         }
 
-        public override bool IsMet()
+        public IsUptrendCondition(int successiveCandles) : base(successiveCandles)
         {
-            if (IsExpired)
-                return false;
-
-            throw new NotImplementedException();
         }
     }
 }

@@ -1,43 +1,19 @@
-﻿using Gradient.CryptoAnalysis.Conditions.DateConditions;
-using Gradient.CryptoAnalysis.Conditions.PriceConditions;
+﻿using CryptoAnalysis.Conditions;
 
 namespace Gradient.CryptoAnalysis.Conditions
 {
-    public class Condition
+    public abstract class Condition : ICondition
     {
-        public List<ICondition> AndConditions { get; set; } = [];
-        public List<Condition> AndSubConditions { get; set; } = [];
-        public List<ICondition> OrConditions { get; set; } = [];
-        public List<Condition> OrSubConditions { get; set; } = [];
+        protected abstract bool IsMet();
 
-        public bool IsMet(List<Price> prices, DateTime dateTime)
+        public bool IsExpired { get; set; }
+
+        public bool IsMet(bool allowExpired)
         {
-            foreach (var condition in AndConditions.Union(OrConditions))
-            {
-                if (condition.GetType().GetInterfaces().Contains(typeof(IDateCondition)))
-                {
-                    ((IDateCondition)condition).SetDateTimeCandidate(dateTime);
-                }
+            if (IsExpired && !allowExpired)
+                return false;
 
-                if (condition.GetType().GetInterfaces().Contains(typeof(IPriceCondition)))
-                {
-                    ((IPriceCondition)condition).SetPrices(prices, Cursor.None);
-                    ((IPriceCondition)condition).SetPrice(dateTime);
-                }
-
-                if (condition.GetType().GetInterfaces().Contains(typeof(IAdjustableCandles)))
-                {
-                    ((IAdjustableCandles)condition).SetSuccessiveCandles(200);
-                    //                    ((IAdjustableCandles)condition).SetSuccessiveCandles(prices.Count());
-                }
-            }
-
-            var m1 = AndConditions.All(x => x.IsMet());
-            var m2 = OrConditions.Any(x => x.IsMet()) || OrConditions.Count() == 0;
-            var m3 = AndSubConditions.All(x => x.IsMet(prices, dateTime));
-            var m4 = OrSubConditions.Any(x => x.IsMet(prices, dateTime)) || OrSubConditions.Count() == 0;
-
-            return m1 && m2 && m3 && m4;
+            return IsMet();
         }
     }
 }

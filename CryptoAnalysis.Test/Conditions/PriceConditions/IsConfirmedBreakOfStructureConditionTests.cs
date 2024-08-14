@@ -1,4 +1,5 @@
-﻿using Gradient.CryptoAnalysis.Csv;
+﻿using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis.Csv;
 
 namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
 {
@@ -17,7 +18,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
         [TestMethod]
         public void TestIsConfirmedBreakOfStructureCondition()
         {
-            var condition = new Condition();
+            var condition = new ConditionSet();
             condition.AndConditions.Add(new IsBreakOfStructureCondition());
 
             var expected = new List<DateTime>()

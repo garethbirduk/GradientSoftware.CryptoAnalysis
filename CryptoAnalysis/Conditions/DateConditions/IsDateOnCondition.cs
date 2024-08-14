@@ -2,6 +2,11 @@
 {
     public class IsDateOnCondition : DateCondition
     {
+        protected override bool IsMet()
+        {
+            return DateTimeConditions.Contains(DateTimeCandidate);
+        }
+
         public IsDateOnCondition(params DateTime[] dateTimeConditions)
         {
             DateTimeConditions = dateTimeConditions.ToList();
@@ -12,14 +17,6 @@
         public void Expire()
         {
             IsExpired = true;
-        }
-
-        public override bool IsMet()
-        {
-            if (IsExpired)
-                return false;
-
-            return DateTimeConditions.Contains(DateTimeCandidate);
         }
     }
 }

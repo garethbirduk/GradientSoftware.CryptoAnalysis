@@ -1,4 +1,5 @@
-﻿using Gradient.CryptoAnalysis.Csv;
+﻿using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis.Csv;
 
 namespace Gradient.CryptoAnalysis.Test.Scenarios
 {
@@ -18,7 +19,7 @@ namespace Gradient.CryptoAnalysis.Test.Scenarios
         [TestMethod]
         public void TestIsBreakOfStructureCondition()
         {
-            var positionRules = new ConditionRules();
+            var positionRules = new BacktestConditionRules();
 
             positionRules.PreConditions.AndConditions.Add(new IsBreakOfStructureCondition(0));
 
@@ -34,7 +35,7 @@ namespace Gradient.CryptoAnalysis.Test.Scenarios
         [TestMethod]
         public void TestIsMarketStructureBreakCondition()
         {
-            var positionRules = new ConditionRules();
+            var positionRules = new BacktestConditionRules();
 
             positionRules.PreConditions.AndConditions.Add(new IsMarketStructureBreakCondition(0));
 
@@ -50,7 +51,7 @@ namespace Gradient.CryptoAnalysis.Test.Scenarios
         [TestMethod]
         public void TestIsMichaelsEmaGreenCondition()
         {
-            var positionRules = new ConditionRules();
+            var positionRules = new BacktestConditionRules();
 
             positionRules.PreConditions.AndConditions.Add(new IsMichaelsEmaGreenCondition());
 
@@ -70,7 +71,7 @@ namespace Gradient.CryptoAnalysis.Test.Scenarios
         [DataRow(5)]
         public void TestIsSuccessiveGreenCandlesCondition(int successive)
         {
-            var positionRules = new ConditionRules();
+            var positionRules = new BacktestConditionRules();
 
             positionRules.PreConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(successive));
 
@@ -91,7 +92,7 @@ namespace Gradient.CryptoAnalysis.Test.Scenarios
         [DataRow(6)]
         public void TestIsSuccessiveGreenCandlesConditionWithMichaelsEma(int successive)
         {
-            var positionRules = new ConditionRules();
+            var positionRules = new BacktestConditionRules();
 
             positionRules.PreConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(successive));
             positionRules.PreConditions.AndConditions.Add(new IsMichaelsEmaGreenCondition());
@@ -113,7 +114,7 @@ namespace Gradient.CryptoAnalysis.Test.Scenarios
         [DataRow(6)]
         public void TestIsSuccessiveRedCandlesConditionWithMichaelsEma(int successive)
         {
-            var positionRules = new ConditionRules();
+            var positionRules = new BacktestConditionRules();
 
             positionRules.PreConditions.AndConditions.Add(new IsSuccessiveRedCandlesCondition(successive));
             positionRules.PreConditions.AndConditions.Add(new IsMichaelsEmaGreenCondition());
@@ -136,7 +137,7 @@ namespace Gradient.CryptoAnalysis.Test.Scenarios
         [DataRow(15, 2)]
         public void TestIsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(int minSwings, int maxMsb)
         {
-            var positionRules = new ConditionRules();
+            var positionRules = new BacktestConditionRules();
 
             for (minSwings = 10; minSwings < 20; minSwings++)
             {

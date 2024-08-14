@@ -17,7 +17,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             data[3].Indicators.MichaelsEma = new MichaelsEma { EMABig = 100, EMASmall = 150 };
             data[4].Indicators.MichaelsEma = new MichaelsEma { EMABig = 200, EMASmall = 150 };
 
-            var condition = new Condition();
+            var condition = new ConditionSet();
             condition.AndConditions.Add(new IsMichaelsEmaChangedRedToGreenCondition());
 
             Assert.IsFalse(condition.IsMet(data, new DateTime(2024, 05, 05, 00, 00, 00)));

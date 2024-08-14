@@ -22,7 +22,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             data[8].Close = 101.0;
             data[9].Close = 105.0; // 100 -> 102 = 5% in 3
 
-            var increase10pc = new Condition();
+            var increase10pc = new ConditionSet();
             increase10pc.AndConditions.Add(new IsPriceIncreaseRateCondition(10, 5));
 
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
@@ -36,7 +36,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 08, 00, 00)));
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 09, 00, 00)));
 
-            var increase4pc = new Condition();
+            var increase4pc = new ConditionSet();
             increase4pc.AndConditions.Add(new IsPriceIncreaseRateCondition(4.5, 3));
 
             Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
@@ -67,7 +67,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             data[8].Close = 101.0;
             data[9].Close = 105.0; // 100 -> 102 = 5% in 3
 
-            var increase10pc = new Condition();
+            var increase10pc = new ConditionSet();
             increase10pc.AndConditions.Add(new IsPriceIncreaseRateCondition(10, 5, true));
 
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
@@ -81,7 +81,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 08, 00, 00)));
             Assert.AreEqual(false, increase10pc.IsMet(data, new DateTime(2024, 01, 01, 09, 00, 00)));
 
-            var increase4pc = new Condition();
+            var increase4pc = new ConditionSet();
             increase4pc.AndConditions.Add(new IsPriceIncreaseRateCondition(4.5, 3, true));
 
             Assert.AreEqual(false, increase4pc.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));

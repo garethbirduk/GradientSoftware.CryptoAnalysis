@@ -9,7 +9,7 @@
 
         public double TargetPrice { get; protected set; }
 
-        public override bool IsMet()
+        protected override bool IsMet()
         {
             return Price.High >= TargetPrice;
         }

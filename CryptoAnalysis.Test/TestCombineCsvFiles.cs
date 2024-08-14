@@ -1,4 +1,5 @@
-﻿using Gradient.CryptoAnalysis.Csv;
+﻿using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis.Csv;
 
 namespace Gradient.CryptoAnalysis.Tests
 {

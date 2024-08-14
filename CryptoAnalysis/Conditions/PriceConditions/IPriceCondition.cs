@@ -1,12 +1,5 @@
 ﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
 {
-    public enum Cursor
-    {
-        None,
-        First,
-        Last,
-    }
-
     public interface IPriceCondition
     {
         public Price Price { get; }

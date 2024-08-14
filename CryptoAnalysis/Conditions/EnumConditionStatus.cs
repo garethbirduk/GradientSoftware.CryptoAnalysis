@@ -1,6 +1,6 @@
-﻿namespace Gradient.CryptoAnalysis
+﻿namespace CryptoAnalysis.Conditions
 {
-    public enum EnumTradeStatus
+    public enum EnumConditionStatus
     {
         None,
         AwaitingConfirmation,

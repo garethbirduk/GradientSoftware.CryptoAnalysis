@@ -2,15 +2,8 @@
 {
     public class IsSuccessiveGreenCandlesCondition : PriceCondition
     {
-        public IsSuccessiveGreenCandlesCondition(int successiveCandles) : base(successiveCandles)
+        protected override bool IsMet()
         {
-        }
-
-        public override bool IsMet()
-        {
-            if (IsExpired)
-                return false;
-
             if (SuccessiveCandles < 2)
                 return false;
 
@@ -23,6 +16,10 @@
                 return false;
 
             return data.All(x => x.Close > x.Open);
+        }
+
+        public IsSuccessiveGreenCandlesCondition(int successiveCandles = DefaultSuccessiveCandles) : base(successiveCandles)
+        {
         }
     }
 }

@@ -2,11 +2,8 @@
 {
     public class IsWeekendCondition : DateCondition
     {
-        public override bool IsMet()
+        protected override bool IsMet()
         {
-            if (IsExpired)
-                return false;
-
             return DateTimeCandidate.DayOfWeek == DayOfWeek.Saturday || DateTimeCandidate.DayOfWeek == DayOfWeek.Sunday;
         }
     }

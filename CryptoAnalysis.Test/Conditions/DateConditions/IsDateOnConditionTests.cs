@@ -16,7 +16,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.DateConditions
         [DataRow(7, false)]
         public void TestIsDateOnAndBeforeConditions(int day, bool expected)
         {
-            var c1 = new Condition();
+            var c1 = new ConditionSet();
             c1.AndConditions.Add(new IsDateOnCondition(new DateTime(2024, 01, 02), new DateTime(2024, 01, 05)));
             c1.AndConditions.Add(new IsBeforeDateCondition(new DateTime(2024, 01, 03)));
 
@@ -33,7 +33,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.DateConditions
         [DataRow(7, false)]
         public void TestIsDateOnCondition_And(int day, bool expected)
         {
-            var c1 = new Condition();
+            var c1 = new ConditionSet();
             c1.AndConditions.Add(new IsDateOnCondition(new DateTime(2024, 01, 02), new DateTime(2024, 01, 05)));
 
             Assert.AreEqual(expected, c1.IsMet(null, new DateTime(2024, 01, day)));
@@ -49,7 +49,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.DateConditions
         [DataRow(7, false)]
         public void TestIsDateOnCondition_Or(int day, bool expected)
         {
-            var c1 = new Condition();
+            var c1 = new ConditionSet();
             c1.OrConditions.Add(new IsDateOnCondition(new DateTime(2024, 01, 02), new DateTime(2024, 01, 05)));
 
             Assert.AreEqual(expected, c1.IsMet(null, new DateTime(2024, 01, day)));
@@ -65,7 +65,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.DateConditions
         [DataRow(7, true)]
         public void TestIsDateOnOrAfterConditions(int day, bool expected)
         {
-            var c1 = new Condition();
+            var c1 = new ConditionSet();
             c1.OrConditions.Add(new IsDateOnCondition(new DateTime(2024, 01, 02), new DateTime(2024, 01, 05)));
             c1.OrConditions.Add(new IsAfterDateCondition(new DateTime(2024, 01, 06)));
 

@@ -1,15 +1,17 @@
-﻿using Gradient.CryptoAnalysis;
-using Gradient.CryptoAnalysis.Conditions;
+﻿using CryptoAnalysis.Conditions;
 
 namespace Gradient.CryptoAnalysis.Conditions.DateConditions
 {
-    public class NeverExpireCondition : Condition, ICondition
+    public abstract class NeverExpireCondition : Condition, ICondition
     {
-        public bool IsExpired { get; set; }
-
-        public bool IsMet()
+        protected override bool IsMet()
         {
             return false;
+        }
+
+        public new bool IsMet(bool allowExpired)
+        {
+            return IsMet();
         }
     }
 }

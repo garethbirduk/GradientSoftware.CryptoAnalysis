@@ -1,5 +1,6 @@
 ﻿using Gradient.CryptoAnalysis.Csv;
 using Gradient.CryptoAnalysis;
+using CryptoAnalysis.Csv.ClassMaps;
 
 namespace Gradient.CryptoAnalysis.Test.PriceExtensionTests
 {

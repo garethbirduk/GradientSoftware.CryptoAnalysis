@@ -2,14 +2,7 @@
 {
     public class IsMichaelsEmaChangedGreenToRedCondition : PriceCondition
     {
-        public IsMichaelsEmaChangedGreenToRedCondition()
-        {
-        }
-
-        public IsMichaelsEmaGreenCondition IsMichaelsEmaGreenCondition { get; set; } = new();
-        public IsMichaelsEmaRedCondition IsMichaelsEmaRedCondition { get; set; } = new();
-
-        public override bool IsMet()
+        protected override bool IsMet()
         {
             IsMichaelsEmaGreenCondition.SetPrices(Prices, Cursor.Last);
             IsMichaelsEmaRedCondition.SetPrices(Prices, Cursor.Last);
@@ -25,7 +18,14 @@
             IsMichaelsEmaGreenCondition.SetPrice(previousIndex);
             IsMichaelsEmaRedCondition.SetPrice(currentIndex);
 
-            return IsMichaelsEmaGreenCondition.IsMet() && IsMichaelsEmaRedCondition.IsMet();
+            return IsMichaelsEmaGreenCondition.IsMet(false) && IsMichaelsEmaRedCondition.IsMet(false);
         }
+
+        public IsMichaelsEmaChangedGreenToRedCondition()
+        {
+        }
+
+        public IsMichaelsEmaGreenCondition IsMichaelsEmaGreenCondition { get; set; } = new();
+        public IsMichaelsEmaRedCondition IsMichaelsEmaRedCondition { get; set; } = new();
     }
 }

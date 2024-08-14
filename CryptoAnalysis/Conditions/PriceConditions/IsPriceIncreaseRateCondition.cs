@@ -2,20 +2,8 @@
 {
     public class IsPriceIncreaseRateCondition : PriceCondition
     {
-        public IsPriceIncreaseRateCondition(double percentageIncrease, int successiveCandles, bool max = false) : base(successiveCandles)
+        protected override bool IsMet()
         {
-            PercentageIncrease = percentageIncrease;
-            PeriodsToTakeIsMaxPeriodsNotAbsolute = max;
-        }
-
-        public double PercentageIncrease { get; set; }
-        public bool PeriodsToTakeIsMaxPeriodsNotAbsolute { get; }
-
-        public override bool IsMet()
-        {
-            if (IsExpired)
-                return false;
-
             try
             {
                 var periods = new List<int>() { SuccessiveCandles };
@@ -38,5 +26,14 @@
                 return false;
             }
         }
+
+        public IsPriceIncreaseRateCondition(double percentageIncrease, int successiveCandles, bool max = false) : base(successiveCandles)
+        {
+            PercentageIncrease = percentageIncrease;
+            PeriodsToTakeIsMaxPeriodsNotAbsolute = max;
+        }
+
+        public double PercentageIncrease { get; set; }
+        public bool PeriodsToTakeIsMaxPeriodsNotAbsolute { get; }
     }
 }

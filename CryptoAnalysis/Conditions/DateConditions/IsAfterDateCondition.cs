@@ -1,9 +1,12 @@
-﻿using Gradient.CryptoAnalysis.Conditions.DateConditions;
-
-namespace Gradient.CryptoAnalysis
+﻿namespace Gradient.CryptoAnalysis
 {
     public class IsAfterDateCondition : DateCondition
     {
+        protected override bool IsMet()
+        {
+            return DateTimeCandidate > DateTimeCondition;
+        }
+
         public IsAfterDateCondition(DateTime dateTimeCondition)
         {
             DateTimeCondition = dateTimeCondition;
@@ -12,14 +15,6 @@ namespace Gradient.CryptoAnalysis
         public void Expire()
         {
             IsExpired = true;
-        }
-
-        public override bool IsMet()
-        {
-            if (IsExpired)
-                return false;
-
-            return DateTimeCandidate > DateTimeCondition;
         }
     }
 }

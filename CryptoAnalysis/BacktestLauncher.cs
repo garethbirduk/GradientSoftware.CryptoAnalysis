@@ -1,4 +1,5 @@
-﻿using Gradient.CryptoAnalysis.Csv;
+﻿using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis.Csv;
 
 namespace Gradient.CryptoAnalysis
 {
@@ -15,7 +16,7 @@ namespace Gradient.CryptoAnalysis
                 {
                     for (int r1 = 3; r1 < 6; r1++)
                     {
-                        var positionRules = new ConditionRules();
+                        var positionRules = new BacktestConditionRules();
 
                         positionRules.PreConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(g1));
                         positionRules.ConfirmationConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(g2));

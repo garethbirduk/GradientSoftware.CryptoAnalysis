@@ -1,4 +1,5 @@
-﻿using Gradient.CryptoAnalysis.Csv;
+﻿using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis.Csv;
 
 namespace Gradient.CryptoAnalysis.Tests
 {
@@ -12,7 +13,7 @@ namespace Gradient.CryptoAnalysis.Tests
             var csvHelper = new CsvReaderHelper();
 
             // Act
-            var data = csvHelper.ReadData<BacktestResult, BacktestResultMap>(Path.Combine("TestData", "ReadBacktestResults", "BacktestResults.csv")).ToList();
+            var data = csvHelper.ReadData<BacktestResult, BacktestResultClassMap>(Path.Combine("TestData", "ReadBacktestResults", "BacktestResults.csv")).ToList();
 
             // Assert
             Assert.IsNotNull(data);

@@ -1,12 +1,11 @@
-﻿namespace Gradient.CryptoAnalysis.Conditions.DateConditions
+﻿using CryptoAnalysis.Conditions;
+
+namespace Gradient.CryptoAnalysis.Conditions.DateConditions
 {
-    public abstract class DateCondition : ICondition, IDateCondition
+    public abstract class DateCondition : Condition, ICondition, IDateCondition
     {
         public DateTime DateTimeCandidate { get; protected set; }
         public DateTime DateTimeCondition { get; protected set; }
-        public bool IsExpired { get; set; }
-
-        public abstract bool IsMet();
 
         public void SetDateTimeCandidate(DateTime dateTime)
         {

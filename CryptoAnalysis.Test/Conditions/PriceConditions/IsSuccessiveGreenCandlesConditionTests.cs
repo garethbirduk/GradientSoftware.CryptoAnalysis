@@ -22,7 +22,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             data[9].Open = 300.0; data[9].Close = data[9].Open + 10.0; // 2
             data[10].Open = 300.0; data[10].Close = data[10].Open + 10.0; // 3
 
-            var c3InARow = new Condition();
+            var c3InARow = new ConditionSet();
             c3InARow.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(3));
 
             Assert.AreEqual(false, c3InARow.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));
@@ -37,7 +37,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             Assert.AreEqual(false, c3InARow.IsMet(data, new DateTime(2024, 01, 01, 09, 00, 00)));
             Assert.AreEqual(true, c3InARow.IsMet(data, new DateTime(2024, 01, 01, 10, 00, 00)));
 
-            var c4InARow = new Condition();
+            var c4InARow = new ConditionSet();
             c4InARow.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(4));
 
             Assert.AreEqual(false, c4InARow.IsMet(data, new DateTime(2024, 01, 01, 00, 00, 00)));

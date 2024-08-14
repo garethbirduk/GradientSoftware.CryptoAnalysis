@@ -1,11 +1,10 @@
 ﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions
 {
-    public abstract class PriceCondition : ICondition, IPriceCondition
+    public abstract class PriceCondition : Condition, IPriceCondition
     {
-        public const int MaxSuccessiveCandles = 100;
-        public readonly int MinDataSize = 2;
+        public const int DefaultSuccessiveCandles = 100;
 
-        public PriceCondition(int successiveCandles = MaxSuccessiveCandles)
+        public PriceCondition(int successiveCandles = DefaultSuccessiveCandles)
         {
             SuccessiveCandles = successiveCandles;
         }
@@ -18,12 +17,10 @@
             }
         }
 
-        public bool IsExpired { get; set; }
+        public int MinDataSize { get; set; } = 2;
         public Price Price { get; protected set; } = new();
         public List<Price> Prices { get; protected set; } = new();
         public int SuccessiveCandles { get; protected set; }
-
-        public abstract bool IsMet();
 
         public void SetPrice(DateTime dateTime)
         {

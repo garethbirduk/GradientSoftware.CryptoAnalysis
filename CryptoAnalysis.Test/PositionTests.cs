@@ -1,4 +1,5 @@
-﻿using Gradient.CryptoAnalysis.Csv;
+﻿using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis.Csv;
 
 using System.Text.Json;
 
@@ -47,21 +48,21 @@ namespace Gradient.CryptoAnalysis.Tests
         [TestMethod]
         public void Test1()
         {
-            var position = new ConditionRules();
+            var position = new BacktestConditionRules();
 
-            var isGoodWeekday = new Condition();
+            var isGoodWeekday = new ConditionSet();
             isGoodWeekday.AndConditions.Add(new IsWeekdayCondition());
             isGoodWeekday.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(3));
 
-            var isBadWeekend = new Condition();
+            var isBadWeekend = new ConditionSet();
             isBadWeekend.AndConditions.Add(new IsWeekendCondition());
             isBadWeekend.AndConditions.Add(new IsSuccessiveRedCandlesCondition(3));
 
-            var isGoodWeekdayOrIsBadWeekend = new Condition();
+            var isGoodWeekdayOrIsBadWeekend = new ConditionSet();
             isGoodWeekdayOrIsBadWeekend.OrSubConditions.Add(isGoodWeekday);
             isGoodWeekdayOrIsBadWeekend.OrSubConditions.Add(isBadWeekend);
 
-            var isInJanuary = new Condition();
+            var isInJanuary = new ConditionSet();
             isInJanuary.AndConditions.Add(new IsAfterDateCondition(new DateTime(2024, 01, 01)));
             isInJanuary.AndConditions.Add(new IsBeforeDateCondition(new DateTime(2024, 02, 01)));
 
@@ -76,7 +77,7 @@ namespace Gradient.CryptoAnalysis.Tests
         [TestMethod]
         public void Test2()
         {
-            var positionRules = new ConditionRules();
+            var positionRules = new BacktestConditionRules();
 
             positionRules.PreConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(5));
             positionRules.ConfirmationConditions.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(3));
@@ -112,9 +113,9 @@ namespace Gradient.CryptoAnalysis.Tests
         [TestMethod]
         public void TestRange()
         {
-            var position = new ConditionRules();
+            var position = new BacktestConditionRules();
 
-            var isGoodWeekday = new Condition();
+            var isGoodWeekday = new ConditionSet();
             isGoodWeekday.AndConditions.Add(new IsWeekdayCondition());
             isGoodWeekday.AndConditions.Add(new IsSuccessiveGreenCandlesCondition(3));
         }

@@ -7,15 +7,8 @@
 
     public class IsBreakOfStructureCondition : PriceCondition, IAdjustableCandles
     {
-        public IsBreakOfStructureCondition(int successiveCandles = MaxSuccessiveCandles) : base(successiveCandles)
+        protected override bool IsMet()
         {
-        }
-
-        public override bool IsMet()
-        {
-            if (IsExpired)
-                return false;
-
             var data = Prices.CreateSubsetByCount(SuccessiveCandles - 1, Price, true);
             var swings = data.ToSwings();
             var swing = swings.LastOrDefault();
@@ -23,6 +16,10 @@
                 return false;
             var result = swing.BreakOfStructure != null && swing.BreakOfStructure == Price;
             return result;
+        }
+
+        public IsBreakOfStructureCondition(int successiveCandles = DefaultSuccessiveCandles) : base(successiveCandles)
+        {
         }
 
         public void SetSuccessiveCandles(int successiveCandles)

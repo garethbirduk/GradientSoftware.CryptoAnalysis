@@ -10,7 +10,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
         [TestMethod]
         public void TestIsMichaelsEmaRedCondition_Null()
         {
-            var condition = new Condition();
+            var condition = new ConditionSet();
             condition.AndConditions.Add(new IsMichaelsEmaRedCondition());
             Assert.IsFalse(condition.IsMet(_prices, new DateTime(2024, 05, 05, 00, 00, 00)));
         }
@@ -23,7 +23,7 @@ namespace Gradient.CryptoAnalysis.Test.Conditions.PriceConditions
             _prices[2].Indicators.MichaelsEma = new MichaelsEma { EMABig = 120, EMASmall = 150 };
             _prices[3].Indicators.MichaelsEma = new MichaelsEma { EMABig = 100, EMASmall = 150 };
 
-            var condition = new Condition();
+            var condition = new ConditionSet();
             condition.AndConditions.Add(new IsMichaelsEmaRedCondition());
 
             Assert.IsTrue(condition.IsMet(_prices, new DateTime(2024, 05, 05, 00, 00, 00)));

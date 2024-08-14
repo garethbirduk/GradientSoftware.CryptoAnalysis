@@ -1,4 +1,5 @@
-﻿using Gradient.CryptoAnalysis.Conditions;
+﻿using CryptoAnalysis.Conditions;
+using Gradient.CryptoAnalysis.Conditions;
 
 namespace Gradient.CryptoAnalysis
 {
@@ -6,19 +7,19 @@ namespace Gradient.CryptoAnalysis
     {
         private void TransitionAwaitingConfirmationToClosed(DateTime dateTime)
         {
-            TradeStatus = EnumTradeStatus.Expired;
+            TradeStatus = EnumConditionStatus.Expired;
             DateTimeClose = dateTime;
             PriceClose = PriceOpen;
         }
 
         private void TransitionAwaitingConfirmationToConfirmed()
         {
-            TradeStatus = EnumTradeStatus.Confirmed;
+            TradeStatus = EnumConditionStatus.Confirmed;
         }
 
         private void TransitionConfirmedToOpen(DateTime dateTime)
         {
-            TradeStatus = EnumTradeStatus.Open;
+            TradeStatus = EnumConditionStatus.Open;
             DateTimeOpen = dateTime;
             PriceOpen = Prices.First(x => x.DateTime == dateTime).Open;
 
@@ -31,15 +32,15 @@ namespace Gradient.CryptoAnalysis
 
         private void TransitionOpenToClosed(DateTime dateTime, double price)
         {
-            TradeStatus = EnumTradeStatus.Completed;
+            TradeStatus = EnumConditionStatus.Completed;
             DateTimeClose = dateTime;
             PriceClose = price;
         }
 
-        public Trade(List<Price> prices, Condition confirmationCondition,
-            Condition takeProfitCondition, Condition stopLossCondition, Condition expireCondition)
+        public Trade(List<Price> prices, ConditionSet confirmationCondition,
+            ConditionSet takeProfitCondition, ConditionSet stopLossCondition, ConditionSet expireCondition)
         {
-            TradeStatus = EnumTradeStatus.AwaitingConfirmation;
+            TradeStatus = EnumConditionStatus.AwaitingConfirmation;
             Prices = prices;
             ConfirmationCondition = confirmationCondition;
             TakeProfitCondition = takeProfitCondition;
@@ -47,10 +48,10 @@ namespace Gradient.CryptoAnalysis
             ExpireCondition = expireCondition;
         }
 
-        public Condition ConfirmationCondition { get; }
+        public ConditionSet ConfirmationCondition { get; }
         public DateTime DateTimeClose { get; private set; }
         public DateTime DateTimeOpen { get; set; }
-        public Condition ExpireCondition { get; }
+        public ConditionSet ExpireCondition { get; }
         public Guid Id { get; } = Guid.NewGuid();
         public double PriceClose { get; private set; }
 
@@ -58,7 +59,7 @@ namespace Gradient.CryptoAnalysis
 
         public List<Price> Prices { get; }
 
-        public Condition StopLossCondition { get; }
+        public ConditionSet StopLossCondition { get; }
 
         public double StopLossTarget
         {
@@ -68,7 +69,7 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public Condition TakeProfitCondition { get; }
+        public ConditionSet TakeProfitCondition { get; }
 
         public double TakeProfitTarget
         {
@@ -78,24 +79,24 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public EnumTradeStatus TradeStatus { get; private set; } = EnumTradeStatus.None;
+        public EnumConditionStatus TradeStatus { get; private set; } = EnumConditionStatus.None;
 
         public void Update(DateTime dateTime)
         {
             switch (TradeStatus)
             {
-                case EnumTradeStatus.AwaitingConfirmation:
+                case EnumConditionStatus.AwaitingConfirmation:
                     if (ConfirmationCondition.IsMet(Prices, dateTime))
                         TransitionAwaitingConfirmationToConfirmed();
                     else if (ExpireCondition.IsMet(Prices, dateTime))
                         TransitionAwaitingConfirmationToClosed(dateTime);
                     break;
 
-                case EnumTradeStatus.Confirmed:
+                case EnumConditionStatus.Confirmed:
                     TransitionConfirmedToOpen(dateTime);
                     break;
 
-                case EnumTradeStatus.Open:
+                case EnumConditionStatus.Open:
                     if (TakeProfitCondition.IsMet(Prices, dateTime))
                         TransitionOpenToClosed(dateTime, ((IsPriceHighGreaterThanOrEqualCondition)TakeProfitCondition.AndConditions.Single()).TargetPrice);
                     else if (StopLossCondition.IsMet(Prices, dateTime))
