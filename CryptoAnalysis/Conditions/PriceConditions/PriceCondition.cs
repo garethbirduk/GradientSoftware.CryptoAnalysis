@@ -24,7 +24,19 @@
 
         public void SetPrice(DateTime dateTime)
         {
-            Price = Prices.First(x => x.DateTime == dateTime);
+            var price = Prices.FirstOrDefault(x => x.DateTime == dateTime);
+
+            if (price != null)
+                Price = price;
+
+            if (Prices.Contains(Price))
+            {
+                // do nothing; use the current price.
+            }
+            else
+            {
+                throw new Exception("Can't find a suitable price");
+            }
         }
 
         public void SetPrice(int index)

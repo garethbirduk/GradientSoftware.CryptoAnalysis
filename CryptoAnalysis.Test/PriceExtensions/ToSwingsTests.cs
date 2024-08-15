@@ -1,6 +1,4 @@
-﻿using Gradient.CryptoAnalysis;
-
-namespace CryptoAnalysis.Test.PriceExtensions
+﻿namespace Gradient.CryptoAnalysis.Test.PriceExtensions
 {
     [TestClass]
     public class ToSwingsTests
@@ -83,18 +81,23 @@ namespace CryptoAnalysis.Test.PriceExtensions
 
             Assert.AreEqual(5, actual.Count);
 
+            Assert.AreEqual(7, actual[0].Prices.Count);
             Assert.AreEqual(21, actual[0].BreakOfStructure.Close);
             Assert.IsNull(actual[0].MarketStructureBreak);
 
+            Assert.AreEqual(4, actual[1].Prices.Count);
             Assert.AreEqual(30, actual[1].BreakOfStructure.Close);
             Assert.IsNull(actual[1].MarketStructureBreak);
 
+            Assert.AreEqual(26, actual[2].Prices.Count);
             Assert.AreEqual(31, actual[2].BreakOfStructure.Close);
             Assert.IsNull(actual[2].MarketStructureBreak);
 
+            Assert.AreEqual(12, actual[3].Prices.Count);
             Assert.AreEqual(35, actual[3].BreakOfStructure.Close);
             Assert.IsNull(actual[3].MarketStructureBreak);
 
+            Assert.AreEqual(5, actual[4].Prices.Count);
             Assert.AreEqual(50, actual[4].BreakOfStructure.Close);
             Assert.AreEqual(20, actual[4].MarketStructureBreak.Close);
 
@@ -113,6 +116,93 @@ namespace CryptoAnalysis.Test.PriceExtensions
 
             Assert.AreEqual(31, interim2[3].BreakOfStructure.Close);
             Assert.AreEqual(16, interim2[3].MarketStructureBreak.Close);
+        }
+
+        [TestMethod]
+        public void TestFindBreaksOfStructures_MaxSwingSize()
+        {
+            var swings = _prices.ToUpswings(0).ToList();
+
+            Assert.AreEqual(5, swings.Count);
+
+            int i = 0;
+            Assert.AreEqual(7, swings[i].Prices.Count);
+            Assert.AreEqual(21, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(4, swings[i].Prices.Count);
+            Assert.AreEqual(30, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(26, swings[i].Prices.Count);
+            Assert.AreEqual(31, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(12, swings[i].Prices.Count);
+            Assert.AreEqual(35, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(5, swings[i].Prices.Count);
+            Assert.AreEqual(50, swings[i].BreakOfStructure.Close);
+            Assert.AreEqual(20, swings[i].MarketStructureBreak.Close);
+
+            var maxSwingSize = 10;
+
+            swings = _prices.ToUpswings(maxSwingSize).ToList();
+
+            i = 0;
+            Assert.AreEqual(7, swings[i].Prices.Count);
+            Assert.AreEqual(21, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(4, swings[i].Prices.Count);
+            Assert.AreEqual(30, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(3, swings[i].Prices.Count);
+            Assert.AreEqual(26, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(2, swings[i].Prices.Count);
+            Assert.AreEqual(29, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(3, swings[i].Prices.Count);
+            Assert.AreEqual(30, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(2, swings[i].Prices.Count);
+            Assert.AreEqual(21, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(4, swings[i].Prices.Count);
+            Assert.AreEqual(22, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(6, swings[i].Prices.Count);
+            Assert.AreEqual(24, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(10, swings[i].Prices.Count);
+            Assert.AreEqual(35, swings[i].BreakOfStructure.Close);
+            Assert.IsNull(swings[i].MarketStructureBreak);
+
+            i++;
+            Assert.AreEqual(5, swings[i].Prices.Count);
+            Assert.AreEqual(50, swings[i].BreakOfStructure.Close);
+            Assert.AreEqual(20, swings[i].MarketStructureBreak.Close);
         }
     }
 }

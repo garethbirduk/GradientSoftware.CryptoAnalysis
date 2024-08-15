@@ -1,6 +1,4 @@
-﻿using Gradient.CryptoAnalysis;
-
-namespace CryptoAnalysis.Test.PriceExtensions
+﻿namespace Gradient.CryptoAnalysis.Test.PriceExtensions
 {
     [TestClass]
     public class ClosesTests

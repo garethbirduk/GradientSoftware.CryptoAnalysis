@@ -27,7 +27,6 @@ namespace Gradient.CryptoAnalysis.Conditions
                 if (condition.GetType().GetInterfaces().Contains(typeof(IAdjustableCandles)))
                 {
                     ((IAdjustableCandles)condition).SetSuccessiveCandles(200);
-                    //                    ((IAdjustableCandles)condition).SetSuccessiveCandles(prices.Count());
                 }
             }
 
