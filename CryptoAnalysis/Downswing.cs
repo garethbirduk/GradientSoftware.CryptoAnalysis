@@ -3,12 +3,12 @@ using PostSharp.Patterns.Contracts;
 
 namespace Gradient.CryptoAnalysis
 {
-    public class Upswing
+    public class Downswing
     {
-        public Upswing([Required] IEnumerable<Price> prices, Upswing? previousUpswing, Price? nextPrice)
+        public Downswing([Required] IEnumerable<Price> prices, Downswing? previousDownswing, Price? nextPrice)
         {
             Prices = prices.Where(x => x != null).ToList();
-            PreviousUpswing = previousUpswing;
+            PreviousDownswing = previousDownswing;
             NextPrice = nextPrice;
         }
 
@@ -16,9 +16,9 @@ namespace Gradient.CryptoAnalysis
         {
             get
             {
-                var price = Prices.FirstOrDefault(x => x.Close > InitialPrice.Close);
+                var price = Prices.FirstOrDefault(x => x.Close < InitialPrice.Close);
 
-                if (price != null && price.Close > InitialPrice.Close)
+                if (price != null && price.Close < InitialPrice.Close)
                     return price;
                 if (price == null && NextPrice != null)
                     return NextPrice;
@@ -31,6 +31,14 @@ namespace Gradient.CryptoAnalysis
             get
             {
                 return Prices.First();
+            }
+        }
+
+        public List<Downswing> InterimDownswings
+        {
+            get
+            {
+                return Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToDownswings();
             }
         }
 
@@ -50,41 +58,34 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public List<Upswing> InterimUpswings
-        {
-            get
-            {
-                return Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToUpswings();
-            }
-        }
-
         public Price? MarketStructureBreak
         {
             get
             {
-                if (PreviousUpswing == null)
+                if (PreviousDownswing == null)
                     return null;
-                if (PreviousUpswing.SwingLow == null)
+                if (PreviousDownswing.SwingHigh == null)
                     return null;
-                return Prices.FirstOrDefault(x => x.Close < PreviousUpswing.SwingLow.Close);
+                return Prices.FirstOrDefault(x => x.Close > PreviousDownswing.SwingHigh.Close);
             }
         }
 
         public List<Price> NextInterswingPrices { get; set; } = new List<Price>();
         public Price? NextPrice { get; }
+        public Downswing? PreviousDownswing { get; }
         public Price? PreviousHigh { get; }
         public List<Price> PreviousInterswingPrices { get; set; } = new List<Price>();
         public Price? PreviousLow { get; }
-        public Upswing? PreviousUpswing { get; }
         public List<Price> Prices { get; set; } = new();
 
-        public Price? SwingLow
+        public Price? SwingClose
         {
             get
             {
-                return Prices.FirstOrDefault(x => x.Close == Prices.Min(x => x.Close));
+                return Prices.Last();
             }
         }
+
         public Price? SwingHigh
         {
             get
@@ -93,18 +94,19 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
+        public Price? SwingLow
+        {
+            get
+            {
+                return Prices.FirstOrDefault(x => x.Close == Prices.Min(x => x.Close));
+            }
+        }
+
         public Price? SwingOpen
         {
             get
             {
                 return Prices.First();
-            }
-        }
-        public Price? SwingClose
-        {
-            get
-            {
-                return Prices.Last();
             }
         }
     }

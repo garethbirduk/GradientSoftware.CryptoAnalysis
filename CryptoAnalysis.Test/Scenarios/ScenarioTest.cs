@@ -143,7 +143,7 @@ namespace Gradient.CryptoAnalysis.Test.Scenarios
             {
                 for (maxMsb = 0; maxMsb < 3; maxMsb++)
                 {
-                    positionRules.PreConditions.AndConditions.Add(new IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(minSwings, maxMsb));
+                    positionRules.PreConditions.AndConditions.Add(new IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(0, minSwings, maxMsb));
 
                     var check = new CheckIndicators()
                     {

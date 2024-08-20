@@ -46,7 +46,7 @@
 
         public virtual void SetPrices(List<Price> data, Cursor newCursor)
         {
-            Prices = data;
+            Prices = data.Where(x => x != null).TakeLast(SuccessiveCandles).ToList();
             switch (newCursor)
             {
                 case Cursor.First:

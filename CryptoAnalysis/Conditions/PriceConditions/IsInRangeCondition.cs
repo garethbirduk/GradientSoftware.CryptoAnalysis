@@ -4,7 +4,7 @@
     {
         protected override bool IsMet()
         {
-            var swings = Prices.ToUpswings().ToList();
+            var swings = Prices.ToUpswings(2).ToList();
             if (swings.Count < 2)
                 return false;
 
@@ -14,7 +14,7 @@
             var prices = previous.Prices.Skip(previous.Prices.IndexOf(previous.SwingLow))
                 .Union(swing.Prices);
 
-            var c = new IsPriceIncreaseRateCondition(75, DefaultSuccessiveCandles, false);
+            var c = new IsPriceDecreaseRateCondition(50, DefaultSuccessiveCandles, false);
             c.SetPrices(prices.ToList(), Cursor.Last);
             var result = c.IsMet(false);
 

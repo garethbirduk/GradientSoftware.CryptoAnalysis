@@ -1,7 +1,7 @@
 ﻿namespace Gradient.CryptoAnalysis.Test.PriceExtensions
 {
     [TestClass]
-    public class ToSwingsTests
+    public class ToUpswingsTests
     {
         private static List<Price> _prices = new List<Price>
         {

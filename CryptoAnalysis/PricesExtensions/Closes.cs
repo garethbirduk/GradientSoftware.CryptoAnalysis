@@ -28,7 +28,7 @@ namespace Gradient.CryptoAnalysis
                 prices.First(),
             };
 
-            foreach (var price in prices)
+            foreach (var price in prices.Where(x => x != null))
             {
                 if (price.Close > list.Last().Close)
                     list.Add(price);

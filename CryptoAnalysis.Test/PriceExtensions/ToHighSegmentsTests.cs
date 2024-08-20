@@ -4,10 +4,10 @@ using Gradient.CryptoAnalysis.Csv;
 namespace Gradient.CryptoAnalysis.Test.PriceExtensions
 {
     [TestClass]
-    public class ToSegmentsTests
+    public class ToHighSegmentsTests
     {
         private List<Price> _prices;
-        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "ToSegmentsTests", "TestData.csv");
+        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "ToHighSegmentsTests", "TestData.csv");
 
         [TestInitialize]
         public void TestInitialize()
@@ -16,15 +16,9 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
         }
 
         [TestMethod]
-        public void TestToSegments_Empty()
+        public void TestToHighSegments_Ok()
         {
-            CollectionAssert.AreEqual(new List<List<Price>>(), new List<Price>().ToSegments());
-        }
-
-        [TestMethod]
-        public void TestToSegments_Ok()
-        {
-            var segments = _prices.ToSegments();
+            var segments = _prices.ToHighSegments();
 
             Assert.AreEqual(10, segments.Count);
             Assert.AreEqual(9, segments[0].Count);
@@ -37,8 +31,12 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
             Assert.AreEqual(3, segments[7].Count);
             Assert.AreEqual(5, segments[8].Count);
             Assert.AreEqual(4, segments[9].Count);
+        }
 
-            var i = 0;
+        [TestMethod]
+        public void TestToSegments_Empty()
+        {
+            CollectionAssert.AreEqual(new List<List<Price>>(), new List<Price>().ToHighSegments());
         }
     }
 }

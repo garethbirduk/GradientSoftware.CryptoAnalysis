@@ -2,7 +2,7 @@
 {
     public static partial class PricesExtensions_Segments
     {
-        public static List<List<Price>> ToSegments(this List<Price> prices)
+        public static List<List<Price>> ToHighSegments(this List<Price> prices)
         {
             if (!prices.Any())
                 return new List<List<Price>>();
@@ -20,6 +20,37 @@
                 if (high != highs.Last())
                 {
                     endIndex = prices.IndexOf(highs[i + 1]);
+                }
+
+                var skip = startIndex;
+                var take = endIndex - startIndex;
+
+                var segment = prices.Skip(skip).Take(take).ToList();
+                if (segment.Count() > 1)
+                    segments.Add(segment);
+            }
+
+            return segments;
+        }
+
+        public static List<List<Price>> ToLowSegments(this List<Price> prices)
+        {
+            if (!prices.Any())
+                return new List<List<Price>>();
+
+            var lows = prices.LowCloses();
+
+            var segments = new List<List<Price>>();
+
+            for (int i = 0; i < lows.Count; i++)
+            {
+                var low = lows[i];
+                var startIndex = prices.IndexOf(low);
+
+                var endIndex = prices.IndexOf(prices.Last()) + 1;
+                if (low != lows.Last())
+                {
+                    endIndex = prices.IndexOf(lows[i + 1]);
                 }
 
                 var skip = startIndex;
