@@ -4,7 +4,7 @@
     {
         protected override bool IsMet()
         {
-            var data = Prices.CreateSubsetByCount(SuccessiveCandles - 1, Price, true);
+            var data = Prices.CreateSubsetByCount(AdditionalCandles - 1, Price, true);
             var swings = data.ToUpswings();
             var swing = swings.LastOrDefault();
             if (swing == null)
@@ -13,13 +13,13 @@
             return result;
         }
 
-        public IsMarketStructureBreakCondition(int successiveCandles = DefaultSuccessiveCandles) : base(successiveCandles)
+        public IsMarketStructureBreakCondition(int successiveCandles = DefaultAdditionalCandles) : base(successiveCandles)
         {
         }
 
         public void SetSuccessiveCandles(int successiveCandles)
         {
-            SuccessiveCandles = successiveCandles;
+            AdditionalCandles = successiveCandles;
         }
     }
 }

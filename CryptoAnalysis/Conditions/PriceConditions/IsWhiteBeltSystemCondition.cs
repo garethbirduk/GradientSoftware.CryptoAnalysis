@@ -23,9 +23,9 @@
             return IsInUptrendCondition.MetAt != null && IsInRangeCondition.IsMet(false);
         }
 
-        public IsWhiteBeltSystemCondition(int maxSwingSize, int minimumUpswings, int maxMarketStructureBreaks, int successiveCandles = DefaultSuccessiveCandles) : base(successiveCandles)
+        public IsWhiteBeltSystemCondition(int maxSwingSize, int minimumUpswings, int maxMarketStructureBreaks, int successiveCandles = DefaultAdditionalCandles) : base(successiveCandles)
         {
-            IsInUptrendCondition = new IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(maxSwingSize, minimumUpswings, maxMarketStructureBreaks, SuccessiveCandles);
+            IsInUptrendCondition = new IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(maxSwingSize, minimumUpswings, maxMarketStructureBreaks, AdditionalCandles);
             IsInRangeCondition = new IsInRangeCondition();
         }
     }

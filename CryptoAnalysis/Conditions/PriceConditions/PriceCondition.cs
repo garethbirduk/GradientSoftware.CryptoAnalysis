@@ -2,12 +2,14 @@
 {
     public abstract class PriceCondition : Condition, IPriceCondition
     {
-        public const int DefaultSuccessiveCandles = 100;
+        public const int DefaultAdditionalCandles = 100;
 
-        public PriceCondition(int successiveCandles = DefaultSuccessiveCandles)
+        public PriceCondition(int additionalCandles = DefaultAdditionalCandles)
         {
-            SuccessiveCandles = successiveCandles;
+            AdditionalCandles = additionalCandles;
         }
+
+        public int AdditionalCandles { get; protected set; }
 
         public int CurrentIndex
         {
@@ -20,7 +22,6 @@
         public int MinDataSize { get; set; } = 2;
         public Price Price { get; protected set; } = new();
         public List<Price> Prices { get; protected set; } = new();
-        public int SuccessiveCandles { get; protected set; }
 
         public void SetPrice(DateTime dateTime)
         {
@@ -46,7 +47,7 @@
 
         public virtual void SetPrices(List<Price> data, Cursor newCursor)
         {
-            Prices = data.Where(x => x != null).TakeLast(SuccessiveCandles).ToList();
+            Prices = data.Where(x => x != null).TakeLast(AdditionalCandles + 1).ToList();
             switch (newCursor)
             {
                 case Cursor.First:
@@ -80,7 +81,7 @@
 
     public abstract class TargetPriceCondition : PriceCondition
     {
-        public TargetPriceCondition(double targetPrice, int successiveCandles = DefaultSuccessiveCandles) : base(successiveCandles)
+        public TargetPriceCondition(double targetPrice, int successiveCandles = DefaultAdditionalCandles) : base(successiveCandles)
         {
             TargetPrice = targetPrice;
         }

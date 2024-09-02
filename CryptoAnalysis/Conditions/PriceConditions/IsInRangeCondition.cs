@@ -14,7 +14,7 @@
             var prices = previous.Prices.Skip(previous.Prices.IndexOf(previous.SwingLow))
                 .Union(swing.Prices);
 
-            var c = new IsPriceDecreaseRateCondition(50, DefaultSuccessiveCandles, false);
+            var c = new IsPriceDecreaseRateCondition(50, DefaultAdditionalCandles, false);
             c.SetPrices(prices.ToList(), Cursor.Last);
             var result = c.IsMet(false);
 

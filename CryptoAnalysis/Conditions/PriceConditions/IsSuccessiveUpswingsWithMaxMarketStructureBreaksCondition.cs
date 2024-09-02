@@ -4,7 +4,7 @@
     {
         protected override bool IsMet()
         {
-            var data = Prices.CreateSubsetByCount(SuccessiveCandles - 1, Price, true);
+            var data = Prices.CreateSubsetByCount(AdditionalCandles - 1, Price, true);
 
             var swings = data.ToUpswings(MaxSwingSize).ToList();
 
@@ -18,7 +18,7 @@
             return true;
         }
 
-        public IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(int maxSwingSize, int minimumUpswings, int maxMarketStructureBreaks, int successiveCandles = DefaultSuccessiveCandles) : base(successiveCandles)
+        public IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(int maxSwingSize, int minimumUpswings, int maxMarketStructureBreaks, int successiveCandles = DefaultAdditionalCandles) : base(successiveCandles)
         {
             MaxSwingSize = maxSwingSize;
             MinimumUpswings = minimumUpswings;
@@ -32,7 +32,7 @@
 
         public void SetSuccessiveCandles(int successiveCandles)
         {
-            SuccessiveCandles = successiveCandles;
+            AdditionalCandles = successiveCandles;
         }
     }
 }

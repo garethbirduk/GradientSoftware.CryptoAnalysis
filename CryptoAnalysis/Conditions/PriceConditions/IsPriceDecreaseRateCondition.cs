@@ -6,10 +6,10 @@
         {
             try
             {
-                var periods = new List<int>() { SuccessiveCandles };
+                var periods = new List<int>() { AdditionalCandles };
                 if (PeriodsToTakeIsMaxPeriodsNotAbsolute)
                 {
-                    periods = periods.TakeLast(SuccessiveCandles).ToList();
+                    periods = periods.TakeLast(AdditionalCandles).ToList();
                 }
 
                 foreach (var period in periods)
