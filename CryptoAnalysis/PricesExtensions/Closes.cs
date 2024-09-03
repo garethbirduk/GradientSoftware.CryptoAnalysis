@@ -1,20 +1,19 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using CryptoAnalysis;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Gradient.CryptoAnalysis
 {
     public static partial class PricesExtensions_Closes
     {
-        public static bool HasDecreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease)
+        public static bool HasDecreasedByPercentage(this IEnumerable<Price> data, double percentageDecrease)
         {
-            return HasIncreasedByPercentage(data, -percentageIncrease);
+            var change = -PercentageIncreaseCloseToClose(data);
+            return change >= percentageDecrease;
         }
 
         public static bool HasIncreasedByPercentage(this IEnumerable<Price> data, double percentageIncrease)
         {
-            var change = PercentageChangeCloseToClose(data);
-
-            if (change < 0 && percentageIncrease < 0)
-                return change <= percentageIncrease;
+            var change = PercentageIncreaseCloseToClose(data);
             return change >= percentageIncrease;
         }
 
@@ -56,12 +55,12 @@ namespace Gradient.CryptoAnalysis
             return list;
         }
 
-        public static double PercentageChangeCloseToClose(this IEnumerable<Price> data)
+        public static double PercentageIncreaseCloseToClose(this IEnumerable<Price> data)
         {
-            var initialOpen = data.First().Close;
+            var initialClose = data.First().Close;
             var finalClose = data.Last().Close;
 
-            return ((finalClose - initialOpen) / initialOpen) * 100;
+            return Maths.PercentageIncrease(initialClose, finalClose);
         }
     }
 }

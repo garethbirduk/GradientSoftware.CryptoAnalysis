@@ -15,7 +15,7 @@
             return data.All(x => x.Close > x.Open);
         }
 
-        public IsSuccessiveGreenCandlesCondition(int successiveCandles = DefaultAdditionalCandles) : base(successiveCandles)
+        public IsSuccessiveGreenCandlesCondition(int additionalCandles = DefaultAdditionalCandles) : base(additionalCandles)
         {
             MinDataSize = 1;
         }

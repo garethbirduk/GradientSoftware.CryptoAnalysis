@@ -4,36 +4,49 @@
     {
         protected override bool IsMet()
         {
-            try
-            {
-                var periods = new List<int>() { AdditionalCandles };
-                if (PeriodsToTakeIsMaxPeriodsNotAbsolute)
-                {
-                    periods = periods.TakeLast(AdditionalCandles).ToList();
-                }
+            var prices = Prices.CreateSubsetByCount(AdditionalCandles, Price, true);
 
-                foreach (var period in periods)
-                {
-                    var data = Prices.CreateSubsetByCount(period - 1, Price, true);
-                    if (data.HasDecreasedByPercentage(PercentageDecrease))
-                        return true;
-                }
+            var from = prices.First();
+            var to = prices.Last();
 
-                return false;
-            }
-            catch (Exception ex)
+            switch (SubsetType)
             {
-                return false;
+                case SubsetType.FirstToLast:
+                default:
+                    {
+                        if (prices.Count() < AdditionalCandles + 1)
+                            return false;
+                        break;
+                    }
+                case SubsetType.HighestToLast:
+                    {
+                        from = prices.Where(x => x.Close == prices.Select(x => x.Close).Max()).First();
+                        break;
+                    }
+                case SubsetType.FirstToLowest:
+                    {
+                        to = prices.Where(x => x.Close == prices.Select(x => x.Close).Min()).First();
+                        break;
+                    }
+                case SubsetType.HighestToLowest:
+                    {
+                        from = prices.Where(x => x.Close == prices.Select(x => x.Close).Max()).First();
+                        to = prices.Where(x => x.Close == prices.Select(x => x.Close).Min()).First();
+                        break;
+                    }
             }
+
+            var data = Prices.CreateSubset(from, to, true);
+            return data.HasDecreasedByPercentage(PercentageDecrease);
         }
 
-        public IsPriceDecreaseRateCondition(double percentageDecrease, int successiveCandles, bool max = false) : base(successiveCandles)
+        public IsPriceDecreaseRateCondition(double percentageDecrease, int additionalCandles, SubsetType subsetType) : base(additionalCandles)
         {
             PercentageDecrease = percentageDecrease;
-            PeriodsToTakeIsMaxPeriodsNotAbsolute = max;
+            SubsetType = subsetType;
         }
 
         public double PercentageDecrease { get; set; }
-        public bool PeriodsToTakeIsMaxPeriodsNotAbsolute { get; }
+        public SubsetType SubsetType { get; set; }
     }
 }

@@ -2,7 +2,7 @@
 {
     public interface IAdjustableCandles
     {
-        public void SetSuccessiveCandles(int successiveCandles);
+        public void SetSuccessiveCandles(int additionalCandles);
     }
 
     public class IsBreakOfStructureCondition : PriceCondition, IAdjustableCandles
@@ -18,13 +18,13 @@
             return result;
         }
 
-        public IsBreakOfStructureCondition(int successiveCandles = DefaultAdditionalCandles) : base(successiveCandles)
+        public IsBreakOfStructureCondition(int additionalCandles = DefaultAdditionalCandles) : base(additionalCandles)
         {
         }
 
-        public void SetSuccessiveCandles(int successiveCandles)
+        public void SetSuccessiveCandles(int additionalCandles)
         {
-            AdditionalCandles = successiveCandles;
+            AdditionalCandles = additionalCandles;
         }
     }
 }
