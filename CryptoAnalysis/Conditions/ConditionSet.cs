@@ -26,7 +26,9 @@ namespace Gradient.CryptoAnalysis.Conditions
 
                 if (condition.GetType().GetInterfaces().Contains(typeof(IAdjustableCandles)))
                 {
-                    ((IAdjustableCandles)condition).SetSuccessiveCandles(200);
+                    var c = (IAdjustableCandles)condition;
+                    var additionalCandles = c.AdditionalCandles;
+                    ((IAdjustableCandles)condition).SetAdditionalCandles(additionalCandles);
                 }
             }
 

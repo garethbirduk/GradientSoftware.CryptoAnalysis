@@ -2,6 +2,19 @@
 
 namespace Gradient.CryptoAnalysis
 {
+    public static class PriceExtensions
+    {
+        public static bool IsGreen(this Price price)
+        {
+            return price.Close > price.Open;
+        }
+
+        public static bool IsRed(this Price price)
+        {
+            return price.Close < price.Open;
+        }
+    }
+
     public class Price
     {
         [Name("close")]
@@ -20,5 +33,10 @@ namespace Gradient.CryptoAnalysis
 
         [Name("open")]
         public double Open { get; set; }
+
+        public override string ToString()
+        {
+            return $"{DateTime} : {Close}";
+        }
     }
 }

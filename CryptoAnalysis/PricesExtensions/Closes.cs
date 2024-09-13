@@ -29,7 +29,7 @@ namespace Gradient.CryptoAnalysis
 
             foreach (var price in prices.Where(x => x != null))
             {
-                if (price.Close > list.Last().Close)
+                if (price.IsGreen() && price.Close > list.Last().Close)
                     list.Add(price);
             }
 
@@ -48,7 +48,7 @@ namespace Gradient.CryptoAnalysis
 
             foreach (var price in values)
             {
-                if (price.Close < list.Last().Close)
+                if (price.IsRed() && price.Close < list.Last().Close)
                     list.Add(price);
             }
 

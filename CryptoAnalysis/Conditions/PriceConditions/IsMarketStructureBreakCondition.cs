@@ -17,7 +17,7 @@
         {
         }
 
-        public void SetSuccessiveCandles(int successiveCandles)
+        public void SetAdditionalCandles(int successiveCandles)
         {
             AdditionalCandles = successiveCandles;
         }

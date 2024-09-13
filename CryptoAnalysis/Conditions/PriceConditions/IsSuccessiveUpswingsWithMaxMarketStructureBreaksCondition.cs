@@ -30,7 +30,7 @@
         public Price? MetAt { get; set; }
         public int MinimumUpswings { get; }
 
-        public void SetSuccessiveCandles(int successiveCandles)
+        public void SetAdditionalCandles(int successiveCandles)
         {
             AdditionalCandles = successiveCandles;
         }

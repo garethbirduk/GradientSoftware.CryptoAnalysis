@@ -2,7 +2,9 @@
 {
     public interface IAdjustableCandles
     {
-        public void SetSuccessiveCandles(int additionalCandles);
+        public int AdditionalCandles { get; }
+
+        public void SetAdditionalCandles(int additionalCandles);
     }
 
     public class IsBreakOfStructureCondition : PriceCondition, IAdjustableCandles
@@ -22,7 +24,7 @@
         {
         }
 
-        public void SetSuccessiveCandles(int additionalCandles)
+        public void SetAdditionalCandles(int additionalCandles)
         {
             AdditionalCandles = additionalCandles;
         }
