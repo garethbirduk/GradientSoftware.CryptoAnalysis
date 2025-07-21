@@ -1,5 +1,6 @@
 ﻿using CryptoAnalysis.Csv.ClassMaps;
 using Gradient.CryptoAnalysis.Csv;
+using Plotly.NET;
 
 namespace Gradient.CryptoAnalysis.Test.PriceExtensions
 {
@@ -18,7 +19,25 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
         [TestMethod]
         public void TestToHighSegments_Ok()
         {
+            var chart = ChartGenerator.CreatePriceChart(_prices);
+
             var segments = _prices.ToHighSegments();
+            foreach (var segment in segments)
+            {
+                chart = chart.AddLayers(new Layer
+                {
+                    Name = "base",
+                    ChartFactory = () => ChartGenerator.GenerateLineChart(
+                        segment,
+                        p => (decimal)p.Close,
+                        "Close Prices"
+                    ),
+                    Color = Color.fromString("red"),
+                    LineWidth = 3,
+                });
+            }
+
+            chart.SaveHtml(Path.Combine("c:\\", "temp", "toHighSegments"));
 
             Assert.AreEqual(10, segments.Count);
             Assert.AreEqual(9, segments[0].Count);

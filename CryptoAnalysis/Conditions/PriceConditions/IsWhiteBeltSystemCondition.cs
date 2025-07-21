@@ -26,7 +26,7 @@
         public IsWhiteBeltSystemCondition(int maxSwingSize, int minimumUpswings, int maxMarketStructureBreaks, int additionalCandles = DefaultAdditionalCandles) : base(additionalCandles)
         {
             IsInUptrendCondition = new IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition(maxSwingSize, minimumUpswings, maxMarketStructureBreaks, AdditionalCandles);
-            IsInRangeCondition = new IsInRangeCondition();
+            IsInRangeCondition = new IsInRangeCondition(10);
         }
     }
 }

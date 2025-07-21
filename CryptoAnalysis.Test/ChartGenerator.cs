@@ -1,6 +1,7 @@
 ﻿using Gradient.CryptoAnalysis;
 using Microsoft.FSharp.Core;
 using Plotly.NET;
+using Plotly.NET.TraceObjects;
 
 public static class ChartGenerator
 {
@@ -21,6 +22,51 @@ public static class ChartGenerator
         });
 
         return Chart.Combine(new[] { baseChart }.Concat(layerCharts));
+    }
+
+    public static Layer CreateAnnotationLayer(
+    List<AnnotatedPrice> prices,
+    Color? color = null,
+    int? size = null
+)
+    {
+        if (!prices.Any()) return new Layer();
+
+        var annotation = prices.First().Annotations.First();
+        var type = annotation.AnnotationType;
+
+        var points = prices.Select(p =>
+        {
+            var a = p.Annotations.First();
+            double y = a.Position switch
+            {
+                EnumPosition.Above => p.Close + 0.5,
+                EnumPosition.Below => p.Close - 0.5,
+                EnumPosition.Precise => p.Close,
+                _ => p.Close
+            };
+            return (x: p.DateTime, y, text: a.Note);
+        }).ToList();
+
+        return new Layer
+        {
+            Name = type.ToString(),
+            ChartFactory = () =>
+                Chart2D.Chart.Point<DateTime, double, string>(
+                    x: points.Select(p => p.x),
+                    y: points.Select(p => p.y),
+                    MultiText: FSharpOption<IEnumerable<string>>.Some(points.Select(p => p.text)),
+                    MultiTextPosition: FSharpOption<IEnumerable<StyleParam.TextPosition>>.Some(
+                        Enumerable.Repeat(StyleParam.TextPosition.TopCenter, points.Count)
+                    )
+                )
+                .WithMarker(Marker.init(
+                    Color: color,
+                    Size: size.HasValue ? FSharpOption<int>.Some(size.Value) : FSharpOption<int>.None,
+                    Symbol: StyleParam.MarkerSymbol.ArrowUp
+                )),
+            Color = color
+        };
     }
 
     public static GenericChart CreateChart(params Layer[] layers)
@@ -48,6 +94,22 @@ public static class ChartGenerator
         });
 
         return Chart.Combine(charts);
+    }
+
+    public static GenericChart CreatePriceChart(List<Price> prices)
+    {
+        return ChartGenerator.CreateChart()
+            .AddLayers(new Layer
+            {
+                Name = "base",
+                ChartFactory = () => ChartGenerator.GenerateLineChart(
+                    prices,
+                    p => (decimal)p.Close,
+                    "Close Prices"
+                ),
+                Color = Color.fromString("blue"),
+                LineWidth = 5,
+            });
     }
 
     public static GenericChart GenerateAnnotatedCandlestickChart(List<AnnotatedPrice> prices)

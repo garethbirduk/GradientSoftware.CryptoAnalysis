@@ -1,5 +1,6 @@
 ﻿using CryptoAnalysis.Csv.ClassMaps;
 using Gradient.CryptoAnalysis.Csv;
+using Plotly.NET;
 
 namespace Gradient.CryptoAnalysis.Test.PriceExtensions
 {
@@ -13,8 +14,12 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
         public void TestGetHighs()
         {
             CollectionAssert.AreEqual(new List<Price>(), new List<Price>().HighCloses());
+            var chart = ChartGenerator.CreatePriceChart(_prices);
 
-            var highs = _prices.HighCloses();
+            var highs = _prices.HighCloses().ToAnnotatedPrices(EnumAnnotationType.HigherHigh);
+            chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(highs));
+            chart.SaveHtml(Path.Combine("c:\\", "temp", "GetHighs"));
+
             Assert.AreEqual(16, highs.Count);
             var i = 0;
             Assert.AreEqual(new DateTime(2024, 2, 7), highs[i++].DateTime);
