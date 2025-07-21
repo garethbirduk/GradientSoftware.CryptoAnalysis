@@ -5,3 +5,6 @@ coverage/
 TestResults/
 
 **/*/coverage.opencover.xml
+ConcatenateCsFiles.ps1
+Combined/CryptoAnalysis.Test_Combined.cs
+Combined/CryptoAnalysis_Combined.cs

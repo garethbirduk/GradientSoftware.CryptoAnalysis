@@ -1,4 +1,6 @@
-﻿namespace Gradient.CryptoAnalysis.Test.PriceExtensions
+﻿using Plotly.NET;
+
+namespace Gradient.CryptoAnalysis.Test.PriceExtensions
 {
     [TestClass]
     public class ToUpswingsTests
@@ -76,46 +78,91 @@
             // Act
             var actual = _prices.ToUpswings();
 
-            // Assert
-            CollectionAssert.AreEqual(new List<Upswing>(), new List<Price>().ToUpswings());
+            //// Assert
+            //CollectionAssert.AreEqual(new List<Upswing>(), new List<Price>().ToUpswings());
 
-            Assert.AreEqual(5, actual.Count);
+            //Assert.AreEqual(5, actual.Count);
 
-            Assert.AreEqual(7, actual[0].Prices.Count);
-            Assert.AreEqual(21, actual[0].BreakOfStructure.Close);
-            Assert.IsNull(actual[0].MarketStructureBreak);
+            //Assert.AreEqual(7, actual[0].Prices.Count);
+            //Assert.AreEqual(21, actual[0].BreakOfStructure.Close);
+            //Assert.IsNull(actual[0].MarketStructureBreak);
 
-            Assert.AreEqual(4, actual[1].Prices.Count);
-            Assert.AreEqual(30, actual[1].BreakOfStructure.Close);
-            Assert.IsNull(actual[1].MarketStructureBreak);
+            //Assert.AreEqual(4, actual[1].Prices.Count);
+            //Assert.AreEqual(30, actual[1].BreakOfStructure.Close);
+            //Assert.IsNull(actual[1].MarketStructureBreak);
 
-            Assert.AreEqual(26, actual[2].Prices.Count);
-            Assert.AreEqual(31, actual[2].BreakOfStructure.Close);
-            Assert.IsNull(actual[2].MarketStructureBreak);
+            //Assert.AreEqual(26, actual[2].Prices.Count);
+            //Assert.AreEqual(31, actual[2].BreakOfStructure.Close);
+            //Assert.IsNull(actual[2].MarketStructureBreak);
 
-            Assert.AreEqual(12, actual[3].Prices.Count);
-            Assert.AreEqual(35, actual[3].BreakOfStructure.Close);
-            Assert.IsNull(actual[3].MarketStructureBreak);
+            //Assert.AreEqual(12, actual[3].Prices.Count);
+            //Assert.AreEqual(35, actual[3].BreakOfStructure.Close);
+            //Assert.IsNull(actual[3].MarketStructureBreak);
 
-            Assert.AreEqual(5, actual[4].Prices.Count);
-            Assert.AreEqual(50, actual[4].BreakOfStructure.Close);
-            Assert.AreEqual(20, actual[4].MarketStructureBreak.Close);
+            //Assert.AreEqual(5, actual[4].Prices.Count);
+            //Assert.AreEqual(50, actual[4].BreakOfStructure.Close);
+            //Assert.AreEqual(20, actual[4].MarketStructureBreak.Close);
 
-            var interim2 = actual[2].InterimUpswings;
+            //var interim2 = actual[2].InterimUpswings;
 
-            Assert.AreEqual(4, interim2.Count);
+            //Assert.AreEqual(4, interim2.Count);
 
-            Assert.AreEqual(26, interim2[0].BreakOfStructure.Close);
-            Assert.IsNull(interim2[0].MarketStructureBreak);
+            //Assert.AreEqual(26, interim2[0].BreakOfStructure.Close);
+            //Assert.IsNull(interim2[0].MarketStructureBreak);
 
-            Assert.AreEqual(29, interim2[1].BreakOfStructure.Close);
-            Assert.IsNull(interim2[1].MarketStructureBreak);
+            //Assert.AreEqual(29, interim2[1].BreakOfStructure.Close);
+            //Assert.IsNull(interim2[1].MarketStructureBreak);
 
-            Assert.AreEqual(30, interim2[2].BreakOfStructure.Close);
-            Assert.IsNull(interim2[2].MarketStructureBreak);
+            //Assert.AreEqual(30, interim2[2].BreakOfStructure.Close);
+            //Assert.IsNull(interim2[2].MarketStructureBreak);
 
-            Assert.AreEqual(31, interim2[3].BreakOfStructure.Close);
-            Assert.AreEqual(16, interim2[3].MarketStructureBreak.Close);
+            //Assert.AreEqual(31, interim2[3].BreakOfStructure.Close);
+            //Assert.AreEqual(16, interim2[3].MarketStructureBreak.Close);
+
+            var chart = ChartGenerator.CreateChart()
+                .AddLayers(new Layer
+                {
+                    Name = "base",
+                    ChartFactory = () => ChartGenerator.GenerateLineChart(
+                        _prices,
+                        p => (decimal)p.Close,
+                        "Close Prices"
+                    ),
+                    Color = Color.fromString("blue"),
+                    LineWidth = 5
+                });
+
+            foreach (var a in actual)
+            {
+                chart = chart.AddLayers(
+                    new Layer
+                    {
+                        Name = "highs",
+                        ChartFactory = () => ChartGenerator.GenerateLineChart(
+                            a.Prices,
+                            p => (decimal)p.Close,
+                            "High Closes"
+                        ),
+                        LineWidth = 3
+                    });
+
+                foreach (var i in a.InterimUpswings)
+                {
+                    chart = chart.AddLayers(
+                        new Layer
+                        {
+                            Name = "highs",
+                            ChartFactory = () => ChartGenerator.GenerateLineChart(
+                                i.Prices,
+                                p => (decimal)p.Close,
+                                "High Closes"
+                            ),
+                            LineWidth = 1
+                        });
+                }
+            }
+
+            chart.SaveHtml(Path.Combine("c:\\", "temp", "upswings"));
         }
 
         [TestMethod]

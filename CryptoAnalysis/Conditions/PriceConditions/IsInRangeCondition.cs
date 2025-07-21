@@ -2,9 +2,11 @@
 {
     public class IsInRangeCondition : PriceCondition
     {
+        private int MaxSwingSize;
+
         protected override bool IsMet()
         {
-            var swings = Prices.ToUpswings(2).ToList();
+            var swings = Prices.ToUpswings(MaxSwingSize).ToList();
             if (swings.Count < 2)
                 return false;
 
@@ -12,13 +14,18 @@
             var previous = swings[swings.Count - 2];
 
             var prices = previous.Prices.Skip(previous.Prices.IndexOf(previous.SwingLow))
-                .Union(swing.Prices);
+                .Union(swing.Prices).ToList();
 
-            var c = new IsPriceDecreaseRateCondition(25, DefaultAdditionalCandles, SubsetType.LowestToLast);
+            var c = new IsPriceDecreaseRateCondition(25, AdditionalCandles, SubsetType.LowestToLast);
             c.SetPrices(prices.ToList(), Cursor.Last);
             var result = c.IsMet(false);
 
             return result;
+        }
+
+        public IsInRangeCondition(int maxSwingSize, int additionalCandles = DefaultAdditionalCandles) : base(additionalCandles)
+        {
+            MaxSwingSize = maxSwingSize;
         }
     }
 }

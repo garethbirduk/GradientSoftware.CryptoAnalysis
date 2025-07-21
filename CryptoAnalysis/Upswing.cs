@@ -71,25 +71,40 @@ namespace Gradient.CryptoAnalysis
         }
 
         public List<Price> NextInterswingPrices { get; set; } = new List<Price>();
+
         public Price? NextPrice { get; }
+
         public Price? PreviousHigh { get; }
+
         public List<Price> PreviousInterswingPrices { get; set; } = new List<Price>();
+
         public Price? PreviousLow { get; }
+
         public Upswing? PreviousUpswing { get; }
+
         public List<Price> Prices { get; set; } = new();
+
+        public Price? SwingClose
+        {
+            get
+            {
+                return Prices.Last();
+            }
+        }
+
+        public Price? SwingHigh
+        {
+            get
+            {
+                return Prices.FirstOrDefault(x => x.Close == Prices.Max(x => x.Close));
+            }
+        }
 
         public Price? SwingLow
         {
             get
             {
                 return Prices.FirstOrDefault(x => x.Close == Prices.Min(x => x.Close));
-            }
-        }
-        public Price? SwingHigh
-        {
-            get
-            {
-                return Prices.FirstOrDefault(x => x.Close == Prices.Max(x => x.Close));
             }
         }
 
@@ -100,12 +115,10 @@ namespace Gradient.CryptoAnalysis
                 return Prices.First();
             }
         }
-        public Price? SwingClose
+
+        public override string ToString()
         {
-            get
-            {
-                return Prices.Last();
-            }
+            return $"{InitialPrice}-{BreakOfStructure} ({Prices.Count()})";
         }
     }
 }

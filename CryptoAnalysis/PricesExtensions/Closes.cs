@@ -36,6 +36,44 @@ namespace Gradient.CryptoAnalysis
             return list;
         }
 
+        public static List<Price> HighHighs(this IEnumerable<Price> prices)
+        {
+            if (!prices.Any())
+                return new List<Price>();
+
+            var list = new List<Price>
+            {
+                prices.First(),
+            };
+
+            foreach (var price in prices.Where(x => x != null))
+            {
+                if (price.IsGreen() && price.High > list.Last().High)
+                    list.Add(price);
+            }
+
+            return list;
+        }
+
+        public static List<Price> HighLows(this IEnumerable<Price> prices)
+        {
+            if (!prices.Any())
+                return new List<Price>();
+
+            var list = new List<Price>
+            {
+                prices.First(),
+            };
+
+            foreach (var price in prices.Where(x => x != null))
+            {
+                if (price.IsRed() && price.High > list.Last().High)
+                    list.Add(price);
+            }
+
+            return list;
+        }
+
         public static List<Price> LowCloses(this IEnumerable<Price> values)
         {
             if (values.IsNullOrEmpty())
@@ -49,6 +87,25 @@ namespace Gradient.CryptoAnalysis
             foreach (var price in values)
             {
                 if (price.IsRed() && price.Close < list.Last().Close)
+                    list.Add(price);
+            }
+
+            return list;
+        }
+
+        public static List<Price> LowLows(this IEnumerable<Price> prices)
+        {
+            if (!prices.Any())
+                return new List<Price>();
+
+            var list = new List<Price>
+            {
+                prices.First(),
+            };
+
+            foreach (var price in prices.Where(x => x != null))
+            {
+                if (price.IsRed() && price.Low < list.Last().Low)
                     list.Add(price);
             }
 
