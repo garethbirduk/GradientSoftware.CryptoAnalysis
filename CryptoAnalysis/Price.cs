@@ -104,6 +104,16 @@ namespace Gradient.CryptoAnalysis
         }
     }
 
+    public sealed class ColorAttribute : Attribute
+    {
+        public ColorAttribute(string color)
+        {
+            Color = color;
+        }
+
+        public string Color { get; }
+    }
+
     public sealed class PositionAttribute : Attribute
     {
         public PositionAttribute(EnumPosition position)

@@ -8,7 +8,9 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
     public class ToHighSegmentsTests
     {
         private List<Price> _prices;
-        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "ToHighSegmentsTests", "TestData.csv");
+
+        //public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "ToHighSegmentsTests", "TestData.csv");
+        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "COINBASE_BTCUSD, 60.csv");
 
         [TestInitialize]
         public void TestInitialize()
@@ -19,22 +21,60 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
         [TestMethod]
         public void TestToHighSegments_Ok()
         {
-            var chart = ChartGenerator.CreatePriceChart(_prices);
+            var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true);
 
             var segments = _prices.ToHighSegments();
-            foreach (var segment in segments)
+            //foreach (var segment in segments)
+            //{
+            //    chart = chart.AddLayers(new Layer
+            //    {
+            //        Name = "base",
+            //        ChartFactory = () => ChartGenerator.GenerateLineChart(
+            //            segment,
+            //            p => (decimal)p.Close,
+            //            "Close Prices"
+            //        ),
+            //        Color = Color.fromString("red"),
+            //        LineWidth = 3,
+            //    });
+            //}
+
+            //var annotatedHigherHighs = _prices.ToHigherHighs().ToAnnotatedPrices(EnumAnnotationType.HigherHigh);
+            //chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(annotatedHigherHighs));
+
+            //var annotatedHigherLows = _prices.ToHigherLows().ToAnnotatedPrices(EnumAnnotationType.HigherLow);
+            //chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(annotatedHigherLows));
+
+            //var sawtooth = _prices.ToUptrendSawtooth();
+            //chart = chart.AddLayers(new Layer
+            //{
+            //    Name = "base",
+            //    ChartFactory = () => ChartGenerator.GenerateLineChart(
+            //        sawtooth,
+            //        p => (decimal)p.Close,
+            //        "Close Prices"
+            //    ),
+            //    Color = Color.fromString("green"),
+            //    LineWidth = 3,
+            //});
+
+            var breakOfStructures = _prices.ToUptrendBreakOfStructures();
+            foreach (var bos in breakOfStructures)
             {
-                chart = chart.AddLayers(new Layer
+                var start = new Price()
                 {
-                    Name = "base",
-                    ChartFactory = () => ChartGenerator.GenerateLineChart(
-                        segment,
-                        p => (decimal)p.Close,
-                        "Close Prices"
-                    ),
-                    Color = Color.fromString("red"),
-                    LineWidth = 3,
-                });
+                    Close = bos.Item2.Close,
+                    DateTime = bos.Item2.DateTime
+                };
+                var end = new Price()
+                {
+                    Close = bos.Item2.Close, // yes item2
+                    DateTime = bos.Item1.DateTime
+                };
+
+                var bosPrices = new List<Price>() { start, end };
+                //var annotatedUptrendBreakOfStructures = bosPrices.ToAnnotatedPrices(EnumAnnotationType.BreakOfStructure);
+                chart = chart.AddLayers(ChartGenerator.PriceClosesLineLayer(bosPrices, Color.fromString("Cyan")));
             }
 
             chart.SaveHtml(Path.Combine("c:\\", "temp", "toHighSegments"));

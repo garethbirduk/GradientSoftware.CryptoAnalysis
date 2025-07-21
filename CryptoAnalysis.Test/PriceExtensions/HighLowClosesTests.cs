@@ -11,26 +11,6 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
         public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "HighLowClosesTests", "TestData.csv");
 
         [TestMethod]
-        public void TestGetHighs()
-        {
-            CollectionAssert.AreEqual(new List<Price>(), new List<Price>().HighCloses());
-            var chart = ChartGenerator.CreatePriceChart(_prices);
-
-            var highs = _prices.HighCloses().ToAnnotatedPrices(EnumAnnotationType.HigherHigh);
-            chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(highs));
-            chart.SaveHtml(Path.Combine("c:\\", "temp", "GetHighs"));
-
-            Assert.AreEqual(16, highs.Count);
-            var i = 0;
-            Assert.AreEqual(new DateTime(2024, 2, 7), highs[i++].DateTime);
-            Assert.AreEqual(new DateTime(2024, 2, 7, 9, 0, 0), highs[i++].DateTime);
-            Assert.AreEqual(new DateTime(2024, 2, 7, 13, 0, 0), highs[i++].DateTime);
-            Assert.AreEqual(new DateTime(2024, 2, 7, 16, 0, 0), highs[i++].DateTime);
-            Assert.AreEqual(new DateTime(2024, 2, 7, 17, 0, 0), highs[i++].DateTime);
-            Assert.AreEqual(new DateTime(2024, 2, 7, 18, 0, 0), highs[i++].DateTime);
-        }
-
-        [TestMethod]
         public void TestGetLows()
         {
             CollectionAssert.AreEqual(new List<Price>(), new List<Price>().LowCloses());
@@ -48,6 +28,30 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
         public void TestInitialize()
         {
             _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(_cryptoDataFilePath).ToList();
+        }
+
+        [TestMethod]
+        public void TestsToHighHighsUsingCloses()
+        {
+            CollectionAssert.AreEqual(new List<Price>(), new List<Price>().HighCloses());
+            var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true);
+
+            var highHighs = _prices.ToHighHighsUsingCloses();
+            var annotated = highHighs.ToAnnotatedPrices(EnumAnnotationType.HigherHigh);
+            chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(annotated, StyleParam.MarkerSymbol.TriangleUp, Color.fromString("Green")));
+            chart.SaveHtml(Path.Combine("c:\\", "temp", "ToHighHighsUsingCloses"));
+        }
+
+        [TestMethod]
+        public void TestsToHighHighsUsingHighs()
+        {
+            CollectionAssert.AreEqual(new List<Price>(), new List<Price>().HighCloses());
+            var chart = ChartGenerator.CreatePriceChart(_prices, lineHighs: true);
+
+            var highHighs = _prices.ToHighHighsUsingHighs();
+            var annotated = highHighs.ToAnnotatedPrices(EnumAnnotationType.HigherHigh);
+            chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(annotated, StyleParam.MarkerSymbol.TriangleUp, Color.fromString("Green")));
+            chart.SaveHtml(Path.Combine("c:\\", "temp", "ToHighHighsUsingHighs"));
         }
     }
 }

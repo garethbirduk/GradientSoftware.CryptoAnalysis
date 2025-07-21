@@ -25,10 +25,11 @@ public static class ChartGenerator
     }
 
     public static Layer CreateAnnotationLayer(
-    List<AnnotatedPrice> prices,
-    Color? color = null,
-    int? size = null
-)
+        List<AnnotatedPrice> prices,
+        StyleParam.MarkerSymbol symbol,
+        Color? color = null,
+        int? size = null
+    )
     {
         if (!prices.Any()) return new Layer();
 
@@ -63,7 +64,7 @@ public static class ChartGenerator
                 .WithMarker(Marker.init(
                     Color: color,
                     Size: size.HasValue ? FSharpOption<int>.Some(size.Value) : FSharpOption<int>.None,
-                    Symbol: StyleParam.MarkerSymbol.ArrowUp
+                    Symbol: symbol
                 )),
             Color = color
         };
@@ -96,20 +97,23 @@ public static class ChartGenerator
         return Chart.Combine(charts);
     }
 
-    public static GenericChart CreatePriceChart(List<Price> prices)
+    public static GenericChart CreatePriceChart(List<Price> prices,
+        bool candlestick = false,
+        bool lineCloses = false,
+        bool lineHighs = false,
+        bool lineLows = false)
     {
-        return ChartGenerator.CreateChart()
-            .AddLayers(new Layer
-            {
-                Name = "base",
-                ChartFactory = () => ChartGenerator.GenerateLineChart(
-                    prices,
-                    p => (decimal)p.Close,
-                    "Close Prices"
-                ),
-                Color = Color.fromString("blue"),
-                LineWidth = 5,
-            });
+        var layers = new List<Layer>();
+        //if (candlestick)
+        //    layers.Add(GenerateCandlestickChart(prices));
+        if (lineCloses)
+            layers.Add(PriceClosesLineLayer(prices));
+        if (lineHighs)
+            layers.Add(PriceHighsLineLayer(prices));
+        if (lineLows)
+            layers.Add(PriceLowsLineLayer(prices));
+
+        return CreateChart().AddLayers(layers.ToArray());
     }
 
     public static GenericChart GenerateAnnotatedCandlestickChart(List<AnnotatedPrice> prices)
@@ -190,7 +194,7 @@ public static class ChartGenerator
         Func<T, DateTime> xSelector,
         Func<T, decimal> ySelector,
         string title = "Line Chart"
-    )
+        )
     {
         var xData = data.Select(xSelector);
         var yData = data.Select(ySelector);
@@ -210,7 +214,7 @@ public static class ChartGenerator
         List<T> prices,
         Func<T, decimal> ySelector,
         string title = "Line Chart"
-    ) where T : Price
+        ) where T : Price
     {
         var xData = prices.Select(x => x.DateTime);
         var yData = prices.Select(ySelector);
@@ -225,6 +229,70 @@ public static class ChartGenerator
             .WithXAxisStyle(title: Title.init("Date"))
             .WithYAxisStyle(title: Title.init("Value"));
     }
+
+    public static Layer PriceClosesLineLayer(List<Price> prices, Color? color = null)
+    {
+        if (color == null)
+            color = Color.fromString("Black");
+        return new Layer
+        {
+            Name = "base",
+            ChartFactory = () => ChartGenerator.GenerateLineChart(
+                    prices,
+                    p => (decimal)p.Close,
+                    "Close Prices"
+                ),
+            Color = color,
+            LineWidth = 3,
+        };
+    }
+
+    public static Layer PriceHighsLineLayer(List<Price> prices, Color? color = null)
+    {
+        if (color == null)
+            color = Color.fromString("Black");
+        return new Layer
+        {
+            Name = "base",
+            ChartFactory = () => ChartGenerator.GenerateLineChart(
+                prices,
+                p => (decimal)p.High,
+                "Close Prices"
+            ),
+            Color = color,
+            LineWidth = 3,
+        };
+    }
+
+    public static Layer PriceLowsLineLayer(List<Price> prices, Color? color = null)
+    {
+        if (color == null)
+            color = Color.fromString("Black");
+        return new Layer
+        {
+            Name = "base",
+            ChartFactory = () => ChartGenerator.GenerateLineChart(
+                prices,
+                p => (decimal)p.Low,
+                "Close Prices"
+            ),
+            Color = color,
+            LineWidth = 3,
+        };
+    }
+
+    public static Layer PriceOpenLine(List<Price> prices) =>
+    new Layer
+    {
+        Name = "base",
+        ChartFactory = () => ChartGenerator.GenerateLineChart(
+                    prices,
+                    p => (decimal)p.Open,
+                    "Close Prices"
+                ),
+        Color = Color.fromString("blue"),
+        LineWidth = 3,
+    };
 
     public static void Save(this GenericChart chart, string outputPath)
     {

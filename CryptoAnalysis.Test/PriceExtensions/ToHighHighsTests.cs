@@ -55,6 +55,6 @@
 //    [TestMethod]
 //    public void TestToHighs_Empty()
 //    {
-//        CollectionAssert.AreEqual(new List<List<Price>>(), new List<Price>().ToHighHighs());
+//        CollectionAssert.AreEqual(new List<List<Price>>(), new List<Price>().ToHighHighsUsingHighs());
 //    }
 //}
