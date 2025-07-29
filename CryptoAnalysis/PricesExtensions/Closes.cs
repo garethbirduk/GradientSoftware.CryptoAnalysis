@@ -3,7 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Gradient.CryptoAnalysis
 {
-    public static partial class PricesExtensions_Closes
+    public static partial class PricesExtensions_Closes2
     {
         public static bool HasDecreasedByPercentage(this IEnumerable<Price> data, double percentageDecrease)
         {
@@ -17,7 +17,7 @@ namespace Gradient.CryptoAnalysis
             return change >= percentageIncrease;
         }
 
-        public static List<Price> HighCloses(this IEnumerable<Price> prices)
+        public static List<Price> HighClosesIsGreen(this IEnumerable<Price> prices, EnumCloseType closeType)
         {
             if (!prices.Any())
                 return new List<Price>();
@@ -29,8 +29,30 @@ namespace Gradient.CryptoAnalysis
 
             foreach (var price in prices.Where(x => x != null))
             {
-                if (price.IsGreen() && price.Close > list.Last().Close)
-                    list.Add(price);
+                if (price.IsGreen())
+                {
+                    switch (closeType)
+                    {
+                        case EnumCloseType.Close:
+                        {
+                            if (price.Close > list.Last().Close)
+                                list.Add(price);
+                            break;
+                        }
+                        case EnumCloseType.High:
+                        {
+                            if (price.High > list.Last().High)
+                                list.Add(price);
+                            break;
+                        }
+                        default:
+                        {
+                            break;
+                        }
+                    }
+                    
+                }
+                    
             }
 
             return list;

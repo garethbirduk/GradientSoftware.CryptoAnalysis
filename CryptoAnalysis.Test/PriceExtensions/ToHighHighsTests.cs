@@ -19,7 +19,7 @@
 //    [TestMethod]
 //    public void TestToHighHighs_Ok()
 //    {
-//        var Highs = _prices.ToHigherHighs();
+//        var Highs = _prices.HigherHighs();
 
 //        ChartGenerator.CreateChart()
 //            .AddLayers(new Layer

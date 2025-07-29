@@ -2,15 +2,15 @@
 {
     public static partial class PricesExtensions_Segments
     {
-        public static List<Price> ToHigherHighs(this List<Price> prices)
+        public static List<Price> HigherHighs(this List<Price> prices)
         {
-            var segments = prices.ToHighSegments();
+            var segments = prices.ToHighSegments(EnumCloseType.Close);
             return segments.Select(x => x.First()).ToList();
         }
 
         public static List<Price> ToHigherLows(this List<Price> prices)
         {
-            var segments = prices.ToHighSegments();
+            var segments = prices.ToHighSegments(EnumCloseType.Close);
             var list = new List<Price>();
             foreach (var segment in segments)
             {
@@ -20,12 +20,13 @@
             return list;
         }
 
-        public static List<List<Price>> ToHighSegments(this List<Price> prices)
+        public static List<List<Price>> ToHighSegments(this List<Price> prices, EnumCloseType closeType, bool TrimStart = false)
         {
             if (!prices.Any())
                 return new List<List<Price>>();
 
-            var highs = prices.HighCloses();
+            var highs = prices.HighClosesIsGreen(closeType);
+            var highs2 = prices.AllTimeHighs(closeType);
 
             var segments = new List<List<Price>>();
 
@@ -46,6 +47,24 @@
                 var segment = prices.Skip(skip).Take(take).ToList();
                 if (segment.Count() > 1)
                     segments.Add(segment);
+            }
+
+            if (TrimStart && segments.Any())
+            {
+                var segment = segments.First();
+                var lowPrice = segment.MinBy(x => x.Close);
+                if (closeType == EnumCloseType.High)
+                    lowPrice = segment.MinBy(x => x.High);
+
+                if (lowPrice != null)
+                {
+                    var highPrice = segment.Where(x => x.DateTime > lowPrice.DateTime).MaxBy(x => x.Close);
+                    if (closeType == EnumCloseType.High)
+                        highPrice = segment.Where(x => x.DateTime > lowPrice.DateTime).MaxBy(x => x.High);
+
+                    if (highPrice != null)
+                        segment.RemoveAll(x => x.DateTime < highPrice.DateTime);
+                }
             }
 
             return segments;
@@ -82,10 +101,54 @@
             return segments;
         }
 
-        public static List<Tuple<Price, Price>> ToUptrendBreakOfStructures(this List<Price> prices)
+        public static (List<Tuple<Price, Price>> breaksOfStructures, List<Tuple<Price, Price>> marketStructureBreaks) ToStructures(this List<Price> prices)
+        {
+            var breaksOfStructures = new List<Tuple<Price, Price>>();
+            var marketStructureBreaks = new List<Tuple<Price, Price>>();
+            var sawtooth = prices.ToUptrendSawtooth();
+            var swings = prices.ToUpswings(EnumCloseType.High);
+
+            for (var index = 0; index < sawtooth.Count; index += 1)
+            {
+                if (index + 2 < sawtooth.Count)
+                {
+                    var start = sawtooth[index];
+                    var mid = sawtooth[index + 1];
+                    var end = sawtooth[index + 2];
+
+                    var swing = prices.Where(x => x.DateTime >= start.DateTime && x.DateTime <= end.DateTime).ToList();
+                }
+            }
+
+            var pIndex = 0;
+            var hhIndex = 1; // skip first
+            while (pIndex < prices.Count && hhIndex < sawtooth.Count - 2)
+            {
+                var price = prices[pIndex];
+                var hl = sawtooth[hhIndex];
+                var hh = sawtooth[hhIndex + 1];
+
+                if (price.Close > hh.Close)
+                {
+                    breaksOfStructures.Add(new(price, hh));
+                    hhIndex += 2;
+                }
+
+                if (price.Close < hl.Close)
+                {
+                    marketStructureBreaks.Add(new(price, hh));
+                    hhIndex += 2;
+                }
+                pIndex++;
+            }
+
+            return (breaksOfStructures, marketStructureBreaks);
+        }
+
+        public static List<Tuple<Price, Price>> ToUptrendMarketStructureBreaks(this List<Price> prices)
         {
             var list = new List<Tuple<Price, Price>>();
-            var higherHighs = prices.ToHigherHighs();
+            var higherHighs = prices.HigherHighs();
 
             var pIndex = 0;
             var hhIndex = 0;
@@ -105,7 +168,7 @@
 
         public static List<Price> ToUptrendSawtooth(this List<Price> prices)
         {
-            return prices.ToHigherHighs().Union(prices.ToHigherLows()).OrderBy(x => x.DateTime).ToList();
+            return prices.HigherHighs().Union(prices.ToHigherLows()).OrderBy(x => x.DateTime).ToList();
         }
 
         //public static List<List<Price>> ToHighSegmentUsingHighs(this List<Price> prices)

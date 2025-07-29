@@ -6,7 +6,7 @@
         {
             var data = Prices.CreateSubsetByCount(AdditionalCandles - 1, Price, true);
 
-            var swings = data.ToUpswings(MaxSwingSize).ToList();
+            var swings = data.ToUpswings(EnumCloseType.Close, MaxSwingSize).ToList();
 
             if (swings.Count < MinimumUpswings)
                 return false;

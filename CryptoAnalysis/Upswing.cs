@@ -38,7 +38,7 @@ namespace Gradient.CryptoAnalysis
         {
             get
             {
-                return Prices.Skip(1).HighCloses();
+                return Prices.Skip(1).HighClosesIsGreen(EnumCloseType.High);
             }
         }
 
@@ -54,7 +54,7 @@ namespace Gradient.CryptoAnalysis
         {
             get
             {
-                return Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToUpswings();
+                return Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToUpswings(EnumCloseType.High);
             }
         }
 
@@ -120,5 +120,11 @@ namespace Gradient.CryptoAnalysis
         {
             return $"{InitialPrice}-{BreakOfStructure} ({Prices.Count()})";
         }
+    }
+
+    public class Upswingx
+    {
+        public Price InitialPrice { get; set; } = new();
+        public List<Price> Prices { get; set; } = new();
     }
 }

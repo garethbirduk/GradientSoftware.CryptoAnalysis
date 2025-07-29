@@ -5,7 +5,7 @@
         protected override bool IsMet()
         {
             var data = Prices.CreateSubsetByCount(AdditionalCandles - 1, Price, true);
-            var swings = data.ToUpswings();
+            var swings = data.ToUpswings(EnumCloseType.Close);
             var swing = swings.LastOrDefault();
             if (swing == null)
                 return false;

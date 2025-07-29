@@ -46,7 +46,7 @@ namespace Gradient.CryptoAnalysis
         {
             get
             {
-                return Prices.Skip(1).HighCloses();
+                return Prices.Skip(1).HighClosesIsGreen(EnumCloseType.High);
             }
         }
 

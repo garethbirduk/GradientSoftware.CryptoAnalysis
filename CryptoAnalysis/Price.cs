@@ -39,6 +39,16 @@ namespace Gradient.CryptoAnalysis
         SuccessiveRedCandles,
     }
 
+    public enum EnumCloseType
+    {
+        None = 0,
+
+        Close,
+
+        High,
+        Low
+    }
+
     public enum EnumPosition
     {
         None,

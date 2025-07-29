@@ -48,13 +48,13 @@
             return swings;
         }
 
-        public static List<Upswing> ToUpswings(this List<Price> prices, int maxSwingSize = 0)
+        public static List<Upswing> ToUpswings(this List<Price> prices, EnumCloseType closeType, int maxSwingSize = 0)
         {
             var swings = new List<Upswing>();
             if (prices.Count() == 0)
                 return swings;
 
-            var segments = prices.ToHighSegments();
+            var segments = prices.ToHighSegments(closeType, true);
 
             Upswing previousSwing = null;
             foreach (var segment in segments.Where(x => x.Count() > 1))
