@@ -5,6 +5,11 @@ using Plotly.NET.TraceObjects;
 
 public static class ChartGenerator
 {
+    private static GenericChart ApplyStyle(GenericChart chart, Color? color, int? lineWidth)
+    {
+        return ApplyStyle(chart, color, lineWidth.HasValue ? (double?)lineWidth.Value : null);
+    }
+
     private static GenericChart ApplyStyle(GenericChart chart, Color? color, double? lineWidth)
     {
         if (color == null && !lineWidth.HasValue) return chart;
@@ -234,7 +239,7 @@ public static class ChartGenerator
         List<Price> prices,
         string name = "prices",
         Color? color = null,
-        double? lineWidth = null)
+        int? lineWidth = null)
     {
         return new Layer
         {
@@ -360,6 +365,6 @@ public class Layer
 
     public Color? Color { get; init; }
 
-    public double? LineWidth { get; init; } = 1;
+    public int? LineWidth { get; init; } = 1;
     public string Name { get; init; } = "";
 }
