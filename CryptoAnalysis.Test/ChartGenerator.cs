@@ -5,22 +5,20 @@ using Plotly.NET.TraceObjects;
 
 public static class ChartGenerator
 {
+    private static GenericChart ApplyStyle(GenericChart chart, Color? color, double? lineWidth)
+    {
+        if (color == null && !lineWidth.HasValue) return chart;
+
+        var line = Line.init(
+            Color: color,
+            Width: lineWidth.HasValue ? FSharpOption<double>.Some(lineWidth.Value) : FSharpOption<double>.None
+        );
+        return chart.WithLine(line);
+    }
+
     public static GenericChart AddLayers(this GenericChart baseChart, params Layer[] layers)
     {
-        var layerCharts = layers.Select(l =>
-        {
-            var chart = l.ChartFactory();
-            if (l.Color != null || l.LineWidth != null)
-            {
-                var line = Line.init(
-                    Color: l.Color,
-                    Width: l.LineWidth.HasValue ? FSharpOption<double>.Some(l.LineWidth.Value) : FSharpOption<double>.None
-                );
-                chart = chart.WithLine(line);
-            }
-            return chart;
-        });
-
+        var layerCharts = layers.Select(l => ApplyStyle(l.ChartFactory(), l.Color, l.LineWidth));
         return Chart.Combine(new[] { baseChart }.Concat(layerCharts));
     }
 
@@ -80,20 +78,7 @@ public static class ChartGenerator
             );
         }
 
-        var charts = layers.Select(l =>
-        {
-            var chart = l.ChartFactory();
-            if (l.Color != null || l.LineWidth != null)
-            {
-                var line = Line.init(
-                    Color: l.Color,
-                    Width: l.LineWidth.HasValue ? FSharpOption<double>.Some(l.LineWidth.Value) : FSharpOption<double>.None
-                );
-                chart = chart.WithLine(line);
-            }
-            return chart;
-        });
-
+        var charts = layers.Select(l => ApplyStyle(l.ChartFactory(), l.Color, l.LineWidth));
         return Chart.Combine(charts);
     }
 
