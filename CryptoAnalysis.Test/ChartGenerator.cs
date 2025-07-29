@@ -252,16 +252,17 @@ public static class ChartGenerator
         int lineWidth = 1,
         string title = "Line Chart",
         Color? color = null
-        )
+    )
     {
         var xData = data.Select(xSelector);
         var yData = data.Select(ySelector);
 
         var chart = Chart2D.Chart.Line<DateTime, decimal, string>(
             x: xData,
-            y: yData,
-            LineWidth: lineWidth
+            y: yData
         );
+
+        chart = ApplyStyle(chart, color, lineWidth);
 
         return chart
             .WithTitle(title)
