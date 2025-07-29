@@ -5,12 +5,12 @@ using Plotly.NET.TraceObjects;
 
 public static class ChartGenerator
 {
-    private static GenericChart ApplyStyle(GenericChart chart, Color? color, int? lineWidth)
+    private static GenericChart ApplyStyle(this GenericChart chart, Color? color, int? lineWidth)
     {
-        return ApplyStyle(chart, color, lineWidth.HasValue ? (double?)lineWidth.Value : null);
+        return chart.ApplyStyle(color, lineWidth.HasValue ? (double?)lineWidth.Value : null);
     }
 
-    private static GenericChart ApplyStyle(GenericChart chart, Color? color, double? lineWidth)
+    private static GenericChart ApplyStyle(this GenericChart chart, Color? color, double? lineWidth)
     {
         if (color == null && !lineWidth.HasValue) return chart;
 
@@ -152,21 +152,10 @@ public static class ChartGenerator
         if (lineLows)
             layers.Add(PriceLowsLineLayer(prices, lineWidth: lineWidth, name: $"{name} - Low", color: color));
 
-        var layout = Layout.init<string>(
-            Width: FSharpOption<int>.Some(1900),
-            Height: FSharpOption<int>.Some(1168),
-            AutoSize: FSharpOption<bool>.Some(false)
-        );
-
-        var config = Config.init(Responsive: false);
-
-        var baseChart = CreateChart();
-        baseChart = ApplyStyle(baseChart, color, lineWidth);
-
-        return baseChart
-            .WithLayout(layout)
-            .WithConfig(config)
+        var baseChart = CreateChart()
             .AddLayers(layers.ToArray());
+
+        return baseChart;
     }
 
     public static GenericChart GenerateAnnotatedCandlestickChart(List<AnnotatedPrice> prices)
@@ -351,6 +340,17 @@ public static class ChartGenerator
         {
             Directory.CreateDirectory(directory);
         }
+
+        var layout = Layout.init<string>(
+            Width: FSharpOption<int>.Some(1800),
+            Height: FSharpOption<int>.Some(900),
+            AutoSize: FSharpOption<bool>.Some(false)
+        );
+        var config = Config.init(Responsive: false);
+
+        chart = chart
+            .WithLayout(layout)
+            .WithConfig(config);
 
         switch (format.ToLowerInvariant())
         {

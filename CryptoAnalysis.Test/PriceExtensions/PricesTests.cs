@@ -26,7 +26,7 @@ public abstract class PricesTests
     public void AssertChart(string name, GenericChart chart)
     {
         var actualHtmlPath = Path.Combine(DirectoryPath(), $"actual_{name}.html");
-        chart.SaveHtml(actualHtmlPath);
+        ChartGenerator.Save(chart, actualHtmlPath);
 
         var expectedHtmlPath = Path.Combine(DirectoryPath(), $"expected_{name}.html");
         AssertHtmlChartFileContent(expectedHtmlPath, actualHtmlPath);
