@@ -63,28 +63,37 @@ public static class ChartGenerator
 
     public static Layer CreateAnnotationLayer(
         List<AnnotatedPrice> prices,
-        StyleParam.MarkerSymbol symbol,
+        StyleParam.MarkerSymbol? symbol = null,
         Color? color = null,
         int? size = null
     )
     {
-        if (!prices.Any()) return new Layer();
+        if (!prices.Any() || prices.All(p => p.Annotations == null || p.Annotations.Count == 0))
+            return new Layer();
 
-        var annotation = prices.First().Annotations.First();
-        var type = annotation.AnnotationType;
+        var first = prices.First(p => p.Annotations != null && p.Annotations.Count > 0);
+        var type = first.Annotations[0].AnnotationType;
+        var markerSymbol = symbol ?? StyleParam.MarkerSymbol.Circle;
+        var s = size ?? 10;
+        var markerOffset = s * 1.0;
+        var labelOffset = s * 2.0;
 
-        var points = prices.Select(p =>
-        {
-            var a = p.Annotations.First();
-            double y = a.Position switch
+        var points = prices
+            .Where(p => p.Annotations != null && p.Annotations.Count > 0)
+            .Select(p =>
             {
-                EnumPosition.Above => p.Close + 0.5,
-                EnumPosition.Below => p.Close - 0.5,
-                EnumPosition.Precise => p.Close,
-                _ => p.Close
-            };
-            return (x: p.DateTime, y, text: a.Note);
-        }).ToList();
+                var a = p.Annotations[0];
+                var baseY = a.Position switch
+                {
+                    EnumPosition.Above => p.Close,
+                    EnumPosition.Below => p.Close,
+                    EnumPosition.Precise => p.Close,
+                    _ => p.Close
+                };
+
+                return (x: p.DateTime, y: baseY + markerOffset, labelY: baseY + labelOffset, text: a.Note);
+            })
+            .ToList();
 
         return new Layer
         {
@@ -92,7 +101,7 @@ public static class ChartGenerator
             ChartFactory = () =>
                 Chart2D.Chart.Point<DateTime, double, string>(
                     x: points.Select(p => p.x),
-                    y: points.Select(p => p.y),
+                    y: points.Select(p => p.labelY),
                     MultiText: FSharpOption<IEnumerable<string>>.Some(points.Select(p => p.text)),
                     MultiTextPosition: FSharpOption<IEnumerable<StyleParam.TextPosition>>.Some(
                         Enumerable.Repeat(StyleParam.TextPosition.TopCenter, points.Count)
@@ -100,10 +109,11 @@ public static class ChartGenerator
                 )
                 .WithMarker(Marker.init(
                     Color: color,
-                    Size: size.HasValue ? FSharpOption<int>.Some(size.Value) : FSharpOption<int>.None,
-                    Symbol: symbol
+                    Size: FSharpOption<int>.Some(s),
+                    Symbol: markerSymbol
                 )),
-            Color = color
+            Color = color,
+            LineWidth = size
         };
     }
 
@@ -177,11 +187,9 @@ public static class ChartGenerator
 
         var annotationCharts = new List<GenericChart>();
 
-        foreach (var p in prices)
+        foreach (var p in prices.Where(p => p.Annotations != null && p.Annotations.Count > 0))
         {
-            if (p.Annotations == null || p.Annotations.Count == 0) continue;
-
-            foreach (var a in p.Annotations)
+            foreach (var a in p.Annotations!)
             {
                 double y = a.Position switch
                 {
@@ -190,12 +198,6 @@ public static class ChartGenerator
                     EnumPosition.Precise => p.Close,
                     _ => p.Close
                 };
-
-                var point = Chart2D.Chart.Point<DateTime, double, string>(
-                    x: new[] { p.DateTime },
-                    y: new[] { y },
-                    Text: FSharpOption<string>.Some(a.Note)
-                );
 
                 annotationCharts.Add(CreateAnnotationPoint(p.DateTime, y, a.Note));
             }
@@ -268,9 +270,13 @@ public static class ChartGenerator
         var chart = Chart2D.Chart.Line<DateTime, decimal, string>(
             x: xData,
             y: yData
+        //Line: Line.init(
+        //    Color: color,
+        //    Width: FSharpOption<double>.Some(lineWidth)
+        //)
         );
 
-        chart = ApplyStyle(chart, color, lineWidth);
+        //chart = ApplyStyle(chart, color, lineWidth);
 
         return chart
             .WithTitle(title)
@@ -283,22 +289,17 @@ public static class ChartGenerator
         Func<T, decimal> ySelector,
         string title = "Line Chart",
         Color? color = null,
-        int? size = null
-        ) where T : Price
+        int? lineWidth = null
+    ) where T : Price
     {
-        var xData = prices.Select(x => x.DateTime);
-        var yData = prices.Select(ySelector);
-
-        var chart = Chart2D.Chart.Line<DateTime, decimal, string>(
-            x: xData,
-            y: yData,
-            LineColor: color
+        return GenerateLineChart(
+            prices,
+            xSelector: x => x.DateTime,
+            ySelector: ySelector,
+            lineWidth: lineWidth ?? 1,
+            title: title,
+            color: color
         );
-
-        return chart
-            .WithTitle(title)
-            .WithXAxisStyle(title: Title.init("Date"))
-            .WithYAxisStyle(title: Title.init("Value"));
     }
 
     public static GenericChart GenerateScatterChart<T>(
@@ -306,7 +307,8 @@ public static class ChartGenerator
         Func<T, decimal> ySelector,
         string title = "Scatter Chart",
         Color? color = null,
-        double? lineWidth = null
+        double? lineWidth = null,
+        int? markerSize = null
     ) where T : Price
     {
         var xData = prices.Select(x => x.DateTime);
@@ -316,6 +318,11 @@ public static class ChartGenerator
             x: xData,
             y: yData
         );
+
+        chart = chart.WithMarker(Marker.init(
+            Color: color,
+            Size: markerSize.HasValue ? FSharpOption<int>.Some(markerSize.Value) : FSharpOption<int>.None
+        ));
 
         chart = ApplyStyle(chart, color, lineWidth);
 

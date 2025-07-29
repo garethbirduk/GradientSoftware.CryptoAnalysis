@@ -2,7 +2,7 @@
 {
     public static partial class PricesExtensions_Annotations
     {
-        public static List<AnnotatedPrice> ToAnnotatedPrices(this List<Price> prices, EnumAnnotationType type)
+        public static List<AnnotatedPrice> ToAnnotatedPrices(this IEnumerable<Price> prices, EnumAnnotationType type)
         {
             return prices.Select(p => new AnnotatedPrice
             {
