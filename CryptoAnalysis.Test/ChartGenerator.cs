@@ -106,8 +106,8 @@ public static class ChartGenerator
         string name = "prices")
     {
         var layers = new List<Layer>();
-        //if (candlestick)
-        //    layers.Add(GenerateCandlestickChart(prices));
+        if (candlestick)
+            layers.Add(GenerateCandlestickLayer(prices));
         if (lineCloses)
             layers.Add(PriceClosesLineLayer(prices, lineWidth: lineWidth, name: name));
         if (lineHighs)
@@ -200,6 +200,15 @@ public static class ChartGenerator
             .WithTitle("Crypto Candlestick")
             .WithXAxisStyle(title: Title.init("Date"))
             .WithYAxisStyle(title: Title.init("Price"));
+    }
+
+    public static Layer GenerateCandlestickLayer(List<Price> prices, string name = "prices")
+    {
+        return new Layer
+        {
+            Name = "base",
+            ChartFactory = () => GenerateCandlestickChart(prices)
+        };
     }
 
     public static GenericChart GenerateLineChart<T>(

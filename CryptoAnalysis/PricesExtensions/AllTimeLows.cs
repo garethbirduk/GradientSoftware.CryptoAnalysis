@@ -14,23 +14,8 @@
 
             foreach (var price in prices.Where(x => x != null))
             {
-                switch (closeType)
-                {
-                    case EnumCloseType.Close:
-                        {
-                            if (price.Close < list.Last().Close)
-                                list.Add(price);
-                            break;
-                        }
-                    case EnumCloseType.Low:
-                        {
-                            if (price.Low < list.Last().Low)
-                                list.Add(price);
-                            break;
-                        }
-                    default:
-                        throw new NotSupportedException("EnumCloseType must be specified");
-                }
+                if (price.CloseValue(closeType) < list.Last().CloseValue(closeType))
+                    list.Add(price);
             }
             return list;
         }

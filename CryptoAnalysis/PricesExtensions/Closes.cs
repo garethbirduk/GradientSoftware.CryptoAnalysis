@@ -31,28 +31,9 @@ namespace Gradient.CryptoAnalysis
             {
                 if (price.IsGreen())
                 {
-                    switch (closeType)
-                    {
-                        case EnumCloseType.Close:
-                        {
-                            if (price.Close > list.Last().Close)
-                                list.Add(price);
-                            break;
-                        }
-                        case EnumCloseType.High:
-                        {
-                            if (price.High > list.Last().High)
-                                list.Add(price);
-                            break;
-                        }
-                        default:
-                        {
-                            break;
-                        }
-                    }
-                    
+                    if (price.CloseValue(closeType) > list.Last().CloseValue(closeType))
+                        list.Add(price);
                 }
-                    
             }
 
             return list;

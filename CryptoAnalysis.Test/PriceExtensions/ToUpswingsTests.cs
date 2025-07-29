@@ -12,21 +12,9 @@ public class ToUpswingsTests : PricesTests
     {
         var name = "ToUpswingTests_1";
 
-        var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true, lineWidth: 3);
+        var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: true, lineWidth: 3);
 
         var upswings = _prices.ToUpswings(EnumCloseType.Close);
-
-        //chart = chart.AddLayers(new Layer
-        //{
-        //    Name = "base",
-        //    ChartFactory = () => ChartGenerator.GenerateScatterChart(
-        //        _prices.ToList(),
-        //        p => (decimal)p.Close,
-        //        name
-        //    ),
-        //    Color = Color.fromString("blue"),
-        //    LineWidth = 1,
-        //});
 
         chart = chart.AddLayers(new Layer
         {
@@ -36,7 +24,7 @@ public class ToUpswingsTests : PricesTests
                 p => (decimal)p.Close,
                 name
             ),
-            Color = Color.fromString("red"),
+            Color = Color.fromString("green"),
             LineWidth = 1,
         });
 
@@ -44,11 +32,23 @@ public class ToUpswingsTests : PricesTests
         {
             Name = "base",
             ChartFactory = () => ChartGenerator.GenerateScatterChart(
-                upswings.Select(x => x.Prices.Last()),
+                upswings.Select(x => x.Prices.AllTimeLows(EnumCloseType.Close).MinBy(x => x.Close)).ToList(),
                 p => (decimal)p.Close,
                 name
             ),
-            Color = Color.fromString("green"),
+            Color = Color.fromString("orange"),
+            LineWidth = 1,
+        });
+
+        chart = chart.AddLayers(new Layer
+        {
+            Name = "base",
+            ChartFactory = () => ChartGenerator.GenerateScatterChart(
+                upswings.Where(x => x.MarketStructureBreak != null).Select(x => x.MarketStructureBreak).ToList(),
+                p => (decimal)p.Close,
+                name
+            ),
+            Color = Color.fromString("red"),
             LineWidth = 1,
         });
 
@@ -77,17 +77,6 @@ public class ToUpswingsTests : PricesTests
             });
         }
 
-        chart = chart.AddLayers(new Layer
-        {
-            Name = "base",
-            ChartFactory = () => ChartGenerator.GenerateScatterChart(
-                upswings.Where(x => x.MarketStructureBreak != null).Select(x => x.MarketStructureBreak).ToList(),
-                p => (decimal)p.Close,
-                name
-            ),
-            Color = Color.fromString("orange"),
-            LineWidth = 1,
-        });
         AssertChart(name, chart);
     }
 }

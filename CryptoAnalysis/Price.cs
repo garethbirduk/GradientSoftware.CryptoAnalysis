@@ -153,6 +153,27 @@ namespace Gradient.CryptoAnalysis
         [Name("open")]
         public double Open { get; set; }
 
+        public double CloseValue(EnumCloseType closeType)
+        {
+            switch (closeType)
+            {
+                case EnumCloseType.Close:
+                    {
+                        return Close;
+                    }
+                case EnumCloseType.High:
+                    {
+                        return High;
+                    }
+                case EnumCloseType.Low:
+                    {
+                        return Low;
+                    }
+                default:
+                    throw new NotSupportedException("EnumCloseType must be specified");
+            }
+        }
+
         public override string ToString()
         {
             return $"{DateTime} : {Close}";
