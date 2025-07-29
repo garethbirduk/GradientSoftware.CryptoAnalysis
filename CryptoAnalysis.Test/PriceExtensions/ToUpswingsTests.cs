@@ -12,7 +12,7 @@ public class ToUpswingsTests : PricesTests
     {
         var name = "ToUpswingTests_1";
 
-        var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: true, lineWidth: 3);
+        var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: true, lineWidth: 1);
 
         var upswings = _prices.ToUpswings(EnumCloseType.Close);
 

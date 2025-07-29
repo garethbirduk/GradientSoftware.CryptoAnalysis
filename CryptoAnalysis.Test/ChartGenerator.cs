@@ -16,6 +16,40 @@ public static class ChartGenerator
         return chart.WithLine(line);
     }
 
+    private static GenericChart CreateAnnotationPoint(DateTime x, double y, string note, Color? color = null, double? size = null)
+    {
+        var point = Chart2D.Chart.Point<DateTime, double, string>(
+            x: new[] { x },
+            y: new[] { y },
+            Text: FSharpOption<string>.Some(note)
+        );
+
+        return ApplyStyle(point, color, size);
+    }
+
+    private static Layer CreatePriceLineLayer(
+        List<Price> prices,
+        Func<Price, decimal> selector,
+        string name,
+        Color? color,
+        int lineWidth)
+    {
+        return new Layer
+        {
+            Name = name,
+            ChartFactory = () => GenerateLineChart(
+                prices,
+                xSelector: p => p.DateTime,
+                ySelector: selector,
+                lineWidth: lineWidth,
+                title: name,
+                color: color
+            ),
+            Color = color,
+            LineWidth = lineWidth
+        };
+    }
+
     public static GenericChart AddLayers(this GenericChart baseChart, params Layer[] layers)
     {
         var layerCharts = layers.Select(l => ApplyStyle(l.ChartFactory(), l.Color, l.LineWidth));
@@ -92,7 +126,7 @@ public static class ChartGenerator
     {
         var layers = new List<Layer>();
         if (candlestick)
-            layers.Add(GenerateCandlestickLayer(prices));
+            layers.Add(GenerateCandlestickLayer(prices, lineWidth: lineWidth, name: name));
         if (lineCloses)
             layers.Add(PriceClosesLineLayer(prices, lineWidth: lineWidth, name: name));
         if (lineHighs)
@@ -108,7 +142,10 @@ public static class ChartGenerator
 
         var config = Config.init(Responsive: false);
 
-        return CreateChart()
+        var baseChart = CreateChart();
+        baseChart = ApplyStyle(baseChart, null, null);
+
+        return baseChart
             .WithLayout(layout)
             .WithConfig(config)
             .AddLayers(layers.ToArray());
@@ -152,7 +189,7 @@ public static class ChartGenerator
                     Text: FSharpOption<string>.Some(a.Note)
                 );
 
-                annotationCharts.Add(point);
+                annotationCharts.Add(CreateAnnotationPoint(p.DateTime, y, a.Note));
             }
         }
 
@@ -165,7 +202,11 @@ public static class ChartGenerator
             .WithYAxisStyle(title: Title.init("Price"));
     }
 
-    public static GenericChart GenerateCandlestickChart(List<Price> prices)
+    public static GenericChart GenerateCandlestickChart(
+        List<Price> prices,
+        string title = "Crypto Candlestick",
+        Color? color = null,
+        double? lineWidth = null)
     {
         var openData = prices.Select(p => (decimal)p.Open);
         var highData = prices.Select(p => (decimal)p.High);
@@ -181,18 +222,26 @@ public static class ChartGenerator
             X: FSharpOption<IEnumerable<DateTime>>.Some(dateData)
         );
 
+        chart = ApplyStyle(chart, color, lineWidth);
+
         return chart
-            .WithTitle("Crypto Candlestick")
+            .WithTitle(title)
             .WithXAxisStyle(title: Title.init("Date"))
             .WithYAxisStyle(title: Title.init("Price"));
     }
 
-    public static Layer GenerateCandlestickLayer(List<Price> prices, string name = "prices")
+    public static Layer GenerateCandlestickLayer(
+        List<Price> prices,
+        string name = "prices",
+        Color? color = null,
+        double? lineWidth = null)
     {
         return new Layer
         {
-            Name = "base",
-            ChartFactory = () => GenerateCandlestickChart(prices)
+            Name = name,
+            ChartFactory = () => GenerateCandlestickChart(prices, name, color, lineWidth),
+            Color = color,
+            LineWidth = lineWidth
         };
     }
 
@@ -246,8 +295,10 @@ public static class ChartGenerator
     public static GenericChart GenerateScatterChart<T>(
         IEnumerable<T> prices,
         Func<T, decimal> ySelector,
-        string title = "Scatter Chart"
-        ) where T : Price
+        string title = "Scatter Chart",
+        Color? color = null,
+        double? lineWidth = null
+    ) where T : Price
     {
         var xData = prices.Select(x => x.DateTime);
         var yData = prices.Select(ySelector);
@@ -257,80 +308,45 @@ public static class ChartGenerator
             y: yData
         );
 
+        chart = ApplyStyle(chart, color, lineWidth);
+
         return chart
             .WithTitle(title)
             .WithXAxisStyle(title: Title.init("Date"))
             .WithYAxisStyle(title: Title.init("Value"));
     }
 
-    public static Layer PriceClosesLineLayer(List<Price> prices, Color? color = null, int lineWidth = 1, string name = "Close Prices")
-    {
-        if (color == null)
-            color = Color.fromString("Black");
-        return new Layer
-        {
-            Name = "base",
-            ChartFactory = () => ChartGenerator.GenerateLineChart(
-                    prices,
-                    p => (decimal)p.Close,
-                    name
-                ),
-            Color = color,
-            LineWidth = lineWidth,
-        };
-    }
+    public static Layer PriceClosesLineLayer(List<Price> prices, Color? color = null, int lineWidth = 1, string name = "Close Prices") =>
+        CreatePriceLineLayer(prices, p => (decimal)p.Close, name, color ?? Color.fromString("Black"), lineWidth);
 
-    public static Layer PriceHighsLineLayer(List<Price> prices, Color? color = null, int lineWidth = 1, string name = "Close Prices")
-    {
-        if (color == null)
-            color = Color.fromString("Black");
-        return new Layer
-        {
-            Name = "base",
-            ChartFactory = () => ChartGenerator.GenerateLineChart(
-                prices,
-                p => (decimal)p.High,
-                name
-            ),
-            Color = color,
-            LineWidth = lineWidth,
-        };
-    }
+    public static Layer PriceHighsLineLayer(List<Price> prices, Color? color = null, int lineWidth = 1, string name = "High Prices") =>
+        CreatePriceLineLayer(prices, p => (decimal)p.High, name, color ?? Color.fromString("Black"), lineWidth);
 
-    public static Layer PriceLowsLineLayer(List<Price> prices, Color? color = null, int lineWidth = 1, string name = "Close Prices")
-    {
-        if (color == null)
-            color = Color.fromString("Black");
-        return new Layer
-        {
-            Name = "base",
-            ChartFactory = () => ChartGenerator.GenerateLineChart(
-                prices,
-                p => (decimal)p.Low,
-                name
-            ),
-            Color = color,
-            LineWidth = lineWidth,
-        };
-    }
+    public static Layer PriceLowsLineLayer(List<Price> prices, Color? color = null, int lineWidth = 1, string name = "Low Prices") =>
+            CreatePriceLineLayer(prices, p => (decimal)p.Low, name, color ?? Color.fromString("Black"), lineWidth);
 
     public static Layer PriceOpenLine(List<Price> prices) =>
-    new Layer
-    {
-        Name = "base",
-        ChartFactory = () => ChartGenerator.GenerateLineChart(
-                    prices,
-                    p => (decimal)p.Open,
-                    "Close Prices"
-                ),
-        Color = Color.fromString("blue"),
-        LineWidth = 3,
-    };
+        CreatePriceLineLayer(prices, p => (decimal)p.Open, "Open Prices", Color.fromString("blue"), 3);
 
-    public static void Save(this GenericChart chart, string outputPath)
+    public static void Save(this GenericChart chart, string outputPath, string format = "html")
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        chart.SaveHtml(outputPath);
+        var directory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        switch (format.ToLowerInvariant())
+        {
+            case "html":
+                chart.SaveHtml(outputPath);
+                break;
+            // case "png":
+            //     chart.SaveImage(outputPath); // Uncomment if Plotly.NET supports it
+            //     break;
+            default:
+                throw new NotSupportedException($"Format '{format}' is not supported.");
+        }
     }
 }
 
