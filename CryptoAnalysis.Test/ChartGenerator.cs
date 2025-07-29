@@ -121,23 +121,26 @@ public static class ChartGenerator
         return Chart.Combine(charts);
     }
 
-    public static GenericChart CreatePriceChart(List<Price> prices,
+    public static GenericChart CreatePriceChart(
+        List<Price> prices,
         bool candlestick = false,
         bool lineCloses = false,
         bool lineHighs = false,
         bool lineLows = false,
         int lineWidth = 1,
-        string name = "prices")
+        string name = "prices",
+        Color? color = null
+    )
     {
         var layers = new List<Layer>();
         if (candlestick)
-            layers.Add(GenerateCandlestickLayer(prices, lineWidth: lineWidth, name: name));
+            layers.Add(GenerateCandlestickLayer(prices, lineWidth: lineWidth, name: $"{name} - Candlestick"));
         if (lineCloses)
-            layers.Add(PriceClosesLineLayer(prices, lineWidth: lineWidth, name: name));
+            layers.Add(PriceClosesLineLayer(prices, lineWidth: lineWidth, name: $"{name} - Close", color: color));
         if (lineHighs)
-            layers.Add(PriceHighsLineLayer(prices, lineWidth: lineWidth, name: name));
+            layers.Add(PriceHighsLineLayer(prices, lineWidth: lineWidth, name: $"{name} - High", color: color));
         if (lineLows)
-            layers.Add(PriceLowsLineLayer(prices, lineWidth: lineWidth, name: name));
+            layers.Add(PriceLowsLineLayer(prices, lineWidth: lineWidth, name: $"{name} - Low", color: color));
 
         var layout = Layout.init<string>(
             Width: FSharpOption<int>.Some(1900),
@@ -148,7 +151,7 @@ public static class ChartGenerator
         var config = Config.init(Responsive: false);
 
         var baseChart = CreateChart();
-        baseChart = ApplyStyle(baseChart, null, null);
+        baseChart = ApplyStyle(baseChart, color, lineWidth);
 
         return baseChart
             .WithLayout(layout)
