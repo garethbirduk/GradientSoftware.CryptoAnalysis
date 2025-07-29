@@ -66,7 +66,7 @@ namespace Gradient.CryptoAnalysis
                     return null;
                 if (PreviousUpswing.SwingLow == null)
                     return null;
-                return Prices.FirstOrDefault(x => x.Close < PreviousUpswing.SwingLow.Close);
+                return Prices.FirstOrDefault(x => x.CloseValue(EnumCloseType.Close) < PreviousUpswing.SwingLow(EnumCloseType.Close).CloseValue(EnumCloseType.Close));
             }
         }
 
@@ -100,20 +100,17 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public Price? SwingLow
-        {
-            get
-            {
-                return Prices.FirstOrDefault(x => x.Close == Prices.Min(x => x.Close));
-            }
-        }
-
         public Price? SwingOpen
         {
             get
             {
                 return Prices.First();
             }
+        }
+
+        public Price? SwingLow(EnumCloseType close)
+        {
+            return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Min(x => x.CloseValue(close)));
         }
 
         public override string ToString()

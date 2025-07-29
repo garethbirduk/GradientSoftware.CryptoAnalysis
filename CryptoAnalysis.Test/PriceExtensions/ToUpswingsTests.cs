@@ -32,7 +32,7 @@ public class ToUpswingsTests : PricesTests
         {
             Name = "base",
             ChartFactory = () => ChartGenerator.GenerateScatterChart(
-                upswings.Select(x => x.Prices.AllTimeLows(EnumCloseType.Close).MinBy(x => x.Close)).ToList(),
+                upswings.Select(x => x.SwingLow(EnumCloseType.Close)).ToList(),
                 p => (decimal)p.Close,
                 title: name,
                 color: Color.fromString("red"),
@@ -48,11 +48,42 @@ public class ToUpswingsTests : PricesTests
                 p => (decimal)p.Close,
                 title: name,
                 color: Color.fromString("orange"),
-                markerSize: 12
+                markerSize: 6
             ),
         });
 
-        foreach (var upswing in upswings.Where(x => x.NextPrice != null))
+        foreach (var upswing in upswings.Where(x => x.MarketStructureBreak != null))
+        {
+            var p1 = upswing.PreviousUpswing.SwingLow(EnumCloseType.Close);
+            var p2 = upswing.MarketStructureBreak;
+            var p = new List<Price>
+            {
+                p1,
+                new Price
+                {
+                    Close = p1.Close,
+                    DateTime = p2.DateTime
+                }
+            };
+
+            chart = chart.AddLayers(
+                ChartGenerator.PriceClosesLineLayer(p, lineWidth: 1, color: Color.fromString("orange"))
+                );
+        }
+
+        chart = chart.AddLayers(new Layer
+        {
+            Name = "BOS",
+            ChartFactory = () => ChartGenerator.GenerateScatterChart(
+                upswings.Where(x => x.BreakOfStructure != null).Select(x => x.BreakOfStructure).ToList(),
+                p => (decimal)p.Close,
+                title: name,
+                color: Color.fromString("cyan"),
+                markerSize: 6
+            ),
+        });
+
+        foreach (var upswing in upswings.Where(x => x.BreakOfStructure != null))
         {
             var p1 = upswing.Prices.First();
             var p2 = upswing.NextPrice;
@@ -66,9 +97,9 @@ public class ToUpswingsTests : PricesTests
                 }
             };
 
-            var layer = ChartGenerator.PriceClosesLineLayer(p, lineWidth: 1, color: Color.fromString("cyan"));
-
-            chart = chart.AddLayers(layer);
+            chart = chart.AddLayers(
+                ChartGenerator.PriceClosesLineLayer(p, lineWidth: 1, color: Color.fromString("cyan"))
+                );
         }
 
         AssertChart(name, chart);

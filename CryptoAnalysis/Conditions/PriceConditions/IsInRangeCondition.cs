@@ -13,7 +13,7 @@
             var swing = swings[swings.Count - 1];
             var previous = swings[swings.Count - 2];
 
-            var prices = previous.Prices.Skip(previous.Prices.IndexOf(previous.SwingLow))
+            var prices = previous.Prices.Skip(previous.Prices.IndexOf(previous.SwingLow(EnumCloseType.Close)))
                 .Union(swing.Prices).ToList();
 
             var c = new IsPriceDecreaseRateCondition(25, AdditionalCandles, SubsetType.LowestToLast);
