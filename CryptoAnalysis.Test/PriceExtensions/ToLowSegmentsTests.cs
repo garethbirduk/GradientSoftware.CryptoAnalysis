@@ -18,13 +18,13 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
         [TestMethod]
         public void TestToLowSegments_Empty()
         {
-            CollectionAssert.AreEqual(new List<List<Price>>(), new List<Price>().ToLowSegments());
+            CollectionAssert.AreEqual(new List<List<Price>>(), new List<Price>().ToLowSegments(EnumCloseType.Low));
         }
 
         [TestMethod]
         public void TestToLowSegments_Ok()
         {
-            var segments = _prices.ToLowSegments();
+            var segments = _prices.ToLowSegments(EnumCloseType.Low);
 
             Assert.AreEqual(7, segments.Count);
             Assert.AreEqual(8, segments[0].Count);

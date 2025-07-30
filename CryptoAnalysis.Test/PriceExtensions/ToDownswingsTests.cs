@@ -1,67 +1,107 @@
-﻿using CryptoAnalysis.Csv.ClassMaps;
-using Gradient.CryptoAnalysis.Csv;
+﻿using Plotly.NET;
 
-namespace Gradient.CryptoAnalysis.Test.PriceExtensions
+namespace Gradient.CryptoAnalysis.Test.PriceExtensions;
+
+[TestClass]
+public class ToDownswingsTests : PricesTests
 {
-    [TestClass]
-    public class ToDownswingsTests
+    public override string TestDirectory => Path.Combine("PricesExtensionsData", "ToDownswingsTests");
+
+    [TestMethod]
+    public void ToDownswingTests_1()
     {
-        private List<Price> _prices;
+        var name = "ToDownswingTests_1";
 
-        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "Downswing.csv");
+        var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true, lineWidth: 1);
 
-        [TestMethod]
-        public void TestFindBreaksOfStructures()
+        var downswings = _prices.ToDownswings(EnumCloseType.Close);
+
+        chart = chart.AddLayers(new Layer
         {
-            // Act
-            var actual = _prices.ToDownswings();
+            Name = "Higher highs",
+            ChartFactory = () => ChartGenerator.GenerateScatterChart(
+                downswings.Select(x => x.Prices.First()).ToList(),
+                p => (decimal)p.Close,
+                title: name,
+                color: Color.fromString("green"),
+                markerSize: 12
+            ),
+        });
 
-            // Assert
-            CollectionAssert.AreEqual(new List<Downswing>(), new List<Price>().ToDownswings());
+        chart = chart.AddLayers(new Layer
+        {
+            Name = "base",
+            ChartFactory = () => ChartGenerator.GenerateScatterChart(
+                downswings.Select(x => x.SwingHigh(EnumCloseType.Close)).ToList(),
+                p => (decimal)p.Close,
+                title: name,
+                color: Color.fromString("red"),
+                markerSize: 12
+            )
+        });
 
-            Assert.AreEqual(7, actual.Count);
+        chart = chart.AddLayers(new Layer
+        {
+            Name = "Market Structure Breaks",
+            ChartFactory = () => ChartGenerator.GenerateScatterChart(
+                downswings.Where(x => x.MarketStructureBreak != null).Select(x => x.MarketStructureBreak).ToList(),
+                p => (decimal)p.Close,
+                title: name,
+                color: Color.fromString("orange"),
+                markerSize: 6
+            ),
+        });
 
-            Assert.AreEqual(8, actual[0].Prices.Count);
-            Assert.AreEqual(_prices[11], actual[0].BreakOfStructure);
-            Assert.IsNull(actual[0].MarketStructureBreak);
+        foreach (var downswing in downswings.Where(x => x.MarketStructureBreak != null))
+        {
+            var p1 = downswing.PreviousDownswing.SwingHigh(EnumCloseType.Close);
+            var p2 = downswing.MarketStructureBreak;
+            var p = new List<Price>
+            {
+                p1,
+                new Price
+                {
+                    Close = p1.Close,
+                    DateTime = p2.DateTime
+                }
+            };
 
-            Assert.AreEqual(3, actual[1].Prices.Count);
-            Assert.AreEqual(_prices[16], actual[1].BreakOfStructure);
-            Assert.IsNull(actual[1].MarketStructureBreak);
-
-            Assert.AreEqual(4, actual[2].Prices.Count);
-            Assert.AreEqual(_prices[20], actual[2].BreakOfStructure);
-            Assert.AreEqual(_prices[17], actual[2].MarketStructureBreak);
-
-            Assert.AreEqual(6, actual[3].Prices.Count);
-            Assert.AreEqual(_prices[30], actual[3].BreakOfStructure);
-            Assert.IsNull(actual[3].MarketStructureBreak);
-
-            Assert.AreEqual(2, actual[4].Prices.Count);
-            Assert.AreEqual(_prices[32], actual[4].BreakOfStructure);
-            Assert.IsNull(actual[4].MarketStructureBreak);
-
-            Assert.AreEqual(2, actual[5].Prices.Count);
-            Assert.AreEqual(_prices[34], actual[5].BreakOfStructure);
-            Assert.IsNull(actual[5].MarketStructureBreak);
-
-            Assert.AreEqual(3, actual[6].Prices.Count);
-            Assert.AreEqual(_prices[37], actual[6].BreakOfStructure);
-            Assert.IsNull(actual[6].MarketStructureBreak);
-
-            var interim2 = actual[2].InterimDownswings;
-
-            Assert.AreEqual(1, interim2.Count);
-
-            Assert.AreEqual(2, interim2[0].Prices.Count);
-            Assert.AreEqual(_prices[19], interim2[0].BreakOfStructure);
-            Assert.IsNull(interim2[0].MarketStructureBreak);
+            chart = chart.AddLayers(
+                ChartGenerator.PriceClosesLineLayer(p, lineWidth: 1, color: Color.fromString("orange"))
+                );
         }
 
-        [TestInitialize]
-        public void TestInitialize()
+        chart = chart.AddLayers(new Layer
         {
-            _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(_cryptoDataFilePath).ToList();
+            Name = "BOS",
+            ChartFactory = () => ChartGenerator.GenerateScatterChart(
+                downswings.Where(x => x.BreakOfStructure != null).Select(x => x.BreakOfStructure).ToList(),
+                p => (decimal)p.Close,
+                title: name,
+                color: Color.fromString("cyan"),
+                markerSize: 6
+            ),
+        });
+
+        foreach (var Downswing in downswings.Where(x => x.BreakOfStructure != null))
+        {
+            var p1 = Downswing.Prices.First();
+            var p2 = Downswing.NextPrice;
+            var p = new List<Price>
+            {
+                p1,
+                new Price
+                {
+                    Close = p1.Close,
+                    DateTime = p2.DateTime
+                }
+            };
+
+            chart = chart.AddLayers(
+                ChartGenerator.PriceClosesLineLayer(p, lineWidth: 1, color: Color.fromString("cyan"))
+                );
         }
+
+        AssertChart(name, chart);
     }
 }

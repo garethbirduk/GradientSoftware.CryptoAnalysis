@@ -26,7 +26,6 @@
                 return new List<List<Price>>();
 
             var highs = prices.HighClosesIsGreen(closeType);
-            var highs2 = prices.AllTimeHighs(closeType);
 
             var segments = new List<List<Price>>();
 
@@ -70,24 +69,25 @@
             return segments;
         }
 
-        public static List<List<Price>> ToLowSegments(this List<Price> prices)
+        public static List<List<Price>> ToLowSegments(this List<Price> prices, EnumCloseType closeType, bool TrimStart = false)
         {
             if (!prices.Any())
                 return new List<List<Price>>();
 
-            var lows = prices.LowCloses();
+            var Lows = prices.LowClosesIsRed(closeType);
+            var Lows2 = prices.AllTimeLows(closeType);
 
             var segments = new List<List<Price>>();
 
-            for (int i = 0; i < lows.Count; i++)
+            for (int i = 0; i < Lows.Count; i++)
             {
-                var low = lows[i];
-                var startIndex = prices.IndexOf(low);
+                var Low = Lows[i];
+                var startIndex = prices.IndexOf(Low);
 
                 var endIndex = prices.IndexOf(prices.Last()) + 1;
-                if (low != lows.Last())
+                if (Low != Lows.Last())
                 {
-                    endIndex = prices.IndexOf(lows[i + 1]);
+                    endIndex = prices.IndexOf(Lows[i + 1]);
                 }
 
                 var skip = startIndex;
@@ -96,6 +96,24 @@
                 var segment = prices.Skip(skip).Take(take).ToList();
                 if (segment.Count() > 1)
                     segments.Add(segment);
+            }
+
+            if (TrimStart && segments.Any())
+            {
+                var segment = segments.First();
+                var lowPrice = segment.MinBy(x => x.Close);
+                if (closeType == EnumCloseType.Low)
+                    lowPrice = segment.MinBy(x => x.Low);
+
+                if (lowPrice != null)
+                {
+                    var LowPrice = segment.Where(x => x.DateTime > lowPrice.DateTime).MaxBy(x => x.Close);
+                    if (closeType == EnumCloseType.Low)
+                        LowPrice = segment.Where(x => x.DateTime > lowPrice.DateTime).MaxBy(x => x.Low);
+
+                    if (LowPrice != null)
+                        segment.RemoveAll(x => x.DateTime < LowPrice.DateTime);
+                }
             }
 
             return segments;

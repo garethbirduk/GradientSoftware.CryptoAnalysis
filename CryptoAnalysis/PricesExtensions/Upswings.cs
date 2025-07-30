@@ -1,14 +1,14 @@
 ﻿namespace Gradient.CryptoAnalysis
 {
-    public static partial class PricesExtensions_Upswings
+    public static partial class PricesExtensions_Swings
     {
-        public static List<Downswing> ToDownswings(this List<Price> prices, int maxSwingSize = 0)
+        public static List<Downswing> ToDownswings(this List<Price> prices, EnumCloseType closeType, int maxSwingSize = 0)
         {
             var swings = new List<Downswing>();
             if (prices.Count() == 0)
                 return swings;
 
-            var segments = prices.ToLowSegments();
+            var segments = prices.ToLowSegments(closeType, true);
 
             Downswing previousSwing = null;
             foreach (var segment in segments.Where(x => x.Count() > 1))
