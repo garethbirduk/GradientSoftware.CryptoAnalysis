@@ -64,9 +64,9 @@ namespace Gradient.CryptoAnalysis
             {
                 if (PreviousDownswing == null)
                     return null;
-                if (PreviousDownswing.Swinglow == null)
+                if (PreviousDownswing.SwingLow == null)
                     return null;
-                return Prices.FirstOrDefault(x => x.CloseValue(EnumCloseType.Close) > PreviousDownswing.Swinglow(EnumCloseType.Close).CloseValue(EnumCloseType.Close));
+                return Prices.FirstOrDefault(x => x.CloseValue(EnumCloseType.Close) > PreviousDownswing.SwingHigh(EnumCloseType.Close).CloseValue(EnumCloseType.Close));
             }
         }
 
@@ -103,7 +103,7 @@ namespace Gradient.CryptoAnalysis
             return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Max(x => x.CloseValue(close)));
         }
 
-        public Price? Swinglow(EnumCloseType close)
+        public Price? SwingLow(EnumCloseType close)
         {
             return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Min(x => x.CloseValue(close)));
         }

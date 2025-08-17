@@ -18,12 +18,12 @@ public class ToDownswingsTests : PricesTests
 
         chart = chart.AddLayers(new Layer
         {
-            Name = "Higher highs",
+            Name = "Lower lows",
             ChartFactory = () => ChartGenerator.GenerateScatterChart(
                 downswings.Select(x => x.Prices.First()).ToList(),
                 p => (decimal)p.Close,
                 title: name,
-                color: Color.fromString("green"),
+                color: Color.fromString("red"),
                 markerSize: 12
             ),
         });
@@ -35,7 +35,7 @@ public class ToDownswingsTests : PricesTests
                 downswings.Select(x => x.SwingHigh(EnumCloseType.Close)).ToList(),
                 p => (decimal)p.Close,
                 title: name,
-                color: Color.fromString("red"),
+                color: Color.fromString("green"),
                 markerSize: 12
             )
         });
