@@ -1,39 +1,35 @@
-﻿using CryptoAnalysis.Csv.ClassMaps;
-using Gradient.CryptoAnalysis.Csv;
+﻿using Plotly.NET;
 
-namespace Gradient.CryptoAnalysis.Test.PriceExtensions
+namespace Gradient.CryptoAnalysis.Test.PriceExtensions;
+
+[TestClass]
+public class ToLowSegmentsTests : PricesTests
 {
-    [TestClass]
-    public class ToLowSegmentsTests
+    public override string TestDirectory => Path.Combine("PricesExtensionsData", "ToLowSegmentsTests");
+
+    [TestMethod]
+    public void ToLowSegmentsTests_Segments()
     {
-        private List<Price> _prices;
-        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "ToLowSegmentsTests", "TestData.csv");
+        var name = "ToLowSegmentsTests_Segments";
 
-        [TestInitialize]
-        public void TestInitialize()
+        var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true, lineWidth: 3);
+
+        var segments = _prices.ToLowSegments(EnumCloseType.Close, true);
+        foreach (var segment in segments)
         {
-            _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(_cryptoDataFilePath).ToList();
+            chart = chart.AddLayers(new Layer
+            {
+                Name = "base",
+                ChartFactory = () => ChartGenerator.GenerateLineChart(
+                    segment,
+                    p => (decimal)p.Close,
+                    name
+                ),
+                Color = Color.fromString("red"),
+                LineWidth = 1,
+            });
         }
 
-        [TestMethod]
-        public void TestToLowSegments_Empty()
-        {
-            CollectionAssert.AreEqual(new List<List<Price>>(), new List<Price>().ToLowSegments(EnumCloseType.Low));
-        }
-
-        [TestMethod]
-        public void TestToLowSegments_Ok()
-        {
-            var segments = _prices.ToLowSegments(EnumCloseType.Low);
-
-            Assert.AreEqual(7, segments.Count);
-            Assert.AreEqual(8, segments[0].Count);
-            Assert.AreEqual(3, segments[1].Count);
-            Assert.AreEqual(4, segments[2].Count);
-            Assert.AreEqual(6, segments[3].Count);
-            Assert.AreEqual(2, segments[4].Count);
-            Assert.AreEqual(2, segments[5].Count);
-            Assert.AreEqual(3, segments[6].Count);
-        }
+        AssertChart(name, chart);
     }
 }
