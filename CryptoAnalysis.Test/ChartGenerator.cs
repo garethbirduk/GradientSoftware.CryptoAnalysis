@@ -1,7 +1,9 @@
 ﻿using Gradient.CryptoAnalysis;
 using Microsoft.FSharp.Core;
 using Plotly.NET;
+using Plotly.NET.LayoutObjects;
 using Plotly.NET.TraceObjects;
+using static Plotly.NET.StyleParam;
 
 public static class ChartGenerator
 {
@@ -144,7 +146,7 @@ public static class ChartGenerator
     {
         var layers = new List<Layer>();
         if (candlestick)
-            layers.Add(GenerateCandlestickLayer(prices, lineWidth: lineWidth, name: $"{name} - Candlestick"));
+            layers.Add(PricesCandlestickLayer(prices, lineWidth: lineWidth, name: $"{name} - Candlestick"));
         if (lineCloses)
             layers.Add(PriceClosesLineLayer(prices, lineWidth: lineWidth, name: $"{name} - Close", color: color));
         if (lineHighs)
@@ -213,13 +215,19 @@ public static class ChartGenerator
         var closeData = prices.Select(p => (decimal)p.Close);
         var dateData = prices.Select(p => p.DateTime);
 
+        var yAxis = new LinearAxis();
+        yAxis.SetValue("autorange", AutoRange.True);
+        yAxis.SetValue("fixedrange", false);
+
         var chart = Chart2D.Chart.Candlestick<decimal, decimal, decimal, decimal, DateTime, string>(
             open: openData,
             high: highData,
             low: lowData,
             close: closeData,
-            X: FSharpOption<IEnumerable<DateTime>>.Some(dateData)
-        );
+            X: FSharpOption<IEnumerable<DateTime>>.Some(dateData),
+            ShowXAxisRangeSlider: FSharpOption<bool>.Some(true),
+            UseDefaults: FSharpOption<bool>.Some(true)
+        ).WithYAxis(yAxis);
 
         chart = ApplyStyle(chart, color, lineWidth);
 
@@ -227,21 +235,6 @@ public static class ChartGenerator
             .WithTitle(title)
             .WithXAxisStyle(title: Title.init("Date"))
             .WithYAxisStyle(title: Title.init("Price"));
-    }
-
-    public static Layer GenerateCandlestickLayer(
-        List<Price> prices,
-        string name = "prices",
-        Color? color = null,
-        int? lineWidth = null)
-    {
-        return new Layer
-        {
-            Name = name,
-            ChartFactory = () => GenerateCandlestickChart(prices, name, color, lineWidth),
-            Color = color,
-            LineWidth = lineWidth
-        };
     }
 
     public static GenericChart GenerateLineChart<T>(
@@ -259,13 +252,7 @@ public static class ChartGenerator
         var chart = Chart2D.Chart.Line<DateTime, decimal, string>(
             x: xData,
             y: yData
-        //Line: Line.init(
-        //    Color: color,
-        //    Width: FSharpOption<double>.Some(lineWidth)
-        //)
         );
-
-        //chart = ApplyStyle(chart, color, lineWidth);
 
         return chart
             .WithTitle(title)
@@ -328,10 +315,21 @@ public static class ChartGenerator
         CreatePriceLineLayer(prices, p => (decimal)p.High, name, color ?? Color.fromString("Black"), lineWidth);
 
     public static Layer PriceLowsLineLayer(List<Price> prices, Color? color = null, int lineWidth = 1, string name = "Low Prices") =>
-            CreatePriceLineLayer(prices, p => (decimal)p.Low, name, color ?? Color.fromString("Black"), lineWidth);
+        CreatePriceLineLayer(prices, p => (decimal)p.Low, name, color ?? Color.fromString("Black"), lineWidth);
 
     public static Layer PriceOpenLine(List<Price> prices) =>
         CreatePriceLineLayer(prices, p => (decimal)p.Open, "Open Prices", Color.fromString("blue"), 3);
+
+    public static Layer PricesCandlestickLayer(List<Price> prices, string name = "prices", Color? color = null, int? lineWidth = null)
+    {
+        return new Layer
+        {
+            Name = name,
+            ChartFactory = () => GenerateCandlestickChart(prices, name, color, lineWidth),
+            Color = color,
+            LineWidth = lineWidth
+        };
+    }
 
     public static void Save(this GenericChart chart, string outputPath, string format = "html")
     {
@@ -342,11 +340,18 @@ public static class ChartGenerator
         }
 
         var layout = Layout.init<string>(
+            DragMode: StyleParam.DragMode.Zoom,
             Width: FSharpOption<int>.Some(1800),
             Height: FSharpOption<int>.Some(900),
             AutoSize: FSharpOption<bool>.Some(false)
         );
-        var config = Config.init(Responsive: false);
+
+        var config = Config.init(
+            ScrollZoom: StyleParam.ScrollZoom.NoZoom,
+            Responsive: true,
+            DisplayModeBar: true,
+            Displaylogo: false
+        );
 
         chart = chart
             .WithLayout(layout)

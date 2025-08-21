@@ -51,7 +51,7 @@
             if (TrimStart && segments.Any())
             {
                 var segment = segments.First();
-                var lowPrice = segment.MinBy(x => x.Close);
+                var lowPrice = segment.MinBy(x => x.CloseValue(closeType));
                 if (closeType == EnumCloseType.High)
                     lowPrice = segment.MinBy(x => x.High);
 

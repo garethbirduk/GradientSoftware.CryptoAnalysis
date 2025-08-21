@@ -40,6 +40,6 @@ public abstract class PricesTests
     [TestInitialize]
     public void TestInitialize()
     {
-        _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(DirectoryPath(), "TestData.csv")).ToList();
+        _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(DirectoryPath(), "TestData.csv")).ToList() ?? new();
     }
 }

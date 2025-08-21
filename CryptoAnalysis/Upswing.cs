@@ -50,14 +50,6 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public List<Upswing> InterimUpswings
-        {
-            get
-            {
-                return Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToUpswings(EnumCloseType.High);
-            }
-        }
-
         public Price? MarketStructureBreak
         {
             get
@@ -106,6 +98,16 @@ namespace Gradient.CryptoAnalysis
             {
                 return Prices.First();
             }
+        }
+
+        public List<Upswing> InterimUpswings(EnumCloseType closeType)
+        {
+            if (NextPrice != null)
+            {
+                var upswings = Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToUpswings(closeType);
+                return upswings;
+            }
+            return Prices.Skip(1).Union(new List<Price>()).ToList().ToUpswings(closeType);
         }
 
         public Price? SwingLow(EnumCloseType close)

@@ -84,7 +84,7 @@
 
                     var index = swings.IndexOf(swing);
                     var pre = swings.Take(index).ToList();
-                    var interim = swing.InterimUpswings.ToList();
+                    var interim = swing.InterimUpswings(closeType).ToList();
                     var post = swings.Skip(index + 1).ToList();
 
                     swings = pre.Union(interim).Union(post).ToList();
