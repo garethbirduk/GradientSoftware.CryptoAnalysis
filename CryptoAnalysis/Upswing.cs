@@ -34,22 +34,6 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public List<Price> InterimHighs
-        {
-            get
-            {
-                return Prices.Skip(1).HighClosesIsGreen(EnumCloseType.High);
-            }
-        }
-
-        public List<Price> InterimLows
-        {
-            get
-            {
-                return Prices.Skip(1).LowCloses();
-            }
-        }
-
         public Price? MarketStructureBreak
         {
             get
@@ -62,43 +46,11 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public List<Price> NextInterswingPrices { get; set; } = new List<Price>();
-
         public Price? NextPrice { get; }
-
-        public Price? PreviousHigh { get; }
-
-        public List<Price> PreviousInterswingPrices { get; set; } = new List<Price>();
-
-        public Price? PreviousLow { get; }
 
         public Upswing? PreviousUpswing { get; }
 
         public List<Price> Prices { get; set; } = new();
-
-        public Price? SwingClose
-        {
-            get
-            {
-                return Prices.Last();
-            }
-        }
-
-        public Price? SwingHigh
-        {
-            get
-            {
-                return Prices.FirstOrDefault(x => x.Close == Prices.Max(x => x.Close));
-            }
-        }
-
-        public Price? SwingOpen
-        {
-            get
-            {
-                return Prices.First();
-            }
-        }
 
         public List<Upswing> InterimUpswings(EnumCloseType closeType)
         {
@@ -119,11 +71,5 @@ namespace Gradient.CryptoAnalysis
         {
             return $"{InitialPrice}-{BreakOfStructure} ({Prices.Count()})";
         }
-    }
-
-    public class Upswingx
-    {
-        public Price InitialPrice { get; set; } = new();
-        public List<Price> Prices { get; set; } = new();
     }
 }

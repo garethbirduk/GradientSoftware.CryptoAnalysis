@@ -34,76 +34,35 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public List<Downswing> InterimDownswings
-        {
-            get
-            {
-                return Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToDownswings(EnumCloseType.Low);
-            }
-        }
-
-        public List<Price> Interimhighs
-        {
-            get
-            {
-                return Prices.Skip(1).LowClosesIsRed(EnumCloseType.Low);
-            }
-        }
-
-        public List<Price> Interimlows
-        {
-            get
-            {
-                return Prices.Skip(1).LowCloses();
-            }
-        }
-
         public Price? MarketStructureBreak
         {
             get
             {
                 if (PreviousDownswing == null)
                     return null;
-                if (PreviousDownswing.SwingLow == null)
+                if (PreviousDownswing.SwingHigh == null)
                     return null;
                 return Prices.FirstOrDefault(x => x.CloseValue(EnumCloseType.Close) > PreviousDownswing.SwingHigh(EnumCloseType.Close).CloseValue(EnumCloseType.Close));
             }
         }
 
-        public List<Price> NextInterswingPrices { get; set; } = new List<Price>();
-
         public Price? NextPrice { get; }
 
         public Downswing? PreviousDownswing { get; }
-        public Price? Previoushigh { get; }
 
-        public List<Price> PreviousInterswingPrices { get; set; } = new List<Price>();
-
-        public Price? Previouslow { get; }
         public List<Price> Prices { get; set; } = new();
 
-        public Price? SwingClose
+        public List<Downswing> InterimDownswings(EnumCloseType closeType)
         {
-            get
+            if (NextPrice != null)
             {
-                return Prices.Last();
+                var downswings = Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToDownswings(closeType);
+                return downswings;
             }
-        }
-
-        public Price? SwingOpen
-        {
-            get
-            {
-                return Prices.First();
-            }
+            return Prices.Skip(1).Union(new List<Price>()).ToList().ToDownswings(closeType);
         }
 
         public Price? SwingHigh(EnumCloseType close)
-        {
-            return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Max(x => x.CloseValue(close)));
-        }
-
-        public Price? SwingLow(EnumCloseType close)
         {
             return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Min(x => x.CloseValue(close)));
         }
@@ -112,11 +71,5 @@ namespace Gradient.CryptoAnalysis
         {
             return $"{InitialPrice}-{BreakOfStructure} ({Prices.Count()})";
         }
-    }
-
-    public class Downswingx
-    {
-        public Price InitialPrice { get; set; } = new();
-        public List<Price> Prices { get; set; } = new();
     }
 }
