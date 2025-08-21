@@ -64,7 +64,7 @@ namespace Gradient.CryptoAnalysis
 
         public Price? SwingHigh(EnumCloseType close)
         {
-            return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Min(x => x.CloseValue(close)));
+            return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Max(x => x.CloseValue(close)));
         }
 
         public override string ToString()
