@@ -52,14 +52,28 @@ namespace Gradient.CryptoAnalysis
 
         public List<Price> Prices { get; set; } = new();
 
+        public List<Downswing> InterimDownswings(EnumCloseType closeType)
+        {
+            var list = new List<Price>();
+            var swingLow = SwingLow(closeType);
+            if (swingLow != null)
+            {
+                list.AddRange(Prices.Skip(1).Where(x => x.DateTime <= swingLow.DateTime));
+            }
+            var downswings = Prices.Skip(1).Union(list).ToList().ToDownswings(closeType);
+            return downswings;
+        }
+
         public List<Upswing> InterimUpswings(EnumCloseType closeType)
         {
-            if (NextPrice != null)
+            var list = new List<Price>();
+            var swingLow = SwingLow(closeType);
+            if (swingLow != null)
             {
-                var upswings = Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToUpswings(closeType);
-                return upswings;
+                list.AddRange(Prices.Skip(1).Where(x => x.DateTime >= swingLow.DateTime));
             }
-            return Prices.Skip(1).Union(new List<Price>()).ToList().ToUpswings(closeType);
+            var upswings = Prices.Skip(1).Union(list).ToList().ToUpswings(closeType);
+            return upswings;
         }
 
         public Price? SwingLow(EnumCloseType close)

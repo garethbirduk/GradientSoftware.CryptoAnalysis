@@ -48,6 +48,10 @@ public static class GenericChartExtensions
     {
         var p1 = downswing.Prices.First();
         var p2 = downswing.NextPrice;
+
+        if (p1 == null || p2 == null)
+            return chart;
+
         var swingHigh = downswing.SwingHigh(EnumCloseType.Close);
 
         if (swingHigh == null) return chart;
@@ -95,6 +99,10 @@ public static class GenericChartExtensions
     {
         var p1 = upswing.Prices.First();
         var p2 = upswing.NextPrice;
+
+        if (p1 == null || p2 == null)
+            return chart;
+
         var swingLow = upswing.SwingLow(EnumCloseType.Close);
 
         if (swingLow == null) return chart;
