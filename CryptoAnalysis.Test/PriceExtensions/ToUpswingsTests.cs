@@ -10,13 +10,13 @@ public class ToUpswingsTests : PricesTests
     [DataRow("ToUpswingTests_LineCloses", false, true)]
     public void ToUpswingTests_1(string name, bool candlestick, bool lineCloses)
     {
-        var upswings = _prices.ToUpswings(EnumCloseType.Close);
+        var upswings = _prices.ToUpswings(EnumCloseType.Close, true);
         var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
         chart = chart
             .WithHigherHighs(upswings, EnumCloseType.Close)
             .WithHigherLows(upswings, EnumCloseType.Close)
             .WithUpswings(upswings, EnumCloseType.Close, lineWidth: 2, color: "cyan")
-            .WithBreaksOfStructure(upswings, EnumCloseType.Close, lineWidth: 3, color: "blue", markerSize: 6)
+            .WithBreaksOfStructure(upswings, EnumCloseType.Close, lineWidth: 3, color: "yellow", markerSize: 6)
             .WithMarketStructureBreaks(upswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
             ;
 
@@ -28,30 +28,29 @@ public class ToUpswingsTests : PricesTests
     {
         var name = "ToUpswingTests_Interims";
 
-        var upswings = _prices.ToUpswings(EnumCloseType.Close);
-        var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: true, lineWidth: 1);
+        var upswings = _prices.ToUpswings(EnumCloseType.Close, true, false);
+        var downswings = _prices.ToDownswings(EnumCloseType.Close, true);
+
+        var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true, lineWidth: 1);
         chart = chart
-            .WithHigherHighs(upswings, EnumCloseType.Close)
-            .WithHigherLows(upswings, EnumCloseType.Close)
-            .WithUpswings(upswings, EnumCloseType.Close, lineWidth: 2, color: "cyan");
+            .WithHigherHighs(upswings.Where(x => x.Broken), EnumCloseType.Close)
+            .WithHigherLows(upswings.Where(x => x.Broken), EnumCloseType.Close)
+            .WithUpswings(upswings, EnumCloseType.Close, lineWidth: 2, color: "green")
+            .WithDownswings(downswings, EnumCloseType.Close, lineWidth: 2, color: "red")
+            ;
 
         foreach (var upswing in upswings)
         {
-            var interimDownswings = upswing.InterimDownswings(EnumCloseType.Close);
-            var interminUpswings = upswing.InterimUpswings(EnumCloseType.Close);
+            chart = chart.WithInterimUpswings(upswing, 3);
+        }
 
-            chart = chart
-                .WithLowerHighs(interimDownswings, EnumCloseType.Close, markerSize: 6)
-                .WithLowerLows(interimDownswings, EnumCloseType.Close, markerSize: 6)
-                .WithHigherHighs(interminUpswings, EnumCloseType.Close, markerSize: 6)
-                .WithHigherLows(interminUpswings, EnumCloseType.Close, markerSize: 6)
-                .WithDownswings(interimDownswings, EnumCloseType.Close, lineWidth: 2, color: "pink")
-                .WithUpswings(interminUpswings, EnumCloseType.Close, lineWidth: 2, color: "lightgreen")
-                ;
+        foreach (var downswing in downswings)
+        {
+            chart = chart.WithInterimDownswings(downswing, 3);
         }
 
         chart = chart
-            .WithBreaksOfStructure(upswings, EnumCloseType.Close, lineWidth: 3, color: "blue", markerSize: 6)
+            .WithBreaksOfStructure(upswings, EnumCloseType.Close, lineWidth: 3, color: "cyan", markerSize: 6)
             .WithMarketStructureBreaks(upswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
             ;
 

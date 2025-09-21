@@ -2,13 +2,13 @@
 {
     public static partial class PricesExtensions_Swings
     {
-        public static List<Downswing> ToDownswings(this List<Price> prices, EnumCloseType closeType, int maxSwingSize = 0)
+        public static List<Downswing> ToDownswings(this List<Price> prices, EnumCloseType closeType, bool trimStart = false, int maxSwingSize = 0)
         {
             var swings = new List<Downswing>();
             if (prices.Count() == 0)
                 return swings;
 
-            var segments = prices.ToLowSegments(closeType, true);
+            var segments = prices.ToLowSegments(closeType, trimStart);
 
             Downswing previousSwing = null;
             foreach (var segment in segments.Where(x => x.Count() > 1))
@@ -48,13 +48,13 @@
             return swings;
         }
 
-        public static List<Upswing> ToUpswings(this List<Price> prices, EnumCloseType closeType, int maxSwingSize = 0)
+        public static List<Upswing> ToUpswings(this List<Price> prices, EnumCloseType closeType, bool trimStart = false, bool trimEnd = false, int maxSwingSize = 0)
         {
             var swings = new List<Upswing>();
             if (prices.Count() == 0)
                 return swings;
 
-            var segments = prices.ToHighSegments(closeType, true);
+            var segments = prices.ToHighSegments(closeType, trimStart, trimEnd);
 
             Upswing previousSwing = null;
             foreach (var segment in segments.Where(x => x.Count() > 1))

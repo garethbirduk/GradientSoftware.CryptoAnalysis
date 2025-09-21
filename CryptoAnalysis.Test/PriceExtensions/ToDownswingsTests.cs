@@ -10,7 +10,7 @@ public class ToDownswingsTests : PricesTests
     [DataRow("ToDownswingTests_LineCloses", false, true)]
     public void ToDownswingTests_1(string name, bool candlestick, bool lineCloses)
     {
-        var downswings = _prices.ToDownswings(EnumCloseType.Close);
+        var downswings = _prices.ToDownswings(EnumCloseType.Close, true);
         var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
         chart = chart
             .WithLowerHighs(downswings, EnumCloseType.Close)

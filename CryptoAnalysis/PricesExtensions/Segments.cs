@@ -20,7 +20,7 @@
             return list;
         }
 
-        public static List<List<Price>> ToHighSegments(this List<Price> prices, EnumCloseType closeType, bool TrimStart = false)
+        public static List<List<Price>> ToHighSegments(this List<Price> prices, EnumCloseType closeType, bool trimStart = false, bool trimEnd = false)
         {
             if (!prices.Any())
                 return new List<List<Price>>();
@@ -48,7 +48,7 @@
                     segments.Add(segment);
             }
 
-            if (TrimStart && segments.Any())
+            if (trimStart && segments.Any())
             {
                 var segment = segments.First();
                 var lowPrice = segment.MinBy(x => x.CloseValue(closeType));
@@ -64,6 +64,12 @@
                     if (highPrice != null)
                         segment.RemoveAll(x => x.DateTime < highPrice.DateTime);
                 }
+            }
+
+            if (trimEnd && segments.Any())
+            {
+                if (segments.Last().Last().CloseValue(closeType) < segments.First().First().CloseValue(closeType))
+                    segments.Remove(segments.Last());
             }
 
             return segments;

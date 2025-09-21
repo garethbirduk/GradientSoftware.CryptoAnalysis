@@ -284,16 +284,30 @@ public static class ChartGenerator
         string title = "Scatter Chart",
         Color? color = null,
         double? lineWidth = null,
-        int? markerSize = null
+        int? markerSize = null,
+        string? text = null
     ) where T : Price
     {
         var xData = prices.Select(x => x.DateTime);
         var yData = prices.Select(ySelector);
 
-        var chart = Chart2D.Chart.Point<DateTime, decimal, string>(
-            x: xData,
-            y: yData
-        );
+        GenericChart chart;
+
+        if (!string.IsNullOrEmpty(text))
+        {
+            chart = Chart2D.Chart.Point<DateTime, decimal, string>(
+                x: xData,
+                y: yData,
+                Text: FSharpOption<string>.Some(text)
+            );
+        }
+        else
+        {
+            chart = Chart2D.Chart.Point<DateTime, decimal, string>(
+                x: xData,
+                y: yData
+            );
+        }
 
         chart = chart.WithMarker(Marker.init(
             Color: color,

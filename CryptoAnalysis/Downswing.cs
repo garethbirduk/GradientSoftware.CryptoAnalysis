@@ -46,11 +46,25 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public Price? NextPrice { get; }
+        public Price? NextPrice { get; set; }
 
         public Downswing? PreviousDownswing { get; }
 
         public List<Price> Prices { get; set; } = new();
+
+        public List<Price> DownlegPrices(EnumCloseType closeType)
+        {
+            var swingLow = SwingLow(closeType);
+            if (swingLow == null)
+                return new List<Price>();
+            return Prices.Skip(1).Where(x => x.DateTime <= swingLow.DateTime).ToList();
+        }
+
+        public List<Downswing> InterimDownswings(EnumCloseType closeType, int skip = 1)
+        {
+            var list = new List<Price>();
+            return DownlegPrices(closeType).Skip(skip).Union(list).ToList().ToDownswings(closeType);
+        }
 
         public List<Downswing> InterimDownswings(EnumCloseType closeType)
         {
@@ -62,14 +76,33 @@ namespace Gradient.CryptoAnalysis
             return Prices.Skip(1).Union(new List<Price>()).ToList().ToDownswings(closeType);
         }
 
+        public List<Upswing> InterimUpswings(EnumCloseType closeType, int skip = 1)
+        {
+            var list = new List<Price>();
+            return UplegPrices(closeType).Skip(skip).Union(list).ToList().ToUpswings(closeType);
+        }
+
         public Price? SwingHigh(EnumCloseType close)
         {
             return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Max(x => x.CloseValue(close)));
         }
 
+        public Price? SwingLow(EnumCloseType close)
+        {
+            return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Min(x => x.CloseValue(close)));
+        }
+
         public override string ToString()
         {
             return $"{InitialPrice}-{BreakOfStructure} ({Prices.Count()})";
+        }
+
+        public List<Price> UplegPrices(EnumCloseType closeType)
+        {
+            var swingLow = SwingLow(closeType);
+            if (swingLow == null)
+                return new List<Price>();
+            return Prices.Skip(1).Where(x => x.DateTime >= swingLow.DateTime).ToList();
         }
     }
 }

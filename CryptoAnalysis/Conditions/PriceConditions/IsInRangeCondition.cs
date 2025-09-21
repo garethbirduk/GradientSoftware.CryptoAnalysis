@@ -6,7 +6,7 @@
 
         protected override bool IsMet()
         {
-            var swings = Prices.ToUpswings(EnumCloseType.Close, MaxSwingSize).ToList();
+            var swings = Prices.ToUpswings(EnumCloseType.Close, true, false, MaxSwingSize).ToList();
             if (swings.Count < 2)
                 return false;
 
