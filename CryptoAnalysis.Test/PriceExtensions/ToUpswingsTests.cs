@@ -33,10 +33,11 @@ public class ToUpswingsTests : PricesTests
 
         var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true, lineWidth: 1);
         chart = chart
-            .WithHigherHighs(upswings.Where(x => x.Broken), EnumCloseType.Close)
-            .WithHigherLows(upswings.Where(x => x.Broken), EnumCloseType.Close)
-            .WithUpswings(upswings, EnumCloseType.Close, lineWidth: 2, color: "green")
-            .WithDownswings(downswings, EnumCloseType.Close, lineWidth: 2, color: "red")
+            .WithHigherHighs(upswings, EnumCloseType.Close)
+            .WithHigherLows(upswings, EnumCloseType.Close)
+            .WithUpswings(upswings, EnumCloseType.Close, lineWidth: 2, color: "cyan")
+            .WithBreaksOfStructure(upswings, EnumCloseType.Close, lineWidth: 3, color: "yellow", markerSize: 6)
+            .WithMarketStructureBreaks(upswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
             ;
 
         foreach (var upswing in upswings)

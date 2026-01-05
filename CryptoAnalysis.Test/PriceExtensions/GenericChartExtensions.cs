@@ -188,6 +188,86 @@ public static class GenericChartExtensions
         });
     }
 
+    public static GenericChart WithHorizontalLineByGain(this GenericChart chart, Price low, Price high, DateTime extent, double gain, EnumCloseType lowCloseType, EnumCloseType highCloseType,
+        string color = "orange", int markerSize = 6, int lineWidth = 1)
+    {
+        var highLowDelta = high.CloseValue(highCloseType) - low.CloseValue(lowCloseType);
+        var retracementDelta = highLowDelta * gain;
+
+        var topY = low.CloseValue(lowCloseType) + retracementDelta;
+        var leftX = low.DateTime;
+        var rightX = extent;
+
+        var line = new List<Price>
+        {
+            new Price { Close = topY, DateTime = high.DateTime },
+            new Price { Close = topY, DateTime = extent }
+        };
+
+        chart = chart.AddLayers(ChartGenerator.PriceClosesLineLayer(line, lineWidth: lineWidth, color: Color.fromString(color))
+            );
+
+        return chart;
+    }
+
+    public static GenericChart WithHorizontalLinesByGain(this GenericChart chart, Price low, Price high, DateTime extent, EnumCloseType lowCloseType, EnumCloseType highCloseType,
+        string color = "orange", int markerSize = 6, int lineWidth = 1, params double[] gains)
+    {
+        foreach (var gain in gains)
+            chart = chart.WithHorizontalLineByGain(low, high, extent, gain, lowCloseType, highCloseType, color, markerSize, lineWidth);
+        return chart;
+    }
+
+    public static GenericChart WithHorizontalLinesByGain_GreyscalePrefix(this GenericChart chart, Upswing upswing, Upswing nextUpswing, DateTime extent, EnumCloseType lowCloseType, EnumCloseType highCloseType, int markerSize = 6, int lineWidth = 1)
+    {
+        var low = upswing.SwingLow(lowCloseType);
+        if (low == null)
+            return chart;
+
+        var high = nextUpswing.Prices.First();
+        var last = nextUpswing.Prices.Last();
+
+        return chart.WithHorizontalLinesByGain_GreyscalePrefix(low, high, nextUpswing.Prices.Last().DateTime, lowCloseType, highCloseType, markerSize, lineWidth);
+    }
+
+    public static GenericChart WithHorizontalLinesByGain_GreyscalePrefix(this GenericChart chart, Price low, Price high, DateTime extent, EnumCloseType lowCloseType, EnumCloseType highCloseType,
+        int markerSize = 6, int lineWidth = 1, params double[] gains)
+    {
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 1.25, lowCloseType, highCloseType, color: "gray", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 1.0, lowCloseType, highCloseType, color: "black", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 0.75, lowCloseType, highCloseType, color: "gray", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 0.5, lowCloseType, highCloseType, color: "gray", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 0.25, lowCloseType, highCloseType, color: "gray", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 0.0, lowCloseType, highCloseType, color: "black", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, -0.25, lowCloseType, highCloseType, color: "gray", markerSize, lineWidth);
+        return chart;
+    }
+
+    public static GenericChart WithHorizontalLinesByGain_RainbowPrefix(this GenericChart chart, Upswing upswing, Upswing nextUpswing, DateTime extent, EnumCloseType lowCloseType, EnumCloseType highCloseType, int markerSize = 6, int lineWidth = 1)
+    {
+        var low = upswing.SwingLow(lowCloseType);
+        if (low == null)
+            return chart;
+
+        var high = nextUpswing.Prices.First();
+        var last = nextUpswing.Prices.Last();
+
+        return chart.WithHorizontalLinesByGain_RainbowPrefix(low, high, nextUpswing.Prices.Last().DateTime, lowCloseType, highCloseType, markerSize, lineWidth);
+    }
+
+    public static GenericChart WithHorizontalLinesByGain_RainbowPrefix(this GenericChart chart, Price low, Price high, DateTime extent, EnumCloseType lowCloseType, EnumCloseType highCloseType,
+        int markerSize = 6, int lineWidth = 1, params double[] gains)
+    {
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 1.25, lowCloseType, highCloseType, color: "purple", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 1.0, lowCloseType, highCloseType, color: "blue", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 0.75, lowCloseType, highCloseType, color: "cyan", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 0.5, lowCloseType, highCloseType, color: "green", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 0.25, lowCloseType, highCloseType, color: "yellow", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, 0.0, lowCloseType, highCloseType, color: "orange", markerSize, lineWidth);
+        chart = chart.WithHorizontalLineByGain(low, high, extent, -0.25, lowCloseType, highCloseType, color: "red", markerSize, lineWidth);
+        return chart;
+    }
+
     public static GenericChart WithInterimDownswings(this GenericChart chart, Downswing downswings, int maxDepth = 0, int depth = 0)
     {
         var interimDownswings = downswings.InterimDownswings(EnumCloseType.Close, skip: 0);
@@ -368,6 +448,96 @@ public static class GenericChartExtensions
         return chart;
     }
 
+    public static GenericChart WithPreviousSwingLowMarker(this GenericChart chart, Price low, DateTime extent, EnumCloseType enumCloseType,
+        int markerSize = 6, int lineWidth = 1, string color = "red")
+    {
+        var line = new List<Price>
+        {
+            new Price { Close = low.CloseValue(enumCloseType), DateTime = low.DateTime },
+            new Price { Close = low.CloseValue(enumCloseType), DateTime = extent }
+        };
+
+        chart = chart.AddLayers(ChartGenerator.PriceClosesLineLayer(line, lineWidth: lineWidth, color: Color.fromString(color))
+            );
+
+        return chart;
+    }
+
+    public static GenericChart WithRetracementLinesFromPreviousSwingLow(this GenericChart chart, List<Upswing> upswings, EnumCloseType lowCloseType, EnumCloseType highCloseType, int interimDepth = 0,
+        int markerSize = 6, int lineWidth = 1)
+    {
+        foreach (var upswing in upswings.Where(x => x != upswings.Last()))
+        {
+            var nextUpswing = upswings[upswings.IndexOf(upswing) + 1];
+
+            chart = chart.WithHorizontalLinesByGain_RainbowPrefix(upswing, nextUpswing, nextUpswing.Prices.Last().DateTime, lowCloseType, highCloseType);
+        }
+        return chart;
+    }
+
+    public static GenericChart WithRetracementMarker(this GenericChart chart, Upswing upswing, Upswing nextSwing, double retracement, EnumCloseType enumCloseType,
+        string color = "orange", int markerSize = 6, int lineWidth = 1)
+    {
+        var low = upswing.SwingLow(enumCloseType);
+        if (low == null)
+            return chart;
+
+        var high = nextSwing.Prices.First();
+        var last = nextSwing.Prices.Last();
+
+        var highLowDelta = high.CloseValue(enumCloseType) - low.CloseValue(enumCloseType);
+        var retracementDelta = highLowDelta * retracement;
+
+        var bottomY = low.CloseValue(enumCloseType);
+        var topY = high.CloseValue(enumCloseType) - retracementDelta;
+        var leftX = low.DateTime;
+        var rightX = last.DateTime;
+
+        var topLine = new List<Price>
+        {
+            new Price { Close = topY, DateTime = high.DateTime },
+            new Price { Close = topY, DateTime = rightX }
+        };
+
+        var bottomLine = new List<Price>
+        {
+            new Price { Close = bottomY, DateTime = leftX },
+            new Price { Close = bottomY, DateTime = high.DateTime }
+        };
+
+        var verticalLine = new List<Price>
+        {
+            new Price { Close = bottomY, DateTime = high.DateTime },
+            new Price { Close = topY, DateTime = high.DateTime }
+        };
+
+        chart = chart.AddLayers(
+            ChartGenerator.PriceClosesLineLayer(topLine, lineWidth: lineWidth, color: Color.fromString(color)),
+            ChartGenerator.PriceClosesLineLayer(bottomLine, lineWidth: lineWidth, color: Color.fromString(color)),
+            ChartGenerator.PriceClosesLineLayer(verticalLine, lineWidth: lineWidth, color: Color.fromString(color))
+        );
+
+        return chart;
+    }
+
+    public static GenericChart WithRetracementMarkers(this GenericChart chart, List<Upswing> upswings, double retracement, EnumCloseType enumCloseType,
+            string color = "orange", int markerSize = 6, int lineWidth = 1)
+    {
+        foreach (var upswing in upswings.Where(x => x != upswings.Last()))
+        {
+            var low = upswing.SwingLow(enumCloseType);
+            if (low == null)
+                continue;
+
+            var nextUpswing = upswings[upswings.IndexOf(upswing) + 1];
+            var high = nextUpswing.Prices.First();
+            var gains = new double[] { -0.25, 0.0, 0.25, 0.5, 0.75, 1.0, 1.25 };
+
+            chart = chart.WithHorizontalLinesByGain(low, high, nextUpswing.Prices.Last().DateTime, EnumCloseType.Low, EnumCloseType.High, gains: gains);
+        }
+        return chart;
+    }
+
     public static GenericChart WithUnfinishedUpswings(this GenericChart chart, List<Upswing> upswings, EnumCloseType closeType, string color = "cyan", int markerSize = 6, int lineWidth = 1)
     {
         foreach (var upswing in upswings.Where(x => x.BreakOfStructure == null))
@@ -432,7 +602,8 @@ public static class GenericChartExtensions
         return chart;
     }
 
-    public static GenericChart WithUpswings(this GenericChart chart, List<Upswing> upswings, EnumCloseType closeType, string color = "cyan", int markerSize = 6, int lineWidth = 1)
+    public static GenericChart WithUpswings(this GenericChart chart, List<Upswing> upswings, EnumCloseType closeType,
+        string color = "cyan", int markerSize = 6, int lineWidth = 1)
     {
         foreach (var upswing in upswings)
         {

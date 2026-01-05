@@ -1,24 +1,24 @@
 ﻿namespace Gradient.CryptoAnalysis
 {
-    public static partial class PricesExtensions_Upswings
+    public static partial class PricesExtensions_Downswings
     {
-        public static List<Upswing> ToUpswings(this List<Price> prices, EnumCloseType closeType,
+        public static List<Downswing> ToDownswings(this List<Price> prices, EnumCloseType closeType,
             bool trimStart = false, bool trimEnd = false, int maxSwingSize = 0)
         {
-            var swings = new List<Upswing>();
+            var swings = new List<Downswing>();
             if (prices.Count() == 0)
                 return swings;
 
-            var segments = prices.ToHighSegments(closeType, trimStart, trimEnd);
+            var segments = prices.ToLowSegments(closeType, trimStart);
 
-            Upswing previousSwing = null;
+            Downswing previousSwing = null;
             foreach (var segment in segments.Where(x => x.Count() > 1))
             {
                 Price? next = null;
                 if (segment.Last() != prices.Last())
                     next = prices[prices.IndexOf(segment.Last()) + 1];
 
-                var swing = new Upswing(segment, previousSwing, next);
+                var swing = new Downswing(segment, previousSwing, next);
 
                 if (swing.MarketStructureBreak == null && swing.BreakOfStructure == null)
                 {
@@ -39,7 +39,7 @@
 
                     var index = swings.IndexOf(swing);
                     var pre = swings.Take(index).ToList();
-                    var interim = swing.InterimUpswings(closeType).ToList();
+                    var interim = swing.InterimDownswings(EnumCloseType.Close).ToList();
                     var post = swings.Skip(index + 1).ToList();
 
                     swings = pre.Union(interim).Union(post).ToList();

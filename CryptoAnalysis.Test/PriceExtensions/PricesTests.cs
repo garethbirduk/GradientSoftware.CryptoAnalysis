@@ -8,9 +8,18 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions;
 public abstract class PricesTests
 {
     protected static readonly string _cryptoDataDirectory = Path.Combine("TestData");
+
     protected static readonly string _cryptoDataFilePath = Path.Combine(_cryptoDataDirectory, "TestData.csv");
 
     protected List<Price> _prices = new();
+
+    protected string SaveChart(GenericChart chart, string filename)
+    {
+        var path = Path.Combine(DirectoryPath(), filename);
+        ChartGenerator.Save(chart, path);
+        return path;
+    }
+
     public abstract string TestDirectory { get; }
 
     public static void AssertHtmlChartFileContent(string expectedPath, string actualPath)
@@ -25,9 +34,7 @@ public abstract class PricesTests
 
     public void AssertChart(string name, GenericChart chart)
     {
-        var actualHtmlPath = Path.Combine(DirectoryPath(), $"actual_{name}.html");
-        ChartGenerator.Save(chart, actualHtmlPath);
-
+        var actualHtmlPath = SaveChart(chart, $"actual_{name}.html");
         var expectedHtmlPath = Path.Combine(DirectoryPath(), $"expected_{name}.html");
         AssertHtmlChartFileContent(expectedHtmlPath, actualHtmlPath);
     }

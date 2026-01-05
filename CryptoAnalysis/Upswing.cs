@@ -79,6 +79,12 @@ namespace Gradient.CryptoAnalysis
             return UplegPrices(closeType).Skip(skip).Union(list).ToList().ToUpswings(closeType);
         }
 
+        public Price? SwingHigh(EnumCloseType close)
+        {
+            var s = Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Max(x => x.CloseValue(close)));
+            return s;
+        }
+
         public Price? SwingLow(EnumCloseType close)
         {
             var s = Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Min(x => x.CloseValue(close)));

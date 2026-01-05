@@ -16,7 +16,42 @@ public class ToDownswingsTests : PricesTests
             .WithLowerHighs(downswings, EnumCloseType.Close)
             .WithLowerLows(downswings, EnumCloseType.Close)
             .WithDownswings(downswings, EnumCloseType.Close, lineWidth: 2, color: "cyan")
-            .WithBreaksOfStructure(downswings, EnumCloseType.Close, lineWidth: 3, color: "blue", markerSize: 6)
+            .WithBreaksOfStructure(downswings, EnumCloseType.Close, lineWidth: 3, color: "yellow", markerSize: 6)
+            //.WithMarketStructureBreaks(downswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
+            ;
+
+        AssertChart(name, chart);
+    }
+
+    [TestMethod]
+    public void ToDownswingTests_Interims()
+    {
+        var name = "ToDownswingTests_Interims";
+
+        var downswings = _prices.ToDownswings(EnumCloseType.Close, true, false);
+        var upswings = _prices.ToUpswings(EnumCloseType.Close, true);
+
+        var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true, lineWidth: 1);
+        chart = chart
+            .WithLowerHighs(downswings, EnumCloseType.Close)
+            .WithLowerLows(downswings, EnumCloseType.Close)
+            .WithDownswings(downswings, EnumCloseType.Close, lineWidth: 2, color: "cyan")
+            .WithBreaksOfStructure(downswings, EnumCloseType.Close, lineWidth: 3, color: "yellow", markerSize: 6)
+            .WithMarketStructureBreaks(downswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
+            ;
+
+        foreach (var upswing in upswings)
+        {
+            chart = chart.WithInterimUpswings(upswing, 3);
+        }
+
+        foreach (var downswing in downswings)
+        {
+            chart = chart.WithInterimDownswings(downswing, 3);
+        }
+
+        chart = chart
+            .WithBreaksOfStructure(downswings, EnumCloseType.Close, lineWidth: 3, color: "cyan", markerSize: 6)
             .WithMarketStructureBreaks(downswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
             ;
 
