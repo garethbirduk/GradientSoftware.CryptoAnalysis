@@ -5,6 +5,44 @@ namespace Gradient.CryptoAnalysis
 {
     public static partial class PricesExtensions_Closes2
     {
+        private static List<Price> ToHighHighsUsingCloses(this IEnumerable<Price> prices)
+        {
+            if (!prices.Any())
+                return new List<Price>();
+
+            var list = new List<Price>
+            {
+                prices.First(),
+            };
+
+            foreach (var price in prices.Where(x => x != null))
+            {
+                if (price.Close > list.Last().Close)
+                    list.Add(price);
+            }
+
+            return list;
+        }
+
+        private static List<Price> ToHighHighsUsingHighs(this IEnumerable<Price> prices)
+        {
+            if (!prices.Any())
+                return new List<Price>();
+
+            var list = new List<Price>
+            {
+                prices.First(),
+            };
+
+            foreach (var price in prices.Where(x => x != null))
+            {
+                if (price.IsGreen() && price.High > list.Last().High)
+                    list.Add(price);
+            }
+
+            return list;
+        }
+
         public static bool HasDecreasedByPercentage(this IEnumerable<Price> data, double percentageDecrease)
         {
             var change = -PercentageIncreaseCloseToClose(data);
@@ -126,42 +164,13 @@ namespace Gradient.CryptoAnalysis
             return Maths.PercentageIncrease(initialClose, finalClose);
         }
 
-        public static List<Price> ToHighHighsUsingCloses(this IEnumerable<Price> prices)
+        public static List<Price> ToHighHighs(this IEnumerable<Price> prices, EnumCloseType closeType)
         {
-            if (!prices.Any())
-                return new List<Price>();
-
-            var list = new List<Price>
+            switch (closeType)
             {
-                prices.First(),
-            };
-
-            foreach (var price in prices.Where(x => x != null))
-            {
-                if (price.Close > list.Last().Close)
-                    list.Add(price);
+                default: case EnumCloseType.Close: return prices.ToHighHighsUsingCloses();
+                case EnumCloseType.High: return prices.ToHighHighsUsingHighs();
             }
-
-            return list;
-        }
-
-        public static List<Price> ToHighHighsUsingHighs(this IEnumerable<Price> prices)
-        {
-            if (!prices.Any())
-                return new List<Price>();
-
-            var list = new List<Price>
-            {
-                prices.First(),
-            };
-
-            foreach (var price in prices.Where(x => x != null))
-            {
-                if (price.IsGreen() && price.High > list.Last().High)
-                    list.Add(price);
-            }
-
-            return list;
         }
     }
 }

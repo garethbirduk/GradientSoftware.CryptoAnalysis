@@ -17,7 +17,7 @@ public class ToDownswingsTests : PricesTests
             .WithLowerLows(downswings, EnumCloseType.Close)
             .WithDownswings(downswings, EnumCloseType.Close, lineWidth: 2, color: "cyan")
             .WithBreaksOfStructure(downswings, EnumCloseType.Close, lineWidth: 3, color: "yellow", markerSize: 6)
-            //.WithMarketStructureBreaks(downswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
+            .WithMarketStructureBreaks(downswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
             ;
 
         AssertChart(name, chart);

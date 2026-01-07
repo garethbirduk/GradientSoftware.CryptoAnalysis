@@ -36,7 +36,7 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
             CollectionAssert.AreEqual(new List<Price>(), new List<Price>().HighClosesIsGreen(EnumCloseType.Close));
             var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true);
 
-            var highHighs = _prices.ToHighHighsUsingCloses();
+            var highHighs = _prices.ToHighHighs(EnumCloseType.Close);
             var annotated = highHighs.ToAnnotatedPrices(EnumAnnotationType.HigherHigh);
             chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(annotated, StyleParam.MarkerSymbol.TriangleUp, Color.fromString("Green")));
             chart.SaveHtml(Path.Combine("c:\\", "temp", "ToHighHighsUsingCloses"));
@@ -48,7 +48,7 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
             CollectionAssert.AreEqual(new List<Price>(), new List<Price>().HighClosesIsGreen(EnumCloseType.High));
             var chart = ChartGenerator.CreatePriceChart(_prices, lineHighs: true);
 
-            var highHighs = _prices.ToHighHighsUsingHighs();
+            var highHighs = _prices.ToHighHighs(EnumCloseType.High);
             var annotated = highHighs.ToAnnotatedPrices(EnumAnnotationType.HigherHigh);
             chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(annotated, StyleParam.MarkerSymbol.TriangleUp, Color.fromString("Green")));
             chart.SaveHtml(Path.Combine("c:\\", "temp", "ToHighHighsUsingHighs"));

@@ -111,4 +111,66 @@ namespace Gradient.CryptoAnalysis
             return upswings;
         }
     }
+
+    public class UpwardBreakout
+    {
+        public UpwardBreakout([Required] IEnumerable<Price> prices, Upswing upswing, EnumCloseType closeType = EnumCloseType.Close)
+        {
+            Prices = prices.Where(x => x != null).ToList();
+            Upswing = upswing;
+
+            var last = prices.LastOrDefault();
+            if (last != null && Confirmation != null && last.DateTime > Confirmation.DateTime && last.CloseValue(closeType) > Confirmation.CloseValue(closeType))
+                SuccessfulBreakoutPrices = prices.ToList();
+            if (last != null && Confirmation != null && last.DateTime > Confirmation.DateTime && last.CloseValue(closeType) <= Confirmation.CloseValue(closeType))
+                FailedBreakoutPrices = prices.ToList();
+        }
+
+        public Price? Breakout
+        {
+            get
+            {
+                return Upswing.BreakOfStructure;
+            }
+        }
+
+        public Price? Confirmation
+        {
+            get
+            {
+                if (Breakout == null)
+                    return null;
+
+                return Prices.Skip(1).FirstOrDefault();
+            }
+        }
+
+        public List<Price> FailedBreakoutPrices { get; } = [];
+        public List<Price> Prices { get; set; } = [];
+
+        public List<Price> SuccessfulBreakout
+        {
+            get
+            {
+                var list = new List<Price>();
+                if (Confirmation != null)
+                    list.AddRange(SuccessfulBreakoutPrices.Skip(1));
+                return list;
+            }
+        }
+
+        public List<Price> FailedBreakout
+        {
+            get
+            {
+                var list = new List<Price>();
+                if (Confirmation != null)
+                    list.AddRange(FailedBreakoutPrices.Skip(1));
+                return list;
+            }
+        }
+
+        public List<Price> SuccessfulBreakoutPrices { get; } = [];
+        public Upswing Upswing { get; }
+    }
 }

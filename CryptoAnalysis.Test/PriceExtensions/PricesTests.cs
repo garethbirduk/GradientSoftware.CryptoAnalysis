@@ -9,7 +9,7 @@ public abstract class PricesTests
 {
     protected static readonly string _cryptoDataDirectory = Path.Combine("TestData");
 
-    protected static readonly string _cryptoDataFilePath = Path.Combine(_cryptoDataDirectory, "TestData.csv");
+    protected static string _cryptoDataFilePath = Path.Combine(_cryptoDataDirectory, "TestData.csv");
 
     protected List<Price> _prices = new();
 

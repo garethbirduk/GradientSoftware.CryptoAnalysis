@@ -8,6 +8,10 @@ public static class GenericChartExtensions
     {
         var p1 = upswing.Prices.First();
         var p2 = upswing.NextPrice;
+
+        if (p2 == null)
+            return chart;
+
         var p = new List<Price>
             {
                 p1,
@@ -28,6 +32,10 @@ public static class GenericChartExtensions
     {
         var p1 = downswing.Prices.First();
         var p2 = downswing.NextPrice;
+
+        if (p2 == null)
+            return chart;
+
         var p = new List<Price>
             {
                 p1,
@@ -333,6 +341,28 @@ public static class GenericChartExtensions
         return chart;
     }
 
+    public static GenericChart WithInterimUpwardBreakouts(this GenericChart chart, Upswing upswing, int maxDepth = 0, int depth = 0)
+    {
+        var closeType = EnumCloseType.Close;
+        var swingLow = upswing.SwingLow(closeType);
+
+        var prices = upswing.Prices.Where(x => x.DateTime > swingLow.DateTime).ToList();
+
+        chart = chart
+            .WithUpwardBreakouts(prices.ToUpwardBreakouts(closeType), EnumCloseType.Close);
+
+        var interminUpswings = upswing.InterimUpswings(EnumCloseType.Close, skip: 0);
+        while (depth < maxDepth)
+        {
+            if (interminUpswings.Count == 0)
+                depth = maxDepth;
+            foreach (var interimUpswing in interminUpswings)
+                chart = chart.WithInterimUpwardBreakouts(interimUpswing, maxDepth, depth + 1);
+            depth++;
+        }
+        return chart;
+    }
+
     public static GenericChart WithLowerHighs(this GenericChart chart, IEnumerable<Downswing> downswings, EnumCloseType closeType, string color = "green", int markerSize = 12)
     {
         return chart.AddLayers(new Layer
@@ -608,6 +638,37 @@ public static class GenericChartExtensions
         foreach (var upswing in upswings)
         {
             chart = WithUpswing(chart, upswing, color, lineWidth);
+        }
+
+        return chart;
+    }
+
+    public static GenericChart WithUpwardBreakout(this GenericChart chart, UpwardBreakout upwardBreakout,
+        string confirmationColor = "yellow", string successfulBreakout = "green", string failedBreakout = "red", int lineWidth = 3
+        )
+    {
+        if (upwardBreakout.Breakout == null)
+            return chart;
+
+        if (upwardBreakout.Confirmation == null)
+            return chart;
+
+        var confirmation = new List<Price> { upwardBreakout.Breakout, upwardBreakout.Confirmation };
+
+        chart = chart.AddLayers(
+            ChartGenerator.PriceClosesLineLayer(confirmation, lineWidth: lineWidth, color: Color.fromString(confirmationColor)),
+            ChartGenerator.PriceClosesLineLayer(upwardBreakout.SuccessfulBreakout, lineWidth: lineWidth, color: Color.fromString(successfulBreakout)),
+            ChartGenerator.PriceClosesLineLayer(upwardBreakout.FailedBreakout, lineWidth: lineWidth, color: Color.fromString(failedBreakout))
+            );
+        return chart;
+    }
+
+    public static GenericChart WithUpwardBreakouts(this GenericChart chart, List<UpwardBreakout> upwardBreakouts, EnumCloseType closeType,
+        string confirmationColor = "yellow", string successfulBreakout = "green", string failedBreakout = "red", int lineWidth = 3)
+    {
+        foreach (var upwardBreakout in upwardBreakouts)
+        {
+            chart = chart.WithUpwardBreakout(upwardBreakout, confirmationColor, successfulBreakout, failedBreakout, lineWidth);
         }
 
         return chart;
