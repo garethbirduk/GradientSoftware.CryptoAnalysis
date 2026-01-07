@@ -71,7 +71,7 @@ public class ToUpwardBreakoutsTests : PricesTests
         var depth = 1;
         foreach (var upswing in upswings)
         {
-            chart = chart.WithInterimUpswings(upswing, depth);
+            chart = chart.WithInterimUpswings(upswing, EnumCloseType.Close, depth);
             chart = chart.WithInterimUpwardBreakouts(upswing, depth);
         }
 

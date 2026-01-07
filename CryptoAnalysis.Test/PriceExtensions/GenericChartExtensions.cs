@@ -333,42 +333,43 @@ public static class GenericChartExtensions
             if (interminUpswings.Count + interimDownswings.Count == 0)
                 depth = maxDepth;
             foreach (var interimUpswing in interminUpswings)
-                chart = chart.WithInterimUpswings(interimUpswing, maxDepth, depth + 1);
+                chart = chart.WithInterimUpswings(interimUpswing, maxDepth: maxDepth, depth: depth + 1);
             foreach (var interimDownswing in interimDownswings)
-                chart = chart.WithInterimDownswings(interimDownswing, maxDepth, depth + 1);
+                chart = chart.WithInterimDownswings(interimDownswing, maxDepth: maxDepth, depth + 1);
             depth++;
         }
         return chart;
     }
 
-    public static GenericChart WithInterimUpswings(this GenericChart chart, Upswing upswing, int maxDepth = 0, int depth = 0)
+    public static GenericChart WithInterimUpswings(this GenericChart chart, Upswing upswing, EnumCloseType closeType = EnumCloseType.Close, int maxDepth = 0, int depth = 0)
     {
-        var interimDownswings = upswing.InterimDownswings(EnumCloseType.Close, skip: 0);
-        var interminUpswings = upswing.InterimUpswings(EnumCloseType.Close, skip: 0);
+        var interimDownswings = upswing.InterimDownswings(closeType, skip: 0);
+        var interminUpswings = upswing.InterimUpswings(closeType, skip: 0);
 
         chart = chart
-            .WithLowerHighs(interimDownswings, EnumCloseType.Close, markerSize: 6, color: "green")
-            .WithLowerLows(interimDownswings, EnumCloseType.Close, markerSize: 6, color: "red")
+            .WithLowerHighs(interimDownswings, closeType, markerSize: 6, color: "green")
+            .WithLowerLows(interimDownswings, closeType, markerSize: 6, color: "red")
 
-            .WithHigherHighs(interminUpswings, EnumCloseType.Close, markerSize: 6, color: "green")
-            .WithHigherLows(interminUpswings, EnumCloseType.Close, markerSize: 6, color: "red")
+            .WithHigherHighs(interminUpswings, closeType, markerSize: 6, color: "green")
+            .WithHigherLows(interminUpswings, closeType, markerSize: 6, color: "red")
 
-            .WithDownswings(interimDownswings, EnumCloseType.Close, markerSize: 6, color: "red")
-            .WithUpswings(interminUpswings, EnumCloseType.Close, markerSize: 6, color: "green")
+            .WithDownswings(interimDownswings, closeType, markerSize: 6, color: "red")
+            .WithUpswings(interminUpswings, closeType, markerSize: 6, color: "green")
 
-            .WithBreaksOfStructure(interminUpswings, EnumCloseType.Close, lineWidth: 3, color: "cyan", markerSize: 6)
-            .WithMarketStructureBreaks(interminUpswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
+            .WithBreaksOfStructure(interminUpswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6)
+            .WithMarketStructureBreaks(interminUpswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
 
-            ;
+            .WithUpswingsSawtooths(interminUpswings, closeType);
+        ;
 
         while (depth < maxDepth)
         {
             if (interminUpswings.Count + interimDownswings.Count == 0)
                 depth = maxDepth;
             foreach (var interimUpswing in interminUpswings)
-                chart = chart.WithInterimUpswings(interimUpswing, maxDepth, depth + 1);
+                chart = chart.WithInterimUpswings(interimUpswing, maxDepth: maxDepth, depth: depth + 1);
             foreach (var interimDownswing in interimDownswings)
-                chart = chart.WithInterimDownswings(interimDownswing, maxDepth, depth + 1);
+                chart = chart.WithInterimDownswings(interimDownswing, maxDepth: maxDepth, depth: depth + 1);
             depth++;
         }
         return chart;
@@ -691,6 +692,25 @@ public static class GenericChartExtensions
             chart = WithUpswing(chart, upswing, color, lineWidth);
         }
 
+        return chart;
+    }
+
+    public static GenericChart WithUpswingSawtooths(this GenericChart chart, Upswing upswing, EnumCloseType closeType,
+        string color = "cyan", int markerSize = 6, int lineWidth = 1)
+    {
+        var downSawtooth = upswing.DownlegPrices(closeType).ToDownwardSawtooth(closeType);
+        chart = chart.WithSawtooth(downSawtooth, closeType, color: "red");
+        var upwardSawtooth = upswing.UplegPrices(closeType).ToUpwardSawtooth(closeType);
+        chart = chart.WithSawtooth(upwardSawtooth, closeType, color: "green");
+
+        return chart;
+    }
+
+    public static GenericChart WithUpswingsSawtooths(this GenericChart chart, List<Upswing> upswings, EnumCloseType closeType,
+            string color = "cyan", int markerSize = 6, int lineWidth = 1)
+    {
+        foreach (var upswing in upswings)
+            chart = chart.WithUpswingSawtooths(upswing, closeType, color, markerSize, lineWidth);
         return chart;
     }
 

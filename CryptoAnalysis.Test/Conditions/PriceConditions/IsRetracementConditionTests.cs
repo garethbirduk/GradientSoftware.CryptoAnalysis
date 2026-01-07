@@ -23,7 +23,7 @@ public class IsRetracementConditionTests : PricesTests
 
         foreach (var upswing in upswings)
         {
-            chart = chart.WithInterimUpswings(upswing, 3);
+            chart = chart.WithInterimUpswings(upswing, EnumCloseType.Close, 3);
         }
 
         foreach (var upswing in upswings.Where(x => x != upswings.First()))
