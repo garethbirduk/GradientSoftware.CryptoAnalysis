@@ -180,6 +180,21 @@ public static class GenericChartExtensions
         });
     }
 
+    public static GenericChart WithHigherHighs(this GenericChart chart, IEnumerable<Price> higherHighs, EnumCloseType closeType, string color = "green", int markerSize = 12)
+    {
+        return chart.AddLayers(new Layer
+        {
+            Name = "Higher highs",
+            ChartFactory = () => ChartGenerator.GenerateScatterChart(
+                higherHighs,
+                p => (decimal)p.CloseValue(closeType),
+                color: Color.fromString(color),
+                markerSize: markerSize,
+                text: "HH"
+            ),
+        });
+    }
+
     public static GenericChart WithHigherLows(this GenericChart chart, IEnumerable<Upswing> upswings, EnumCloseType closeType, string color = "red", int markerSize = 12)
     {
         var s = upswings.Select(x => x.SwingLow(EnumCloseType.Close)).ToList();
@@ -194,6 +209,23 @@ public static class GenericChartExtensions
                 text: "HL"
             )
         });
+    }
+
+    public static GenericChart WithHigherLows(this GenericChart chart, IEnumerable<Price> higherLows, EnumCloseType closeType, string color = "red", int markerSize = 12)
+    {
+        {
+            return chart.AddLayers(new Layer
+            {
+                Name = "Higher lows",
+                ChartFactory = () => ChartGenerator.GenerateScatterChart(
+                    higherLows,
+                    p => (decimal)p.CloseValue(closeType),
+                    color: Color.fromString(color),
+                    markerSize: markerSize,
+                    text: "HL"
+                ),
+            });
+        }
     }
 
     public static GenericChart WithHorizontalLineByGain(this GenericChart chart, Price low, Price high, DateTime extent, double gain, EnumCloseType lowCloseType, EnumCloseType highCloseType,
@@ -212,7 +244,8 @@ public static class GenericChartExtensions
             new Price { Close = topY, DateTime = extent }
         };
 
-        chart = chart.AddLayers(ChartGenerator.PriceClosesLineLayer(line, lineWidth: lineWidth, color: Color.fromString(color))
+        chart = chart.AddLayers(
+            ChartGenerator.PriceClosesLineLayer(line, lineWidth: lineWidth, color: Color.fromString(color))
             );
 
         return chart;
@@ -493,8 +526,18 @@ public static class GenericChartExtensions
         return chart;
     }
 
+    public static GenericChart WithRangeIndicators(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType, string color = "blue", int markerSize = 12, int lineWidth = 1)
+    {
+        //var
+        //chart = chart.AddLayers(
+        //    ChartGenerator.PriceClosesLineLayer(p, lineWidth: 1, color: Color.fromString(color))
+        //    );
+
+        return chart;
+    }
+
     public static GenericChart WithRetracementLinesFromPreviousSwingLow(this GenericChart chart, List<Upswing> upswings, EnumCloseType lowCloseType, EnumCloseType highCloseType, int interimDepth = 0,
-        int markerSize = 6, int lineWidth = 1)
+            int markerSize = 6, int lineWidth = 1)
     {
         foreach (var upswing in upswings.Where(x => x != upswings.Last()))
         {
@@ -565,6 +608,14 @@ public static class GenericChartExtensions
 
             chart = chart.WithHorizontalLinesByGain(low, high, nextUpswing.Prices.Last().DateTime, EnumCloseType.Low, EnumCloseType.High, gains: gains);
         }
+        return chart;
+    }
+
+    public static GenericChart WithSawtooth(this GenericChart chart, List<Price> sawtooth, EnumCloseType closeType, string color = "black", int markerSize = 12, int lineWidth = 1)
+    {
+        chart = chart.AddLayers(
+            ChartGenerator.PriceClosesLineLayer(sawtooth, lineWidth: lineWidth, color: Color.fromString(color))
+            );
         return chart;
     }
 
