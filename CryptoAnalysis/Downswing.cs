@@ -52,34 +52,28 @@ namespace Gradient.CryptoAnalysis
 
         public List<Price> Prices { get; set; } = new();
 
-        public List<Price> DownlegPrices(EnumCloseType closeType)
+        public List<Price> DownlegPrices(EnumCloseType closeType, bool includeSwingHigh, bool includeNextPrice)
         {
-            var swingLow = SwingLow(closeType);
-            if (swingLow == null)
+            var swingHigh = SwingHigh(closeType);
+            if (swingHigh == null)
                 return new List<Price>();
-            return Prices.Skip(1).Where(x => x.DateTime <= swingLow.DateTime).ToList();
+            var skip = includeSwingHigh ? 0 : 1;
+            var downleg = Prices.Where(x => x.DateTime >= swingHigh.DateTime).Skip(skip).ToList();
+            if (includeNextPrice && NextPrice != null)
+                downleg.Add(NextPrice);
+            return downleg;
         }
 
-        public List<Downswing> InterimDownswings(EnumCloseType closeType, int skip = 1)
+        public List<Downswing> InterimDownswings(EnumCloseType closeType, bool includeSwingHigh, bool includeNextPrice)
         {
             var list = new List<Price>();
-            return DownlegPrices(closeType).Skip(skip).Union(list).ToList().ToDownswings(closeType);
+            return DownlegPrices(closeType, includeSwingHigh, includeNextPrice).Union(list).ToList().ToDownswings(closeType);
         }
 
-        public List<Downswing> InterimDownswings(EnumCloseType closeType)
-        {
-            if (NextPrice != null)
-            {
-                var downswings = Prices.Skip(1).Union(new List<Price>() { NextPrice }).ToList().ToDownswings(closeType);
-                return downswings;
-            }
-            return Prices.Skip(1).Union(new List<Price>()).ToList().ToDownswings(closeType);
-        }
-
-        public List<Upswing> InterimUpswings(EnumCloseType closeType, int skip = 1)
+        public List<Upswing> InterimUpswings(EnumCloseType closeType, bool includeFirstPrice, bool includeSwingHigh)
         {
             var list = new List<Price>();
-            return UplegPrices(closeType).Skip(skip).Union(list).ToList().ToUpswings(closeType);
+            return UplegPrices(closeType, includeFirstPrice, includeSwingHigh).Union(list).ToList().ToUpswings(closeType);
         }
 
         public Price? SwingHigh(EnumCloseType close)
@@ -97,12 +91,20 @@ namespace Gradient.CryptoAnalysis
             return $"{InitialPrice}-{BreakOfStructure} ({Prices.Count()})";
         }
 
-        public List<Price> UplegPrices(EnumCloseType closeType)
+        public List<Price> UplegPrices(EnumCloseType closeType, bool includeFirstPrice, bool includeSwingHigh)
         {
-            var swingLow = SwingLow(closeType);
-            if (swingLow == null)
+            var swingHigh = SwingHigh(closeType);
+            if (swingHigh == null)
                 return new List<Price>();
-            return Prices.Skip(1).Where(x => x.DateTime >= swingLow.DateTime).ToList();
+            var skip = includeFirstPrice ? 0 : 1;
+            var upleg = Prices.Where(x => x.DateTime <= swingHigh.DateTime).Skip(skip).ToList();
+            if (includeSwingHigh)
+            {
+                var swinghigh = SwingHigh(closeType);
+                if (swinghigh != null)
+                    upleg.Add(swinghigh);
+            }
+            return upleg;
         }
     }
 }

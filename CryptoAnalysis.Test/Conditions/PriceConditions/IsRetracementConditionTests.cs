@@ -15,15 +15,15 @@ public class IsRetracementConditionTests : PricesTests
         var upswings = _prices.ToUpswings(EnumCloseType.Close, true, false);
         var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: true, lineWidth: 1)
             .WithUpswings(upswings, EnumCloseType.Close, "cyan", lineWidth: 3)
-            .WithBreaksOfStructure(upswings, EnumCloseType.Close)
-            .WithMarketStructureBreaks(upswings, EnumCloseType.Close)
+            .WithBreaksOfStructureMarkers(upswings, EnumCloseType.Close)
+            .WithMarketStructureBreaksMarkers(upswings, EnumCloseType.Close)
             .WithHigherHighs(upswings, EnumCloseType.Close)
             .WithHigherLows(upswings, EnumCloseType.Close)
             ;
 
         foreach (var upswing in upswings)
         {
-            chart = chart.WithInterimUpswings(upswing, EnumCloseType.Close, 3);
+            chart = chart.WithInterimSwings(upswing, EnumCloseType.Close, 3);
         }
 
         foreach (var upswing in upswings.Where(x => x != upswings.First()))
@@ -57,7 +57,7 @@ public class IsRetracementConditionTests : PricesTests
             //    var previousUpswing = finalInterimUpswings.Last();
             //}
 
-            //chart = chart.WithInterimUpswings(upswing, maxDepth);
+            //chart = chart.WithInterimSwings(upswing, maxDepth);
         }
 
         for (int i = 1; i < _prices.Count; i++)

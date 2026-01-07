@@ -6,54 +6,40 @@ public class ToDownswingsTests : PricesTests
     public override string TestDirectory => Path.Combine("PricesExtensionsData", "ToDownswingsTests");
 
     [DataTestMethod]
-    [DataRow("ToDownswingTests_Candlestick", true, false)]
-    [DataRow("ToDownswingTests_LineCloses", false, true)]
-    public void ToDownswingTests_1(string name, bool candlestick, bool lineCloses)
+    [DataRow("ToDownswingTests_Candlestick", true, false, -1)]
+    [DataRow("ToDownswingTests_LineCloses", false, true, -1)]
+    [DataRow("ToDownswingTests_Candlestick", true, false, 0)]
+    [DataRow("ToDownswingTests_LineCloses", false, true, 0)]
+    public void ToDownswingTests(string name, bool candlestick, bool lineCloses, int interims)
     {
-        var downswings = _prices.ToDownswings(EnumCloseType.Close, true);
+        var closeType = EnumCloseType.Close;
+        var upswings = _prices.ToUpswings(closeType, true);
+        var downswings = _prices.ToDownswings(closeType, true);
         var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
+
         chart = chart
-            .WithLowerHighs(downswings, EnumCloseType.Close)
-            .WithLowerLows(downswings, EnumCloseType.Close)
-            .WithDownswings(downswings, EnumCloseType.Close, lineWidth: 2, color: "cyan")
-            .WithBreaksOfStructure(downswings, EnumCloseType.Close, lineWidth: 3, color: "yellow", markerSize: 6)
-            .WithMarketStructureBreaks(downswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
+            .WithLowerHighs(downswings, closeType)
+            .WithLowerLows(downswings, closeType)
+            .WithDownswings(downswings, closeType, lineWidth: 1, color: "red")
+            .WithBreaksOfStructureMarkers(upswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6)
+            .WithBreaksOfStructureMarkers(downswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6)
+            .WithMarketStructureBreaksMarkers(upswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
+            .WithMarketStructureBreaksMarkers(downswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
             ;
 
-        AssertChart(name, chart);
-    }
-
-    [TestMethod]
-    public void ToDownswingTests_Interims()
-    {
-        var name = "ToDownswingTests_Interims";
-
-        var downswings = _prices.ToDownswings(EnumCloseType.Close, true, false);
-        var upswings = _prices.ToUpswings(EnumCloseType.Close, true);
-
-        var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true, lineWidth: 1);
-        chart = chart
-            .WithLowerHighs(downswings, EnumCloseType.Close)
-            .WithLowerLows(downswings, EnumCloseType.Close)
-            .WithDownswings(downswings, EnumCloseType.Close, lineWidth: 2, color: "cyan")
-            .WithBreaksOfStructure(downswings, EnumCloseType.Close, lineWidth: 3, color: "yellow", markerSize: 6)
-            .WithMarketStructureBreaks(downswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
-            ;
-
-        foreach (var upswing in upswings)
+        if (interims > -1)
         {
-            chart = chart.WithInterimUpswings(upswing, EnumCloseType.Close, 3);
-        }
+            name = $"{name}_Interims_{interims}";
+            foreach (var upswing in upswings)
+            {
+                chart = chart.WithInterimSwings(upswing, EnumCloseType.Close, interims);
+            }
 
-        foreach (var downswing in downswings)
-        {
-            chart = chart.WithInterimDownswings(downswing, 3);
+            foreach (var downswing in downswings)
+            {
+                chart = chart.WithInterimSwings(downswing, EnumCloseType.Close, interims);
+            }
         }
-
-        chart = chart
-            .WithBreaksOfStructure(downswings, EnumCloseType.Close, lineWidth: 3, color: "cyan", markerSize: 6)
-            .WithMarketStructureBreaks(downswings, EnumCloseType.Close, lineWidth: 3, color: "orange", markerSize: 6)
-            ;
 
         AssertChart(name, chart);
     }

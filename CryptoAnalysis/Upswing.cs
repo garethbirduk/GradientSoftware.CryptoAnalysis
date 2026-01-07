@@ -54,29 +54,37 @@ namespace Gradient.CryptoAnalysis
 
         public List<Price> Prices { get; set; } = new();
 
-        public List<Price> DownlegPrices(EnumCloseType closeType)
+        public List<Price> DownlegPrices(EnumCloseType closeType, bool includeFirstPrice, bool includeSwingLow)
         {
             var swingLow = SwingLow(closeType);
             if (swingLow == null)
                 return new List<Price>();
-            return Prices.Skip(1).Where(x => x.DateTime <= swingLow.DateTime).ToList();
+            var skip = includeFirstPrice ? 0 : 1;
+            var downleg = Prices.Skip(skip).Where(x => x.DateTime < swingLow.DateTime).ToList();
+            if (includeSwingLow)
+            {
+                var swinglow = SwingLow(closeType);
+                if (swinglow != null)
+                    downleg.Add(swinglow);
+            }
+            return downleg;
         }
 
         public Downswing? DownlegSwing(EnumCloseType closeType)
         {
-            return DownlegPrices(closeType).ToDownswings(closeType, false).SingleOrDefault();
+            return DownlegPrices(closeType, true, true).ToDownswings(closeType, false).SingleOrDefault();
         }
 
-        public List<Downswing> InterimDownswings(EnumCloseType closeType, int skip = 1)
+        public List<Downswing> InterimDownswings(EnumCloseType closeType, bool includeFirstPrice, bool includeSwingLow)
         {
             var list = new List<Price>();
-            return DownlegPrices(closeType).Skip(skip).Union(list).ToList().ToDownswings(closeType);
+            return DownlegPrices(closeType, includeFirstPrice, includeSwingLow).Union(list).ToList().ToDownswings(closeType);
         }
 
-        public List<Upswing> InterimUpswings(EnumCloseType closeType, int skip = 1)
+        public List<Upswing> InterimUpswings(EnumCloseType closeType, bool includeSwingLow, bool includeNextPrice)
         {
             var list = new List<Price>();
-            return UplegPrices(closeType).Skip(skip).Union(list).ToList().ToUpswings(closeType);
+            return UplegPrices(closeType, includeSwingLow, includeNextPrice).Union(list).ToList().ToUpswings(closeType);
         }
 
         public Price? SwingHigh(EnumCloseType close)
@@ -96,20 +104,24 @@ namespace Gradient.CryptoAnalysis
             return $"{InitialPrice}-{BreakOfStructure} ({Prices.Count()})";
         }
 
-        public List<Price> UplegPrices(EnumCloseType closeType)
+        public List<Price> UplegPrices(EnumCloseType closeType, bool includeSwingLow, bool includeNextPrice)
         {
             var swingLow = SwingLow(closeType);
             if (swingLow == null)
                 return new List<Price>();
-            return Prices.Skip(1).Where(x => x.DateTime >= swingLow.DateTime).ToList();
+            var skip = includeSwingLow ? 0 : 1;
+            var upleg = Prices.Where(x => x.DateTime >= swingLow.DateTime).Skip(skip).ToList();
+            if (includeNextPrice && NextPrice != null)
+                upleg.Add(NextPrice);
+            return upleg;
         }
 
-        public List<Upswing> UplegSwing(EnumCloseType closeType)
-        {
-            var prices = UplegPrices(closeType);
-            var upswings = prices.ToUpswings(closeType);
-            return upswings;
-        }
+        //public List<Upswing> UplegSwing(EnumCloseType closeType)
+        //{
+        //    var prices = UplegPrices(closeType);
+        //    var upswings = prices.ToUpswings(closeType);
+        //    return upswings;
+        //}
     }
 
     public class UpwardBreakout
@@ -145,6 +157,17 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
+        public List<Price> FailedBreakout
+        {
+            get
+            {
+                var list = new List<Price>();
+                if (Confirmation != null)
+                    list.AddRange(FailedBreakoutPrices.Skip(1));
+                return list;
+            }
+        }
+
         public List<Price> FailedBreakoutPrices { get; } = [];
         public List<Price> Prices { get; set; } = [];
 
@@ -155,17 +178,6 @@ namespace Gradient.CryptoAnalysis
                 var list = new List<Price>();
                 if (Confirmation != null)
                     list.AddRange(SuccessfulBreakoutPrices.Skip(1));
-                return list;
-            }
-        }
-
-        public List<Price> FailedBreakout
-        {
-            get
-            {
-                var list = new List<Price>();
-                if (Confirmation != null)
-                    list.AddRange(FailedBreakoutPrices.Skip(1));
                 return list;
             }
         }
