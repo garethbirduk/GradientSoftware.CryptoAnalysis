@@ -562,7 +562,13 @@ public static class GenericChartExtensions
     {
         foreach (var downswing in downswings.Where(x => x.MarketStructureBreak != null))
         {
+            if (downswing.PreviousDownswing == null)
+                continue;
+
             var p1 = downswing.PreviousDownswing.SwingHigh(EnumCloseType.Close);
+            if (p1 == null)
+                continue;
+
             var p2 = downswing.MarketStructureBreak;
             var p = new List<Price>
             {

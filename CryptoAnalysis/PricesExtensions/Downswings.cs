@@ -11,7 +11,7 @@
 
             var segments = prices.ToLowSegments(closeType, trimStart);
 
-            Downswing previousSwing = null;
+            Downswing? previousSwing = null;
             foreach (var segment in segments.Where(x => x.Count() > 1))
             {
                 Price? next = null;
