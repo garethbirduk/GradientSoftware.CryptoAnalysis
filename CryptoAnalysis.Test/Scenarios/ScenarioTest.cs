@@ -149,7 +149,7 @@ namespace Gradient.CryptoAnalysis.Test.Scenarios
                     {
                         PositionRules = positionRules,
                         Prices = _prices,
-                        //Prices = _prices.Where(x => x.DateTime > new DateTime(2024, 07, 12)).ToList(),
+                        //Prices = Prices.Where(x => x.DateTime > new DateTime(2024, 07, 12)).ToList(),
                         OutputFilepath = Path.Combine("c:\\", "temp", "output", $"IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition_{minSwings}_{maxMsb}.csv")
                     };
                     check.Execute();

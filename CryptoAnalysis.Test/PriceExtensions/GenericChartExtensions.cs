@@ -116,8 +116,11 @@ public static class GenericChartExtensions
         return chart;
     }
 
-    public static GenericChart WithDownswing(this GenericChart chart, Downswing? downswing, string color = "cyan", int lineWidth = 1)
+    public static GenericChart WithDownswing(this GenericChart chart, Downswing downswing, string color = "cyan", int lineWidth = 1)
     {
+        if (downswing.SwingType() == EnumSwingType.DownlegOnly)
+            return chart;
+
         var p1 = downswing.Prices.First();
         var p2 = downswing.NextPrice;
 
@@ -370,36 +373,36 @@ public static class GenericChartExtensions
             .WithMarketStructureBreaksMarkers(interimDownswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
         ;
 
-        var uplegSawtoothPrices = new List<Price>()
-        {
-            downswing.Prices.First()
-        };
-        foreach (var interimUpswing in interimUpswings)
-        {
-            uplegSawtoothPrices.Add(interimUpswing.Prices.First());
-            var interimSwinglow = interimUpswing.SwingLow(closeType);
-            if (interimSwinglow != null)
-                uplegSawtoothPrices.Add(interimSwinglow);
-        }
-        var swinghigh = downswing.SwingHigh(closeType);
-        if (swinghigh != null)
-            uplegSawtoothPrices.Add(swinghigh);
-        chart = chart.WithSawtooth(uplegSawtoothPrices, closeType, "green");
+        //var uplegSawtoothPrices = new List<Price>()
+        //{
+        //    downswing.Prices.First()
+        //};
+        //foreach (var interimUpswing in interimUpswings)
+        //{
+        //    uplegSawtoothPrices.Add(interimUpswing.Prices.First());
+        //    var interimSwinglow = interimUpswing.SwingLow(closeType);
+        //    if (interimSwinglow != null)
+        //        uplegSawtoothPrices.Add(interimSwinglow);
+        //}
+        //var swinghigh = downswing.SwingHigh(closeType);
+        //if (swinghigh != null)
+        //    uplegSawtoothPrices.Add(swinghigh);
+        //chart = chart.WithSawtooth(uplegSawtoothPrices, closeType, "green");
 
-        var downlegSawtoothPrices = new List<Price>();
-        if (swinghigh != null)
-            downlegSawtoothPrices.Add(swinghigh);
-        foreach (var interimDownswing in interimDownswings)
-        {
-            downlegSawtoothPrices.Add(interimDownswing.Prices.First());
-            var interimSwingHigh = interimDownswing.SwingHigh(closeType);
-            if (interimSwingHigh != null)
-                downlegSawtoothPrices.Add(interimSwingHigh);
-        }
-        var nextPrice = downswing.NextPrice;
-        if (nextPrice != null)
-            downlegSawtoothPrices.Add(nextPrice);
-        chart = chart.WithSawtooth(downlegSawtoothPrices, closeType, "red");
+        //var downlegSawtoothPrices = new List<Price>();
+        //if (swinghigh != null)
+        //    downlegSawtoothPrices.Add(swinghigh);
+        //foreach (var interimDownswing in interimDownswings)
+        //{
+        //    downlegSawtoothPrices.Add(interimDownswing.Prices.First());
+        //    var interimSwingHigh = interimDownswing.SwingHigh(closeType);
+        //    if (interimSwingHigh != null)
+        //        downlegSawtoothPrices.Add(interimSwingHigh);
+        //}
+        //var nextPrice = downswing.NextPrice;
+        //if (nextPrice != null)
+        //    downlegSawtoothPrices.Add(nextPrice);
+        //chart = chart.WithSawtooth(downlegSawtoothPrices, closeType, "red");
 
         while (depth < maxDepth)
         {
@@ -440,36 +443,36 @@ public static class GenericChartExtensions
             //.WithDownswingsSawtooths(interimDownswings, closeType)
             ;
 
-        var downlegSawtoothPrices = new List<Price>()
-        {
-            upswing.Prices.First()
-        };
-        foreach (var interimDownswing in interimDownswings)
-        {
-            downlegSawtoothPrices.Add(interimDownswing.Prices.First());
-            var interimSwingHigh = interimDownswing.SwingHigh(closeType);
-            if (interimSwingHigh != null)
-                downlegSawtoothPrices.Add(interimSwingHigh);
-        }
-        var swinglow = upswing.SwingLow(closeType);
-        if (swinglow != null)
-            downlegSawtoothPrices.Add(swinglow);
-        chart = chart.WithSawtooth(downlegSawtoothPrices, closeType, "red");
+        //var downlegSawtoothPrices = new List<Price>()
+        //{
+        //    upswing.Prices.First()
+        //};
+        //foreach (var interimDownswing in interimDownswings)
+        //{
+        //    downlegSawtoothPrices.Add(interimDownswing.Prices.First());
+        //    var interimSwingHigh = interimDownswing.SwingHigh(closeType);
+        //    if (interimSwingHigh != null)
+        //        downlegSawtoothPrices.Add(interimSwingHigh);
+        //}
+        //var swinglow = upswing.SwingLow(closeType);
+        //if (swinglow != null)
+        //    downlegSawtoothPrices.Add(swinglow);
+        //chart = chart.WithSawtooth(downlegSawtoothPrices, closeType, "red");
 
-        var uplegSawtoothPrices = new List<Price>();
-        if (swinglow != null)
-            uplegSawtoothPrices.Add(swinglow);
-        foreach (var interimUpswing in interimUpswings)
-        {
-            uplegSawtoothPrices.Add(interimUpswing.Prices.First());
-            var interimSwinglow = interimUpswing.SwingLow(closeType);
-            if (interimSwinglow != null)
-                uplegSawtoothPrices.Add(interimSwinglow);
-        }
-        var nextPrice = upswing.NextPrice;
-        if (nextPrice != null)
-            uplegSawtoothPrices.Add(nextPrice);
-        chart = chart.WithSawtooth(uplegSawtoothPrices, closeType, "green");
+        //var uplegSawtoothPrices = new List<Price>();
+        //if (swinglow != null)
+        //    uplegSawtoothPrices.Add(swinglow);
+        //foreach (var interimUpswing in interimUpswings)
+        //{
+        //    uplegSawtoothPrices.Add(interimUpswing.Prices.First());
+        //    var interimSwinglow = interimUpswing.SwingLow(closeType);
+        //    if (interimSwinglow != null)
+        //        uplegSawtoothPrices.Add(interimSwinglow);
+        //}
+        //var nextPrice = upswing.NextPrice;
+        //if (nextPrice != null)
+        //    uplegSawtoothPrices.Add(nextPrice);
+        //chart = chart.WithSawtooth(uplegSawtoothPrices, closeType, "green");
 
         while (depth < maxDepth)
         {
@@ -536,6 +539,30 @@ public static class GenericChartExtensions
         });
     }
 
+    public static GenericChart WithMarketStructureBreakReferences(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1)
+    {
+        foreach (var downswing in downswings.Where(x => x.MarketStructureBreak != null))
+        {
+            var p1 = downswing.PreviousDownswing.SwingHigh(EnumCloseType.Close);
+            var p2 = downswing.MarketStructureBreak;
+            var p = new List<Price>
+            {
+                p1,
+                new Price
+                {
+                    Close = p1.Close,
+                    DateTime = p2.DateTime
+                }
+            };
+
+            chart = chart.AddLayers(
+                ChartGenerator.PriceClosesLineLayer(p, lineWidth: 1, color: Color.fromString(color))
+                );
+        }
+
+        return chart;
+    }
+
     public static GenericChart WithMarketStructureBreaksMarkers(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1)
     {
         chart = chart.AddLayers(new Layer
@@ -574,30 +601,6 @@ public static class GenericChartExtensions
         {
             var p1 = upswing.PreviousUpswing.SwingLow(EnumCloseType.Close);
             var p2 = upswing.MarketStructureBreak;
-            var p = new List<Price>
-            {
-                p1,
-                new Price
-                {
-                    Close = p1.Close,
-                    DateTime = p2.DateTime
-                }
-            };
-
-            chart = chart.AddLayers(
-                ChartGenerator.PriceClosesLineLayer(p, lineWidth: 1, color: Color.fromString(color))
-                );
-        }
-
-        return chart;
-    }
-
-    public static GenericChart WithMarketStructureReferences(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1)
-    {
-        foreach (var downswing in downswings.Where(x => x.MarketStructureBreak != null))
-        {
-            var p1 = downswing.PreviousDownswing.SwingHigh(EnumCloseType.Close);
-            var p2 = downswing.MarketStructureBreak;
             var p = new List<Price>
             {
                 p1,

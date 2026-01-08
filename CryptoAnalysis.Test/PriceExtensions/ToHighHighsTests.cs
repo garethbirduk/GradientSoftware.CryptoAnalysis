@@ -7,26 +7,26 @@
 //[TestClass]
 //public class ToHighHighsTests
 //{
-//    private List<Price> _prices;
+//    private List<Price> Prices;
 //    public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "PricesExtensionsData", "ToHighHighsTests", "TestData.csv");
 
 //    [TestInitialize]
 //    public void TestInitialize()
 //    {
-//        _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(_cryptoDataFilePath).ToList();
+//        Prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(_cryptoDataFilePath).ToList();
 //    }
 
 //    [TestMethod]
 //    public void TestToHighHighs_Ok()
 //    {
-//        var Highs = _prices.HigherHighs();
+//        var Highs = Prices.HigherHighs();
 
 //        ChartGenerator.CreateChart()
 //            .AddLayers(new Layer
 //            {
 //                Name = "base",
 //                ChartFactory = () => ChartGenerator.GenerateLineChart(
-//                    _prices,
+//                    Prices,
 //                    p => (decimal)p.Close,
 //                    "Close Prices"
 //                ),

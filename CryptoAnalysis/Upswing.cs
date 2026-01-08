@@ -118,8 +118,8 @@ namespace Gradient.CryptoAnalysis
 
         //public List<Upswing> UplegSwing(EnumCloseType closeType)
         //{
-        //    var prices = UplegPrices(closeType);
-        //    var upswings = prices.ToUpswings(closeType);
+        //    var Prices = UplegPrices(closeType);
+        //    var upswings = Prices.ToUpswings(closeType);
         //    return upswings;
         //}
     }

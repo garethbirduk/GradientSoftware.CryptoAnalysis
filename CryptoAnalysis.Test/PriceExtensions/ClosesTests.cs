@@ -105,9 +105,9 @@ public class ClosesTests
 //[TestMethod]
 //public void TestToHighSegments_Ok()
 //{
-//    var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true, lineWidth: 5);
+//    var chart = ChartGenerator.CreatePriceChart(Prices, lineCloses: true, lineWidth: 5);
 
-//    var segments = _prices.ToHighSegments();
+//    var segments = Prices.ToHighSegments();
 //    foreach (var segment in segments)
 //    {
 //        chart = chart.AddLayers(new Layer
@@ -123,19 +123,19 @@ public class ClosesTests
 //        });
 //    }
 
-//    //var annotatedHigherHighs = _prices.HigherHighs().ToAnnotatedPrices(EnumAnnotationType.HigherHigh);
+//    //var annotatedHigherHighs = Prices.HigherHighs().ToAnnotatedPrices(EnumAnnotationType.HigherHigh);
 //    //chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(annotatedHigherHighs, StyleParam.MarkerSymbol.ArrowUp));
 
-//    //var annotatedHigherLows = _prices.ToHigherLows().ToAnnotatedPrices(EnumAnnotationType.HigherLow);
+//    //var annotatedHigherLows = Prices.ToHigherLows().ToAnnotatedPrices(EnumAnnotationType.HigherLow);
 //    //chart = chart.AddLayers(ChartGenerator.CreateAnnotationLayer(annotatedHigherLows, StyleParam.MarkerSymbol.ArrowDown));
 
-//    var upswings = _prices.ToUpswings();
+//    var upswings = Prices.ToUpswings();
 //    foreach (var upswing in upswings)
 //    {
 //        chart = chart.AddLayers(ChartGenerator.PriceClosesLineLayer(upswing.Prices, Color.fromString("Green"), lineWidth: 2));
 //    }
 
-//    //var sawtooth = _prices.ToUptrendSawtooth();
+//    //var sawtooth = Prices.ToUptrendSawtooth();
 //    //chart = chart.AddLayers(new Layer
 //    //{
 //    //    Name = "base",
@@ -148,7 +148,7 @@ public class ClosesTests
 //    //    LineWidth = 1,
 //    //});
 
-//    //(var breakOfStructures, var marketStructureBreaks) = _prices.ToStructures();
+//    //(var breakOfStructures, var marketStructureBreaks) = Prices.ToStructures();
 //    //foreach (var bos in breakOfStructures)
 //    //{
 //    //    var start = new Price()

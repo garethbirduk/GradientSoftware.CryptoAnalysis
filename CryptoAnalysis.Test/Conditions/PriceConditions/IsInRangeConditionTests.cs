@@ -6,7 +6,7 @@
 //    [TestClass]
 //    public class IsInRangeConditionTests
 //    {
-//        private List<Price> _prices;
+//        private List<Price> Prices;
 //        public static readonly string _cryptoDataFilePath = Path.Combine("TestData", "Conditions", "PriceConditions", "IsInRangeConditionTests.csv");
 
 //        [TestMethod]
@@ -20,7 +20,7 @@
 //            var list = new List<DateTime>();
 //            while (date < new DateTime(2024, 07, 01))
 //            {
-//                var result = conditionSet.IsMet(_prices, date);
+//                var result = conditionSet.IsMet(Prices, date);
 //                dictionary.Add(date, result);
 //                if (result)
 //                    list.Add(date);
@@ -33,7 +33,7 @@
 //        [TestInitialize]
 //        public void TestInitialize()
 //        {
-//            _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(_cryptoDataFilePath).
+//            Prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(_cryptoDataFilePath).
 //                Where(x => x.DateTime > new DateTime(2022, 12, 31)).ToList();
 //        }
 //    }

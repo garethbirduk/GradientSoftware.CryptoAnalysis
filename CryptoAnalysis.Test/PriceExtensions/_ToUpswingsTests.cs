@@ -5,7 +5,7 @@
 //    [TestClass]
 //    public class ToUpswingsTests
 //    {
-//        private static List<Price> _prices = new List<Price>
+//        private static List<Price> Prices = new List<Price>
 //        {
 //            new Price { Close = 10, DateTime = new DateTime(2010, 01, 01).AddDays(-62) },
 //            new Price { Close = 14, DateTime = new DateTime(2010, 01, 01).AddDays(-61) },
@@ -76,7 +76,7 @@
 //        public void TestFindBreaksOfStructures()
 //        {
 //            // Act
-//            var actual = _prices.ToUpswings();
+//            var actual = Prices.ToUpswings();
 
 //            //// Assert
 //            //CollectionAssert.AreEqual(new List<Upswing>(), new List<Price>().ToUpswings());
@@ -124,7 +124,7 @@
 //                {
 //                    Name = "base",
 //                    ChartFactory = () => ChartGenerator.GenerateLineChart(
-//                        _prices,
+//                        Prices,
 //                        p => (decimal)p.Close,
 //                        "Close Prices"
 //                    ),
@@ -168,7 +168,7 @@
 //        [TestMethod]
 //        public void TestFindBreaksOfStructures_MaxSwingSize()
 //        {
-//            var swings = _prices.ToUpswings(0).ToList();
+//            var swings = Prices.ToUpswings(0).ToList();
 
 //            Assert.AreEqual(5, swings.Count);
 
@@ -199,7 +199,7 @@
 
 //            var maxSwingSize = 10;
 
-//            swings = _prices.ToUpswings(maxSwingSize).ToList();
+//            swings = Prices.ToUpswings(maxSwingSize).ToList();
 
 //            i = 0;
 //            Assert.AreEqual(7, swings[i].Prices.Count);

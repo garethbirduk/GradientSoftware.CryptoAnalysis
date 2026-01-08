@@ -12,9 +12,9 @@
 //    [DataRow("ToUpwardBreakoutsTests_LineCloses", false, true)]
 //    public void ToUpwardBreakoutsTests_1(string name, bool candlestick, bool lineCloses)
 //    {
-//        var upswings = _prices.ToUpswings(EnumCloseType.Close, true);
-//        var upwardBreakouts = _prices.ToUpwardBreakouts(EnumCloseType.Close, true);
-//        var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
+//        var upswings = Prices.ToUpswings(EnumCloseType.Close, true);
+//        var upwardBreakouts = Prices.ToUpwardBreakouts(EnumCloseType.Close, true);
+//        var chart = ChartGenerator.CreatePriceChart(Prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
 //        chart = chart
 //            .WithHigherHighs(upswings, EnumCloseType.Close)
 //            .WithHigherLows(upswings, EnumCloseType.Close)
@@ -32,11 +32,11 @@
 //    public void ToUpwardBreakoutsTests_1_Full(string name, bool candlestick, bool lineCloses)
 //    {
 //        _cryptoDataFilePath = Path.Combine(_cryptoDataDirectory, "TestData -- full.csv");
-//        _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(DirectoryPath(), "TestData -- full.csv")).ToList() ?? new();
+//        Prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(DirectoryPath(), "TestData -- full.csv")).ToList() ?? new();
 
-//        var upswings = _prices.ToUpswings(EnumCloseType.Close, true);
-//        var upwardBreakouts = _prices.ToUpwardBreakouts(EnumCloseType.Close, true);
-//        var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
+//        var upswings = Prices.ToUpswings(EnumCloseType.Close, true);
+//        var upwardBreakouts = Prices.ToUpwardBreakouts(EnumCloseType.Close, true);
+//        var chart = ChartGenerator.CreatePriceChart(Prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
 //        chart = chart
 //            .WithHigherHighs(upswings, EnumCloseType.Close)
 //            .WithHigherLows(upswings, EnumCloseType.Close)
@@ -54,11 +54,11 @@
 //    public void ToUpwardBreakoutsTests_WithInterims(string name, bool candlestick, bool lineCloses)
 //    {
 //        _cryptoDataFilePath = Path.Combine(_cryptoDataDirectory, "TestData -- full.csv");
-//        _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(DirectoryPath(), "TestData -- full.csv")).ToList() ?? new();
+//        Prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(DirectoryPath(), "TestData -- full.csv")).ToList() ?? new();
 
-//        var upswings = _prices.ToUpswings(EnumCloseType.Close, true);
-//        var upwardBreakouts = _prices.ToUpwardBreakouts(EnumCloseType.Close, true);
-//        var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
+//        var upswings = Prices.ToUpswings(EnumCloseType.Close, true);
+//        var upwardBreakouts = Prices.ToUpwardBreakouts(EnumCloseType.Close, true);
+//        var chart = ChartGenerator.CreatePriceChart(Prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
 //        chart = chart
 //            //.WithHigherHighs(upswings, EnumCloseType.Close)
 //            //.WithHigherLows(upswings, EnumCloseType.Close)
@@ -83,11 +83,11 @@
 //    public void ToUpwardBreakoutsTests_WithInterims_Large(string name, bool candlestick, bool lineCloses)
 //    {
 //        _cryptoDataFilePath = Path.Combine(_cryptoDataDirectory, "TestData -- large.csv");
-//        _prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(DirectoryPath(), "TestData -- large.csv")).ToList() ?? new();
+//        Prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(DirectoryPath(), "TestData -- large.csv")).ToList() ?? new();
 
-//        var upswings = _prices.ToUpswings(EnumCloseType.Close, true);
-//        var upwardBreakouts = _prices.ToUpwardBreakouts(EnumCloseType.Close, true);
-//        var chart = ChartGenerator.CreatePriceChart(_prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
+//        var upswings = Prices.ToUpswings(EnumCloseType.Close, true);
+//        var upwardBreakouts = Prices.ToUpwardBreakouts(EnumCloseType.Close, true);
+//        var chart = ChartGenerator.CreatePriceChart(Prices, candlestick: candlestick, lineCloses: lineCloses, lineWidth: 1);
 //        chart = chart
 //            .WithHigherHighs(upswings, EnumCloseType.Close)
 //            .WithHigherLows(upswings, EnumCloseType.Close)

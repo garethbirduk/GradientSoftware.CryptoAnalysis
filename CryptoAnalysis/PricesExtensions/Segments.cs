@@ -195,30 +195,30 @@
             return prices.HigherHighs().Union(prices.ToHigherLows()).OrderBy(x => x.DateTime).ToList();
         }
 
-        //public static List<List<Price>> ToHighSegmentUsingHighs(this List<Price> prices)
+        //public static List<List<Price>> ToHighSegmentUsingHighs(this List<Price> Prices)
         //{
-        //    if (!prices.Any())
+        //    if (!Prices.Any())
         //        return new List<List<Price>>();
 
-        //    var highs = prices.HighHighs();
+        //    var highs = Prices.HighHighs();
 
         //    var segments = new List<List<Price>>();
 
         //    for (int i = 0; i < highs.Count; i++)
         //    {
         //        var high = highs[i];
-        //        var startIndex = prices.IndexOf(high);
+        //        var startIndex = Prices.IndexOf(high);
 
-        //        var endIndex = prices.IndexOf(prices.Last()) + 1;
+        //        var endIndex = Prices.IndexOf(Prices.Last()) + 1;
         //        if (high != highs.Last())
         //        {
-        //            endIndex = prices.IndexOf(highs[i + 1]);
+        //            endIndex = Prices.IndexOf(highs[i + 1]);
         //        }
 
         //        var skip = startIndex;
         //        var take = endIndex - startIndex;
 
-        //        var segment = prices.Skip(skip).Take(take).ToList();
+        //        var segment = Prices.Skip(skip).Take(take).ToList();
         //        if (segment.Count() > 1)
         //            segments.Add(segment);
         //    }
