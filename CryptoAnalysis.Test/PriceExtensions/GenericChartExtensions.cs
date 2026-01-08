@@ -63,7 +63,8 @@ public static class GenericChartExtensions
     }
 
     public static GenericChart WithBreaksOfStructureMarkers(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType,
-        string color = "cyan", int markerSize = 12, int lineWidth = 1, BreakOfStructureFormat breakOfStructureFormat = BreakOfStructureFormat.Box)
+        string color = "cyan", int markerSize = 12, int lineWidth = 1, BreakOfStructureFormat breakOfStructureFormat = BreakOfStructureFormat.Box,
+        string text = "BOS")
     {
         chart = chart.AddLayers(new Layer
         {
@@ -72,14 +73,16 @@ public static class GenericChartExtensions
                 downswings.Where(x => x.BreakOfStructure != null).Select(x => x.BreakOfStructure).ToList(),
                 p => (decimal)p.Close,
                 color: Color.fromString(color),
-                markerSize: markerSize
+                markerSize: markerSize,
+                text: text
             ),
         });
         return chart;
     }
 
     public static GenericChart WithBreaksOfStructureMarkers(this GenericChart chart, List<Upswing> upswings, EnumCloseType closeType,
-            string color = "cyan", int markerSize = 12, int lineWidth = 1, BreakOfStructureFormat breakOfStructureFormat = BreakOfStructureFormat.Box)
+        string color = "cyan", int markerSize = 12, int lineWidth = 1, BreakOfStructureFormat breakOfStructureFormat = BreakOfStructureFormat.Box,
+        string text = "BOS")
     {
         chart = chart.AddLayers(new Layer
         {
@@ -88,7 +91,8 @@ public static class GenericChartExtensions
                 upswings.Where(x => x.BreakOfStructure != null).Select(x => x.BreakOfStructure).ToList(),
                 p => (decimal)p.Close,
                 color: Color.fromString(color),
-                markerSize: markerSize
+                markerSize: markerSize,
+                text: text
             ),
         });
         return chart;
@@ -112,6 +116,20 @@ public static class GenericChartExtensions
         {
             chart = chart.WithBreakOfStructure(upswing, color, lineWidth);
         }
+
+        return chart;
+    }
+
+    public static GenericChart WithBreaksOfStructuresConnectedMarkers(this GenericChart chart, List<Upswing> upswings, List<Downswing> downswings, EnumCloseType closeType, string color = "cyan", int markerSize = 12, int lineWidth = 1)
+    {
+        var swings = upswings.Where(x => x.BreakOfStructure != null).Select(x => x.BreakOfStructure)
+            .Union(downswings.Where(x => x.BreakOfStructure != null).Select(x => x.BreakOfStructure)
+            .Where(x => x != null))
+            .OrderBy(x => x.DateTime)
+            .ToList();
+        chart = chart.AddLayers(
+            ChartGenerator.PriceClosesLineLayer(swings.ToList(), lineWidth: lineWidth, color: Color.fromString(color))
+            );
 
         return chart;
     }
@@ -191,11 +209,11 @@ public static class GenericChartExtensions
     //    return chart;
     //}
 
-    //public static GenericChart WithDownswingsSawtooths(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType,
+    //public static GenericChart WithDownswingsSawtooths(this GenericChart chart, List<Downswing> swings, EnumCloseType closeType,
     //    string color = "cyan", int markerSize = 6, int lineWidth = 1)
     //{
     //    var prices = new List<Price>();
-    //    foreach (var downswing in downswings)
+    //    foreach (var downswing in swings)
     //    {
     //        prices.Add(downswing.Prices.First());
     //        if (downswing.SwingHigh(closeType) != null)
@@ -370,7 +388,7 @@ public static class GenericChartExtensions
     }
 
     public static GenericChart WithInterimSwings(this GenericChart chart, Downswing downswing, EnumCloseType closeType = EnumCloseType.Close,
-        int maxDepth = 0, int depth = 0)
+        int maxDepth = 0, int depth = 0, string bosLabel = "BOS", string msbLabel = "MSB")
     {
         var interimUpswings = downswing.InterimUpswings(closeType, true, true);
         var interimDownswings = downswing.InterimDownswings(closeType, true, true);
@@ -385,11 +403,11 @@ public static class GenericChartExtensions
             .WithUpswings(interimUpswings, EnumCloseType.Close, markerSize: 6, color: "green")
             .WithDownswings(interimDownswings, EnumCloseType.Close, markerSize: 6, color: "red")
 
-            .WithBreaksOfStructureMarkers(interimUpswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6)
-            .WithBreaksOfStructureMarkers(interimDownswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6)
+            .WithBreaksOfStructureMarkers(interimUpswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
+            .WithBreaksOfStructureMarkers(interimDownswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
 
-            .WithMarketStructureBreaksMarkers(interimUpswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
-            .WithMarketStructureBreaksMarkers(interimDownswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
+            .WithMarketStructureBreaksMarkers(interimUpswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
+            .WithMarketStructureBreaksMarkers(interimDownswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
         ;
 
         //var uplegSawtoothPrices = new List<Price>()
@@ -437,7 +455,7 @@ public static class GenericChartExtensions
     }
 
     public static GenericChart WithInterimSwings(this GenericChart chart, Upswing upswing, EnumCloseType closeType = EnumCloseType.Close,
-        int maxDepth = 0, int depth = 0)
+        int maxDepth = 0, int depth = 0, string bosLabel = "BOS", string msbLabel = "MSB")
     {
         var interimDownswings = upswing.InterimDownswings(closeType, true, true);
         var interimUpswings = upswing.InterimUpswings(closeType, true, true);
@@ -452,11 +470,11 @@ public static class GenericChartExtensions
             .WithDownswings(interimDownswings, closeType, markerSize: 6, color: "red")
             .WithUpswings(interimUpswings, closeType, markerSize: 6, color: "green")
 
-            .WithBreaksOfStructureMarkers(interimUpswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6)
-            .WithBreaksOfStructureMarkers(interimDownswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6)
+            .WithBreaksOfStructureMarkers(interimUpswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
+            .WithBreaksOfStructureMarkers(interimDownswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
 
-            .WithMarketStructureBreaksMarkers(interimUpswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
-            .WithMarketStructureBreaksMarkers(interimDownswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
+            .WithMarketStructureBreaksMarkers(interimUpswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
+            .WithMarketStructureBreaksMarkers(interimDownswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
 
             //.WithUpswingsSawtooths(interimUpswings, closeType)
             //.WithDownswingsSawtooths(interimDownswings, closeType)
@@ -588,7 +606,21 @@ public static class GenericChartExtensions
         return chart;
     }
 
-    public static GenericChart WithMarketStructureBreaksMarkers(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1)
+    public static GenericChart WithMarketStructureBreaksConnectedMarkers(this GenericChart chart, List<Upswing> upswings, List<Downswing> downswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1)
+    {
+        var swings = upswings.Where(x => x.MarketStructureBreak != null).Select(x => x.MarketStructureBreak)
+            .Union(downswings.Where(x => x.MarketStructureBreak != null).Select(x => x.MarketStructureBreak)
+            .Where(x => x != null))
+            .OrderBy(x => x.DateTime)
+            .ToList();
+        chart = chart.AddLayers(
+            ChartGenerator.PriceClosesLineLayer(swings.ToList(), lineWidth: lineWidth, color: Color.fromString(color))
+            );
+
+        return chart;
+    }
+
+    public static GenericChart WithMarketStructureBreaksMarkers(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1, string text = "MSB")
     {
         chart = chart.AddLayers(new Layer
         {
@@ -598,13 +630,14 @@ public static class GenericChartExtensions
                 p => (decimal)p.Close,
                 color: Color.fromString(color),
                 markerSize: markerSize,
-                lineWidth: lineWidth
+                lineWidth: lineWidth,
+                text: text
             ),
         });
         return chart;
     }
 
-    public static GenericChart WithMarketStructureBreaksMarkers(this GenericChart chart, List<Upswing> upswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1)
+    public static GenericChart WithMarketStructureBreaksMarkers(this GenericChart chart, List<Upswing> upswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1, string text = "MSB")
     {
         chart = chart.AddLayers(new Layer
         {
@@ -614,7 +647,8 @@ public static class GenericChartExtensions
                 p => (decimal)p.Close,
                 color: Color.fromString(color),
                 markerSize: markerSize,
-                lineWidth: lineWidth
+                lineWidth: lineWidth,
+                text: text
             ),
         });
         return chart;
@@ -666,7 +700,8 @@ public static class GenericChartExtensions
             new Price { Close = low.CloseValue(enumCloseType), DateTime = extent }
         };
 
-        chart = chart.AddLayers(ChartGenerator.PriceClosesLineLayer(line, lineWidth: lineWidth, color: Color.fromString(color))
+        chart = chart.AddLayers(
+            ChartGenerator.PriceClosesLineLayer(line, lineWidth: lineWidth, color: Color.fromString(color))
             );
 
         return chart;

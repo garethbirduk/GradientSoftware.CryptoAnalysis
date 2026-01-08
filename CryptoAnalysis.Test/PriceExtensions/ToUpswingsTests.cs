@@ -21,10 +21,10 @@ public class ToUpswingsTests : PricesTests
             .WithHigherHighs(upswings, closeType)
             .WithHigherLows(upswings, closeType)
             .WithUpswings(upswings, closeType, lineWidth: 2, color: "green")
-            .WithBreaksOfStructureMarkers(upswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6)
-            .WithBreaksOfStructureMarkers(downswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6)
-            .WithMarketStructureBreaksMarkers(upswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
-            .WithMarketStructureBreaksMarkers(downswings, closeType, lineWidth: 3, color: "orange", markerSize: 6)
+            .WithBreaksOfStructureMarkers(upswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: "")
+            .WithBreaksOfStructureMarkers(downswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: "")
+            .WithMarketStructureBreaksMarkers(upswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: "")
+            .WithMarketStructureBreaksMarkers(downswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: "")
             ;
 
         if (interims > -1)
@@ -32,12 +32,12 @@ public class ToUpswingsTests : PricesTests
             name = $"{name}_Interims_{interims}";
             foreach (var upswing in upswings)
             {
-                chart = chart.WithInterimSwings(upswing, EnumCloseType.Close, interims);
+                chart = chart.WithInterimSwings(upswing, EnumCloseType.Close, interims, bosLabel: "", msbLabel: "");
             }
 
             foreach (var downswing in downswings)
             {
-                chart = chart.WithInterimSwings(downswing, EnumCloseType.Close, interims);
+                chart = chart.WithInterimSwings(downswing, EnumCloseType.Close, interims, bosLabel: "", msbLabel: "");
             }
         }
 
