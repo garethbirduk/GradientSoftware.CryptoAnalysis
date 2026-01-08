@@ -9,7 +9,7 @@ public class Upleg
 
     public void Setup([Required] Downswing downswing, EnumCloseType closeType, bool includeFirstPrice, bool includeSwingHigh)
     {
-        Prices = new List<Price>();
+        Prices = [];
 
         var swingHigh = downswing.SwingHigh(closeType);
         if (swingHigh == null)
@@ -20,5 +20,20 @@ public class Upleg
 
         if (includeSwingHigh && swingHigh != null)
             Prices.Add(swingHigh);
+    }
+
+    public void Setup([Required] Upswing upswing, EnumCloseType closeType, bool includeFirstPrice, bool includeSwingLow)
+    {
+        Prices = [];
+
+        var swingLow = upswing.SwingLow(closeType);
+        if (swingLow == null)
+            return;
+
+        var skip = includeFirstPrice ? 0 : 1;
+        Prices = upswing.Prices.Where(x => x.DateTime < swingLow.DateTime).ToList();
+
+        if (includeSwingLow && swingLow != null)
+            Prices.Add(swingLow);
     }
 }

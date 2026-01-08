@@ -3,7 +3,7 @@ using PostSharp.Patterns.Contracts;
 
 namespace Gradient.CryptoAnalysis;
 
-public class Downswing
+public class Downswing : Swing
 {
     public Downswing([Required] IEnumerable<Price> prices, Downswing? previousDownswing, Price? nextPrice)
     {
@@ -29,8 +29,6 @@ public class Downswing
         }
     }
 
-    public Downleg Downleg { get; set; } = new();
-
     public Price InitialPrice
     {
         get
@@ -43,24 +41,26 @@ public class Downswing
     {
         get
         {
-            if (PreviousDownswing == null)
+            var previousDownswing = PreviousDownswing;
+            if (previousDownswing == null)
                 return null;
-            if (PreviousDownswing.SwingHigh == null)
+
+            var swingHigh = previousDownswing.SwingHigh(EnumCloseType.Close);
+            if (swingHigh == null)
                 return null;
-            return Prices.FirstOrDefault(x => x.CloseValue(EnumCloseType.Close) > PreviousDownswing.SwingHigh(EnumCloseType.Close).CloseValue(EnumCloseType.Close));
+
+            return Prices.FirstOrDefault(x => x.CloseValue(EnumCloseType.Close) > swingHigh.CloseValue(EnumCloseType.Close));
         }
     }
 
     public Price? NextPrice { get; set; }
     public Downswing? PreviousDownswing { get; }
-    public List<Price> Prices { get; set; } = new();
-    public Upleg Upleg { get; set; } = new();
 
     public List<Price> DownlegPrices(EnumCloseType closeType, bool includeSwingHigh, bool includeNextPrice)
     {
         var swingHigh = SwingHigh(closeType);
         if (swingHigh == null)
-            return new List<Price>();
+            return [];
         var skip = includeSwingHigh ? 0 : 1;
         var downleg = Prices.Where(x => x.DateTime >= swingHigh.DateTime).Skip(skip).ToList();
         if (includeNextPrice && NextPrice != null)
@@ -137,7 +137,7 @@ public class Downswing
     {
         var swingHigh = SwingHigh(closeType);
         if (swingHigh == null)
-            return new List<Price>();
+            return [];
         var skip = includeFirstPrice ? 0 : 1;
         var upleg = Prices.Where(x => x.DateTime <= swingHigh.DateTime).Skip(skip).ToList();
         if (includeSwingHigh)

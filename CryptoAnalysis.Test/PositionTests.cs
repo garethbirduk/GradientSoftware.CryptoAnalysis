@@ -70,8 +70,6 @@ namespace Gradient.CryptoAnalysis.Tests
             position.PreConditions.AndSubConditions.Add(isInJanuary);
 
             var data = TestHelper.CreatePriceData(new DateTime(2024, 01, 01), 60, 100 * 24);
-
-            var xx = 1;
         }
 
         [TestMethod]

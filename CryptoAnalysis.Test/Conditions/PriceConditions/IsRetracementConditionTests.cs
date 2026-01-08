@@ -71,7 +71,7 @@ public class IsRetracementConditionTests : PricesTests
             {
                 condition.SetPrice(price.DateTime);
             }
-            catch (Exception ex)
+            catch
             {
                 continue;
             }

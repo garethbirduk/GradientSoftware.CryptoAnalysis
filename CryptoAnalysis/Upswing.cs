@@ -3,13 +3,16 @@ using PostSharp.Patterns.Contracts;
 
 namespace Gradient.CryptoAnalysis
 {
-    public class Upswing
+    public class Upswing : Swing
     {
         public Upswing([Required] IEnumerable<Price> prices, Upswing? previousUpswing, Price? nextPrice)
         {
             Prices = prices.Where(x => x != null).ToList();
             PreviousUpswing = previousUpswing;
             NextPrice = nextPrice;
+
+            Downleg.Setup(this, EnumCloseType.Close, false, false);
+            Upleg.Setup(this, EnumCloseType.Close, false, false);
         }
 
         public Price? BreakOfStructure
@@ -51,8 +54,6 @@ namespace Gradient.CryptoAnalysis
         public Price? NextPrice { get; set; }
 
         public Upswing? PreviousUpswing { get; }
-
-        public List<Price> Prices { get; set; } = new();
 
         public List<Price> DownlegPrices(EnumCloseType closeType, bool includeFirstPrice, bool includeSwingLow)
         {

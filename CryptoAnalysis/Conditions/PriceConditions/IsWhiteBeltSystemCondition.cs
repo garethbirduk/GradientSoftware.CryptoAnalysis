@@ -2,7 +2,6 @@
 {
     public class IsWhiteBeltSystemCondition : PriceCondition
     {
-        private ConditionSet ConditionSet { get; set; }
         private IsInRangeCondition IsInRangeCondition { get; set; }
 
         private IsSuccessiveUpswingsWithMaxMarketStructureBreaksCondition IsInUptrendCondition { get; set; }

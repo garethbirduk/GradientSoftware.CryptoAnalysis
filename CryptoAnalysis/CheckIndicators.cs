@@ -5,14 +5,14 @@ namespace Gradient.CryptoAnalysis
 {
     public class CheckIndicators
     {
-        public string OutputFilepath { get; set; }
+        public string OutputFilepath { get; set; } = string.Empty;
         public BacktestConditionRules PositionRules { get; set; } = new();
-        public List<Price> Prices { get; set; } = new();
-        public List<Price> PricesWhereConditionIsMet { get; set; } = new();
+        public List<Price> Prices { get; set; } = [];
+        public List<Price> PricesWhereConditionIsMet { get; set; } = [];
 
         public DateTime StartDateTime { get; set; }
 
-        public List<Trade> Trades { get; set; } = new();
+        public List<Trade> Trades { get; set; } = [];
 
         public List<Trade> Execute()
         {

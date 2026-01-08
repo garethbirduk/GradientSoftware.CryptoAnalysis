@@ -12,8 +12,8 @@ public class ToRangesTests : PricesTests
     [DataRow("ToRangesTest_LineCloses", false, true, 1)]
     public void ToRangesTest1(string name, bool candlestick, bool lineCloses, int interims)
     {
-        var closeType = EnumCloseType.Close;
-        var downtrends = _prices.ToDowntrends();
+        //var closeType = EnumCloseType.Close;
+        //var downtrends = _prices.ToDowntrends();
 
         //    var upswings = _prices.ToUpswings(closeType, true);
         //    var downswings = _prices.ToDownswings(closeType, true);
