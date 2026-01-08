@@ -48,5 +48,12 @@
 
             return swings;
         }
+
+        public static Downswing ToGlobalSwing(this List<Price> prices, EnumCloseType closeType)
+        {
+            var segments = prices.ToHighSegments(EnumCloseType.Close);
+            //var swing = new Downswing(segment, previousSwing, next);
+            return null;
+        }
     }
 }

@@ -2,6 +2,14 @@
 {
     public static partial class PricesExtensions_Upswings
     {
+        public static (Upleg, Downleg) ToGlobalLegs(this List<Price> prices, EnumCloseType closeType)
+        {
+            var peak = prices.Where(x => x.CloseValue(closeType) == prices.Select(x => x.Close).Max()).First();
+            var upleg = Upleg.Create(prices.Where(x => x.DateTime <= peak.DateTime).ToList()); // ATH lives in upleg
+            var downleg = Downleg.Create(prices.Where(x => x.DateTime > peak.DateTime).ToList());
+            return (upleg, downleg);
+        }
+
         public static List<Upswing> ToUpswings(this List<Price> prices, EnumCloseType closeType,
             bool trimStart = false, bool trimEnd = false, int maxSwingSize = 0)
         {

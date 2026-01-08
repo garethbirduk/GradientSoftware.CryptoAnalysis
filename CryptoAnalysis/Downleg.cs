@@ -5,7 +5,18 @@ namespace Gradient.CryptoAnalysis;
 
 public class Downleg
 {
+    private Downleg()
+    { }
+
     public List<Price> Prices { get; private set; } = [];
+
+    public static Downleg Create(List<Price> prices)
+    {
+        return new Downleg()
+        {
+            Prices = prices
+        };
+    }
 
     public static Downleg Create([Required] Downswing downswing, EnumCloseType closeType, bool includeSwingHigh, bool includeNextPrice)
     {

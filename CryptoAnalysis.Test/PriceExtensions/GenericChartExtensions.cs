@@ -134,6 +134,63 @@ public static class GenericChartExtensions
         return chart;
     }
 
+    public static GenericChart WithDiscountZone(this GenericChart chart, Price high, Price low, EnumCloseType closeType, DateTime? dateTime = null,
+        string color = "green", int markerSize = 6, int lineWidth = 2)
+    {
+        var delta = high.CloseValue(closeType) - low.CloseValue(closeType);
+        var earliest = high;
+        if (low.DateTime < high.DateTime)
+            earliest = low;
+
+        if (dateTime == null)
+            dateTime = earliest.DateTime.AddDays(1);
+
+        var latest = new Price()
+        {
+            DateTime = dateTime.Value
+        };
+
+        var fibValues = new List<double> { -0.2, 0.0, 0.25, 0.5, 0.75, 1.0, 1.2 }.Select(x => low.CloseValue(closeType) + x * delta).ToList();
+
+        var bottom = fibValues[1];
+        var top = fibValues[2];
+        var left = earliest;
+        var right = dateTime;
+
+        var topLine = new List<Price>
+        {
+            new Price { Close = top, DateTime = earliest.DateTime },
+            new Price { Close = top, DateTime = latest.DateTime }
+        };
+
+        var bottomLine = new List<Price>
+        {
+            new Price { Close = bottom, DateTime = earliest.DateTime },
+            new Price { Close = bottom, DateTime = latest.DateTime }
+        };
+
+        var leftLine = new List<Price>
+        {
+            new Price { Close = bottom, DateTime = earliest.DateTime },
+            new Price { Close = top, DateTime = earliest.DateTime }
+        };
+
+        var rightLine = new List<Price>
+        {
+            new Price { Close = bottom, DateTime = latest.DateTime },
+            new Price { Close = top, DateTime = latest.DateTime }
+        };
+
+        chart = chart.AddLayers(
+            ChartGenerator.PriceClosesLineLayer(topLine, lineWidth: lineWidth, color: Color.fromString(color)),
+            ChartGenerator.PriceClosesLineLayer(bottomLine, lineWidth: lineWidth, color: Color.fromString(color)),
+            ChartGenerator.PriceClosesLineLayer(leftLine, lineWidth: lineWidth, color: Color.fromString(color)),
+            ChartGenerator.PriceClosesLineLayer(rightLine, lineWidth: lineWidth, color: Color.fromString(color))
+        );
+
+        return chart;
+    }
+
     public static GenericChart WithDownswing(this GenericChart chart, Downswing downswing, string color = "cyan", int lineWidth = 1)
     {
         if (downswing.SwingType(EnumCloseType.Close) == EnumSwingType.DownlegOnly)
@@ -198,16 +255,16 @@ public static class GenericChartExtensions
         return chart;
     }
 
-    //public static GenericChart WithDownswingSawtooths(this GenericChart chart, Downswing downswing, EnumCloseType closeType,
-    //    string color = "cyan", int markerSize = 6, int lineWidth = 1)
-    //{
-    //    var downSawtooth = downswing.DownlegPrices(closeType, true).ToDownwardSawtooth(closeType, true);
-    //    chart = chart.WithSawtooth(downSawtooth, closeType, color: "red");
-    //    var upwardSawtooth = downswing.UplegPrices(closeType, true).ToUpwardSawtooth(closeType, true);
-    //    chart = chart.WithSawtooth(upwardSawtooth, closeType, color: "green");
+    public static GenericChart WithDownswingSawtooths(this GenericChart chart, Downswing downswing, EnumCloseType closeType,
+        string color = "cyan", int markerSize = 6, int lineWidth = 1)
+    {
+        var upwardSawtooth = Upleg.Create(downswing, closeType, true, true).Prices.ToUpwardSawtooth(closeType, true);
+        chart = chart.WithSawtooth(upwardSawtooth, closeType, color: "green");
+        var downSawtooth = Downleg.Create(downswing, closeType, true, true).Prices.ToDownwardSawtooth(closeType, true);
+        chart = chart.WithSawtooth(downSawtooth, closeType, color: "red");
 
-    //    return chart;
-    //}
+        return chart;
+    }
 
     //public static GenericChart WithDownswingsSawtooths(this GenericChart chart, List<Downswing> swings, EnumCloseType closeType,
     //    string color = "cyan", int markerSize = 6, int lineWidth = 1)
@@ -223,18 +280,6 @@ public static class GenericChartExtensions
     //    chart = chart.WithSawtooth(sawtooth, closeType, "red");
     //    return chart;
     //}
-
-    public static GenericChart WithDownswingSawtooths(this GenericChart chart, Downswing downswing, EnumCloseType closeType,
-        string color = "cyan", int markerSize = 6, int lineWidth = 1)
-    {
-        var upwardSawtooth = Upleg.Create(downswing, closeType, true, true).Prices.ToUpwardSawtooth(closeType, true);
-        chart = chart.WithSawtooth(upwardSawtooth, closeType, color: "green");
-        var downSawtooth = Downleg.Create(downswing, closeType, true, true).Prices.ToDownwardSawtooth(closeType, true);
-        chart = chart.WithSawtooth(downSawtooth, closeType, color: "red");
-
-        return chart;
-    }
-
     public static GenericChart WithDownswingsSawtooths(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType,
         string color = "cyan", int markerSize = 6, int lineWidth = 1)
     {
@@ -243,6 +288,51 @@ public static class GenericChartExtensions
         return chart;
     }
 
+    //    return chart;
+    //}
+    public static GenericChart WithFib(this GenericChart chart, Price high, Price low, EnumCloseType closeType, DateTime? dateTime = null,
+        string color = "black", int markerSize = 6, int lineWidth = 1)
+    {
+        var delta = high.CloseValue(closeType) - low.CloseValue(closeType);
+        var earliest = high;
+        if (low.DateTime < high.DateTime)
+            earliest = low;
+
+        if (dateTime == null)
+            dateTime = earliest.DateTime.AddDays(1);
+
+        var fibValues = new List<double> { -0.2, 0.0, 0.25, 0.5, 0.75, 1.0, 1.2 }.Select(x => low.CloseValue(closeType) + x * delta).ToList();
+        foreach (var fibValue in fibValues)
+        {
+            var p = new List<Price>
+                {
+                    new Price
+                    {
+                        Close = fibValue,
+                        DateTime = earliest.DateTime
+                    },
+                    new Price
+                    {
+                        Close = fibValue,
+                        DateTime = dateTime.Value
+                    },
+                };
+
+            chart = chart.AddLayers(
+                ChartGenerator.PriceClosesLineLayer(p, lineWidth: lineWidth, color: Color.fromString(color))
+                );
+        }
+
+        return chart;
+    }
+
+    //public static GenericChart WithDownswingSawtooths(this GenericChart chart, Downswing downswing, EnumCloseType closeType,
+    //    string color = "cyan", int markerSize = 6, int lineWidth = 1)
+    //{
+    //    var downSawtooth = downswing.DownlegPrices(closeType, true).ToDownwardSawtooth(closeType, true);
+    //    chart = chart.WithSawtooth(downSawtooth, closeType, color: "red");
+    //    var upwardSawtooth = downswing.UplegPrices(closeType, true).ToUpwardSawtooth(closeType, true);
+    //    chart = chart.WithSawtooth(upwardSawtooth, closeType, color: "green");
     public static GenericChart WithHigherHighs(this GenericChart chart, IEnumerable<Upswing> upswings, EnumCloseType closeType, string color = "green", int markerSize = 12)
     {
         return chart.AddLayers(new Layer
@@ -394,20 +484,20 @@ public static class GenericChartExtensions
         var interimDownswings = downswing.InterimDownswings(closeType, true, true);
 
         chart = chart
-            .WithLowerHighs(interimDownswings, EnumCloseType.Close, markerSize: 6, color: "green")
-            .WithLowerLows(interimDownswings, EnumCloseType.Close, markerSize: 6, color: "red")
+            //.WithLowerHighs(interimDownswings, EnumCloseType.Close, markerSize: 6, color: "green")
+            //.WithLowerLows(interimDownswings, EnumCloseType.Close, markerSize: 6, color: "red")
 
-            .WithHigherHighs(interimUpswings, EnumCloseType.Close, markerSize: 6, color: "green")
-            .WithHigherLows(interimUpswings, EnumCloseType.Close, markerSize: 6, color: "red")
+            //.WithHigherHighs(interimUpswings, EnumCloseType.Close, markerSize: 6, color: "green")
+            //.WithHigherLows(interimUpswings, EnumCloseType.Close, markerSize: 6, color: "red")
 
             .WithUpswings(interimUpswings, EnumCloseType.Close, markerSize: 6, color: "green")
             .WithDownswings(interimDownswings, EnumCloseType.Close, markerSize: 6, color: "red")
 
-            .WithBreaksOfStructureMarkers(interimUpswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
-            .WithBreaksOfStructureMarkers(interimDownswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
+        //.WithBreaksOfStructureMarkers(interimUpswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
+        //.WithBreaksOfStructureMarkers(interimDownswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
 
-            .WithMarketStructureBreaksMarkers(interimUpswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
-            .WithMarketStructureBreaksMarkers(interimDownswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
+        //.WithMarketStructureBreaksMarkers(interimUpswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
+        //.WithMarketStructureBreaksMarkers(interimDownswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
         ;
 
         //var uplegSawtoothPrices = new List<Price>()
@@ -461,20 +551,20 @@ public static class GenericChartExtensions
         var interimUpswings = upswing.InterimUpswings(closeType, true, true);
 
         chart = chart
-            .WithLowerHighs(interimDownswings, closeType, markerSize: 6, color: "green")
-            .WithLowerLows(interimDownswings, closeType, markerSize: 6, color: "red")
+            //.WithLowerHighs(interimDownswings, closeType, markerSize: 6, color: "green")
+            //.WithLowerLows(interimDownswings, closeType, markerSize: 6, color: "red")
 
-            .WithHigherHighs(interimUpswings, closeType, markerSize: 6, color: "green")
-            .WithHigherLows(interimUpswings, closeType, markerSize: 6, color: "red")
+            //.WithHigherHighs(interimUpswings, closeType, markerSize: 6, color: "green")
+            //.WithHigherLows(interimUpswings, closeType, markerSize: 6, color: "red")
 
             .WithDownswings(interimDownswings, closeType, markerSize: 6, color: "red")
             .WithUpswings(interimUpswings, closeType, markerSize: 6, color: "green")
 
-            .WithBreaksOfStructureMarkers(interimUpswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
-            .WithBreaksOfStructureMarkers(interimDownswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
+            //.WithBreaksOfStructureMarkers(interimUpswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
+            //.WithBreaksOfStructureMarkers(interimDownswings, closeType, lineWidth: 3, color: "cyan", markerSize: 6, text: bosLabel)
 
-            .WithMarketStructureBreaksMarkers(interimUpswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
-            .WithMarketStructureBreaksMarkers(interimDownswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
+            //.WithMarketStructureBreaksMarkers(interimUpswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
+            //.WithMarketStructureBreaksMarkers(interimDownswings, closeType, lineWidth: 3, color: "orange", markerSize: 6, text: msbLabel)
 
             //.WithUpswingsSawtooths(interimUpswings, closeType)
             //.WithDownswingsSawtooths(interimDownswings, closeType)
@@ -524,28 +614,6 @@ public static class GenericChartExtensions
         return chart;
     }
 
-    //public static GenericChart WithInterimUpwardBreakouts(this GenericChart chart, Upswing upswing, int maxDepth = 0, int depth = 0)
-    //{
-    //    var closeType = EnumCloseType.Close;
-    //    var swingLow = upswing.SwingLow(closeType);
-
-    //    var prices = upswing.Prices.Where(x => x.DateTime > swingLow.DateTime).ToList();
-
-    //    chart = chart
-    //        .WithUpwardBreakouts(prices.ToUpwardBreakouts(closeType), EnumCloseType.Close);
-
-    //    var interminUpswings = upswing.InterimUpswings(EnumCloseType.Close, false, false);
-    //    while (depth < maxDepth)
-    //    {
-    //        if (interminUpswings.Count == 0)
-    //            depth = maxDepth;
-    //        foreach (var interimUpswing in interminUpswings)
-    //            chart = chart.WithInterimUpwardBreakouts(interimUpswing, maxDepth, depth + 1);
-    //        depth++;
-    //    }
-    //    return chart;
-    //}
-
     public static GenericChart WithLowerHighs(this GenericChart chart, IEnumerable<Downswing> downswings, EnumCloseType closeType, string color = "green", int markerSize = 12)
     {
         return chart.AddLayers(new Layer
@@ -561,6 +629,17 @@ public static class GenericChartExtensions
         });
     }
 
+    //    var interminUpswings = upswing.InterimUpswings(EnumCloseType.Close, false, false);
+    //    while (depth < maxDepth)
+    //    {
+    //        if (interminUpswings.Count == 0)
+    //            depth = maxDepth;
+    //        foreach (var interimUpswing in interminUpswings)
+    //            chart = chart.WithInterimUpwardBreakouts(interimUpswing, maxDepth, depth + 1);
+    //        depth++;
+    //    }
+    //    return chart;
+    //}
     public static GenericChart WithLowerLows(this GenericChart chart, IEnumerable<Downswing> downswings, EnumCloseType closeType, string color = "red", int markerSize = 12)
     {
         return chart.AddLayers(new Layer
@@ -576,6 +655,8 @@ public static class GenericChartExtensions
         });
     }
 
+    //    chart = chart
+    //        .WithUpwardBreakouts(prices.ToUpwardBreakouts(closeType), EnumCloseType.Close);
     public static GenericChart WithMarketStructureBreakReferences(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1)
     {
         foreach (var downswing in downswings.Where(x => x.MarketStructureBreak != null))
@@ -606,6 +687,7 @@ public static class GenericChartExtensions
         return chart;
     }
 
+    //    var prices = upswing.Prices.Where(x => x.DateTime > swingLow.DateTime).ToList();
     public static GenericChart WithMarketStructureBreaksConnectedMarkers(this GenericChart chart, List<Upswing> upswings, List<Downswing> downswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1)
     {
         var swings = upswings.Where(x => x.MarketStructureBreak != null).Select(x => x.MarketStructureBreak)
@@ -620,6 +702,10 @@ public static class GenericChartExtensions
         return chart;
     }
 
+    //public static GenericChart WithInterimUpwardBreakouts(this GenericChart chart, Upswing upswing, int maxDepth = 0, int depth = 0)
+    //{
+    //    var closeType = EnumCloseType.Close;
+    //    var swingLow = upswing.SwingLow(closeType);
     public static GenericChart WithMarketStructureBreaksMarkers(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType, string color = "orange", int markerSize = 12, int lineWidth = 1, string text = "MSB")
     {
         chart = chart.AddLayers(new Layer
@@ -687,6 +773,63 @@ public static class GenericChartExtensions
 
             chart = WithDownswing(chart, downswing, color, lineWidth);
         }
+
+        return chart;
+    }
+
+    public static GenericChart WithPremiumZone(this GenericChart chart, Price high, Price low, EnumCloseType closeType, DateTime? dateTime = null,
+                                                                                                        string color = "red", int markerSize = 6, int lineWidth = 2)
+    {
+        var delta = high.CloseValue(closeType) - low.CloseValue(closeType);
+        var earliest = high;
+        if (low.DateTime < high.DateTime)
+            earliest = low;
+
+        if (dateTime == null)
+            dateTime = earliest.DateTime.AddDays(1);
+
+        var latest = new Price()
+        {
+            DateTime = dateTime.Value
+        };
+
+        var fibValues = new List<double> { -0.2, 0.0, 0.25, 0.5, 0.75, 1.0, 1.2 }.Select(x => low.CloseValue(closeType) + x * delta).ToList();
+
+        var bottom = fibValues[4];
+        var top = fibValues[5];
+        var left = earliest;
+        var right = dateTime;
+
+        var topLine = new List<Price>
+        {
+            new Price { Close = top, DateTime = earliest.DateTime },
+            new Price { Close = top, DateTime = latest.DateTime }
+        };
+
+        var bottomLine = new List<Price>
+        {
+            new Price { Close = bottom, DateTime = earliest.DateTime },
+            new Price { Close = bottom, DateTime = latest.DateTime }
+        };
+
+        var leftLine = new List<Price>
+        {
+            new Price { Close = bottom, DateTime = earliest.DateTime },
+            new Price { Close = top, DateTime = earliest.DateTime }
+        };
+
+        var rightLine = new List<Price>
+        {
+            new Price { Close = bottom, DateTime = latest.DateTime },
+            new Price { Close = top, DateTime = latest.DateTime }
+        };
+
+        chart = chart.AddLayers(
+            ChartGenerator.PriceClosesLineLayer(topLine, lineWidth: lineWidth, color: Color.fromString(color)),
+            ChartGenerator.PriceClosesLineLayer(bottomLine, lineWidth: lineWidth, color: Color.fromString(color)),
+            ChartGenerator.PriceClosesLineLayer(leftLine, lineWidth: lineWidth, color: Color.fromString(color)),
+            ChartGenerator.PriceClosesLineLayer(rightLine, lineWidth: lineWidth, color: Color.fromString(color))
+        );
 
         return chart;
     }

@@ -66,6 +66,16 @@ namespace Gradient.CryptoAnalysis
 
     public static class PriceExtensions
     {
+        public static bool IsGlobalEnd(this Price price)
+        {
+            return price.DateTime == DateTime.MaxValue;
+        }
+
+        public static bool IsGlobalStart(this Price price)
+        {
+            return price.DateTime == DateTime.MinValue;
+        }
+
         public static bool IsGreen(this Price price)
         {
             return price.Close > price.Open;

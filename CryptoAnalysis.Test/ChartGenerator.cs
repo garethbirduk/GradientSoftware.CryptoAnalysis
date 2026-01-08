@@ -34,29 +34,6 @@ public static class ChartGenerator
         return ApplyStyle(point, color, size);
     }
 
-    private static Layer CreatePriceLineLayer(
-        List<Price> prices,
-        Func<Price, decimal> selector,
-        string name,
-        Color? color,
-        int lineWidth)
-    {
-        return new Layer
-        {
-            Name = name,
-            ChartFactory = () => GenerateLineChart(
-                prices,
-                xSelector: p => p.DateTime,
-                ySelector: selector,
-                lineWidth: lineWidth,
-                title: name,
-                color: color
-            ),
-            Color = color,
-            LineWidth = lineWidth
-        };
-    }
-
     public static GenericChart AddLayers(this GenericChart baseChart, params Layer[] layers)
     {
         var layerCharts = layers.Select(l => ApplyStyle(l.ChartFactory(), l.Color, l.LineWidth));
@@ -158,6 +135,29 @@ public static class ChartGenerator
             .AddLayers(layers.ToArray());
 
         return baseChart;
+    }
+
+    public static Layer CreatePriceLineLayer(
+                        List<Price> prices,
+        Func<Price, decimal> selector,
+        string name,
+        Color? color,
+        int lineWidth)
+    {
+        return new Layer
+        {
+            Name = name,
+            ChartFactory = () => GenerateLineChart(
+                prices,
+                xSelector: p => p.DateTime,
+                ySelector: selector,
+                lineWidth: lineWidth,
+                title: name,
+                color: color
+            ),
+            Color = color,
+            LineWidth = lineWidth
+        };
     }
 
     public static GenericChart GenerateAnnotatedCandlestickChart(List<AnnotatedPrice> prices)
