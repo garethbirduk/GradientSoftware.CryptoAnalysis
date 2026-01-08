@@ -7,33 +7,43 @@ public class Upleg
 {
     public List<Price> Prices { get; private set; } = [];
 
-    public void Setup([Required] Downswing downswing, EnumCloseType closeType, bool includeFirstPrice, bool includeSwingHigh)
+    public static Upleg Create([Required] Downswing downswing, EnumCloseType closeType, bool includeFirstPrice, bool includeSwingHigh)
     {
-        Prices = [];
-
         var swingHigh = downswing.SwingHigh(closeType);
         if (swingHigh == null)
-            return;
+            return new Upleg();
 
         var skip = includeFirstPrice ? 0 : 1;
-        Prices = downswing.Prices.Where(x => x.DateTime < swingHigh.DateTime).ToList();
+        var prices = downswing.Prices.Where(x => x.DateTime < swingHigh.DateTime).ToList();
 
-        if (includeSwingHigh && swingHigh != null)
-            Prices.Add(swingHigh);
+        if (includeSwingHigh && swingHigh != null && !prices.Contains(swingHigh))
+            prices.Add(swingHigh);
+
+        return new Upleg()
+        {
+            Prices = prices
+        };
     }
 
-    public void Setup([Required] Upswing upswing, EnumCloseType closeType, bool includeFirstPrice, bool includeSwingLow)
+    public static Upleg Create([Required] Upswing upswing, EnumCloseType closeType, bool includeSwingLow, bool includeNextPrice)
     {
-        Prices = [];
-
         var swingLow = upswing.SwingLow(closeType);
         if (swingLow == null)
-            return;
+            return new Upleg();
 
-        var skip = includeFirstPrice ? 0 : 1;
-        Prices = upswing.Prices.Where(x => x.DateTime < swingLow.DateTime).ToList();
+        var skip = includeSwingLow ? 0 : 1;
+        var prices = upswing.Prices.Where(x => x.DateTime > swingLow.DateTime).Skip(skip).ToList();
 
-        if (includeSwingLow && swingLow != null)
-            Prices.Add(swingLow);
+        if (includeNextPrice)
+        {
+            var nextPrice = upswing.NextPrice;
+            if (nextPrice != null && !prices.Contains(nextPrice))
+                prices.Add(nextPrice);
+        }
+
+        return new Upleg()
+        {
+            Prices = prices
+        };
     }
 }

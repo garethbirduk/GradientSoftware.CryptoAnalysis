@@ -37,7 +37,7 @@ public class ToUpswingsTests : PricesTests
 
             foreach (var downswing in downswings)
             {
-                //chart = chart.WithInterimSwings(downswing, EnumCloseType.Close, interims);
+                chart = chart.WithInterimSwings(downswing, EnumCloseType.Close, interims);
             }
         }
 

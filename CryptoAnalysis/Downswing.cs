@@ -10,12 +10,9 @@ public class Downswing : Swing
         Prices = prices.Where(x => x != null).ToList();
         PreviousDownswing = previousDownswing;
         NextPrice = nextPrice;
-
-        Downleg.Setup(this, EnumCloseType.Close, false, false);
-        Upleg.Setup(this, EnumCloseType.Close, false, false);
     }
 
-    public Price? BreakOfStructure
+    public override Price? BreakOfStructure
     {
         get
         {
@@ -29,15 +26,7 @@ public class Downswing : Swing
         }
     }
 
-    public Price InitialPrice
-    {
-        get
-        {
-            return Prices.First();
-        }
-    }
-
-    public Price? MarketStructureBreak
+    public override Price? MarketStructureBreak
     {
         get
         {
@@ -53,7 +42,6 @@ public class Downswing : Swing
         }
     }
 
-    public Price? NextPrice { get; set; }
     public Downswing? PreviousDownswing { get; }
 
     public List<Price> DownlegPrices(EnumCloseType closeType, bool includeSwingHigh, bool includeNextPrice)
@@ -71,13 +59,13 @@ public class Downswing : Swing
     public List<Downswing> InterimDownswings(EnumCloseType closeType, bool includeSwingHigh, bool includeNextPrice)
     {
         var list = new List<Price>();
-        return DownlegPrices(closeType, includeSwingHigh, includeNextPrice).Union(list).ToList().ToDownswings(closeType);
+        return Downleg.Create(this, closeType, includeSwingHigh, includeNextPrice).Prices.Union(list).ToList().ToDownswings(closeType);
     }
 
     public List<Upswing> InterimUpswings(EnumCloseType closeType, bool includeFirstPrice, bool includeSwingHigh)
     {
         var list = new List<Price>();
-        return UplegPrices(closeType, includeFirstPrice, includeSwingHigh).Union(list).ToList().ToUpswings(closeType);
+        return Upleg.Create(this, closeType, includeFirstPrice, includeSwingHigh).Prices.Union(list).ToList().ToUpswings(closeType);
     }
 
     public Price? SwingHigh(EnumCloseType close)
@@ -90,10 +78,10 @@ public class Downswing : Swing
         return Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Min(x => x.CloseValue(close)));
     }
 
-    public EnumSwingType SwingType()
+    public EnumSwingType SwingType(EnumCloseType closeType)
     {
-        var up = Upleg.Prices.Any();
-        var down = Downleg.Prices.Any();
+        var up = Upleg.Create(this, closeType, false, false).Prices.Any();
+        var down = Downleg.Create(this, closeType, false, true).Prices.Any();
 
         switch (up, down)
         {

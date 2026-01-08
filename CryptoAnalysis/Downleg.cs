@@ -7,31 +7,43 @@ public class Downleg
 {
     public List<Price> Prices { get; private set; } = [];
 
-    public void Setup([Required] Downswing downswing, EnumCloseType closeType, bool includeSwingHigh, bool includeNextPrice)
+    public static Downleg Create([Required] Downswing downswing, EnumCloseType closeType, bool includeSwingHigh, bool includeNextPrice)
     {
-        Prices = [];
-
         var swingHigh = downswing.SwingHigh(closeType);
         if (swingHigh == null)
-            return;
+            return new Downleg();
 
         var skip = includeSwingHigh ? 0 : 1;
-        Prices = downswing.Prices.Where(x => x.DateTime >= swingHigh.DateTime).Skip(skip).ToList();
-        if (includeNextPrice && downswing.NextPrice != null)
-            Prices.Add(downswing.NextPrice);
+        var prices = downswing.Prices.Where(x => x.DateTime >= swingHigh.DateTime).Skip(skip).ToList();
+
+        if (includeNextPrice)
+        {
+            var nextPrice = downswing.NextPrice;
+            if (nextPrice != null && !prices.Contains(nextPrice))
+                prices.Add(nextPrice);
+        }
+
+        return new Downleg()
+        {
+            Prices = prices
+        };
     }
 
-    public void Setup([Required] Upswing upswing, EnumCloseType closeType, bool includeSwingLow, bool includeNextPrice)
+    public static Downleg Create([Required] Upswing upswing, EnumCloseType closeType, bool includeFirstPrice, bool includeSwingLow)
     {
-        Prices = [];
-
         var swingLow = upswing.SwingLow(closeType);
         if (swingLow == null)
-            return;
+            return new Downleg();
 
-        var skip = includeSwingLow ? 0 : 1;
-        Prices = upswing.Prices.Where(x => x.DateTime >= swingLow.DateTime).Skip(skip).ToList();
-        if (includeNextPrice && upswing.NextPrice != null)
-            Prices.Add(upswing.NextPrice);
+        var skip = includeFirstPrice ? 0 : 1;
+        var prices = upswing.Prices.Where(x => x.DateTime <= swingLow.DateTime).Skip(skip).ToList();
+
+        if (includeSwingLow && swingLow != null && !prices.Contains(swingLow))
+            prices.Add(swingLow);
+
+        return new Downleg()
+        {
+            Prices = prices
+        };
     }
 }

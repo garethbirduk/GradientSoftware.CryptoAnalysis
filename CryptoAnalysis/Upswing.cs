@@ -10,12 +10,9 @@ namespace Gradient.CryptoAnalysis
             Prices = prices.Where(x => x != null).ToList();
             PreviousUpswing = previousUpswing;
             NextPrice = nextPrice;
-
-            Downleg.Setup(this, EnumCloseType.Close, false, false);
-            Upleg.Setup(this, EnumCloseType.Close, false, false);
         }
 
-        public Price? BreakOfStructure
+        public override Price? BreakOfStructure
         {
             get
             {
@@ -29,29 +26,21 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
-        public bool Broken => BreakOfStructure != null;
-
-        public Price InitialPrice
+        public override Price? MarketStructureBreak
         {
             get
             {
-                return Prices.First();
+                var previousUpswing = PreviousUpswing;
+                if (previousUpswing == null)
+                    return null;
+
+                var swingLow = previousUpswing.SwingLow(EnumCloseType.Close);
+                if (swingLow == null)
+                    return null;
+
+                return Prices.FirstOrDefault(x => x.CloseValue(EnumCloseType.Close) < swingLow.CloseValue(EnumCloseType.Close));
             }
         }
-
-        public Price? MarketStructureBreak
-        {
-            get
-            {
-                if (PreviousUpswing == null)
-                    return null;
-                if (PreviousUpswing.SwingLow == null)
-                    return null;
-                return Prices.FirstOrDefault(x => x.CloseValue(EnumCloseType.Close) < PreviousUpswing.SwingLow(EnumCloseType.Close)?.CloseValue(EnumCloseType.Close));
-            }
-        }
-
-        public Price? NextPrice { get; set; }
 
         public Upswing? PreviousUpswing { get; }
 
@@ -71,21 +60,16 @@ namespace Gradient.CryptoAnalysis
             return downleg;
         }
 
-        public Downswing? DownlegSwing(EnumCloseType closeType)
-        {
-            return DownlegPrices(closeType, true, true).ToDownswings(closeType, false).SingleOrDefault();
-        }
-
         public List<Downswing> InterimDownswings(EnumCloseType closeType, bool includeFirstPrice, bool includeSwingLow)
         {
             var list = new List<Price>();
-            return DownlegPrices(closeType, includeFirstPrice, includeSwingLow).Union(list).ToList().ToDownswings(closeType);
+            return Downleg.Create(this, closeType, includeFirstPrice, includeSwingLow).Prices.Union(list).ToList().ToDownswings(closeType);
         }
 
         public List<Upswing> InterimUpswings(EnumCloseType closeType, bool includeSwingLow, bool includeNextPrice)
         {
             var list = new List<Price>();
-            return UplegPrices(closeType, includeSwingLow, includeNextPrice).Union(list).ToList().ToUpswings(closeType);
+            return Upleg.Create(this, closeType, includeSwingLow, includeNextPrice).Prices.Union(list).ToList().ToUpswings(closeType);
         }
 
         public Price? SwingHigh(EnumCloseType close)
@@ -98,6 +82,30 @@ namespace Gradient.CryptoAnalysis
         {
             var s = Prices.FirstOrDefault(x => x.CloseValue(close) == Prices.Min(x => x.CloseValue(close)));
             return s;
+        }
+
+        public EnumSwingType SwingType(EnumCloseType closeType)
+        {
+            var down = Downleg.Create(this, closeType, false, false).Prices.Any();
+            var up = Upleg.Create(this, closeType, false, true).Prices.Any();
+
+            switch (up, down)
+            {
+                case (up: true, down: false):
+                    return EnumSwingType.UplegOnly;
+
+                case (up: false, down: true):
+                    return EnumSwingType.DownlegOnly;
+
+                case (true, true):
+                    {
+                        if (BreakOfStructure == null)
+                            return EnumSwingType.PartialSwing;
+                        return EnumSwingType.Swing;
+                    }
+                case (false, false):
+                    return EnumSwingType.None;
+            }
         }
 
         public override string ToString()

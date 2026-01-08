@@ -118,7 +118,7 @@ public static class GenericChartExtensions
 
     public static GenericChart WithDownswing(this GenericChart chart, Downswing downswing, string color = "cyan", int lineWidth = 1)
     {
-        if (downswing.SwingType() == EnumSwingType.DownlegOnly)
+        if (downswing.SwingType(EnumCloseType.Close) == EnumSwingType.DownlegOnly)
             return chart;
 
         var p1 = downswing.Prices.First();
@@ -205,6 +205,25 @@ public static class GenericChartExtensions
     //    chart = chart.WithSawtooth(sawtooth, closeType, "red");
     //    return chart;
     //}
+
+    public static GenericChart WithDownswingSawtooths(this GenericChart chart, Downswing downswing, EnumCloseType closeType,
+        string color = "cyan", int markerSize = 6, int lineWidth = 1)
+    {
+        var upwardSawtooth = Upleg.Create(downswing, closeType, true, true).Prices.ToUpwardSawtooth(closeType, true);
+        chart = chart.WithSawtooth(upwardSawtooth, closeType, color: "green");
+        var downSawtooth = Downleg.Create(downswing, closeType, true, true).Prices.ToDownwardSawtooth(closeType, true);
+        chart = chart.WithSawtooth(downSawtooth, closeType, color: "red");
+
+        return chart;
+    }
+
+    public static GenericChart WithDownswingsSawtooths(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType,
+        string color = "cyan", int markerSize = 6, int lineWidth = 1)
+    {
+        foreach (var downswing in downswings)
+            chart = chart.WithDownswingSawtooths(downswing, closeType, color, markerSize, lineWidth);
+        return chart;
+    }
 
     public static GenericChart WithHigherHighs(this GenericChart chart, IEnumerable<Upswing> upswings, EnumCloseType closeType, string color = "green", int markerSize = 12)
     {
@@ -445,7 +464,7 @@ public static class GenericChartExtensions
 
         //var downlegSawtoothPrices = new List<Price>()
         //{
-        //    upswing.Prices.First()
+        //    downswing.Prices.First()
         //};
         //foreach (var interimDownswing in interimDownswings)
         //{
@@ -454,7 +473,7 @@ public static class GenericChartExtensions
         //    if (interimSwingHigh != null)
         //        downlegSawtoothPrices.Add(interimSwingHigh);
         //}
-        //var swinglow = upswing.SwingLow(closeType);
+        //var swinglow = downswing.SwingLow(closeType);
         //if (swinglow != null)
         //    downlegSawtoothPrices.Add(swinglow);
         //chart = chart.WithSawtooth(downlegSawtoothPrices, closeType, "red");
@@ -469,7 +488,7 @@ public static class GenericChartExtensions
         //    if (interimSwinglow != null)
         //        uplegSawtoothPrices.Add(interimSwinglow);
         //}
-        //var nextPrice = upswing.NextPrice;
+        //var nextPrice = downswing.NextPrice;
         //if (nextPrice != null)
         //    uplegSawtoothPrices.Add(nextPrice);
         //chart = chart.WithSawtooth(uplegSawtoothPrices, closeType, "green");
@@ -487,27 +506,27 @@ public static class GenericChartExtensions
         return chart;
     }
 
-    public static GenericChart WithInterimUpwardBreakouts(this GenericChart chart, Upswing upswing, int maxDepth = 0, int depth = 0)
-    {
-        var closeType = EnumCloseType.Close;
-        var swingLow = upswing.SwingLow(closeType);
+    //public static GenericChart WithInterimUpwardBreakouts(this GenericChart chart, Upswing upswing, int maxDepth = 0, int depth = 0)
+    //{
+    //    var closeType = EnumCloseType.Close;
+    //    var swingLow = upswing.SwingLow(closeType);
 
-        var prices = upswing.Prices.Where(x => x.DateTime > swingLow.DateTime).ToList();
+    //    var prices = upswing.Prices.Where(x => x.DateTime > swingLow.DateTime).ToList();
 
-        chart = chart
-            .WithUpwardBreakouts(prices.ToUpwardBreakouts(closeType), EnumCloseType.Close);
+    //    chart = chart
+    //        .WithUpwardBreakouts(prices.ToUpwardBreakouts(closeType), EnumCloseType.Close);
 
-        var interminUpswings = upswing.InterimUpswings(EnumCloseType.Close, false, false);
-        while (depth < maxDepth)
-        {
-            if (interminUpswings.Count == 0)
-                depth = maxDepth;
-            foreach (var interimUpswing in interminUpswings)
-                chart = chart.WithInterimUpwardBreakouts(interimUpswing, maxDepth, depth + 1);
-            depth++;
-        }
-        return chart;
-    }
+    //    var interminUpswings = upswing.InterimUpswings(EnumCloseType.Close, false, false);
+    //    while (depth < maxDepth)
+    //    {
+    //        if (interminUpswings.Count == 0)
+    //            depth = maxDepth;
+    //        foreach (var interimUpswing in interminUpswings)
+    //            chart = chart.WithInterimUpwardBreakouts(interimUpswing, maxDepth, depth + 1);
+    //        depth++;
+    //    }
+    //    return chart;
+    //}
 
     public static GenericChart WithLowerHighs(this GenericChart chart, IEnumerable<Downswing> downswings, EnumCloseType closeType, string color = "green", int markerSize = 12)
     {
@@ -755,6 +774,9 @@ public static class GenericChartExtensions
 
     public static GenericChart WithUpswing(this GenericChart chart, Upswing upswing, string color = "cyan", int lineWidth = 1)
     {
+        if (upswing.SwingType(EnumCloseType.Close) == EnumSwingType.DownlegOnly)
+            return chart;
+
         var p1 = upswing.Prices.First();
         var p2 = upswing.NextPrice;
 
@@ -818,9 +840,9 @@ public static class GenericChartExtensions
     public static GenericChart WithUpswingSawtooths(this GenericChart chart, Upswing upswing, EnumCloseType closeType,
         string color = "cyan", int markerSize = 6, int lineWidth = 1)
     {
-        var downSawtooth = upswing.DownlegPrices(closeType, true, true).ToDownwardSawtooth(closeType, true);
+        var downSawtooth = Downleg.Create(upswing, closeType, true, true).Prices.ToDownwardSawtooth(closeType, true);
         chart = chart.WithSawtooth(downSawtooth, closeType, color: "red");
-        var upwardSawtooth = upswing.UplegPrices(closeType, true, true).ToUpwardSawtooth(closeType, true);
+        var upwardSawtooth = Upleg.Create(upswing, closeType, true, true).Prices.ToUpwardSawtooth(closeType, true);
         chart = chart.WithSawtooth(upwardSawtooth, closeType, color: "green");
 
         return chart;
