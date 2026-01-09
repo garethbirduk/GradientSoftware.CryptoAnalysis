@@ -39,11 +39,11 @@ public class ToRangesTests : PricesTests
         //            chart = chart.WithInterimSwings(upswing, EnumCloseType.Close, interims);
         //        }
 
-        //        foreach (var downswing in downswings)
+        //        foreach (var Downswing in downswings)
         //        {
-        //            var interimDownswings = downswing.InterimDownswings(closeType, true, true);
-        //            var interimUpswings = downswing.InterimUpswings(closeType, true, true);
-        //            chart = chart.WithInterimSwings(downswing, EnumCloseType.Close, interims);
+        //            var interimDownswings = Downswing.InterimDownswings(closeType, true, true);
+        //            var interimUpswings = Downswing.InterimUpswings(closeType, true, true);
+        //            chart = chart.WithInterimSwings(Downswing, EnumCloseType.Close, interims);
         //        }
         //    }
 

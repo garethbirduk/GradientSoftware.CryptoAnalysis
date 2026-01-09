@@ -270,11 +270,11 @@ public static class GenericChartExtensions
     //    string color = "cyan", int markerSize = 6, int lineWidth = 1)
     //{
     //    var prices = new List<Price>();
-    //    foreach (var downswing in swings)
+    //    foreach (var Downswing in swings)
     //    {
-    //        prices.Add(downswing.Prices.First());
-    //        if (downswing.SwingHigh(closeType) != null)
-    //            prices.Add(downswing.SwingHigh(closeType));
+    //        prices.Add(Downswing.Prices.First());
+    //        if (Downswing.SwingHigh(closeType) != null)
+    //            prices.Add(Downswing.SwingHigh(closeType));
     //    }
     //    var sawtooth = prices.ToDownwardSawtooth(closeType);
     //    chart = chart.WithSawtooth(sawtooth, closeType, "red");
@@ -326,12 +326,12 @@ public static class GenericChartExtensions
         return chart;
     }
 
-    //public static GenericChart WithDownswingSawtooths(this GenericChart chart, Downswing downswing, EnumCloseType closeType,
+    //public static GenericChart WithDownswingSawtooths(this GenericChart chart, Downswing Downswing, EnumCloseType closeType,
     //    string color = "cyan", int markerSize = 6, int lineWidth = 1)
     //{
-    //    var downSawtooth = downswing.DownlegPrices(closeType, true).ToDownwardSawtooth(closeType, true);
+    //    var downSawtooth = Downswing.DownlegPrices(closeType, true).ToDownwardSawtooth(closeType, true);
     //    chart = chart.WithSawtooth(downSawtooth, closeType, color: "red");
-    //    var upwardSawtooth = downswing.UplegPrices(closeType, true).ToUpwardSawtooth(closeType, true);
+    //    var upwardSawtooth = Downswing.UplegPrices(closeType, true).ToUpwardSawtooth(closeType, true);
     //    chart = chart.WithSawtooth(upwardSawtooth, closeType, color: "green");
     public static GenericChart WithHigherHighs(this GenericChart chart, IEnumerable<Upswing> upswings, EnumCloseType closeType, string color = "green", int markerSize = 12)
     {
@@ -502,7 +502,7 @@ public static class GenericChartExtensions
 
         //var uplegSawtoothPrices = new List<Price>()
         //{
-        //    downswing.Prices.First()
+        //    Downswing.Prices.First()
         //};
         //foreach (var interimUpswing in interimUpswings)
         //{
@@ -511,7 +511,7 @@ public static class GenericChartExtensions
         //    if (interimSwinglow != null)
         //        uplegSawtoothPrices.Add(interimSwinglow);
         //}
-        //var swinghigh = downswing.SwingHigh(closeType);
+        //var swinghigh = Downswing.SwingHigh(closeType);
         //if (swinghigh != null)
         //    uplegSawtoothPrices.Add(swinghigh);
         //chart = chart.WithSawtooth(uplegSawtoothPrices, closeType, "green");
@@ -526,7 +526,7 @@ public static class GenericChartExtensions
         //    if (interimSwingHigh != null)
         //        downlegSawtoothPrices.Add(interimSwingHigh);
         //}
-        //var nextPrice = downswing.NextPrice;
+        //var nextPrice = Downswing.NextPrice;
         //if (nextPrice != null)
         //    downlegSawtoothPrices.Add(nextPrice);
         //chart = chart.WithSawtooth(downlegSawtoothPrices, closeType, "red");
@@ -572,7 +572,7 @@ public static class GenericChartExtensions
 
         //var downlegSawtoothPrices = new List<Price>()
         //{
-        //    downswing.Prices.First()
+        //    Downswing.Prices.First()
         //};
         //foreach (var interimDownswing in interimDownswings)
         //{
@@ -581,7 +581,7 @@ public static class GenericChartExtensions
         //    if (interimSwingHigh != null)
         //        downlegSawtoothPrices.Add(interimSwingHigh);
         //}
-        //var swinglow = downswing.SwingLow(closeType);
+        //var swinglow = Downswing.SwingLow(closeType);
         //if (swinglow != null)
         //    downlegSawtoothPrices.Add(swinglow);
         //chart = chart.WithSawtooth(downlegSawtoothPrices, closeType, "red");
@@ -596,7 +596,7 @@ public static class GenericChartExtensions
         //    if (interimSwinglow != null)
         //        uplegSawtoothPrices.Add(interimSwinglow);
         //}
-        //var nextPrice = downswing.NextPrice;
+        //var nextPrice = Downswing.NextPrice;
         //if (nextPrice != null)
         //    uplegSawtoothPrices.Add(nextPrice);
         //chart = chart.WithSawtooth(uplegSawtoothPrices, closeType, "green");
