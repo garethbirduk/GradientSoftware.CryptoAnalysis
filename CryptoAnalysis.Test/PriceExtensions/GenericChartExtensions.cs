@@ -290,8 +290,15 @@ public static class GenericChartExtensions
 
     //    return chart;
     //}
+
     public static GenericChart WithFib(this GenericChart chart, Price high, Price low, EnumCloseType closeType, DateTime? dateTime = null,
-        string color = "black", int markerSize = 6, int lineWidth = 1)
+    string color = "black", int markerSize = 6, int lineWidth = 1)
+    {
+        var fibRange = new List<double> { -0.2, 0.0, 0.25, 0.5, 0.75, 1.0, 1.2 };
+        return chart.WithFib(high, low, EnumCloseType.Close, fibRange, dateTime, color, markerSize, lineWidth);
+    }
+
+    public static GenericChart WithFib(this GenericChart chart, Price high, Price low, EnumCloseType closeType, List<double> fibRange, DateTime? dateTime = null, string color = "black", int markerSize = 6, int lineWidth = 1)
     {
         var delta = high.CloseValue(closeType) - low.CloseValue(closeType);
         var earliest = high;
@@ -301,7 +308,7 @@ public static class GenericChartExtensions
         if (dateTime == null)
             dateTime = earliest.DateTime.AddDays(1);
 
-        var fibValues = new List<double> { -0.2, 0.0, 0.25, 0.5, 0.75, 1.0, 1.2 }.Select(x => low.CloseValue(closeType) + x * delta).ToList();
+        var fibValues = fibRange.Select(x => low.CloseValue(closeType) + x * delta).ToList();
         foreach (var fibValue in fibValues)
         {
             var p = new List<Price>
@@ -848,6 +855,22 @@ public static class GenericChartExtensions
             );
 
         return chart;
+    }
+
+    public static GenericChart WithPrice(this GenericChart chart, Price price, EnumCloseType closeType, string color = "black", int markerSize = 12,
+        string text = "")
+    {
+        return chart.AddLayers(new Layer
+        {
+            Name = "Higher highs",
+            ChartFactory = () => ChartGenerator.GenerateScatterChart(
+                new List<Price> { price },
+                p => (decimal)p.CloseValue(closeType),
+                color: Color.fromString(color),
+                markerSize: markerSize,
+                text: text
+            ),
+        });
     }
 
     public static GenericChart WithRangeIndicators(this GenericChart chart, List<Downswing> downswings, EnumCloseType closeType, string color = "blue", int markerSize = 12, int lineWidth = 1)

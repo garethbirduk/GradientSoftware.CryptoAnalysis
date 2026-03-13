@@ -110,9 +110,13 @@ public class DownswingToRange
 
         if (Retracement != null)
         {
+            chart = chart.WithPrice(previousSwingHigh, CloseType, text: "SwingHigh", color: "purple");
+            chart = chart.WithPrice(potential, CloseType, text: "Potential", color: "purple");
+            chart = chart.WithPrice(Retracement, CloseType, text: "Retracement", color: "yellow");
+
             var last = Downswing.Prices.Last();
 
-            chart = chart.WithFib(previousSwingHigh, swingEntry, CloseType, potential.DateTime, "black");
+            chart = chart.WithFib(previousSwingHigh, swingEntry, CloseType, Retracement.DateTime, "purple");
             var rangeLow = potential;
             var rangeHigh = Retracement;
 
@@ -253,7 +257,7 @@ public class LongerTests : PricesTests
     }
 
     [DataTestMethod]
-    [DataRow("ToDownswingTests_LineCloses", true, true, 0)]
+    [DataRow("ToDownswingTests_LineCloses", true, true, 2)]
     public void Test2(string name, bool candlestick, bool lineCloses, int interims)
     {
         var closeType = EnumCloseType.Close;
@@ -296,6 +300,16 @@ public class LongerTests : PricesTests
                     //.WithLowerHighs(interimDownswings, CloseType)
                     //.WithLowerLows(interimDownswings, CloseType)
                     ;
+
+                var interimUpleg = Upleg.Create(upswing, closeType, true, true);
+                var interimUplegToRange = new UplegToRange(interimUpleg, closeType);
+                if (interimUplegToRange.Upswings.Any())
+                    chart = interimUplegToRange.Analyse(chart);
+
+                var interimDownleg = Upleg.Create(upswing, closeType, true, true);
+                var interimDownlegToRange = new UplegToRange(interimDownleg, closeType);
+                if (interimDownlegToRange.Upswings.Any())
+                    chart = interimDownlegToRange.Analyse(chart);
             }
 
             foreach (var downswing in downswings)
@@ -309,6 +323,14 @@ public class LongerTests : PricesTests
                     //.WithLowerHighs(interimDownswings, CloseType)
                     //.WithLowerLows(interimDownswings, CloseType)
                     ;
+
+                var interimUpleg = Upleg.Create(downswing, closeType, true, true);
+                var interimUplegToRange = new UplegToRange(interimUpleg, closeType);
+                chart = interimUplegToRange.Analyse(chart);
+
+                var interimDownleg = Upleg.Create(downswing, closeType, true, true);
+                var interimDownlegToRange = new UplegToRange(interimDownleg, closeType);
+                chart = interimDownlegToRange.Analyse(chart);
             }
         }
 
@@ -399,12 +421,12 @@ public class UpswingToRange
                 var take = Upswing.Prices.IndexOf(price);
                 var prices = Upswing.Prices.Take(take).ToList();
 
-                var WILLBEupswing = prices.ToDownswings(CloseType).FirstOrDefault();
+                var upswing = prices.ToDownswings(CloseType).FirstOrDefault();
 
-                if (WILLBEupswing == null)
+                if (upswing == null)
                     continue;
 
-                msbForConfirmation = WILLBEupswing;
+                msbForConfirmation = upswing;
                 MsbForConfirmationSwingLow = msbForConfirmation.SwingLow(CloseType);
                 if (MsbForConfirmationSwingLow == null)
                     break;
@@ -423,9 +445,12 @@ public class UpswingToRange
 
         if (Retracement != null)
         {
+            chart = chart.WithPrice(potential, CloseType, text: "Potential", color: "purple");
+            chart = chart.WithPrice(Retracement, CloseType, text: "Retracement", color: "yellow");
+
             var last = Upswing.Prices.Last();
 
-            chart = chart.WithFib(previousSwingHigh, swingEntry, CloseType, potential.DateTime, "black");
+            chart = chart.WithFib(previousSwingHigh, swingEntry, CloseType, Retracement.DateTime, "purple");
             var rangeLow = Retracement;
             var rangeHigh = potential;
 
