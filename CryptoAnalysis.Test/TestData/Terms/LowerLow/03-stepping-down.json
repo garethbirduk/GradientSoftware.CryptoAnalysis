@@ -1,0 +1,28 @@
+{
+  "term": "LowerLow",
+  "title": "Stepping down",
+  "description": "From its 23,005 high, price steps down over a day with lower lows at 22,516, 22,512 and 21,771. The first low after the high, 22,833, has nothing to compare with. The first two lower lows are only about 4 apart, yet each is below the one before, so each counts.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "LowerLow",
+      "direction": "Down",
+      "time": "2023-02-09T03:00:00Z",
+      "price": 22516.01
+    },
+    {
+      "type": "LowerLow",
+      "direction": "Down",
+      "time": "2023-02-09T16:00:00Z",
+      "price": 22511.78
+    },
+    {
+      "type": "LowerLow",
+      "direction": "Down",
+      "time": "2023-02-09T22:00:00Z",
+      "price": 21770.8
+    }
+  ],
+  "level": 1
+}

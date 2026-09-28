@@ -106,18 +106,18 @@
             if (TrimStart && segments.Any())
             {
                 var segment = segments.First();
-                var lowPrice = segment.MinBy(x => x.Close);
+                var highPrice = segment.MaxBy(x => x.CloseValue(closeType));
                 if (closeType == EnumCloseType.Low)
-                    lowPrice = segment.MinBy(x => x.Low);
+                    highPrice = segment.MaxBy(x => x.Low);
 
-                if (lowPrice != null)
+                if (highPrice != null)
                 {
-                    var LowPrice = segment.Where(x => x.DateTime > lowPrice.DateTime).MaxBy(x => x.Close);
+                    var lowPrice = segment.Where(x => x.DateTime > highPrice.DateTime).MinBy(x => x.Close);
                     if (closeType == EnumCloseType.Low)
-                        LowPrice = segment.Where(x => x.DateTime > lowPrice.DateTime).MaxBy(x => x.Low);
+                        lowPrice = segment.Where(x => x.DateTime > highPrice.DateTime).MinBy(x => x.Low);
 
-                    if (LowPrice != null)
-                        segment.RemoveAll(x => x.DateTime < LowPrice.DateTime);
+                    if (lowPrice != null)
+                        segment.RemoveAll(x => x.DateTime < lowPrice.DateTime);
                 }
             }
 

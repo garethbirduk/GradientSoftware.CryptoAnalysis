@@ -1,4 +1,4 @@
-﻿using CsvHelper.Configuration.Attributes;
+using CsvHelper.Configuration.Attributes;
 
 namespace Gradient.CryptoAnalysis
 {
@@ -11,71 +11,101 @@ namespace Gradient.CryptoAnalysis
         None,
 
         /// <summary>
-        /// A close that exceeds every close before it in the current run. It is the high an upswing starts from.
+        /// A high above the previous high. Price has pushed past its last peak, the upward half of structure.
         /// </summary>
         /// <remarks>
-        /// Detected as the first price of each <see cref="Upswing"/>.
+        /// Detected on the sawtooth: a high pivot above the previous high pivot at the same level (see <see cref="Sawtooth"/>).
         /// </remarks>
         [Term("HH", "Higher high", TermCategories.StructurePoints, EnumPosition.Above, "green", "triangle-down")]
         HigherHigh,
 
         /// <summary>
-        /// The lowest close in the pullback that follows a higher high, before price breaks above that high again.
+        /// A low above the previous low. The pullback held above the last trough.
         /// </summary>
         /// <remarks>
-        /// Detected as <see cref="Upswing.SwingLow"/> of each <see cref="Upswing"/>.
+        /// Detected on the sawtooth: a low pivot above the previous low pivot at the same level (see <see cref="Sawtooth"/>).
         /// </remarks>
-        [Term("HL", "Higher low", TermCategories.StructurePoints, EnumPosition.Below, "red", "triangle-up")]
+        [Term("HL", "Higher low", TermCategories.StructurePoints, EnumPosition.Below, "green", "triangle-up")]
         HigherLow,
 
         /// <summary>
-        /// The highest close in the bounce that follows a lower low, before price breaks below that low again.
+        /// A high below the previous high. The bounce failed to reach the last peak.
         /// </summary>
         /// <remarks>
-        /// Detected as <see cref="Downswing.SwingHigh"/> of each <see cref="Downswing"/>.
+        /// Detected on the sawtooth: a high pivot below the previous high pivot at the same level (see <see cref="Sawtooth"/>).
         /// </remarks>
-        [Term("LH", "Lower high", TermCategories.StructurePoints, EnumPosition.Above, "green", "triangle-down")]
+        [Term("LH", "Lower high", TermCategories.StructurePoints, EnumPosition.Above, "red", "triangle-down")]
         LowerHigh,
 
         /// <summary>
-        /// A close that is below every close before it in the current run. It is the low a downswing starts from.
+        /// A low below the previous low. Price has broken beneath its last trough, the downward half of structure.
         /// </summary>
         /// <remarks>
-        /// Detected as <see cref="Downswing.SwingLow"/> of each <see cref="Downswing"/>.
+        /// Detected on the sawtooth: a low pivot below the previous low pivot at the same level (see <see cref="Sawtooth"/>).
         /// </remarks>
         [Term("LL", "Lower low", TermCategories.StructurePoints, EnumPosition.Below, "red", "triangle-up")]
         LowerLow,
 
         /// <summary>
-        /// The first close beyond the swing's starting point, continuing the trend: above the higher high in an upswing,
-        /// below the lower low in a downswing.
+        /// The first close above an upswing's high after the pullback from it. It confirms the upswing and continues the move up.
         /// </summary>
         /// <remarks>
-        /// Detected by <see cref="Upswing.BreakOfStructure"/> and <see cref="Downswing.BreakOfStructure"/>.
+        /// Detected on the sawtooth (see <see cref="Sawtooth.Swings"/>): inside an upleg of the level above, a high, the low
+        /// after it, then the first close above that high.
         /// </remarks>
-        [Term("BoS", "Break of structure", TermCategories.StructureBreaks, EnumPosition.Left, "cyan", "diamond")]
-        BreakOfStructure,
+        [Term("BoS↑", "Bullish break of structure", TermCategories.StructureBreaks, EnumPosition.Above, "#3b82f6", "arrow-up")]
+        BullishBreakOfStructure,
 
         /// <summary>
-        /// The first close that breaks the previous swing's protective point, signalling a possible trend change:
-        /// below the previous higher low in an upswing, above the previous lower high in a downswing.
+        /// The first close below a downswing's low after the bounce from it. It confirms the downswing and continues the move down.
         /// </summary>
         /// <remarks>
-        /// Detected by <see cref="Upswing.MarketStructureBreak"/> and <see cref="Downswing.MarketStructureBreak"/>.
+        /// Detected on the sawtooth (see <see cref="Sawtooth.Swings"/>): inside a downleg of the level above, a low, the high
+        /// after it, then the first close below that low.
         /// </remarks>
-        [Term("MSB", "Market structure break", TermCategories.StructureBreaks, EnumPosition.Left, "orange", "x")]
-        MarketStructureBreak,
+        [Term("BoS↓", "Bearish break of structure", TermCategories.StructureBreaks, EnumPosition.Below, "#a855f7", "arrow-down")]
+        BearishBreakOfStructure,
 
         /// <summary>
-        /// A run of consecutive green candles (close above open).
+        /// The first close above a downswing's protective high (its previous lower high): a warning that the fall may be ending.
+        /// It is a signal, not structure: the downswing can still continue.
         /// </summary>
-        [Term("G", "Successive green candles", TermCategories.CandlePatterns, EnumPosition.Above, "green", "circle")]
+        /// <remarks>
+        /// Detected by <see cref="Downswing.MarketStructureBreak"/> (the old swing detector, until the indicator moves to the sawtooth).
+        /// </remarks>
+        [Term("MSB↑", "Bullish market structure break", TermCategories.Indicators, EnumPosition.Above, "orange", "triangle-up-open")]
+        BullishMarketStructureBreak,
+
+        /// <summary>
+        /// The first close below an upswing's protective low (its previous higher low): a warning that the rise may be ending.
+        /// It is a signal, not structure: the upswing can still continue.
+        /// </summary>
+        /// <remarks>
+        /// Detected by <see cref="Upswing.MarketStructureBreak"/> (the old swing detector, until the indicator moves to the sawtooth).
+        /// </remarks>
+        [Term("MSB↓", "Bearish market structure break", TermCategories.Indicators, EnumPosition.Below, "orange", "triangle-down-open")]
+        BearishMarketStructureBreak,
+
+        /// <summary>
+        /// A run of at least three consecutive green candles (close above open). A red candle, or one that closes where it
+        /// opened, ends the run. It is a candle pattern, not structure.
+        /// </summary>
+        /// <remarks>
+        /// Detected by <see cref="CandleRuns.Runs"/>; each run is one maximal stretch, drawn from the first candle's open to the
+        /// last candle's close, and asserted at its last candle.
+        /// </remarks>
+        [Term("G", "Successive green candles", TermCategories.CandlePatterns, EnumPosition.Above, "#16a34a", "arrow-up")]
         SuccessiveGreenCandles,
 
         /// <summary>
-        /// A run of consecutive red candles (close below open).
+        /// A run of at least three consecutive red candles (close below open). A green candle, or one that closes where it
+        /// opened, ends the run. It is a candle pattern, not structure.
         /// </summary>
-        [Term("R", "Successive red candles", TermCategories.CandlePatterns, EnumPosition.Above, "red", "circle")]
+        /// <remarks>
+        /// Detected by <see cref="CandleRuns.Runs"/>; each run is one maximal stretch, drawn from the first candle's open to the
+        /// last candle's close, and asserted at its last candle.
+        /// </remarks>
+        [Term("R", "Successive red candles", TermCategories.CandlePatterns, EnumPosition.Below, "#dc2626", "arrow-down")]
         SuccessiveRedCandles,
     }
 

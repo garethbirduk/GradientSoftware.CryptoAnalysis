@@ -40,8 +40,10 @@ public class TermsTests
     [DataRow(EnumAnnotationType.HigherLow, "HL", EnumPosition.Below)]
     [DataRow(EnumAnnotationType.LowerHigh, "LH", EnumPosition.Above)]
     [DataRow(EnumAnnotationType.LowerLow, "LL", EnumPosition.Below)]
-    [DataRow(EnumAnnotationType.BreakOfStructure, "BoS", EnumPosition.Left)]
-    [DataRow(EnumAnnotationType.MarketStructureBreak, "MSB", EnumPosition.Left)]
+    [DataRow(EnumAnnotationType.BullishBreakOfStructure, "BoS↑", EnumPosition.Above)]
+    [DataRow(EnumAnnotationType.BearishBreakOfStructure, "BoS↓", EnumPosition.Below)]
+    [DataRow(EnumAnnotationType.BullishMarketStructureBreak, "MSB↑", EnumPosition.Above)]
+    [DataRow(EnumAnnotationType.BearishMarketStructureBreak, "MSB↓", EnumPosition.Below)]
     public void AnnotationCreate_DefaultsFromRegistry(EnumAnnotationType type, string expectedNote, EnumPosition expectedPosition)
     {
         var annotation = Annotation.Create(type);

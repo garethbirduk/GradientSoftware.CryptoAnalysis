@@ -1,0 +1,34 @@
+{
+  "term": "BullishBreakOfStructure",
+  "title": "Rally with consolidation",
+  "description": "Four bullish breaks of structure as price rallies from 22.1k to 25.1k over 15 and 16 Feb 2023: 22,812, 22,980, 24,329 and 25,077. The last comes after half a day of sideways trade under the 24.7k high; the final candle's close breaks above it and confirms the swing.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2023-02-15T15:00:00Z",
+      "price": 22812.23
+    },
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2023-02-15T18:00:00Z",
+      "price": 22979.62
+    },
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2023-02-15T23:00:00Z",
+      "price": 24329.04
+    },
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2023-02-16T15:00:00Z",
+      "price": 25076.56
+    }
+  ]
+}

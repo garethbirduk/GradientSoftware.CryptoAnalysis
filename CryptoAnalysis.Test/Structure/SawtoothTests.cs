@@ -1,0 +1,183 @@
+using CryptoAnalysis.Csv.ClassMaps;
+using Gradient.CryptoAnalysis.Csv;
+
+namespace Gradient.CryptoAnalysis.Test.Structure;
+
+[TestClass]
+public class SawtoothTests
+{
+    private static readonly DateTime Start = new(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    private static List<Price> Closes(params double[] closes) =>
+        closes.Select((c, i) => new Price { DateTime = Start.AddHours(i), Open = c, High = c, Low = c, Close = c }).ToList();
+
+    private static string Describe(SawtoothLevel level) =>
+        string.Join(" ", level.Pivots.Select(p => $"{p.Kind.ToString()[0]}{p.Index}:{p.Price}"));
+
+    [TestMethod]
+    public void LevelZero_IsFirstPriceToHighToCurrent()
+    {
+        var levels = Sawtooth.Levels(Closes(10, 12, 15, 11, 13), EnumPriceBasis.Close);
+
+        Assert.AreEqual("S0:10 H2:15 C4:13", Describe(levels[0]));
+    }
+
+    [TestMethod]
+    public void LevelZero_HighIsLastPrice_IsOneLine()
+    {
+        var levels = Sawtooth.Levels(Closes(10, 12, 14), EnumPriceBasis.Close);
+
+        Assert.AreEqual("S0:10 H2:14", Describe(levels[0]));
+    }
+
+    [TestMethod]
+    public void LevelZero_HighIsFirstPrice_IsOneLine()
+    {
+        var levels = Sawtooth.Levels(Closes(15, 12, 13), EnumPriceBasis.Close);
+
+        Assert.AreEqual("H0:15 C2:13", Describe(levels[0]));
+    }
+
+    [TestMethod]
+    public void LevelZero_TiedHigh_FirstWins()
+    {
+        var levels = Sawtooth.Levels(Closes(10, 15, 12, 15, 11), EnumPriceBasis.Close);
+
+        Assert.AreEqual("S0:10 H1:15 C4:11", Describe(levels[0]));
+    }
+
+    [TestMethod]
+    public void DipBeforeFirstHigh_IsTheFirstLowAtLevelOne()
+    {
+        var levels = Sawtooth.Levels(Closes(10, 8, 9, 12, 11), EnumPriceBasis.Close);
+
+        Assert.AreEqual(2, levels.Count);
+        Assert.AreEqual("S0:10 H3:12 C4:11", Describe(levels[0]));
+        Assert.AreEqual("S0:10 L1:8 H3:12 C4:11", Describe(levels[1]));
+    }
+
+    [TestMethod]
+    public void EqualHigh_IsNotANewHigh()
+    {
+        var levels = Sawtooth.Levels(Closes(10, 12, 11, 12, 14), EnumPriceBasis.Close);
+
+        Assert.AreEqual(2, levels.Count);
+        Assert.AreEqual("S0:10 H4:14", Describe(levels[0]));
+        Assert.AreEqual("S0:10 H1:12 L2:11 H4:14", Describe(levels[1]));
+    }
+
+    [TestMethod]
+    public void TiedPullbackLow_FirstWins()
+    {
+        var levels = Sawtooth.Levels(Closes(10, 12, 11, 11, 14), EnumPriceBasis.Close);
+
+        Assert.AreEqual("S0:10 H1:12 L2:11 H4:14", Describe(levels[1]));
+    }
+
+    [TestMethod]
+    public void FinalLeg_SplitsIntoLowerLowsThenBounce()
+    {
+        var levels = Sawtooth.Levels(Closes(10, 20, 15, 17, 12, 14, 13), EnumPriceBasis.Close);
+
+        Assert.AreEqual(3, levels.Count);
+        Assert.AreEqual("S0:10 H1:20 C6:13", Describe(levels[0]));
+        Assert.AreEqual("S0:10 H1:20 L2:15 H3:17 L4:12 C6:13", Describe(levels[1]));
+        Assert.AreEqual("S0:10 H1:20 L2:15 H3:17 L4:12 H5:14 C6:13", Describe(levels[2]));
+    }
+
+    [TestMethod]
+    public void WickBasis_UsesHighsAndLows()
+    {
+        var prices = new List<Price>
+        {
+            new() { DateTime = Start, Open = 10, High = 10.5, Low = 9.5, Close = 10 },
+            new() { DateTime = Start.AddHours(1), Open = 10, High = 12.5, Low = 10, Close = 12 },
+            new() { DateTime = Start.AddHours(2), Open = 12, High = 13, Low = 10.5, Close = 11 },
+        };
+
+        var closes = Sawtooth.Levels(prices, EnumPriceBasis.Close);
+        var wicks = Sawtooth.Levels(prices, EnumPriceBasis.Wick);
+
+        Assert.AreEqual("S0:10 H1:12 C2:11", Describe(closes[0]));
+        Assert.AreEqual("S0:10 H2:13 C2:11", Describe(wicks[0]));
+    }
+
+    private static string DescribeSwings(List<Price> prices, int level)
+    {
+        var levels = Sawtooth.Levels(prices, EnumPriceBasis.Close);
+        return string.Join(" ", Sawtooth.Swings(prices, levels, EnumPriceBasis.Close, level)
+            .Select(s => $"{s.Direction}:{s.Start.Price}>{s.Extreme.Price}>{s.BreakOfStructure!.Price}"));
+    }
+
+    [TestMethod]
+    public void Swings_InUpleg_AreHighPullbackBreak()
+    {
+        Assert.AreEqual("Up:12>11>13 Up:13>12>15", DescribeSwings(Closes(10, 12, 11, 13, 12, 15, 14), 1));
+    }
+
+    [TestMethod]
+    public void Swings_InDownleg_AreLowBounceBreak()
+    {
+        Assert.AreEqual("Down:15>17>14 Down:14>16>13", DescribeSwings(Closes(20, 15, 17, 14, 16, 13, 14), 1));
+    }
+
+    [TestMethod]
+    public void Swings_LowerLowInsideUpleg_IsNotADownswing()
+    {
+        Assert.AreEqual("Up:14>11>15 Up:15>9>16", DescribeSwings(Closes(10, 14, 11, 15, 9, 16), 1));
+    }
+
+    [TestMethod]
+    public void Swings_UnbrokenLastHigh_IsNotASwing()
+    {
+        Assert.AreEqual("Up:12>11>13", DescribeSwings(Closes(10, 12, 11, 13, 12), 1));
+    }
+
+    [TestMethod]
+    public void Swings_BreakIsFirstCloseBeyondTheHigh()
+    {
+        Assert.AreEqual("Up:12>10>12.5", DescribeSwings(Closes(9, 12, 10, 12.5, 11, 14), 1).Split(' ')[0]);
+    }
+
+    public static IEnumerable<object[]> RealData()
+    {
+        var root = Path.Combine(AppContext.BaseDirectory, "TestData");
+        var files = TermExampleLibrary.Discover(Path.Combine(root, "Terms")).Select(x => x.CsvPath)
+            .Append(Path.Combine(root, "PricesExtensionsData", "COINBASE_BTCUSD, 60", "COINBASE_BTCUSD, 60.csv"));
+        foreach (var file in files)
+            foreach (var basis in Enum.GetValues<EnumPriceBasis>())
+                yield return new object[] { Path.GetRelativePath(root, file), basis };
+    }
+
+    [DataTestMethod]
+    [DynamicData(nameof(RealData), DynamicDataSourceType.Method)]
+    public void RealData_LevelsAreWellFormed(string file, EnumPriceBasis basis)
+    {
+        var prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(AppContext.BaseDirectory, "TestData", file)).ToList();
+        var levels = Sawtooth.Levels(prices, basis, maxLevel: 50);
+
+        for (var l = 0; l < levels.Count; l++)
+        {
+            var pivots = levels[l].Pivots;
+            var turns = pivots.Where(p => p.Kind is EnumPivotKind.High or EnumPivotKind.Low).ToList();
+
+            for (var i = 1; i < pivots.Count; i++)
+                Assert.IsTrue(pivots[i].Index > pivots[i - 1].Index || pivots[i].Kind == EnumPivotKind.Current, $"Level {l}: pivots out of order at {i}");
+
+            for (var i = 1; i < turns.Count; i++)
+                Assert.AreNotEqual(turns[i - 1].Kind, turns[i].Kind, $"Level {l}: {turns[i].Kind} follows {turns[i - 1].Kind} at {turns[i].Time:u}");
+
+            Assert.IsTrue(pivots.Count(p => p.Kind == EnumPivotKind.Current) <= 1 && (pivots[^1].Kind == EnumPivotKind.Current || pivots.All(p => p.Kind != EnumPivotKind.Current)),
+                $"Level {l}: current price must be last");
+
+            if (l > 0)
+            {
+                var finer = pivots.Select(p => (p.Kind, p.Index)).ToHashSet();
+                Assert.IsTrue(levels[l - 1].Pivots.All(p => finer.Contains((p.Kind, p.Index))), $"Level {l} does not contain level {l - 1}");
+            }
+        }
+
+        var highest = prices.Max(p => basis == EnumPriceBasis.Wick ? p.High : p.Close);
+        Assert.AreEqual(highest, levels[0].Pivots.Where(p => p.Kind == EnumPivotKind.High).Max(p => p.Price));
+    }
+}

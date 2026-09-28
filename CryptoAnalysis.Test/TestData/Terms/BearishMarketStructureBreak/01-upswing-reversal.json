@@ -1,0 +1,16 @@
+{
+  "term": "BearishMarketStructureBreak",
+  "title": "Upswing reversal",
+  "description": "An uptrend of higher highs and higher lows peaks at 71,289 (31 Mar 23:00). On 1 Apr 03:00 price closes at 70,597, below the previous higher low: a bearish market structure break. At level 1 the same close is the first bearish break of structure after the peak, and the downleg breaks lower twice more, to 66.5k.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "BearishMarketStructureBreak",
+      "direction": "Down",
+      "time": "2024-04-01T03:00:00Z",
+      "price": 70596.99
+    }
+  ],
+  "level": 1
+}

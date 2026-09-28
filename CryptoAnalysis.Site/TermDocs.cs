@@ -42,6 +42,14 @@ public sealed class TermDocs
         return (Text(member.Element("summary")), Text(member.Element("remarks")));
     }
 
+    /// <summary>
+    /// Gets the summary of a type, with cref links reduced to code spans.
+    /// </summary>
+    public string SummaryOf(Type type)
+    {
+        return _members.TryGetValue($"T:{type.FullName}", out var member) ? Text(member.Element("summary")) : "";
+    }
+
     private static string Text(XElement? element)
     {
         if (element == null)

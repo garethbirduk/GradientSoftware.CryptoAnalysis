@@ -20,6 +20,11 @@ public sealed class TermExample
     public bool Reviewed { get; set; }
 
     public EnumCloseType CloseType { get; set; } = EnumCloseType.Close;
+
+    /// <summary>
+    /// The sawtooth level the structure points (HH, HL, LH, LL) are taken from.
+    /// </summary>
+    public int Level { get; set; } = 1;
     public List<TermAnnotation> Expected { get; set; } = [];
 }
 
@@ -50,7 +55,7 @@ public sealed record TermExampleFile(string Id, string CsvPath, string JsonPath)
     /// </summary>
     public List<TermAnnotation> Detect(TermExample example)
     {
-        return TermAnnotations.Annotate(LoadPrices(), example.CloseType).Where(x => x.Type == example.Term).ToList();
+        return TermAnnotations.Annotate(LoadPrices(), example.CloseType, example.Level).Where(x => x.Type == example.Term).ToList();
     }
 }
 

@@ -1,0 +1,28 @@
+{
+  "term": "HigherLow",
+  "title": "Immediate pullback",
+  "description": "Each higher low comes straight after its high: 66,426 the candle after the 67,145 high, 69,542 the candle after 70,068, and 71,079 two candles after 71,432. A higher low is simply the lowest price before the next new high, however early it comes.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "HigherLow",
+      "direction": "Up",
+      "time": "2024-05-20T06:00:00Z",
+      "price": 66426.45
+    },
+    {
+      "type": "HigherLow",
+      "direction": "Up",
+      "time": "2024-05-20T20:00:00Z",
+      "price": 69541.52
+    },
+    {
+      "type": "HigherLow",
+      "direction": "Up",
+      "time": "2024-05-21T01:00:00Z",
+      "price": 71079.24
+    }
+  ],
+  "level": 1
+}

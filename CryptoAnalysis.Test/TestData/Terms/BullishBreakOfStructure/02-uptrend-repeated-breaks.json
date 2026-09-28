@@ -1,0 +1,40 @@
+{
+  "term": "BullishBreakOfStructure",
+  "title": "Uptrend: repeated breaks",
+  "description": "Five bullish breaks of structure at level 1: 48,823, 50,213, 50,223, 50,785 and 51,592. Each swing is a high, a pullback and the close that breaks above the high. The swing from the 13 Feb 09:00 high survives a bearish market structure break at 13:00: price falls to 48,490, then closes above the high at 08:00 on 14 Feb.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-12T14:00:00Z",
+      "price": 48822.53
+    },
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-12T20:00:00Z",
+      "price": 50212.91
+    },
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-13T09:00:00Z",
+      "price": 50222.9
+    },
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-14T08:00:00Z",
+      "price": 50784.6
+    },
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-14T12:00:00Z",
+      "price": 51592.38
+    }
+  ],
+  "level": 1
+}

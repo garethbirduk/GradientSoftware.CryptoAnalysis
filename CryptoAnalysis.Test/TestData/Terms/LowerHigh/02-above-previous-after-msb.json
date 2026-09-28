@@ -1,0 +1,34 @@
+{
+  "term": "LowerHigh",
+  "title": "Lower highs after the snippet high",
+  "description": "The snippet starts at 58,759 and falls to 57,384 before rallying to its 58,813 high (11 Jul 12:00). At level 1 that fall is just the first low; its own lower highs appear a level down. From the high, each bounce stops lower: 57,846, 57,558, 57,341 and 57,328, including a one-candle swing where the low and the next high are both 57,341. The first pullback low, 57,412, is a higher low because it is above 57,384, even though the highs are already falling.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2024-07-11T18:00:00Z",
+      "price": 57846.32
+    },
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2024-07-11T20:00:00Z",
+      "price": 57558.22
+    },
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2024-07-11T23:00:00Z",
+      "price": 57340.77
+    },
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2024-07-12T02:00:00Z",
+      "price": 57328.17
+    }
+  ],
+  "level": 1
+}

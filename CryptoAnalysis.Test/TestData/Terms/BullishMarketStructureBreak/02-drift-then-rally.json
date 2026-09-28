@@ -1,0 +1,16 @@
+{
+  "term": "BullishMarketStructureBreak",
+  "title": "Drift then rally",
+  "description": "Price drifts sideways and lower for a day from 42.5k. On 1 Jan 2024 09:00 it closes at 42,651, above the last lower high: a bullish market structure break. Six hours later the first bullish break of structure follows (42,797), and four more take the rally to 45.5k.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "BullishMarketStructureBreak",
+      "direction": "Up",
+      "time": "2024-01-01T09:00:00Z",
+      "price": 42650.97
+    }
+  ]
+}

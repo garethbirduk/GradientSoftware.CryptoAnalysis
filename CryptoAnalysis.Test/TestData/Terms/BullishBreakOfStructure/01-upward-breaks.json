@@ -1,0 +1,22 @@
+{
+  "term": "BullishBreakOfStructure",
+  "title": "Bullish breaks",
+  "description": "Two bullish breaks of structure at level 1. At 13:00 the close of 20,186 breaks above the 08:00 high of 19,956, after the dip to 19,622. At 23:00 the close of 20,230 breaks above the 13:00 high, after the pullback to 19,826. After the 20,861 high, the incomplete leg has a bearish break of its own: the 20,427 low, a bounce to 20,510, then the close of 20,403 at 06:00.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2023-03-10T13:00:00Z",
+      "price": 20186.22
+    },
+    {
+      "type": "BullishBreakOfStructure",
+      "direction": "Up",
+      "time": "2023-03-10T23:00:00Z",
+      "price": 20230.08
+    }
+  ],
+  "level": 1
+}

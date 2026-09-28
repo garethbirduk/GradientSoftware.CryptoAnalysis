@@ -1,0 +1,22 @@
+{
+  "term": "BearishBreakOfStructure",
+  "title": "Bearish break (level 2)",
+  "description": "Asserted at level 2. The snippet's high comes late (65,288 on 1 Aug 23:00), so the whole decline lies inside level 0's first leg, and at level 1 it is a single dip. One level down that decline is a downleg with its own swings: the 63,692 low, a bounce to 64,856, then the close of 62,863 at 15:00 breaks below it. A one-candle break at 01:00 (64,165) is at the same level, and the recovery has a bullish break at 19:00 (63,346).",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "BearishBreakOfStructure",
+      "direction": "Down",
+      "time": "2024-08-01T01:00:00Z",
+      "price": 64165.42
+    },
+    {
+      "type": "BearishBreakOfStructure",
+      "direction": "Down",
+      "time": "2024-08-01T15:00:00Z",
+      "price": 62863.31
+    }
+  ],
+  "level": 2
+}

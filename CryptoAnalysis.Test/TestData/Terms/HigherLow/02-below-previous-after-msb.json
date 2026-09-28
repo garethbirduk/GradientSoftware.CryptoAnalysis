@@ -1,0 +1,22 @@
+{
+  "term": "HigherLow",
+  "title": "Higher low depends on the level",
+  "description": "At level 1 the lows are 60,168, 61,030 and 64,589, each higher than the last, so 61,030 (19 Apr 01:00) is a higher low. The 62,263 low that the market structure break closed below is only a pivot at level 2, and there 61,030 is a lower low. Labels compare pivots within one level, so the same low can be a higher low at one level and a lower low at the next.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "HigherLow",
+      "direction": "Up",
+      "time": "2024-04-19T01:00:00Z",
+      "price": 61029.87
+    },
+    {
+      "type": "HigherLow",
+      "direction": "Up",
+      "time": "2024-04-19T07:00:00Z",
+      "price": 64589.16
+    }
+  ],
+  "level": 1
+}

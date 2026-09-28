@@ -43,6 +43,7 @@ public class TermExampleTests
             Description = example.Description,
             Reviewed = false,
             CloseType = example.CloseType,
+            Level = example.Level,
             Expected = actual,
         };
         File.WriteAllText(actualPath, JsonSerializer.Serialize(actualExample, TermAnnotations.JsonOptions));

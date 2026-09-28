@@ -1,0 +1,22 @@
+{
+  "term": "HigherHigh",
+  "title": "Holding through consolidation",
+  "description": "The higher high at 35,667 (7 Nov 20:00) holds through a full day of sideways trade. The higher low forms late, at 35,223 on 8 Nov 15:00, before price breaks above and makes the next higher high at 35,800. The final close, 36,457, is the snippet high but its run has not ended.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "HigherHigh",
+      "direction": "Up",
+      "time": "2023-11-07T20:00:00Z",
+      "price": 35666.73
+    },
+    {
+      "type": "HigherHigh",
+      "direction": "Up",
+      "time": "2023-11-08T22:00:00Z",
+      "price": 35800.37
+    }
+  ],
+  "level": 1
+}

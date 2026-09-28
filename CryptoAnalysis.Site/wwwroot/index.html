@@ -12,14 +12,16 @@
     --accent: #0f766e; --chip: #f5f5f4; --code: #f1f5f9;
     --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
     --up: #26a69a; --down: #ef5350; --close: #a8a29e; --grid: #eeeceb;
-    --upswing: #2563eb; --downswing: #9333ea;
+    --upswing: #2563eb; --downswing: #9333ea; --saw: #334155;
+    --lv1: #2a78d6; --lv2: #eb6834; --lv3: #1baf7a; --lv4: #eda100; --lv5: #e87ba4; --lv6: #008300; --lv7: #4a3aa7; --lv8: #e34948;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #0c0a09; --panel: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --border: #292524;
       --accent: #2dd4bf; --chip: #292524; --code: #292524;
       --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --close: #78716c; --grid: #292524;
-      --upswing: #60a5fa; --downswing: #c084fc;
+      --upswing: #60a5fa; --downswing: #c084fc; --saw: #e2e8f0;
+      --lv1: #3987e5; --lv2: #d95926; --lv3: #199e70; --lv4: #c98500; --lv5: #d55181; --lv6: #008300; --lv7: #9085e9; --lv8: #e66767;
     }
   }
   * { box-sizing: border-box; }
@@ -39,14 +41,20 @@
   .term-head p { margin: 8px 0 0; max-width: 72ch; }
   .term-head .remarks { color: var(--muted); font-size: 14px; }
   code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
-  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 20px 0 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
-  .toolbar .lead { color: var(--muted); font-size: 13px; margin-right: 4px; }
-  .toolbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 6px; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--chip); color: var(--text); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 13px; cursor: pointer; }
-  .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
-  .chip[aria-pressed="false"] { opacity: .45; }
-  .chip[aria-pressed="false"] .dot { background: transparent !important; outline: 1px solid var(--muted); }
-  .chip:disabled { cursor: default; }
+  .layerbar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px;
+    margin: -28px -32px 20px; padding: 10px 32px; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .layerbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 6px; }
+  .layerbar .section { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+  .layerbar .lead { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; margin-right: 2px; }
+  .layer { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: none; color: var(--text);
+    border-radius: 6px; padding: 3px 7px; font: inherit; font-size: 13px; cursor: pointer; }
+  .layer:hover { background: var(--chip); }
+  .layer:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .layer[aria-pressed="false"] { opacity: .38; }
+  .layer[aria-pressed="false"] .name { text-decoration: line-through; }
+  .layer svg { flex: none; }
+  .layer.text { color: var(--muted); font-size: 12px; }
+  @media (max-width: 800px) { .layerbar { margin: -20px -16px 16px; padding: 8px 16px; } }
   .example { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-top: 18px; }
   .example header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
   .example h3 { margin: 0; font-size: 17px; }
@@ -83,12 +91,43 @@
 const DATA = window.SITE_DATA || { terms: [], examples: [] };
 const TERMS = new Map(DATA.terms.map(t => [t.type, t]));
 const ARROW = { Up: '↑', Down: '↓' };
-const STORE_KEY = 'terms-site:v1';
+const STORE_KEY = 'terms-site:v5';
+const LEVELS = 9;
+const POINT_TYPES = { HH: 'HigherHigh', HL: 'HigherLow', LH: 'LowerHigh', LL: 'LowerLow' };
+const SWINGS = { Up: { name: 'Upswings', color: '--upswing' }, Down: { name: 'Downswings', color: '--downswing' } };
+
+// Every layer a chart can show, grouped into sections that appear in the same order on every page.
+const SECTIONS = [
+  { name: 'Price', layers: [{ id: 'price', label: 'Candles' }, { id: 'close', label: 'Closes' }] },
+  { name: 'Candles', layers: [{ id: 'SuccessiveGreenCandles', label: 'Green runs' }, { id: 'SuccessiveRedCandles', label: 'Red runs' }] },
+  { name: 'Points', layers: ['HigherHigh', 'LowerHigh', 'LowerLow', 'HigherLow'].map(id => ({ id })) },
+  { name: 'Upswings', layers: [{ id: 'Up', label: 'Upswing' }, { id: 'BullishBreakOfStructure' }, { id: 'bosLevelUp', label: 'BoS level', term: 'BullishBreakOfStructure' }] },
+  { name: 'Downswings', layers: [{ id: 'Down', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' }] },
+  { name: 'Sawtooth', levels: true, layers: Array.from({ length: LEVELS }, (_, l) => ({ id: `level${l}`, label: `${l}`, level: l })) },
+  { name: 'Indicators', layers: [{ id: 'BullishMarketStructureBreak' }, { id: 'msbLevelUp', label: 'MSB↑ level', term: 'BullishMarketStructureBreak' },
+    { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' }] },
+].map(s => ({ ...s, layers: s.layers.map(l => ({ ...l, label: l.label ?? TERMS.get(l.id)?.label ?? l.id })) }));
+const LAYERS = SECTIONS.flatMap(s => s.layers);
+const LEVEL_IDS = LAYERS.filter(l => l.level !== undefined).map(l => l.id);
+const POINT_LAYERS = ['HigherHigh', 'HigherLow', 'LowerHigh', 'LowerLow'];
+
+// What a page shows before its buttons are touched: candles plus the page's own layers.
+const PAGE_DEFAULTS = {
+  BullishBreakOfStructure: ['price', 'Up', 'BullishBreakOfStructure', 'bosLevelUp'],
+  BearishBreakOfStructure: ['price', 'Down', 'BearishBreakOfStructure', 'bosLevelDown'],
+  BullishMarketStructureBreak: ['price', 'BullishMarketStructureBreak', 'msbLevelUp'],
+  BearishMarketStructureBreak: ['price', 'BearishMarketStructureBreak', 'msbLevelDown'],
+  Sawtooth: ['price', 'level0', 'level1'],
+};
+const defaultsFor = page => PAGE_DEFAULTS[page] ?? ['price', page];
 
 function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } }
 function save(state) { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { } }
-const state = Object.assign({ context: [], mode: 'candles', swings: ['Up', 'Down'] }, load());
-const SWINGS = [{ dir: 'Up', name: 'Upswings', color: '--upswing' }, { dir: 'Down', name: 'Downswings', color: '--downswing' }];
+const state = Object.assign({ pages: {} }, load());
+let currentPage = null;
+const layersOf = page => state.pages[page] ?? defaultsFor(page);
+const on = id => layersOf(currentPage).includes(id);
+const setLayers = layers => { state.pages[currentPage] = layers; save(state); };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const prose = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -96,6 +135,7 @@ const css = name => getComputedStyle(document.documentElement).getPropertyValue(
 const fmtTime = t => String(t).slice(0, 16).replace('T', ' ');
 const fmtPrice = p => p.toLocaleString(undefined, { maximumFractionDigits: 2 });
 const key = a => `${a.type}|${a.direction}|${a.time}|${a.price}`;
+const levelColor = l => css(l === 0 ? '--saw' : `--lv${Math.min(l, 8)}`);
 
 function examplesFor(type) { return DATA.examples.filter(e => e.term === type); }
 
@@ -103,6 +143,8 @@ function renderNav(active) {
   const byCat = new Map();
   for (const t of DATA.terms) (byCat.get(t.category) ?? byCat.set(t.category, []).get(t.category)).push(t);
   let html = '<h1>Market structure terms</h1>';
+  const structureCount = DATA.structure?.examples?.length ?? 0;
+  html += `<h2>Structure</h2><a href="#Sawtooth" class="${active === 'Sawtooth' ? 'active' : ''}"><span>Sawtooth levels</span><span class="count">${structureCount || ''}</span></a>`;
   for (const [cat, terms] of byCat) {
     html += `<h2>${esc(cat)}</h2>`;
     for (const t of terms) {
@@ -114,9 +156,55 @@ function renderNav(active) {
   document.getElementById('nav').innerHTML = html;
 }
 
-function chip(t, pressed, disabled) {
-  return `<button class="chip" data-type="${t.type}" aria-pressed="${pressed}" ${disabled ? 'disabled title="Focus term"' : ''}>
-    <span class="dot" style="background:${esc(t.color)}"></span>${esc(t.label)}</button>`;
+function markerSvg(symbol, color) {
+  const shapes = {
+    'triangle-up': `<polygon points="7,2 12,11 2,11" fill="${color}"/>`,
+    'triangle-down': `<polygon points="2,3 12,3 7,12" fill="${color}"/>`,
+    'diamond': `<polygon points="7,1 13,7 7,13 1,7" fill="${color}"/>`,
+    'x': `<path d="M3 3 L11 11 M11 3 L3 11" stroke="${color}" stroke-width="3"/>`,
+    'arrow-up': `<path d="M7 1 L12 7 L9 7 L9 13 L5 13 L5 7 L2 7 Z" fill="${color}"/>`,
+    'arrow-down': `<path d="M7 13 L12 7 L9 7 L9 1 L5 1 L5 7 L2 7 Z" fill="${color}"/>`,
+    'triangle-up-open': `<polygon points="7,2 12,11 2,11" fill="none" stroke="${color}" stroke-width="1.8"/>`,
+    'triangle-down-open': `<polygon points="2,3 12,3 7,12" fill="none" stroke="${color}" stroke-width="1.8"/>`,
+  };
+  return shapes[symbol] ?? `<circle cx="7" cy="7" r="5" fill="${color}"/>`;
+}
+
+function swatch(layer) {
+  const svg = inner => `<svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true">${inner}</svg>`;
+  if (layer.id === 'price') return svg(`<line x1="6" y1="1" x2="6" y2="13" stroke="${css('--up')}"/><rect x="3.5" y="3" width="5" height="8" fill="${css('--up')}"/>
+    <line x1="15" y1="2" x2="15" y2="12" stroke="${css('--down')}"/><rect x="12.5" y="5" width="5" height="5" fill="${css('--down')}"/>`);
+  if (layer.id === 'close') return svg(`<path d="M1 10 L7 5 L13 8 L21 3" fill="none" stroke="${css('--close')}" stroke-width="1.5"/>`);
+  if (layer.level !== undefined) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${levelColor(layer.level)}" stroke-width="3"/><circle cx="11" cy="7" r="3" fill="${levelColor(layer.level)}"/>`);
+  if (SWINGS[layer.id]) { const c = css(SWINGS[layer.id].color); return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(c, 0.15)}" stroke="${c}"/>`); }
+  if (layer.id.startsWith('Successive')) { const c = TERMS.get(layer.id)?.color, up = layer.id.includes('Green'); const [y1, y2] = up ? [12, 2] : [2, 12];
+    return svg(`<line x1="2" y1="${y1}" x2="18" y2="${y2}" stroke="${c}" stroke-width="2"/><path d="M${up ? '13 2 L19 1 L17 7' : '13 12 L19 13 L17 7'}" fill="none" stroke="${c}" stroke-width="2"/>`); }
+  if (layer.id.startsWith('msbLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="1.5 2.5"/>`);
+  if (layer.id.startsWith('bosLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="4 3"/>`);
+  const term = TERMS.get(layer.term ?? layer.id);
+  return term ? `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">${markerSvg(term.symbol, term.color)}</svg>` : '';
+}
+
+function layerBar() {
+  const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>`;
+  const section = s => `<div class="section" role="group" aria-label="${esc(s.name)}"><span class="lead">${esc(s.name)}</span>
+    ${s.levels ? '<button class="layer text" data-levels="none">None</button>' : ''}${s.layers.map(button).join('')}${s.levels ? '<button class="layer text" data-levels="all">All</button>' : ''}</div>`;
+  return `<div class="layerbar" role="toolbar" aria-label="Chart layers">${SECTIONS.map(section).join('<span class="sep"></span>')}</div>`;
+}
+
+function wireLayerBar(main) {
+  const sync = layers => {
+    setLayers(layers);
+    main.querySelectorAll('.layer[data-layer]').forEach(b => b.setAttribute('aria-pressed', on(b.dataset.layer)));
+    drawAll(currentPage);
+  };
+  main.querySelectorAll('.layer[data-layer]').forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.layer, layers = layersOf(currentPage);
+    sync(on(id) ? layers.filter(x => x !== id) : [...layers, id]);
+  }));
+  main.querySelectorAll('.layer[data-levels]').forEach(b => b.addEventListener('click', () => {
+    sync([...layersOf(currentPage).filter(x => !LEVEL_IDS.includes(x)), ...(b.dataset.levels === 'all' ? LEVEL_IDS : [])]);
+  }));
 }
 
 function renderTerm(type) {
@@ -126,29 +214,16 @@ function renderTerm(type) {
 
   const examples = examplesFor(type);
   selected.clear();
-  const others = DATA.terms.filter(t => t.type !== type && DATA.examples.some(e => e.annotations.some(a => a.type === t.type)));
 
-  let html = `<section class="term-head">
+  currentPage = type;
+  let html = layerBar() + `<section class="term-head">
     <h2>${esc(term.name)}<span class="label">${esc(term.label)}</span></h2>
     ${term.summary ? `<p>${prose(term.summary)}</p>` : ''}
     ${term.remarks ? `<p class="remarks">${prose(term.remarks)}</p>` : ''}
   </section>`;
 
-  if (!examples.length) {
+  if (!examples.length)
     html += `<div class="empty">No examples yet. Add a CSV and sidecar under <code>TestData/Terms/${esc(type)}/</code>.</div>`;
-    main.innerHTML = html;
-    return;
-  }
-
-  html += `<div class="toolbar"><span class="lead">Show</span>${chip(term, true, true)}
-    ${others.map(t => chip(t, state.context.includes(t.type), false)).join('')}
-    <span class="sep"></span>
-    ${SWINGS.map(s => `<button class="chip" data-swing="${s.dir}" aria-pressed="${state.swings.includes(s.dir)}">
-      <span class="dot" style="background:${css(s.color)}"></span>${s.name}</button>`).join('')}
-    <span class="sep"></span>
-    <button class="chip" data-mode="candles" aria-pressed="${state.mode === 'candles'}">Candles</button>
-    <button class="chip" data-mode="line" aria-pressed="${state.mode === 'line'}">Close line</button>
-  </div>`;
 
   for (const ex of examples) {
     const badges = [
@@ -156,7 +231,7 @@ function renderTerm(type) {
       ex.matches ? '' : '<span class="badge bad">Detector differs from expected</span>',
     ].join('');
     html += `<article class="example" id="ex-${esc(ex.id)}">
-      <header><h3>${esc(ex.title || ex.id)}</h3>${badges}<span class="id">${esc(ex.id)}</span></header>
+      <header><h3>${esc(ex.title || ex.id)}</h3>${badges}<span class="id">${esc(ex.id)} · level ${ex.level ?? 1}</span></header>
       ${ex.description ? `<p>${prose(ex.description)}</p>` : ''}
       <div class="chart" data-id="${esc(ex.id)}"></div>
       ${expectedTable(ex, term)}
@@ -164,23 +239,7 @@ function renderTerm(type) {
   }
   main.innerHTML = html;
 
-  main.querySelectorAll('.toolbar .chip[data-type]:not(:disabled)').forEach(b => b.addEventListener('click', () => {
-    const t = b.dataset.type;
-    state.context = state.context.includes(t) ? state.context.filter(x => x !== t) : [...state.context, t];
-    b.setAttribute('aria-pressed', state.context.includes(t));
-    save(state); drawAll(type);
-  }));
-  main.querySelectorAll('.toolbar .chip[data-swing]').forEach(b => b.addEventListener('click', () => {
-    const d = b.dataset.swing;
-    state.swings = state.swings.includes(d) ? state.swings.filter(x => x !== d) : [...state.swings, d];
-    b.setAttribute('aria-pressed', state.swings.includes(d));
-    save(state); drawAll(type);
-  }));
-  main.querySelectorAll('.toolbar .chip[data-mode]').forEach(b => b.addEventListener('click', () => {
-    state.mode = b.dataset.mode;
-    main.querySelectorAll('.toolbar .chip[data-mode]').forEach(x => x.setAttribute('aria-pressed', x.dataset.mode === state.mode));
-    save(state); drawAll(type);
-  }));
+  wireLayerBar(main);
   main.querySelectorAll('tr.pick').forEach(row => {
     row.addEventListener('click', () => toggleSelection(row, type));
     row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelection(row, type); } });
@@ -209,22 +268,31 @@ function toggleSelection(row, type) {
   if (selected.get(id) === k) selected.delete(id); else selected.set(id, k);
   document.querySelectorAll(`tr.pick[data-ex="${CSS.escape(id)}"]`).forEach(r => r.classList.toggle('selected', selected.get(id) === r.dataset.key));
   const el = document.querySelector(`.chart[data-id="${CSS.escape(id)}"]`);
-  draw(el, DATA.examples.find(e => e.id === id), type);
+  draw(el, findExample(id), type);
   if (selected.has(id)) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function owningSwing(ex, a) {
-  const at = {
-    BreakOfStructure: w => w.breakOfStructure,
-    MarketStructureBreak: w => w.marketStructureBreak,
-    HigherHigh: w => w.start, LowerLow: w => w.start,
-    HigherLow: w => w.extreme, LowerHigh: w => w.extreme,
-  }[a.type];
-  return at && ex.swings.find(w => w.direction === a.direction && at(w)?.time === a.time);
+function selectedLevels(ex) {
+  return LAYERS.filter(l => l.level !== undefined && on(l.id) && l.level < (ex.sawtooth?.length ?? 0)).map(l => l.level);
 }
 
-function drawAll(type) {
-  document.querySelectorAll('.chart').forEach(el => draw(el, DATA.examples.find(e => e.id === el.dataset.id), type));
+// Points, swings and breaks follow the finest level shown, or the example's own level when no level is shown.
+function structureLevel(ex) {
+  const levels = selectedLevels(ex);
+  return levels.length ? Math.max(...levels) : (ex.level ?? 1);
+}
+
+function swingsFor(ex) {
+  return ex.swingsByLevel?.[structureLevel(ex)] ?? ex.swings ?? [];
+}
+
+function owningSwing(ex, a) {
+  const at = { BullishBreakOfStructure: w => w.breakOfStructure, BearishBreakOfStructure: w => w.breakOfStructure }[a.type];
+  return at && swingsFor(ex).find(w => w.direction === a.direction && at(w)?.time === a.time);
+}
+
+function drawAll(page) {
+  document.querySelectorAll('.chart').forEach(el => draw(el, findExample(el.dataset.id), page === 'Sawtooth' ? null : page));
 }
 
 function withAlpha(hex, a) {
@@ -252,88 +320,183 @@ function highlight(ex, traces, labels) {
   const shapes = [{ type: 'line', xref: 'x', yref: 'paper', x0: a.time, x1: a.time, y0: 0, y1: 1, layer: 'below',
     line: { color: accent, width: 1, dash: 'dot' } }];
 
+  const msb = (ex.marketStructureBreaks ?? []).find(m => m.type === a.type && m.break.time === a.time);
+  if (msb) shapes.push({ type: 'line', xref: 'x', yref: 'y', x0: msb.reference.time, x1: msb.break.time, y0: msb.reference.price, y1: msb.reference.price,
+    line: { color: term.color, width: 3, dash: 'dot' } });
+
   const w = owningSwing(ex, a);
   if (w) {
-    const color = css(SWINGS.find(s => s.dir === w.direction).color);
+    const color = css(SWINGS[w.direction].color);
     shapes.push({ type: 'rect', xref: 'x', yref: 'y', layer: 'below', x0: w.start.time, x1: w.end.time,
       y0: Math.min(w.start.price, w.extreme.price), y1: Math.max(w.start.price, w.extreme.price),
       line: { color, width: 2.5 }, fillcolor: withAlpha(color, 0.18) });
-
-    const ref = a.type === 'BreakOfStructure' ? { from: w.start, to: w.breakOfStructure, level: w.start.price }
-      : a.type === 'MarketStructureBreak' && w.msbReference ? { from: w.msbReference, to: w.marketStructureBreak, level: w.msbReference.price }
-      : null;
-    if (ref) shapes.push({ type: 'line', xref: 'x', yref: 'y', x0: ref.from.time, x1: ref.to.time, y0: ref.level, y1: ref.level,
+    shapes.push({ type: 'line', xref: 'x', yref: 'y', x0: w.start.time, x1: w.breakOfStructure.time, y0: w.start.price, y1: w.start.price,
       line: { color: term.color, width: 3 } });
   }
 
-  traces.push({ type: 'scatter', mode: 'markers', name: 'Selected', showlegend: false, hoverinfo: 'skip', x: [a.time], y: [a.price],
+  traces.push({ type: 'scatter', mode: 'markers', name: 'Selected', hoverinfo: 'skip', x: [a.time], y: [a.price],
     marker: { symbol: 'circle-open', size: 26, color: accent, line: { width: 2.5 } } });
-  labels.push({ x: a.time, y: a.price, text: `<b>${term.label} ${ARROW[a.direction]}</b> ${fmtTime(a.time)} · ${fmtPrice(a.price)}`,
+  labels.push({ x: a.time, y: a.price, text: `<b>${term.label}</b> ${fmtTime(a.time)} · ${fmtPrice(a.price)}`,
     showarrow: true, arrowcolor: accent, arrowwidth: 1.5, ax: 0, ay: term.position === 'Below' ? 60 : -60,
     bgcolor: css('--panel'), bordercolor: accent, borderpad: 4, font: { color: css('--text'), size: 12 } });
   return shapes;
+}
+
+function sawtoothLabels(turns, lastTime) {
+  let high = null, low = null;
+  return turns.map(p => {
+    if (p.kind === 'Start' || p.time === lastTime) return '';
+    const isHigh = p.kind === 'High';
+    const prev = isHigh ? high : low;
+    if (isHigh) high = p.price; else low = p.price;
+    if (prev === null) return isHigh ? 'H' : 'L';
+    if (p.price === prev) return isHigh ? 'EQH' : 'EQL';
+    return isHigh ? (p.price > prev ? 'HH' : 'LH') : (p.price > prev ? 'HL' : 'LL');
+  });
+}
+
+function pointsAt(ex, level) {
+  const pivots = ex.sawtooth?.[Math.min(level, (ex.sawtooth?.length ?? 1) - 1)] ?? [];
+  const turns = pivots.filter(p => p.kind !== 'Current');
+  const names = sawtoothLabels(turns, ex.prices.t[ex.prices.t.length - 1]);
+  return turns.map((p, i) => ({ type: POINT_TYPES[names[i]], direction: names[i]?.startsWith('H') ? 'Up' : 'Down', time: p.time, price: p.price }))
+    .filter(a => a.type);
+}
+
+function drawSawtooth(ex, traces, labels, stacks, withLabels) {
+  const levels = selectedLevels(ex);
+  if (!levels.length) return;
+
+  const finest = levels[levels.length - 1];
+  const lastTime = ex.prices.t[ex.prices.t.length - 1];
+  for (const level of levels) {
+    const color = levelColor(level);
+    // Levels nest, so shared legs overlap; coarser levels are drawn wider underneath and show as a casing.
+    const width = Math.min(2 + (finest - level) * 2, 12);
+    const pivots = ex.sawtooth[level];
+    const turns = pivots.filter(p => p.kind !== 'Current');
+    const current = pivots.find(p => p.kind === 'Current');
+    const names = sawtoothLabels(turns, lastTime);
+
+    traces.push({ type: 'scatter', mode: 'lines+markers', name: `Level ${level}`,
+      x: turns.map(p => p.time), y: turns.map(p => p.price),
+      line: { color, width }, marker: { color, size: level === finest ? 6 : 0 },
+      hovertemplate: turns.map((p, i) => `Level ${level} · ${names[i] || (p.kind === 'Start' ? 'start' : p.kind.toLowerCase())}<br>${fmtTime(p.time)}<br>${fmtPrice(p.price)}<extra></extra>`) });
+
+    if (current && turns.length) {
+      const from = turns[turns.length - 1];
+      traces.push({ type: 'scatter', mode: 'lines', name: `Level ${level} incomplete`,
+        x: [from.time, current.time], y: [from.price, current.price], line: { color, width, dash: 'dash' },
+        hovertemplate: `Incomplete leg, level ${level}<br>${fmtTime(from.time)} → ${fmtTime(current.time)}<br>now ${fmtPrice(current.price)}<extra></extra>` });
+    }
+  }
+
+  if (!withLabels || levels.length !== 1) return;
+  const turns = ex.sawtooth[finest].filter(p => p.kind !== 'Current');
+  if (turns.length > 60) return;
+  const names = sawtoothLabels(turns, lastTime);
+  turns.forEach((p, i) => {
+    if (!names[i] || POINT_TYPES[names[i]] && on(POINT_TYPES[names[i]])) return;
+    const below = p.kind === 'Low';
+    const sk = `${p.time}|${below}`;
+    const n = stacks.get(sk) ?? 0;
+    stacks.set(sk, n + 1);
+    labels.push({ x: p.time, y: p.price, text: names[i], showarrow: false, yshift: (below ? -1 : 1) * (16 + n * 14),
+      font: { size: 11, color: css('--muted') } });
+  });
+}
+
+function drawCandleRuns(ex, labels) {
+  for (const [type, green] of [['SuccessiveGreenCandles', true], ['SuccessiveRedCandles', false]]) {
+    if (!on(type)) continue;
+    const term = TERMS.get(type);
+    for (const r of (ex.candleRuns ?? []).filter(r => r.green === green)) {
+      const change = (r.end.price - r.start.price) / r.start.price * 100;
+      const hover = `${r.length} ${green ? 'green' : 'red'} candles<br>${fmtTime(r.start.time)} → ${fmtTime(r.end.time)}<br>open ${fmtPrice(r.start.price)} → close ${fmtPrice(r.end.price)} (${change >= 0 ? '+' : ''}${change.toFixed(2)}%)`;
+      labels.push({ x: r.end.time, y: r.end.price, ax: r.start.time, ay: r.start.price, axref: 'x', ayref: 'y', text: '',
+        showarrow: true, arrowhead: 2, arrowsize: 1.2, arrowwidth: 2, arrowcolor: term.color, hovertext: hover, opacity: 0.9 });
+      const mid = new Date((Date.parse(r.start.time) + Date.parse(r.end.time)) / 2).toISOString();
+      labels.push({ x: mid, y: (r.start.price + r.end.price) / 2, text: `${r.length}`, showarrow: false, hovertext: hover,
+        bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: term.color, borderwidth: 1.5, borderpad: 2,
+        font: { size: 10, color: css('--text') } });
+    }
+  }
 }
 
 function draw(el, ex, focus) {
   const p = ex.prices;
   const text = css('--text'), muted = css('--muted'), grid = css('--grid');
   const traces = [];
-  const shown = [focus, ...state.context.filter(t => t !== focus)];
+  const swings = swingsFor(ex);
 
-  for (const s of SWINGS.filter(s => state.swings.includes(s.dir))) {
+  for (const dir of ['Up', 'Down'].filter(on)) {
+    const s = SWINGS[dir];
     const color = css(s.color);
-    ex.swings.filter(w => w.direction === s.dir).forEach((w, i) => {
+    swings.filter(w => w.direction === dir && w.confirmed).forEach(w => {
       const top = Math.max(w.start.price, w.extreme.price), bottom = Math.min(w.start.price, w.extreme.price);
-      const [hi, lo] = s.dir === 'Up' ? ['HH', 'HL'] : ['LH', 'LL'];
-      const hiPt = s.dir === 'Up' ? w.start : w.extreme, loPt = s.dir === 'Up' ? w.extreme : w.start;
+      const [hi, lo] = dir === 'Up' ? ['HH', 'HL'] : ['LH', 'LL'];
+      const hiPt = dir === 'Up' ? w.start : w.extreme, loPt = dir === 'Up' ? w.extreme : w.start;
       traces.push({
-        type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', legendgroup: s.dir, showlegend: i === 0, name: s.name,
+        type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: s.name,
         x: [w.start.time, w.end.time, w.end.time, w.start.time, w.start.time], y: [top, top, bottom, bottom, top],
-        line: { color, width: 1, dash: w.breakOfStructure ? 'solid' : 'dash' }, fillcolor: withAlpha(color, 0.08),
-        hovertemplate: `${s.name.slice(0, -1)} ${ARROW[s.dir]}${w.breakOfStructure ? '' : ' (not yet broken)'}<br>${fmtTime(w.start.time)} → ${fmtTime(w.end.time)}<br>${hi} ${fmtPrice(hiPt.price)} · ${lo} ${fmtPrice(loPt.price)}<extra></extra>`,
+        line: { color, width: 1 }, fillcolor: withAlpha(color, 0.08),
+        hovertemplate: `${s.name.slice(0, -1)} ${ARROW[dir]}<br>${fmtTime(w.start.time)} → ${fmtTime(w.end.time)}<br>${hi} ${fmtPrice(hiPt.price)} · ${lo} ${fmtPrice(loPt.price)}<extra></extra>`,
       });
     });
   }
 
-  if (state.mode === 'candles') {
+  if (on('price')) {
     traces.push({ type: 'candlestick', name: 'Price', x: p.t, open: p.o, high: p.h, low: p.l, close: p.c,
       increasing: { line: { color: css('--up'), width: 1 } }, decreasing: { line: { color: css('--down'), width: 1 } }, hoverinfo: 'x+y' });
   }
-  traces.push({ type: 'scatter', mode: 'lines', name: 'Close', x: p.t, y: p.c, hoverinfo: 'skip',
-    line: { color: state.mode === 'candles' ? css('--close') : text, width: state.mode === 'candles' ? 1 : 1.6 } });
-
-  const visibleSwings = ex.swings.filter(w => state.swings.includes(w.direction));
-  if (shown.includes('BreakOfStructure')) {
-    const refs = visibleSwings.filter(w => w.breakOfStructure);
-    referenceLines(traces, 'BoS level', TERMS.get('BreakOfStructure').color, 'dash',
-      refs.map(w => ({ from: w.start, to: w.breakOfStructure, level: w.start.price, what: `${w.direction === 'Up' ? 'HH' : 'LL'} level broken` })));
+  if (on('close')) {
+    traces.push({ type: 'scatter', mode: 'lines', name: 'Close', x: p.t, y: p.c, hoverinfo: 'skip',
+      line: { color: on('price') ? css('--close') : text, width: on('price') ? 1 : 1.6 } });
   }
-  if (shown.includes('MarketStructureBreak')) {
-    const refs = visibleSwings.filter(w => w.marketStructureBreak && w.msbReference);
-    referenceLines(traces, 'MSB level', TERMS.get('MarketStructureBreak').color, 'dot',
-      refs.map(w => ({ from: w.msbReference, to: w.marketStructureBreak, level: w.msbReference.price, what: `previous ${w.direction === 'Up' ? 'HL' : 'LH'} broken` })));
+
+  for (const [dir, type] of [['Up', 'BullishBreakOfStructure'], ['Down', 'BearishBreakOfStructure']]) {
+    if (!on(`bosLevel${dir}`)) continue;
+    referenceLines(traces, 'BoS level', TERMS.get(type).color, 'dash',
+      swings.filter(w => w.direction === dir && w.breakOfStructure)
+        .map(w => ({ from: w.start, to: w.breakOfStructure, level: w.start.price, what: `${dir === 'Up' ? 'high' : 'low'} broken` })));
+  }
+
+  for (const [layer, type] of [['msbLevelUp', 'BullishMarketStructureBreak'], ['msbLevelDown', 'BearishMarketStructureBreak']]) {
+    if (!on(layer)) continue;
+    referenceLines(traces, 'MSB level', TERMS.get(type).color, 'dot',
+      (ex.marketStructureBreaks ?? []).filter(m => m.type === type)
+        .map(m => ({ from: m.reference, to: m.break, level: m.reference.price, what: `previous ${type.startsWith('Bullish') ? 'lower high' : 'higher low'} broken` })));
   }
 
   const labels = [];
   const stacks = new Map();
+  drawCandleRuns(ex, labels);
+  drawSawtooth(ex, traces, labels, stacks, focus === null);
 
-  for (const type of shown) {
+  const level = structureLevel(ex);
+  const BOS_DIRECTION = { BullishBreakOfStructure: 'Up', BearishBreakOfStructure: 'Down' };
+  const markerTypes = [...POINT_LAYERS, 'BullishBreakOfStructure', 'BearishBreakOfStructure', 'BullishMarketStructureBreak', 'BearishMarketStructureBreak'].filter(on);
+  for (const type of markerTypes) {
     const term = TERMS.get(type);
-    const items = ex.annotations.filter(a => a.type === type);
+    const items = POINT_LAYERS.includes(type) ? pointsAt(ex, level).filter(a => a.type === type)
+      : BOS_DIRECTION[type] ? swings.filter(w => w.direction === BOS_DIRECTION[type]).map(w => ({ type, direction: w.direction, time: w.breakOfStructure.time, price: w.breakOfStructure.price }))
+      : ex.annotations.filter(a => a.type === type);
     if (!term || !items.length) continue;
     const isFocus = type === focus;
     traces.push({
       type: 'scatter', mode: 'markers', name: term.label, x: items.map(a => a.time), y: items.map(a => a.price),
-      marker: { color: term.color, symbol: term.symbol, size: isFocus ? 13 : 10, line: { width: 1, color: css('--panel') } },
-      opacity: isFocus ? 1 : 0.8,
-      hovertemplate: items.map(a => `${term.name} ${ARROW[a.direction]}<br>${fmtTime(a.time)}<br>${fmtPrice(a.price)}<extra></extra>`),
+      marker: term.symbol.endsWith('-open')
+        ? { color: term.color, symbol: term.symbol, size: isFocus ? 20 : 17, line: { width: 2, color: term.color } }
+        : { color: term.color, symbol: term.symbol, size: isFocus ? 13 : 10, line: { width: 1, color: css('--panel') } },
+      opacity: isFocus ? 1 : 0.85,
+      hovertemplate: items.map(a => `${term.name}<br>${fmtTime(a.time)}<br>${fmtPrice(a.price)}<extra></extra>`),
     });
     for (const a of items) {
       const below = term.position === 'Below';
       const sk = `${a.time}|${below}`;
       const n = stacks.get(sk) ?? 0;
       stacks.set(sk, n + 1);
-      labels.push({ x: a.time, y: a.price, text: `${term.label}${ARROW[a.direction]}`, showarrow: false,
+      labels.push({ x: a.time, y: a.price, text: term.label, showarrow: false,
         yshift: (below ? -1 : 1) * (16 + n * 14), font: { size: isFocus ? 12 : 11, color: isFocus ? text : muted } });
     }
   }
@@ -352,13 +515,48 @@ function draw(el, ex, focus) {
     font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
     xaxis: { rangeslider: { visible: false }, gridcolor: grid, linecolor: grid },
     yaxis: { gridcolor: grid, linecolor: grid, tickformat: ',.0f' },
-    legend: { orientation: 'h', y: 1.02, yanchor: 'bottom', x: 0, font: { color: text } },
-    annotations: labels, shapes, hovermode: 'closest', showlegend: true,
+    annotations: labels, shapes, hovermode: 'closest', showlegend: false,
   }, { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['select2d', 'lasso2d'] });
+}
+
+function findExample(id) {
+  return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id);
+}
+
+function renderStructure() {
+  const main = document.getElementById('main');
+  const examples = DATA.structure?.examples ?? [];
+  selected.clear();
+
+  currentPage = 'Sawtooth';
+  let html = layerBar() + `<section class="term-head">
+    <h2>Sawtooth levels</h2>
+    ${DATA.structure?.summary ? `<p>${prose(DATA.structure.summary)}</p>` : ''}
+    <p class="remarks">The dashed line is the incomplete final leg, ending at the latest price. Until a new high breaks structure, it is treated as a presumed downleg.
+    Labels compare each pivot with the previous one of the same kind: HH or LH for highs, HL or LL for lows, EQH or EQL when equal.</p>
+  </section>`;
+
+  if (!examples.length) html += '<div class="empty">No sawtooth examples.</div>';
+  for (const ex of examples) {
+    html += `<article class="example" id="ex-${esc(ex.id)}">
+      <header><h3>${esc(ex.title)}</h3><span class="id">${esc(ex.id)} · ${ex.sawtooth.length} levels</span></header>
+      ${ex.description ? `<p>${prose(ex.description)}</p>` : ''}
+      <div class="chart" data-id="${esc(ex.id)}"></div>
+    </article>`;
+  }
+  main.innerHTML = html;
+  wireLayerBar(main);
+  drawAll('Sawtooth');
 }
 
 function route() {
   let type = decodeURIComponent(location.hash.slice(1));
+  if (type === 'Sawtooth') {
+    renderNav(type);
+    renderStructure();
+    window.scrollTo(0, 0);
+    return;
+  }
   if (!TERMS.has(type)) type = (DATA.terms.find(t => examplesFor(t.type).length) || DATA.terms[0] || {}).type;
   renderNav(type);
   renderTerm(type);
