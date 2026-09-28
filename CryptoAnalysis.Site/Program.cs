@@ -51,7 +51,7 @@ var examples = TermExampleLibrary.Discover(examplesRoot).Select(file =>
         Swings = TermAnnotations.Swings(prices, example.CloseType, example.Level),
         SwingsByLevel = SwingsByLevel(prices),
         MarketStructureBreaks = TermAnnotations.MarketStructureBreaks(prices, example.CloseType),
-        CandleRuns = CandleRuns.Runs(prices),
+        CandleRuns = CandleRuns.Runs(prices, minLength: 2),
         Sawtooth = Sawtooth.Levels(prices, EnumPriceBasis.Close, maxLevel: 8)
             .Select(level => level.Pivots.Select(p => new { p.Kind, p.Time, p.Price })),
         Prices = new
@@ -82,7 +82,7 @@ object SawtoothExample(string id, string title, string description, List<Price> 
     Level = 1,
     Annotations = TermAnnotations.Annotate(prices, EnumCloseType.Close),
     MarketStructureBreaks = TermAnnotations.MarketStructureBreaks(prices, EnumCloseType.Close),
-    CandleRuns = CandleRuns.Runs(prices),
+    CandleRuns = CandleRuns.Runs(prices, minLength: 2),
     Swings = Array.Empty<object>(),
     SwingsByLevel = SwingsByLevel(prices),
     Expected = Array.Empty<object>(),

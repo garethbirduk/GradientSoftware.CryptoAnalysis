@@ -54,6 +54,9 @@
   .layer[aria-pressed="false"] .name { text-decoration: line-through; }
   .layer svg { flex: none; }
   .layer.text { color: var(--muted); font-size: 12px; }
+  .runmin { width: 3.4em; margin: 0 6px 0 -2px; padding: 1px 2px; font: inherit; font-size: 12px; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 4px; }
+  .runmin:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   @media (max-width: 800px) { .layerbar { margin: -20px -16px 16px; padding: 8px 16px; } }
   .example { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-top: 18px; }
   .example header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
@@ -185,8 +188,14 @@ function swatch(layer) {
   return term ? `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">${markerSvg(term.symbol, term.color)}</svg>` : '';
 }
 
+const RUN_MIN_DEFAULT = 5;
+const runMin = type => state.runMin?.[type] ?? RUN_MIN_DEFAULT;
+
 function layerBar() {
-  const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>`;
+  const runInput = l => l.id.startsWith('Successive')
+    ? `<input class="runmin" type="number" min="2" max="99" step="1" value="${runMin(l.id)}" data-run="${l.id}" title="Minimum run length" aria-label="Minimum ${esc(l.label.toLowerCase())} length">`
+    : '';
+  const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>${runInput(l)}`;
   const section = s => `<div class="section" role="group" aria-label="${esc(s.name)}"><span class="lead">${esc(s.name)}</span>
     ${s.levels ? '<button class="layer text" data-levels="none">None</button>' : ''}${s.layers.map(button).join('')}${s.levels ? '<button class="layer text" data-levels="all">All</button>' : ''}</div>`;
   return `<div class="layerbar" role="toolbar" aria-label="Chart layers">${SECTIONS.map(section).join('<span class="sep"></span>')}</div>`;
@@ -204,6 +213,12 @@ function wireLayerBar(main) {
   }));
   main.querySelectorAll('.layer[data-levels]').forEach(b => b.addEventListener('click', () => {
     sync([...layersOf(currentPage).filter(x => !LEVEL_IDS.includes(x)), ...(b.dataset.levels === 'all' ? LEVEL_IDS : [])]);
+  }));
+  main.querySelectorAll('.runmin').forEach(input => input.addEventListener('input', () => {
+    const value = Math.round(Number(input.value));
+    if (!Number.isFinite(value) || value < 2) return;
+    state.runMin = { ...state.runMin, [input.dataset.run]: value };
+    save(state); drawAll(currentPage);
   }));
 }
 
@@ -410,7 +425,7 @@ function drawCandleRuns(ex, labels) {
   for (const [type, green] of [['SuccessiveGreenCandles', true], ['SuccessiveRedCandles', false]]) {
     if (!on(type)) continue;
     const term = TERMS.get(type);
-    for (const r of (ex.candleRuns ?? []).filter(r => r.green === green)) {
+    for (const r of (ex.candleRuns ?? []).filter(r => r.green === green && r.length >= runMin(type))) {
       const change = (r.end.price - r.start.price) / r.start.price * 100;
       const hover = `${r.length} ${green ? 'green' : 'red'} candles<br>${fmtTime(r.start.time)} → ${fmtTime(r.end.time)}<br>open ${fmtPrice(r.start.price)} → close ${fmtPrice(r.end.price)} (${change >= 0 ? '+' : ''}${change.toFixed(2)}%)`;
       labels.push({ x: r.end.time, y: r.end.price, ax: r.start.time, ay: r.start.price, axref: 'x', ayref: 'y', text: '',
@@ -510,11 +525,17 @@ function draw(el, ex, focus) {
 
   const shapes = highlight(ex, traces, labels);
 
+  // A fixed default view of the whole snippet, so toggling layers never rescales; uirevision keeps any zoom or pan across redraws.
+  const low = p.l.reduce((a, b) => Math.min(a, b)), high = p.h.reduce((a, b) => Math.max(a, b)), pad = (high - low) * 0.06;
+  const first = Date.parse(p.t[0]), last = Date.parse(p.t[p.t.length - 1]), candle = (last - first) / Math.max(1, p.t.length - 1);
+  const xRange = [new Date(first - candle).toISOString(), new Date(last + candle).toISOString()];
+
   Plotly.react(el, traces, {
+    uirevision: ex.id,
     margin: { t: 10, r: 10, b: 36, l: 56 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
     font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
-    xaxis: { rangeslider: { visible: false }, gridcolor: grid, linecolor: grid },
-    yaxis: { gridcolor: grid, linecolor: grid, tickformat: ',.0f' },
+    xaxis: { type: 'date', rangeslider: { visible: false }, gridcolor: grid, linecolor: grid, range: xRange },
+    yaxis: { type: 'linear', gridcolor: grid, linecolor: grid, tickformat: ',.0f', range: [low - pad, high + pad] },
     annotations: labels, shapes, hovermode: 'closest', showlegend: false,
   }, { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['select2d', 'lasso2d'] });
 }
