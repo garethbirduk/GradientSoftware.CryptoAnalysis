@@ -33,7 +33,7 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
         [TestMethod]
         public void TestsToHighHighsUsingCloses()
         {
-            CollectionAssert.AreEqual(new List<Price>(), new List<Price>().HighClosesIsGreen(EnumCloseType.Close));
+            CollectionAssert.AreEqual(new List<Price>(), new List<Price>().AllTimeHighs(EnumCloseType.Close));
             var chart = ChartGenerator.CreatePriceChart(_prices, lineCloses: true);
 
             var highHighs = _prices.ToHighHighs(EnumCloseType.Close);
@@ -45,7 +45,7 @@ namespace Gradient.CryptoAnalysis.Test.PriceExtensions
         [TestMethod]
         public void TestsToHighHighsUsingHighs()
         {
-            CollectionAssert.AreEqual(new List<Price>(), new List<Price>().HighClosesIsGreen(EnumCloseType.High));
+            CollectionAssert.AreEqual(new List<Price>(), new List<Price>().AllTimeHighs(EnumCloseType.High));
             var chart = ChartGenerator.CreatePriceChart(_prices, lineHighs: true);
 
             var highHighs = _prices.ToHighHighs(EnumCloseType.High);

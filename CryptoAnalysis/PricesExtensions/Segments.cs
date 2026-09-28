@@ -25,7 +25,7 @@
             if (!prices.Any())
                 return new List<List<Price>>();
 
-            var highs = prices.HighClosesIsGreen(closeType);
+            var highs = prices.AllTimeHighs(closeType);
 
             var segments = new List<List<Price>>();
 
@@ -80,8 +80,7 @@
             if (!prices.Any())
                 return new List<List<Price>>();
 
-            var Lows = prices.LowClosesIsRed(closeType);
-            var Lows2 = prices.AllTimeLows(closeType);
+            var Lows = prices.AllTimeLows(closeType);
 
             var segments = new List<List<Price>>();
 

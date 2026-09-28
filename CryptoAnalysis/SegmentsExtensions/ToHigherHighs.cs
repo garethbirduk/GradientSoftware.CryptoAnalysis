@@ -12,7 +12,7 @@
 
             foreach (var segment in segments)
             {
-                list.Add(segment.HighClosesIsGreen(EnumCloseType.High).First());
+                list.Add(segment.AllTimeHighs(EnumCloseType.High).First());
             }
             return list;
         }

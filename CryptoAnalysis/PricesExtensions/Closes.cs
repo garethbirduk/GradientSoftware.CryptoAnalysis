@@ -93,28 +93,6 @@ namespace Gradient.CryptoAnalysis
             return change >= percentageIncrease;
         }
 
-        public static List<Price> HighClosesIsGreen(this IEnumerable<Price> prices, EnumCloseType closeType)
-        {
-            if (!prices.Any())
-                return new List<Price>();
-
-            var list = new List<Price>
-            {
-                prices.First(),
-            };
-
-            foreach (var price in prices.Where(x => x != null))
-            {
-                if (price.IsGreen())
-                {
-                    if (price.CloseValue(closeType) > list.Last().CloseValue(closeType))
-                        list.Add(price);
-                }
-            }
-
-            return list;
-        }
-
         public static List<Price> HighLows(this IEnumerable<Price> prices)
         {
             if (!prices.Any())
@@ -148,28 +126,6 @@ namespace Gradient.CryptoAnalysis
             {
                 if (price.IsRed() && price.Close < list.Last().Close)
                     list.Add(price);
-            }
-
-            return list;
-        }
-
-        public static List<Price> LowClosesIsRed(this IEnumerable<Price> prices, EnumCloseType closeType)
-        {
-            if (!prices.Any())
-                return new List<Price>();
-
-            var list = new List<Price>
-            {
-                prices.First(),
-            };
-
-            foreach (var price in prices.Where(x => x != null))
-            {
-                if (price.IsRed())
-                {
-                    if (price.CloseValue(closeType) < list.Last().CloseValue(closeType))
-                        list.Add(price);
-                }
             }
 
             return list;
