@@ -47,6 +47,30 @@ namespace Gradient.CryptoAnalysis
         LowerLow,
 
         /// <summary>
+        /// A high, the pullback low after it, and the first close back above the high. The break of structure confirms it:
+        /// until then the high may be the top. The pullback low is the swing's protective level.
+        /// </summary>
+        /// <remarks>
+        /// Detected on the sawtooth (see <see cref="Sawtooth.Swings"/>): only inside an upleg of the level above, so a lower
+        /// low inside an upleg is not a downswing. Asserted at its start, the high it pulls back from. The swings one level
+        /// finer that start inside it are its interim swings (see <see cref="Sawtooth.Interims"/>).
+        /// </remarks>
+        [Term("S↑", "Upswing", TermCategories.Swings, EnumPosition.Above, "#2563eb", "square")]
+        Upswing,
+
+        /// <summary>
+        /// A low, the bounce high after it, and the first close back below the low. The break of structure confirms it:
+        /// until then the low may be the bottom. The bounce high is the swing's protective level.
+        /// </summary>
+        /// <remarks>
+        /// Detected on the sawtooth (see <see cref="Sawtooth.Swings"/>): only inside a downleg of the level above, so a higher
+        /// high inside a downleg is not an upswing. Asserted at its start, the low it bounces from. The swings one level
+        /// finer that start inside it are its interim swings (see <see cref="Sawtooth.Interims"/>).
+        /// </remarks>
+        [Term("S↓", "Downswing", TermCategories.Swings, EnumPosition.Below, "#9333ea", "square")]
+        Downswing,
+
+        /// <summary>
         /// The first close above an upswing's high after the pullback from it. It confirms the upswing and continues the move up.
         /// </summary>
         /// <remarks>
@@ -67,21 +91,25 @@ namespace Gradient.CryptoAnalysis
         BearishBreakOfStructure,
 
         /// <summary>
-        /// The first close above a downswing's protective high (its previous lower high): a warning that the fall may be ending.
-        /// It is a signal, not structure: the downswing can still continue.
+        /// The first close above a downswing's protective high (the bounce high before its break of structure): a warning that
+        /// the fall may be ending. It is a signal, not structure: the downswing can still continue.
         /// </summary>
         /// <remarks>
-        /// Detected by <see cref="Downswing.MarketStructureBreak"/> (the old swing detector, until the indicator moves to the sawtooth).
+        /// Detected on the sawtooth (see <see cref="Sawtooth.MarketStructureBreaks"/>): from a downswing's break of structure
+        /// until the next downswing at the same level breaks structure, the first close above its bounce high. Each protective
+        /// high breaks at most once.
         /// </remarks>
         [Term("MSB↑", "Bullish market structure break", TermCategories.Indicators, EnumPosition.Above, "orange", "triangle-up-open")]
         BullishMarketStructureBreak,
 
         /// <summary>
-        /// The first close below an upswing's protective low (its previous higher low): a warning that the rise may be ending.
-        /// It is a signal, not structure: the upswing can still continue.
+        /// The first close below an upswing's protective low (the pullback low before its break of structure): a warning that
+        /// the rise may be ending. It is a signal, not structure: the upswing can still continue.
         /// </summary>
         /// <remarks>
-        /// Detected by <see cref="Upswing.MarketStructureBreak"/> (the old swing detector, until the indicator moves to the sawtooth).
+        /// Detected on the sawtooth (see <see cref="Sawtooth.MarketStructureBreaks"/>): from an upswing's break of structure
+        /// until the next upswing at the same level breaks structure, the first close below its pullback low. Each protective
+        /// low breaks at most once.
         /// </remarks>
         [Term("MSB↓", "Bearish market structure break", TermCategories.Indicators, EnumPosition.Below, "orange", "triangle-down-open")]
         BearishMarketStructureBreak,

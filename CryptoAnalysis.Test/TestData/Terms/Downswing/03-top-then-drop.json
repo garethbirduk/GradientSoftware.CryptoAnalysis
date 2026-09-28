@@ -1,0 +1,22 @@
+{
+  "term": "Downswing",
+  "title": "Top, then drop",
+  "description": "An upswing takes price to the 28,656 high (23 Mar 15:00). Everything after it is the incomplete leg, which holds two downswings: the 27,961 low (18:00) bounces to 28,428 and is closed below on 24 Mar 11:00 (27,637); that close is the next low, which bounces to 28,052 and is closed below at 17:00 (27,634).",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Downswing",
+      "direction": "Down",
+      "time": "2023-03-23T18:00:00Z",
+      "price": 27960.59
+    },
+    {
+      "type": "Downswing",
+      "direction": "Down",
+      "time": "2023-03-24T11:00:00Z",
+      "price": 27637.4
+    }
+  ]
+}

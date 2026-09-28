@@ -50,6 +50,16 @@ public sealed class TermDocs
         return _members.TryGetValue($"T:{type.FullName}", out var member) ? Text(member.Element("summary")) : "";
     }
 
+    /// <summary>
+    /// Gets the summary of a method by name (the first overload found), with cref links reduced to code spans.
+    /// </summary>
+    public string SummaryOfMethod(Type type, string name)
+    {
+        var prefix = $"M:{type.FullName}.{name}(";
+        var member = _members.FirstOrDefault(x => x.Key.StartsWith(prefix, StringComparison.Ordinal)).Value;
+        return member == null ? "" : Text(member.Element("summary"));
+    }
+
     private static string Text(XElement? element)
     {
         if (element == null)

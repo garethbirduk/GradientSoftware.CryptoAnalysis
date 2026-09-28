@@ -1,0 +1,59 @@
+{
+  "title": "Downswings and their interims",
+  "description": "Price tops on the first candle (68,772) and falls to 64,496, so level 1 holds two downswings. The first (low 66,484, bounce to 67,158, break on 13 Apr 01:00) has one interim, a downswing on the way down to its break. The second (low 65,906, bounce to 67,688, break at 64,866) has an interim upswing in its long bounce, with level-3 interims of its own, and a downswing in the drop to its break.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "depth": 2,
+  "expected": [
+    {
+      "level": 1,
+      "direction": "Down",
+      "start": "2024-04-12T18:00:00Z",
+      "break": "2024-04-13T01:00:00Z",
+      "parent": null
+    },
+    {
+      "level": 2,
+      "direction": "Down",
+      "start": "2024-04-12T21:00:00Z",
+      "break": "2024-04-13T00:00:00Z",
+      "parent": "2024-04-12T18:00:00Z"
+    },
+    {
+      "level": 1,
+      "direction": "Down",
+      "start": "2024-04-13T01:00:00Z",
+      "break": "2024-04-13T19:00:00Z",
+      "parent": null
+    },
+    {
+      "level": 2,
+      "direction": "Up",
+      "start": "2024-04-13T04:00:00Z",
+      "break": "2024-04-13T15:00:00Z",
+      "parent": "2024-04-13T01:00:00Z"
+    },
+    {
+      "level": 3,
+      "direction": "Down",
+      "start": "2024-04-13T05:00:00Z",
+      "break": "2024-04-13T08:00:00Z",
+      "parent": "2024-04-13T04:00:00Z"
+    },
+    {
+      "level": 3,
+      "direction": "Up",
+      "start": "2024-04-13T10:00:00Z",
+      "break": "2024-04-13T12:00:00Z",
+      "parent": "2024-04-13T04:00:00Z"
+    },
+    {
+      "level": 2,
+      "direction": "Down",
+      "start": "2024-04-13T17:00:00Z",
+      "break": "2024-04-13T19:00:00Z",
+      "parent": "2024-04-13T01:00:00Z"
+    }
+  ]
+}

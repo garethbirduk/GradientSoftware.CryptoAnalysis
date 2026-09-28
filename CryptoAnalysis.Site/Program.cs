@@ -48,20 +48,7 @@ var examples = TermExampleLibrary.Discover(examplesRoot).Select(file =>
         Matches = detected.SequenceEqual(example.Expected),
         Expected = example.Expected,
         Annotations = annotations,
-        Swings = TermAnnotations.Swings(prices, example.CloseType, example.Level),
-        SwingsByLevel = SwingsByLevel(prices),
-        MarketStructureBreaks = TermAnnotations.MarketStructureBreaks(prices, example.CloseType),
-        CandleRuns = CandleRuns.Runs(prices, minLength: 2),
-        Sawtooth = Sawtooth.Levels(prices, EnumPriceBasis.Close, maxLevel: 8)
-            .Select(level => level.Pivots.Select(p => new { p.Kind, p.Time, p.Price })),
-        Prices = new
-        {
-            T = prices.Select(p => p.DateTime),
-            O = prices.Select(p => p.Open),
-            H = prices.Select(p => p.High),
-            L = prices.Select(p => p.Low),
-            C = prices.Select(p => p.Close),
-        },
+        Structure = StructureOf(prices),
     };
 }).ToList();
 
@@ -81,21 +68,8 @@ object SawtoothExample(string id, string title, string description, List<Price> 
     Description = description,
     Level = 1,
     Annotations = TermAnnotations.Annotate(prices, EnumCloseType.Close),
-    MarketStructureBreaks = TermAnnotations.MarketStructureBreaks(prices, EnumCloseType.Close),
-    CandleRuns = CandleRuns.Runs(prices, minLength: 2),
-    Swings = Array.Empty<object>(),
-    SwingsByLevel = SwingsByLevel(prices),
     Expected = Array.Empty<object>(),
-    Sawtooth = Sawtooth.Levels(prices, EnumPriceBasis.Close, maxLevel: 8)
-        .Select(level => level.Pivots.Select(p => new { p.Kind, p.Time, p.Price })),
-    Prices = new
-    {
-        T = prices.Select(p => p.DateTime),
-        O = prices.Select(p => p.Open),
-        H = prices.Select(p => p.High),
-        L = prices.Select(p => p.Low),
-        C = prices.Select(p => p.Close),
-    },
+    Structure = StructureOf(prices),
 };
 
 var fullPath = Path.Combine(repoRoot, "CryptoAnalysis.Test", "TestData", "PricesExtensionsData", "COINBASE_BTCUSD, 60", "COINBASE_BTCUSD, 60.csv");
@@ -134,7 +108,37 @@ var structure = new
     Examples = sawtoothExamples,
 };
 
-var data = new { Generated = DateTime.UtcNow, Terms = terms, Examples = examples, Structure = structure };
+var interimRoot = Path.GetFullPath(Path.Combine(examplesRoot, "..", "Structure", "InterimSwings"));
+var interimExamples = TermExampleLibrary.Discover(interimRoot).Select(file =>
+{
+    var example = file.LoadSidecar<InterimSwingExample>();
+    var prices = file.LoadPrices();
+    var detected = InterimSwings.Detect(prices, example);
+
+    return new
+    {
+        Id = $"InterimSwings/{file.Id}",
+        example.Title,
+        example.Description,
+        example.Reviewed,
+        example.CloseType,
+        example.Level,
+        example.Depth,
+        Matches = detected.SequenceEqual(example.Expected),
+        Expected = example.Expected,
+        Detected = detected,
+        Annotations = TermAnnotations.Annotate(prices, example.CloseType, example.Level),
+        Structure = StructureOf(prices),
+    };
+}).ToList();
+
+var interims = new
+{
+    Summary = docs.SummaryOfMethod(typeof(Sawtooth), nameof(Sawtooth.Interims)),
+    Examples = interimExamples,
+};
+
+var data = new { Generated = DateTime.UtcNow, Terms = terms, Examples = examples, Structure = structure, Interims = interims };
 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions(TermAnnotations.JsonOptions) { WriteIndented = false });
 File.WriteAllText(Path.Combine(outDir, "data.js"), $"window.SITE_DATA = {json};\n");
 
@@ -142,10 +146,40 @@ var mismatched = examples.Count(x => !x.Matches);
 Console.WriteLine($"{terms.Count} terms, {examples.Count} examples ({mismatched} mismatched) -> {Path.Combine(outDir, "index.html")}");
 return 0;
 
-static List<List<SwingOutline>> SwingsByLevel(List<Price> prices)
+// The sawtooth levels, each level's swings (with the indexes of their interims in the next level's list) and each level's
+// market structure breaks, plus the candles, for the page to draw at whichever level is shown.
+static object StructureOf(List<Price> prices)
 {
     var levels = Sawtooth.Levels(prices, EnumPriceBasis.Close, maxLevel: 8);
-    return Enumerable.Range(0, levels.Count).Select(l => Sawtooth.Swings(prices, levels, EnumPriceBasis.Close, l)).ToList();
+    var swings = Enumerable.Range(0, levels.Count)
+        .Select(l => Sawtooth.Swings(prices, levels, EnumPriceBasis.Close, l).OrderBy(x => x.Start.Time).ToList())
+        .ToList();
+
+    return new
+    {
+        Sawtooth = levels.Select(level => level.Pivots.Select(p => new { p.Kind, p.Time, p.Price })),
+        SwingsByLevel = swings.Select((list, l) => list.Select(w => new
+        {
+            w.Level,
+            w.Direction,
+            w.Start,
+            w.End,
+            w.Extreme,
+            w.BreakOfStructure,
+            w.Confirmed,
+            Interims = l + 1 < swings.Count ? Sawtooth.Interims(w, swings[l + 1]).Select(x => swings[l + 1].IndexOf(x)).ToList() : [],
+        })),
+        MarketStructureBreaksByLevel = swings.Select(list => Sawtooth.MarketStructureBreaks(prices, list, EnumPriceBasis.Close)),
+        CandleRuns = CandleRuns.Runs(prices, minLength: 2),
+        Prices = new
+        {
+            T = prices.Select(p => p.DateTime),
+            O = prices.Select(p => p.Open),
+            H = prices.Select(p => p.High),
+            L = prices.Select(p => p.Low),
+            C = prices.Select(p => p.Close),
+        },
+    };
 }
 
 static string FindRepoRoot(string start)

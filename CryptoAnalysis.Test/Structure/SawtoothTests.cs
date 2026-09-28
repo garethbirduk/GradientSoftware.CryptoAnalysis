@@ -139,6 +139,49 @@ public class SawtoothTests
         Assert.AreEqual("Up:12>10>12.5", DescribeSwings(Closes(9, 12, 10, 12.5, 11, 14), 1).Split(' ')[0]);
     }
 
+    private static string DescribeBreaks(List<Price> prices, int level)
+    {
+        var levels = Sawtooth.Levels(prices, EnumPriceBasis.Close);
+        var swings = Sawtooth.Swings(prices, levels, EnumPriceBasis.Close, level);
+        return string.Join(" ", Sawtooth.MarketStructureBreaks(prices, swings, EnumPriceBasis.Close)
+            .Select(m => $"{(m.Type == EnumAnnotationType.BullishMarketStructureBreak ? "Bullish" : "Bearish")}:{m.Reference.Price}>{m.Break.Price}"));
+    }
+
+    [TestMethod]
+    public void MarketStructureBreak_InsideUpleg_DoesNotEndTheLeg()
+    {
+        Assert.AreEqual("Bearish:11>10.5", DescribeBreaks(Closes(10, 12, 11, 13, 10.5, 14), 1));
+    }
+
+    [TestMethod]
+    public void MarketStructureBreak_AfterTheHigh_BreaksTheLastPullbackLow()
+    {
+        Assert.AreEqual("Bearish:11>10.5", DescribeBreaks(Closes(10, 12, 11, 13, 12, 11.5, 10.5), 1));
+    }
+
+    [TestMethod]
+    public void MarketStructureBreak_InDownleg_BreaksTheBounceHigh()
+    {
+        Assert.AreEqual("Bullish:19>19.5", DescribeBreaks(Closes(20, 18, 19, 17, 18, 18.5, 19.5), 1));
+    }
+
+    [TestMethod]
+    public void MarketStructureBreak_NextBreakOfStructureReplacesTheProtectiveLevel()
+    {
+        Assert.AreEqual("", DescribeBreaks(Closes(10, 12, 11, 13, 12, 14, 12.5), 1));
+    }
+
+    [TestMethod]
+    public void SwingTree_PullbackDownswingsAreInterimsOfTheUpswing()
+    {
+        var prices = Closes(10, 20, 17, 18, 15, 16, 14, 21);
+        var levels = Sawtooth.Levels(prices, EnumPriceBasis.Close);
+        var tree = InterimSwings.Flatten(Sawtooth.SwingTree(prices, levels, EnumPriceBasis.Close, 1, 1));
+
+        Assert.AreEqual("1Up:1-7 2Down:2-4^1 2Down:4-6^1",
+            string.Join(" ", tree.Select(x => $"{x.Level}{x.Direction}:{x.Start.Hour}-{x.Break.Hour}{(x.Parent is DateTime p ? $"^{p.Hour}" : "")}")));
+    }
+
     public static IEnumerable<object[]> RealData()
     {
         var root = Path.Combine(AppContext.BaseDirectory, "TestData");

@@ -1,0 +1,40 @@
+{
+  "term": "Downswing",
+  "title": "Staircase",
+  "description": "A slide from 60,427 to 54,386 in five downswings: lows at 59,544, 58,540, 57,630, 57,219 and 57,042, each bounced from and then closed below. On 4 Jul 15:00 price closes at 58,100, above the bounce high of the third swing (57,900): a bullish market structure break. The next low still breaks lower, so the downswings continue.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Downswing",
+      "direction": "Down",
+      "time": "2024-07-03T20:00:00Z",
+      "price": 59543.93
+    },
+    {
+      "type": "Downswing",
+      "direction": "Down",
+      "time": "2024-07-04T01:00:00Z",
+      "price": 58540.29
+    },
+    {
+      "type": "Downswing",
+      "direction": "Down",
+      "time": "2024-07-04T08:00:00Z",
+      "price": 57630
+    },
+    {
+      "type": "Downswing",
+      "direction": "Down",
+      "time": "2024-07-04T12:00:00Z",
+      "price": 57218.86
+    },
+    {
+      "type": "Downswing",
+      "direction": "Down",
+      "time": "2024-07-04T23:00:00Z",
+      "price": 57042.14
+    }
+  ]
+}

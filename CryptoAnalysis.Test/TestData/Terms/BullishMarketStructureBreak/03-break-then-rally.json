@@ -1,16 +1,22 @@
 {
   "term": "BullishMarketStructureBreak",
   "title": "Signal and structure agree",
-  "description": "On 9 Apr 2023 18:00 the close of 28,044 breaks above the last lower high: a bullish market structure break. The very next candle is a bullish break of structure (28,165), so the signal and the structure agree within an hour. Three more breaks take price to 29.6k.",
+  "description": "On 9 Apr 2023 18:00 the close of 28,044 breaks above the last lower high: a bullish market structure break. The very next candle is a bullish break of structure (28,165), so the signal and the structure agree within an hour. Three more breaks take price to 29.6k. A second bullish market structure break follows on 10 Apr 15:00 (28,459), above the bounce high of the next downswing. The snippet ends at its high, so at level 1 it is one upleg holding only upswings; the downswings, and so these breaks, are at level 2.",
   "reviewed": false,
   "closeType": "Close",
-  "level": 1,
+  "level": 2,
   "expected": [
     {
       "type": "BullishMarketStructureBreak",
       "direction": "Up",
       "time": "2023-04-09T18:00:00Z",
       "price": 28043.74
+    },
+    {
+      "type": "BullishMarketStructureBreak",
+      "direction": "Up",
+      "time": "2023-04-10T15:00:00Z",
+      "price": 28459.05
     }
   ]
 }

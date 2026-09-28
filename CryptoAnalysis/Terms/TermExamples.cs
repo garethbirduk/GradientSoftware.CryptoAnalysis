@@ -34,11 +34,16 @@ public sealed class TermExample
 public sealed record TermExampleFile(string Id, string CsvPath, string JsonPath)
 {
     /// <summary>
-    /// Reads the sidecar.
+    /// Reads the sidecar as a term example.
     /// </summary>
-    public TermExample LoadExample()
+    public TermExample LoadExample() => LoadSidecar<TermExample>();
+
+    /// <summary>
+    /// Reads the sidecar as the given example type.
+    /// </summary>
+    public T LoadSidecar<T>()
     {
-        return JsonSerializer.Deserialize<TermExample>(File.ReadAllText(JsonPath), TermAnnotations.JsonOptions)
+        return JsonSerializer.Deserialize<T>(File.ReadAllText(JsonPath), TermAnnotations.JsonOptions)
             ?? throw new InvalidDataException($"Empty example sidecar: {JsonPath}");
     }
 

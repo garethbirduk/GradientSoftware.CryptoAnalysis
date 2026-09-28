@@ -1,0 +1,34 @@
+{
+  "term": "Upswing",
+  "title": "Staircase",
+  "description": "Four upswings as price steps from 64,663 to 67,712: highs at 66,442, 66,940, 67,313 and 67,438, each pulled back from and then closed above. The third and fourth pullbacks dip below the previous pullback low (bearish market structure breaks at 6 Mar 12:00 and 7 Mar 03:00), but they are still upswings: a lower low inside an upleg is not a downswing.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Upswing",
+      "direction": "Up",
+      "time": "2024-03-06T05:00:00Z",
+      "price": 66442.11
+    },
+    {
+      "type": "Upswing",
+      "direction": "Up",
+      "time": "2024-03-06T08:00:00Z",
+      "price": 66940.04
+    },
+    {
+      "type": "Upswing",
+      "direction": "Up",
+      "time": "2024-03-06T11:00:00Z",
+      "price": 67312.8
+    },
+    {
+      "type": "Upswing",
+      "direction": "Up",
+      "time": "2024-03-06T17:00:00Z",
+      "price": 67437.83
+    }
+  ]
+}

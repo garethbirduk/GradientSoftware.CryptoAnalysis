@@ -17,23 +17,26 @@ public sealed record TermAnnotation(EnumAnnotationType Type, EnumSwingDirection 
 public sealed record PricePoint(DateTime Time, double Price);
 
 /// <summary>
-/// The geometry of one detected swing, enough to draw it and the levels its breaks are measured against.
-/// Start is the swing's first price (the HH or LL); End is the break candle, or the last price if the swing never broke.
-/// A swing is only confirmed once it has a break of structure; until then its extreme (HL or LH) is not final.
-/// Start's price is also the level the break of structure crosses.
-/// MsbReference is the previous swing's protective point (its HL or LH), which the market structure break crosses.
+/// The geometry of one detected swing at a sawtooth level, enough to draw it and the levels its breaks are measured against.
+/// Start is the swing's first price (the high an upswing pulls back from, the low a downswing bounces from); End is the break candle.
+/// A swing is only confirmed once it has a break of structure; until then its extreme (the pullback low or bounce high) is not final.
+/// Start's price is the level the break of structure crosses, and Extreme's price the protective level a market structure break crosses.
 /// </summary>
 public sealed record SwingOutline(
+    int Level,
     EnumSwingDirection Direction,
     PricePoint Start,
     PricePoint End,
     PricePoint Extreme,
-    PricePoint? BreakOfStructure,
-    PricePoint? MarketStructureBreak,
-    PricePoint? MsbReference)
+    PricePoint? BreakOfStructure)
 {
     public bool Confirmed => BreakOfStructure != null;
 }
+
+/// <summary>
+/// A swing and its interim swings: the swings one level finer that start inside it, each with its own interims.
+/// </summary>
+public sealed record SwingNode(SwingOutline Swing, IReadOnlyList<SwingNode> Interims);
 
 /// <summary>
 /// A market structure break and the level it broke: Reference is the protective high or low, Break the close beyond it.
@@ -54,19 +57,26 @@ public static class TermAnnotations
     };
 
     /// <summary>
-    /// Returns the structure points (HH, HL, LH, LL) and breaks of structure from the sawtooth at the given level,
-    /// plus market structure breaks from the old swing detectors. An upswing's MSB is a bearish break, a downswing's a bullish one.
+    /// Returns the structure points (HH, HL, LH, LL), swings, breaks of structure and market structure breaks from the
+    /// sawtooth at the given level, plus candle runs. A swing is asserted at its start. An upswing's MSB is a bearish break,
+    /// a downswing's a bullish one.
     /// </summary>
     public static List<TermAnnotation> Annotate(List<Price> prices, EnumCloseType closeType, int level = 1)
     {
         var annotations = StructurePoints(prices, closeType, level);
+        var swings = Swings(prices, closeType, level);
 
-        annotations.AddRange(Swings(prices, closeType, level)
+        annotations.AddRange(swings
+            .Select(x => new TermAnnotation(
+                x.Direction == EnumSwingDirection.Up ? EnumAnnotationType.Upswing : EnumAnnotationType.Downswing,
+                x.Direction, x.Start.Time, x.Start.Price)));
+
+        annotations.AddRange(swings
             .Select(x => new TermAnnotation(
                 x.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BullishBreakOfStructure : EnumAnnotationType.BearishBreakOfStructure,
                 x.Direction, x.BreakOfStructure!.Time, x.BreakOfStructure.Price)));
 
-        annotations.AddRange(MarketStructureBreaks(prices, closeType)
+        annotations.AddRange(MarketStructureBreaks(prices, closeType, level)
             .Select(x => new TermAnnotation(x.Type,
                 x.Type == EnumAnnotationType.BullishMarketStructureBreak ? EnumSwingDirection.Up : EnumSwingDirection.Down,
                 x.Break.Time, x.Break.Price)));
@@ -85,27 +95,13 @@ public static class TermAnnotations
     }
 
     /// <summary>
-    /// Returns each market structure break with the level it broke, from the old swing detectors: a bearish break closes below
-    /// the previous upswing's low, a bullish break above the previous downswing's high.
+    /// Returns each market structure break at a sawtooth level with the protective level it broke: a bearish break is the
+    /// first price below an upswing's pullback low, a bullish break the first price above a downswing's bounce high.
     /// </summary>
-    public static List<MarketStructureBreakOutline> MarketStructureBreaks(List<Price> prices, EnumCloseType closeType)
+    public static List<MarketStructureBreakOutline> MarketStructureBreaks(List<Price> prices, EnumCloseType closeType, int level)
     {
-        PricePoint Point(Price price) => new(price.DateTime, price.CloseValue(closeType));
-        var breaks = new List<MarketStructureBreakOutline>();
-
-        foreach (var upswing in prices.ToUpswings(closeType, trimStart: true))
-        {
-            if (upswing.MarketStructureBreak is Price broken && upswing.PreviousUpswing?.SwingLow(closeType) is Price reference)
-                breaks.Add(new(EnumAnnotationType.BearishMarketStructureBreak, Point(reference), Point(broken)));
-        }
-
-        foreach (var downswing in prices.ToDownswings(closeType, trimStart: true))
-        {
-            if (downswing.MarketStructureBreak is Price broken && downswing.PreviousDownswing?.SwingHigh(closeType) is Price reference)
-                breaks.Add(new(EnumAnnotationType.BullishMarketStructureBreak, Point(reference), Point(broken)));
-        }
-
-        return breaks.OrderBy(x => x.Break.Time).ToList();
+        var basis = Basis(closeType);
+        return Sawtooth.MarketStructureBreaks(prices, Swings(prices, closeType, level), basis);
     }
 
     /// <summary>
@@ -113,10 +109,22 @@ public static class TermAnnotations
     /// </summary>
     public static List<SwingOutline> Swings(List<Price> prices, EnumCloseType closeType, int level)
     {
-        var basis = closeType == EnumCloseType.Close ? EnumPriceBasis.Close : EnumPriceBasis.Wick;
+        var basis = Basis(closeType);
         var levels = Sawtooth.Levels(prices, basis, level);
         return Sawtooth.Swings(prices, levels, basis, level).OrderBy(x => x.Start.Time).ToList();
     }
+
+    /// <summary>
+    /// Returns the confirmed swings at a sawtooth level, each with its interim swings down to depth levels finer.
+    /// </summary>
+    public static List<SwingNode> SwingTree(List<Price> prices, EnumCloseType closeType, int level, int depth)
+    {
+        var basis = Basis(closeType);
+        var levels = Sawtooth.Levels(prices, basis, level + depth);
+        return Sawtooth.SwingTree(prices, levels, basis, level, depth);
+    }
+
+    private static EnumPriceBasis Basis(EnumCloseType closeType) => closeType == EnumCloseType.Close ? EnumPriceBasis.Close : EnumPriceBasis.Wick;
 
     /// <summary>
     /// Classifies each pivot of a sawtooth level against the previous pivot of the same kind:
@@ -126,7 +134,7 @@ public static class TermAnnotations
     /// </summary>
     public static List<TermAnnotation> StructurePoints(List<Price> prices, EnumCloseType closeType, int level)
     {
-        var basis = closeType == EnumCloseType.Close ? EnumPriceBasis.Close : EnumPriceBasis.Wick;
+        var basis = Basis(closeType);
         var levels = Sawtooth.Levels(prices, basis, level);
         var pivots = levels.Count == 0 ? [] : levels[Math.Min(level, levels.Count - 1)].Pivots;
 

@@ -96,13 +96,12 @@ public static class Sawtooth
                     {
                         var breakPoint = new PricePoint(prices[c].DateTime, value);
                         swings.Add(new SwingOutline(
+                            level,
                             up ? EnumSwingDirection.Up : EnumSwingDirection.Down,
                             new PricePoint(start.Time, start.Price),
                             breakPoint,
                             new PricePoint(counter.Time, counter.Price),
-                            breakPoint,
-                            null,
-                            null));
+                            breakPoint));
                         break;
                     }
                 }
@@ -110,6 +109,78 @@ public static class Sawtooth
         }
 
         return swings;
+    }
+
+    /// <summary>
+    /// Returns the swings one level finer that start inside a swing, before its break of structure: in an upswing, the
+    /// downswings of its pullback and the upswings of the climb back to the break; in a downswing the mirror.
+    /// </summary>
+    public static List<SwingOutline> Interims(SwingOutline swing, IEnumerable<SwingOutline> finer)
+    {
+        return finer
+            .Where(x => x.Level == swing.Level + 1 && x.Start.Time >= swing.Start.Time && x.Start.Time < swing.End.Time)
+            .OrderBy(x => x.Start.Time)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Returns the confirmed swings at a level, each with its interim swings, recursively down to depth levels finer.
+    /// </summary>
+    public static List<SwingNode> SwingTree(List<Price> prices, IReadOnlyList<SawtoothLevel> levels, EnumPriceBasis basis, int level, int depth)
+    {
+        var byLevel = Enumerable.Range(level, depth + 1)
+            .Select(l => Swings(prices, levels, basis, l).OrderBy(x => x.Start.Time).ToList())
+            .ToList();
+
+        List<SwingNode> Nodes(IEnumerable<SwingOutline> swings, int d) => swings
+            .Select(x => new SwingNode(x, d < depth ? Nodes(Interims(x, byLevel[d + 1]), d + 1) : []))
+            .ToList();
+
+        return Nodes(byLevel[0], 0);
+    }
+
+    /// <summary>
+    /// Returns the market structure breaks for a level's swings. From its break of structure on, each swing's extreme is its
+    /// protective level: the first price beyond it (below an upswing's pullback low, above a downswing's bounce high) is a
+    /// market structure break. The protective level lasts until the next swing in the same direction breaks structure and
+    /// replaces it, and breaks at most once. A market structure break does not end the swing.
+    /// </summary>
+    public static List<MarketStructureBreakOutline> MarketStructureBreaks(List<Price> prices, IReadOnlyList<SwingOutline> swings, EnumPriceBasis basis)
+    {
+        var index = new Dictionary<DateTime, int>();
+        for (var i = 0; i < prices.Count; i++)
+            index.TryAdd(prices[i].DateTime, i);
+
+        var breaks = new List<MarketStructureBreakOutline>();
+        foreach (var direction in new[] { EnumSwingDirection.Up, EnumSwingDirection.Down })
+        {
+            var up = direction == EnumSwingDirection.Up;
+            var confirmed = swings.Where(x => x.Direction == direction && x.BreakOfStructure != null)
+                .OrderBy(x => x.BreakOfStructure!.Time)
+                .ToList();
+
+            for (var s = 0; s < confirmed.Count; s++)
+            {
+                var swing = confirmed[s];
+                var from = index[swing.BreakOfStructure!.Time] + 1;
+                var to = s + 1 < confirmed.Count ? index[confirmed[s + 1].BreakOfStructure!.Time] - 1 : prices.Count - 1;
+
+                for (var c = from; c <= to; c++)
+                {
+                    var value = up ? LowOf(prices[c], basis) : HighOf(prices[c], basis);
+                    if (up ? value < swing.Extreme.Price : value > swing.Extreme.Price)
+                    {
+                        breaks.Add(new MarketStructureBreakOutline(
+                            up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak,
+                            swing.Extreme,
+                            new PricePoint(prices[c].DateTime, value)));
+                        break;
+                    }
+                }
+            }
+        }
+
+        return breaks.OrderBy(x => x.Break.Time).ThenBy(x => x.Type).ToList();
     }
 
     private static double HighOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.High : price.Close;

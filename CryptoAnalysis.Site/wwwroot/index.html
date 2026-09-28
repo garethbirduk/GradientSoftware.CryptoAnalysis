@@ -26,38 +26,52 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
-  nav { border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-  nav h1 { font-size: 15px; margin: 0 0 16px; }
-  nav h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 6px; }
-  nav a { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--text); text-decoration: none; }
-  nav a:hover { background: var(--chip); }
-  nav a.active { background: var(--chip); color: var(--accent); font-weight: 600; }
-  nav .count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-  nav .foot { margin-top: 24px; font-size: 12px; color: var(--muted); }
-  main { padding: 28px 32px 64px; max-width: 1200px; min-width: 0; }
+  .topnav { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+    padding: 8px 20px; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .topnav h1 { font-size: 15px; margin: 0 14px 0 0; white-space: nowrap; }
+  .menu { position: relative; }
+  .menu > button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid transparent; background: none; color: var(--text);
+    border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .menu > button::after { content: ''; border: 4px solid transparent; border-top-color: currentColor; margin-top: 4px; opacity: .6; }
+  .menu > button:hover, .menu.open > button { background: var(--chip); }
+  .menu > button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .menu.active > button { color: var(--accent); font-weight: 600; }
+  .dropdown { display: none; position: absolute; top: 100%; left: 0; min-width: 250px; padding: 6px; margin-top: 2px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); }
+  .menu.open .dropdown { display: block; }
+  @media (hover: hover) { .menu:hover .dropdown { display: block; } }
+  .dropdown a { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px; color: var(--text); text-decoration: none; }
+  .dropdown a:hover, .dropdown a:focus-visible { background: var(--chip); outline: none; }
+  .dropdown a.active { color: var(--accent); font-weight: 600; }
+  .dropdown .count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .topnav .foot { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .layout { display: grid; grid-template-columns: 230px 1fr; min-height: calc(100vh - var(--nav-h, 50px)); }
+  aside { border-right: 1px solid var(--border); padding: 14px 12px 24px; position: sticky; top: var(--nav-h, 50px);
+    height: calc(100vh - var(--nav-h, 50px)); overflow-y: auto; }
+  main { padding: 24px 32px 64px; max-width: 1200px; min-width: 0; }
   .term-head h2 { margin: 0; font-size: 26px; }
   .term-head .label { font-family: ui-monospace, Consolas, monospace; font-size: 14px; color: var(--muted); margin-left: 8px; }
   .term-head p { margin: 8px 0 0; max-width: 72ch; }
   .term-head .remarks { color: var(--muted); font-size: 14px; }
   code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
-  .layerbar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px;
-    margin: -28px -32px 20px; padding: 10px 32px; background: var(--bg); border-bottom: 1px solid var(--border); }
-  .layerbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 6px; }
-  .layerbar .section { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; }
-  .layerbar .lead { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; margin-right: 2px; }
-  .layer { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: none; color: var(--text);
-    border-radius: 6px; padding: 3px 7px; font: inherit; font-size: 13px; cursor: pointer; }
+  .layerbar .section + .section { margin-top: 12px; }
+  .layerbar .lead { color: var(--muted); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 3px 7px; }
+  .layerbar .items { display: flex; flex-direction: column; align-items: stretch; }
+  .layerbar .items.levels { flex-direction: row; flex-wrap: wrap; gap: 2px; }
+  .layerbar .item { display: flex; align-items: center; }
+  .layerbar .item .layer { flex: 1; }
+  .layer { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; background: none; color: var(--text);
+    border-radius: 6px; padding: 3px 7px; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+  .layer svg { min-width: 22px; }
   .layer:hover { background: var(--chip); }
   .layer:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .layer[aria-pressed="false"] { opacity: .38; }
   .layer[aria-pressed="false"] .name { text-decoration: line-through; }
   .layer svg { flex: none; }
   .layer.text { color: var(--muted); font-size: 12px; }
-  .runmin { width: 3.4em; margin: 0 6px 0 -2px; padding: 1px 2px; font: inherit; font-size: 12px; color: var(--text);
+  .runmin { width: 3.4em; margin: 0 0 0 4px; padding: 1px 2px; font: inherit; font-size: 12px; color: var(--text);
     background: var(--panel); border: 1px solid var(--border); border-radius: 4px; }
   .runmin:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  @media (max-width: 800px) { .layerbar { margin: -20px -16px 16px; padding: 8px 16px; } }
   .example { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-top: 18px; }
   .example header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
   .example h3 { margin: 0; font-size: 17px; }
@@ -78,34 +92,46 @@
   tr.pick.selected td { background: var(--chip); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 600; }
   .empty { margin-top: 24px; padding: 20px; border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); }
   @media (max-width: 800px) {
+    .topnav { padding: 8px 16px; }
+    .topnav .foot { display: none; }
+    .dropdown { position: fixed; left: 16px; right: 16px; top: var(--nav-h, 50px); min-width: 0; }
     .layout { grid-template-columns: 1fr; }
-    nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+    aside { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 12px 16px; }
+    .layerbar { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+    .layerbar .section + .section { margin-top: 0; }
+    .layerbar .items { flex-direction: row; flex-wrap: wrap; }
     main { padding: 20px 16px 48px; }
     .chart { height: 360px; }
   }
 </style>
 </head>
 <body>
+<nav class="topnav" id="nav" aria-label="Pages"></nav>
 <div class="layout">
-  <nav id="nav"></nav>
+  <aside id="layers" aria-label="Chart layers"></aside>
   <main id="main"></main>
 </div>
 <script>
 const DATA = window.SITE_DATA || { terms: [], examples: [] };
+// Each example carries its sawtooth, swings, breaks and candles in a structure block; lift them onto the example.
+for (const ex of [...DATA.examples, ...(DATA.structure?.examples ?? []), ...(DATA.interims?.examples ?? [])]) Object.assign(ex, ex.structure);
 const TERMS = new Map(DATA.terms.map(t => [t.type, t]));
 const ARROW = { Up: '↑', Down: '↓' };
-const STORE_KEY = 'terms-site:v5';
+const STORE_KEY = 'terms-site:v6';
 const LEVELS = 9;
 const POINT_TYPES = { HH: 'HigherHigh', HL: 'HigherLow', LH: 'LowerHigh', LL: 'LowerLow' };
-const SWINGS = { Up: { name: 'Upswings', color: '--upswing' }, Down: { name: 'Downswings', color: '--downswing' } };
+const SWINGS = { Up: { name: 'Upswings', layer: 'Upswing', color: '--upswing' }, Down: { name: 'Downswings', layer: 'Downswing', color: '--downswing' } };
+const SWING_DIRECTION = { Upswing: 'Up', Downswing: 'Down' };
+const STRUCTURE_PAGES = ['Sawtooth', 'InterimSwings'];
 
 // Every layer a chart can show, grouped into sections that appear in the same order on every page.
 const SECTIONS = [
   { name: 'Price', layers: [{ id: 'price', label: 'Candles' }, { id: 'close', label: 'Closes' }] },
   { name: 'Candles', layers: [{ id: 'SuccessiveGreenCandles', label: 'Green runs' }, { id: 'SuccessiveRedCandles', label: 'Red runs' }] },
   { name: 'Points', layers: ['HigherHigh', 'LowerHigh', 'LowerLow', 'HigherLow'].map(id => ({ id })) },
-  { name: 'Upswings', layers: [{ id: 'Up', label: 'Upswing' }, { id: 'BullishBreakOfStructure' }, { id: 'bosLevelUp', label: 'BoS level', term: 'BullishBreakOfStructure' }] },
-  { name: 'Downswings', layers: [{ id: 'Down', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' }] },
+  { name: 'Upswings', layers: [{ id: 'Upswing', label: 'Upswing' }, { id: 'BullishBreakOfStructure' }, { id: 'bosLevelUp', label: 'BoS level', term: 'BullishBreakOfStructure' }] },
+  { name: 'Downswings', layers: [{ id: 'Downswing', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' }] },
+  { name: 'Interims', layers: [{ id: 'interims', label: 'Interim swings' }] },
   { name: 'Sawtooth', levels: true, layers: Array.from({ length: LEVELS }, (_, l) => ({ id: `level${l}`, label: `${l}`, level: l })) },
   { name: 'Indicators', layers: [{ id: 'BullishMarketStructureBreak' }, { id: 'msbLevelUp', label: 'MSB↑ level', term: 'BullishMarketStructureBreak' },
     { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' }] },
@@ -116,11 +142,14 @@ const POINT_LAYERS = ['HigherHigh', 'HigherLow', 'LowerHigh', 'LowerLow'];
 
 // What a page shows before its buttons are touched: candles plus the page's own layers.
 const PAGE_DEFAULTS = {
-  BullishBreakOfStructure: ['price', 'Up', 'BullishBreakOfStructure', 'bosLevelUp'],
-  BearishBreakOfStructure: ['price', 'Down', 'BearishBreakOfStructure', 'bosLevelDown'],
+  Upswing: ['price', 'Upswing', 'BullishBreakOfStructure'],
+  Downswing: ['price', 'Downswing', 'BearishBreakOfStructure'],
+  BullishBreakOfStructure: ['price', 'Upswing', 'BullishBreakOfStructure', 'bosLevelUp'],
+  BearishBreakOfStructure: ['price', 'Downswing', 'BearishBreakOfStructure', 'bosLevelDown'],
   BullishMarketStructureBreak: ['price', 'BullishMarketStructureBreak', 'msbLevelUp'],
   BearishMarketStructureBreak: ['price', 'BearishMarketStructureBreak', 'msbLevelDown'],
   Sawtooth: ['price', 'level0', 'level1'],
+  InterimSwings: ['price', 'Upswing', 'Downswing', 'interims'],
 };
 const defaultsFor = page => PAGE_DEFAULTS[page] ?? ['price', page];
 
@@ -142,22 +171,58 @@ const levelColor = l => css(l === 0 ? '--saw' : `--lv${Math.min(l, 8)}`);
 
 function examplesFor(type) { return DATA.examples.filter(e => e.term === type); }
 
-function renderNav(active) {
-  const byCat = new Map();
-  for (const t of DATA.terms) (byCat.get(t.category) ?? byCat.set(t.category, []).get(t.category)).push(t);
-  let html = '<h1>Market structure terms</h1>';
-  const structureCount = DATA.structure?.examples?.length ?? 0;
-  html += `<h2>Structure</h2><a href="#Sawtooth" class="${active === 'Sawtooth' ? 'active' : ''}"><span>Sawtooth levels</span><span class="count">${structureCount || ''}</span></a>`;
-  for (const [cat, terms] of byCat) {
-    html += `<h2>${esc(cat)}</h2>`;
-    for (const t of terms) {
-      const n = examplesFor(t.type).length;
-      html += `<a href="#${t.type}" class="${t.type === active ? 'active' : ''}"><span>${esc(t.name)}</span><span class="count">${n || ''}</span></a>`;
-    }
-  }
-  html += `<div class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC · ${DATA.examples.length} examples</div>`;
-  document.getElementById('nav').innerHTML = html;
+// Pages grouped into the top bar's menus: the structure pages, then one menu per term category.
+function navGroups() {
+  const groups = new Map([['Structure', [
+    { id: 'Sawtooth', name: 'Sawtooth levels', count: DATA.structure?.examples?.length ?? 0 },
+    { id: 'InterimSwings', name: 'Interim swings', count: DATA.interims?.examples?.length ?? 0 },
+  ]]]);
+  for (const t of DATA.terms)
+    (groups.get(t.category) ?? groups.set(t.category, []).get(t.category)).push({ id: t.type, name: t.name, count: examplesFor(t.type).length });
+  return groups;
 }
+
+function renderNav(active) {
+  const menu = ([name, pages], i) => {
+    const current = pages.some(p => p.id === active);
+    return `<div class="menu${current ? ' active' : ''}">
+      <button type="button" aria-expanded="false" aria-controls="menu-${i}">${esc(name)}</button>
+      <div class="dropdown" id="menu-${i}">${pages.map(p =>
+        `<a href="#${p.id}" class="${p.id === active ? 'active' : ''}"${p.id === active ? ' aria-current="page"' : ''}><span>${esc(p.name)}</span><span class="count">${p.count || ''}</span></a>`).join('')}</div>
+    </div>`;
+  };
+  const nav = document.getElementById('nav');
+  nav.innerHTML = `<h1>Market structure terms</h1>${[...navGroups()].map(menu).join('')}
+    <span class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC · ${DATA.examples.length} examples</span>`;
+
+  nav.querySelectorAll('.menu > button').forEach(b => b.addEventListener('click', () => {
+    const open = !b.parentElement.classList.contains('open');
+    closeMenus();
+    b.parentElement.classList.toggle('open', open);
+    b.setAttribute('aria-expanded', open);
+    if (open) b.parentElement.querySelector('a')?.focus();
+  }));
+  document.documentElement.style.setProperty('--nav-h', `${nav.offsetHeight}px`);
+}
+
+function closeMenus() {
+  document.querySelectorAll('.menu.open').forEach(m => {
+    m.classList.remove('open');
+    m.querySelector('button').setAttribute('aria-expanded', 'false');
+  });
+}
+
+document.addEventListener('click', e => { if (!e.target.closest('.menu')) closeMenus(); });
+document.addEventListener('keydown', e => {
+  const menu = e.target.closest?.('.menu');
+  if (e.key === 'Escape' && menu) { closeMenus(); menu.querySelector('button').focus(); return; }
+  if (!menu || !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
+  const links = [...menu.querySelectorAll('a')];
+  if (!menu.classList.contains('open')) menu.querySelector('button').click();
+  else links[(links.indexOf(e.target) + (e.key === 'ArrowDown' ? 1 : links.length - 1)) % links.length]?.focus();
+  e.preventDefault();
+});
+window.addEventListener('resize', () => document.documentElement.style.setProperty('--nav-h', `${document.getElementById('nav').offsetHeight}px`));
 
 function markerSvg(symbol, color) {
   const shapes = {
@@ -179,7 +244,9 @@ function swatch(layer) {
     <line x1="15" y1="2" x2="15" y2="12" stroke="${css('--down')}"/><rect x="12.5" y="5" width="5" height="5" fill="${css('--down')}"/>`);
   if (layer.id === 'close') return svg(`<path d="M1 10 L7 5 L13 8 L21 3" fill="none" stroke="${css('--close')}" stroke-width="1.5"/>`);
   if (layer.level !== undefined) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${levelColor(layer.level)}" stroke-width="3"/><circle cx="11" cy="7" r="3" fill="${levelColor(layer.level)}"/>`);
-  if (SWINGS[layer.id]) { const c = css(SWINGS[layer.id].color); return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(c, 0.15)}" stroke="${c}"/>`); }
+  if (SWING_DIRECTION[layer.id]) { const c = css(SWINGS[SWING_DIRECTION[layer.id]].color); return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(c, 0.15)}" stroke="${c}"/>`); }
+  if (layer.id === 'interims') return svg(`<rect x="1" y="1" width="20" height="12" fill="none" stroke="${css('--muted')}"/>
+    <rect x="4" y="4" width="6" height="6" fill="none" stroke="${css('--downswing')}" stroke-dasharray="2 1.5"/><rect x="12" y="4" width="6" height="6" fill="none" stroke="${css('--upswing')}" stroke-dasharray="2 1.5"/>`);
   if (layer.id.startsWith('Successive')) { const c = TERMS.get(layer.id)?.color, up = layer.id.includes('Green'); const [y1, y2] = up ? [12, 2] : [2, 12];
     return svg(`<line x1="2" y1="${y1}" x2="18" y2="${y2}" stroke="${c}" stroke-width="2"/><path d="M${up ? '13 2 L19 1 L17 7' : '13 12 L19 13 L17 7'}" fill="none" stroke="${c}" stroke-width="2"/>`); }
   if (layer.id.startsWith('msbLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="1.5 2.5"/>`);
@@ -195,26 +262,34 @@ function layerBar() {
   const runInput = l => l.id.startsWith('Successive')
     ? `<input class="runmin" type="number" min="2" max="99" step="1" value="${runMin(l.id)}" data-run="${l.id}" title="Minimum run length" aria-label="Minimum ${esc(l.label.toLowerCase())} length">`
     : '';
-  const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>${runInput(l)}`;
-  const section = s => `<div class="section" role="group" aria-label="${esc(s.name)}"><span class="lead">${esc(s.name)}</span>
-    ${s.levels ? '<button class="layer text" data-levels="none">None</button>' : ''}${s.layers.map(button).join('')}${s.levels ? '<button class="layer text" data-levels="all">All</button>' : ''}</div>`;
-  return `<div class="layerbar" role="toolbar" aria-label="Chart layers">${SECTIONS.map(section).join('<span class="sep"></span>')}</div>`;
+  const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>`;
+  const items = s => s.levels
+    ? `<div class="items levels"><button class="layer text" data-levels="none">None</button>${s.layers.map(button).join('')}<button class="layer text" data-levels="all">All</button></div>`
+    : `<div class="items">${s.layers.map(l => `<div class="item">${button(l)}${runInput(l)}</div>`).join('')}</div>`;
+  const section = s => `<div class="section" role="group" aria-label="${esc(s.name)}"><div class="lead">${esc(s.name)}</div>${items(s)}</div>`;
+  return `<div class="layerbar" role="toolbar" aria-orientation="vertical" aria-label="Chart layers">${SECTIONS.map(section).join('')}</div>`;
 }
 
-function wireLayerBar(main) {
+function renderLayers() {
+  const aside = document.getElementById('layers');
+  aside.innerHTML = layerBar();
+  wireLayerBar(aside);
+}
+
+function wireLayerBar(root) {
   const sync = layers => {
     setLayers(layers);
-    main.querySelectorAll('.layer[data-layer]').forEach(b => b.setAttribute('aria-pressed', on(b.dataset.layer)));
+    root.querySelectorAll('.layer[data-layer]').forEach(b => b.setAttribute('aria-pressed', on(b.dataset.layer)));
     drawAll(currentPage);
   };
-  main.querySelectorAll('.layer[data-layer]').forEach(b => b.addEventListener('click', () => {
+  root.querySelectorAll('.layer[data-layer]').forEach(b => b.addEventListener('click', () => {
     const id = b.dataset.layer, layers = layersOf(currentPage);
     sync(on(id) ? layers.filter(x => x !== id) : [...layers, id]);
   }));
-  main.querySelectorAll('.layer[data-levels]').forEach(b => b.addEventListener('click', () => {
+  root.querySelectorAll('.layer[data-levels]').forEach(b => b.addEventListener('click', () => {
     sync([...layersOf(currentPage).filter(x => !LEVEL_IDS.includes(x)), ...(b.dataset.levels === 'all' ? LEVEL_IDS : [])]);
   }));
-  main.querySelectorAll('.runmin').forEach(input => input.addEventListener('input', () => {
+  root.querySelectorAll('.runmin').forEach(input => input.addEventListener('input', () => {
     const value = Math.round(Number(input.value));
     if (!Number.isFinite(value) || value < 2) return;
     state.runMin = { ...state.runMin, [input.dataset.run]: value };
@@ -231,7 +306,7 @@ function renderTerm(type) {
   selected.clear();
 
   currentPage = type;
-  let html = layerBar() + `<section class="term-head">
+  let html = `<section class="term-head">
     <h2>${esc(term.name)}<span class="label">${esc(term.label)}</span></h2>
     ${term.summary ? `<p>${prose(term.summary)}</p>` : ''}
     ${term.remarks ? `<p class="remarks">${prose(term.remarks)}</p>` : ''}
@@ -254,7 +329,7 @@ function renderTerm(type) {
   }
   main.innerHTML = html;
 
-  wireLayerBar(main);
+  renderLayers();
   main.querySelectorAll('tr.pick').forEach(row => {
     row.addEventListener('click', () => toggleSelection(row, type));
     row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelection(row, type); } });
@@ -283,7 +358,7 @@ function toggleSelection(row, type) {
   if (selected.get(id) === k) selected.delete(id); else selected.set(id, k);
   document.querySelectorAll(`tr.pick[data-ex="${CSS.escape(id)}"]`).forEach(r => r.classList.toggle('selected', selected.get(id) === r.dataset.key));
   const el = document.querySelector(`.chart[data-id="${CSS.escape(id)}"]`);
-  draw(el, findExample(id), type);
+  draw(el, findExample(id), STRUCTURE_PAGES.includes(type) ? null : type);
   if (selected.has(id)) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -298,16 +373,26 @@ function structureLevel(ex) {
 }
 
 function swingsFor(ex) {
-  return ex.swingsByLevel?.[structureLevel(ex)] ?? ex.swings ?? [];
+  return ex.swingsByLevel?.[structureLevel(ex)] ?? [];
+}
+
+// A swing's interims are the swings one level finer that start inside it; the data lists them as indexes into that level.
+function interimsOf(ex, w) {
+  const finer = ex.swingsByLevel?.[w.level + 1] ?? [];
+  return (w.interims ?? []).map(i => finer[i]).filter(Boolean);
+}
+
+function marketStructureBreaksFor(ex) {
+  return ex.marketStructureBreaksByLevel?.[structureLevel(ex)] ?? [];
 }
 
 function owningSwing(ex, a) {
-  const at = { BullishBreakOfStructure: w => w.breakOfStructure, BearishBreakOfStructure: w => w.breakOfStructure }[a.type];
+  const at = { BullishBreakOfStructure: w => w.breakOfStructure, BearishBreakOfStructure: w => w.breakOfStructure, Upswing: w => w.start, Downswing: w => w.start }[a.type];
   return at && swingsFor(ex).find(w => w.direction === a.direction && at(w)?.time === a.time);
 }
 
 function drawAll(page) {
-  document.querySelectorAll('.chart').forEach(el => draw(el, findExample(el.dataset.id), page === 'Sawtooth' ? null : page));
+  document.querySelectorAll('.chart').forEach(el => draw(el, findExample(el.dataset.id), STRUCTURE_PAGES.includes(page) ? null : page));
 }
 
 function withAlpha(hex, a) {
@@ -325,8 +410,39 @@ function referenceLines(traces, name, color, dash, refs) {
   traces.push({ type: 'scatter', mode: 'lines', name, x, y, line: { color, width: 1.5, dash }, hovertemplate: hover });
 }
 
+// The selected swing as a bold box with its break level, and its interims as dotted boxes inside it.
+function swingShapes(ex, w, breakColor) {
+  const color = css(SWINGS[w.direction].color);
+  const box = (s, style) => ({ type: 'rect', xref: 'x', yref: 'y', layer: 'below', x0: s.start.time, x1: s.end.time,
+    y0: Math.min(s.start.price, s.extreme.price), y1: Math.max(s.start.price, s.extreme.price), ...style });
+  return [
+    box(w, { line: { color, width: 2.5 }, fillcolor: withAlpha(color, 0.18) }),
+    { type: 'line', xref: 'x', yref: 'y', x0: w.start.time, x1: w.breakOfStructure.time, y0: w.start.price, y1: w.start.price,
+      line: { color: breakColor ?? color, width: 3 } },
+    ...interimsOf(ex, w).map(s => {
+      const c = css(SWINGS[s.direction].color);
+      return box(s, { line: { color: c, width: 2, dash: 'dot' }, fillcolor: withAlpha(c, 0.12) });
+    }),
+  ];
+}
+
+// Tree rows select a swing by level, direction and start time rather than by annotation.
+function highlightSwing(ex, k, labels) {
+  const [, level, direction, time] = k.split('|');
+  const w = (ex.swingsByLevel?.[Number(level)] ?? []).find(s => s.direction === direction && s.start.time === time);
+  if (!w) return [];
+
+  const accent = css('--accent');
+  const n = interimsOf(ex, w).length;
+  labels.push({ x: w.start.time, y: w.start.price, text: `<b>Level ${level} ${direction === 'Up' ? 'upswing' : 'downswing'}</b> · ${n} interim${n === 1 ? '' : 's'}`,
+    showarrow: true, arrowcolor: accent, arrowwidth: 1.5, ax: 0, ay: direction === 'Up' ? -60 : 60,
+    bgcolor: css('--panel'), bordercolor: accent, borderpad: 4, font: { color: css('--text'), size: 12 } });
+  return swingShapes(ex, w);
+}
+
 function highlight(ex, traces, labels) {
   const k = selected.get(ex.id);
+  if (k?.startsWith('swing|')) return highlightSwing(ex, k, labels);
   const a = k && [...ex.expected, ...ex.annotations].find(x => key(x) === k);
   if (!a) return [];
 
@@ -335,19 +451,12 @@ function highlight(ex, traces, labels) {
   const shapes = [{ type: 'line', xref: 'x', yref: 'paper', x0: a.time, x1: a.time, y0: 0, y1: 1, layer: 'below',
     line: { color: accent, width: 1, dash: 'dot' } }];
 
-  const msb = (ex.marketStructureBreaks ?? []).find(m => m.type === a.type && m.break.time === a.time);
+  const msb = marketStructureBreaksFor(ex).find(m => m.type === a.type && m.break.time === a.time);
   if (msb) shapes.push({ type: 'line', xref: 'x', yref: 'y', x0: msb.reference.time, x1: msb.break.time, y0: msb.reference.price, y1: msb.reference.price,
     line: { color: term.color, width: 3, dash: 'dot' } });
 
   const w = owningSwing(ex, a);
-  if (w) {
-    const color = css(SWINGS[w.direction].color);
-    shapes.push({ type: 'rect', xref: 'x', yref: 'y', layer: 'below', x0: w.start.time, x1: w.end.time,
-      y0: Math.min(w.start.price, w.extreme.price), y1: Math.max(w.start.price, w.extreme.price),
-      line: { color, width: 2.5 }, fillcolor: withAlpha(color, 0.18) });
-    shapes.push({ type: 'line', xref: 'x', yref: 'y', x0: w.start.time, x1: w.breakOfStructure.time, y0: w.start.price, y1: w.start.price,
-      line: { color: term.color, width: 3 } });
-  }
+  if (w) shapes.push(...swingShapes(ex, w, term.color));
 
   traces.push({ type: 'scatter', mode: 'markers', name: 'Selected', hoverinfo: 'skip', x: [a.time], y: [a.price],
     marker: { symbol: 'circle-open', size: 26, color: accent, line: { width: 2.5 } } });
@@ -443,22 +552,26 @@ function draw(el, ex, focus) {
   const text = css('--text'), muted = css('--muted'), grid = css('--grid');
   const traces = [];
   const swings = swingsFor(ex);
+  const swingBox = (w, interim) => {
+    const s = SWINGS[w.direction], color = css(s.color);
+    const top = Math.max(w.start.price, w.extreme.price), bottom = Math.min(w.start.price, w.extreme.price);
+    const [startName, extremeName] = w.direction === 'Up' ? ['high', 'pullback low'] : ['low', 'bounce high'];
+    const n = interimsOf(ex, w).length;
+    return {
+      type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: s.name,
+      x: [w.start.time, w.end.time, w.end.time, w.start.time, w.start.time], y: [top, top, bottom, bottom, top],
+      line: { color, width: 1, dash: interim ? 'dot' : 'solid' }, fillcolor: withAlpha(color, interim ? 0.05 : 0.08),
+      hovertemplate: `${interim ? 'Interim ' : ''}${s.name.slice(0, -1).toLowerCase()} ${ARROW[w.direction]} · level ${w.level}<br>${fmtTime(w.start.time)} → ${fmtTime(w.end.time)}` +
+        `<br>${startName} ${fmtPrice(w.start.price)} · ${extremeName} ${fmtPrice(w.extreme.price)}${n ? `<br>${n} interim swing${n === 1 ? '' : 's'}` : ''}<extra></extra>`,
+    };
+  };
 
-  for (const dir of ['Up', 'Down'].filter(on)) {
-    const s = SWINGS[dir];
-    const color = css(s.color);
-    swings.filter(w => w.direction === dir && w.confirmed).forEach(w => {
-      const top = Math.max(w.start.price, w.extreme.price), bottom = Math.min(w.start.price, w.extreme.price);
-      const [hi, lo] = dir === 'Up' ? ['HH', 'HL'] : ['LH', 'LL'];
-      const hiPt = dir === 'Up' ? w.start : w.extreme, loPt = dir === 'Up' ? w.extreme : w.start;
-      traces.push({
-        type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: s.name,
-        x: [w.start.time, w.end.time, w.end.time, w.start.time, w.start.time], y: [top, top, bottom, bottom, top],
-        line: { color, width: 1 }, fillcolor: withAlpha(color, 0.08),
-        hovertemplate: `${s.name.slice(0, -1)} ${ARROW[dir]}<br>${fmtTime(w.start.time)} → ${fmtTime(w.end.time)}<br>${hi} ${fmtPrice(hiPt.price)} · ${lo} ${fmtPrice(loPt.price)}<extra></extra>`,
-      });
-    });
+  // Interims of the swings shown (or of every swing when neither direction is shown), drawn dotted beneath them.
+  if (on('interims')) {
+    const parents = swings.filter(w => on(SWINGS[w.direction].layer));
+    for (const w of (parents.length ? parents : swings).flatMap(w => interimsOf(ex, w))) traces.push(swingBox(w, true));
   }
+  for (const w of swings.filter(w => w.confirmed && on(SWINGS[w.direction].layer))) traces.push(swingBox(w, false));
 
   if (on('price')) {
     traces.push({ type: 'candlestick', name: 'Price', x: p.t, open: p.o, high: p.h, low: p.l, close: p.c,
@@ -479,8 +592,8 @@ function draw(el, ex, focus) {
   for (const [layer, type] of [['msbLevelUp', 'BullishMarketStructureBreak'], ['msbLevelDown', 'BearishMarketStructureBreak']]) {
     if (!on(layer)) continue;
     referenceLines(traces, 'MSB level', TERMS.get(type).color, 'dot',
-      (ex.marketStructureBreaks ?? []).filter(m => m.type === type)
-        .map(m => ({ from: m.reference, to: m.break, level: m.reference.price, what: `previous ${type.startsWith('Bullish') ? 'lower high' : 'higher low'} broken` })));
+      marketStructureBreaksFor(ex).filter(m => m.type === type)
+        .map(m => ({ from: m.reference, to: m.break, level: m.reference.price, what: `protective ${type.startsWith('Bullish') ? 'bounce high' : 'pullback low'} broken` })));
   }
 
   const labels = [];
@@ -495,7 +608,7 @@ function draw(el, ex, focus) {
     const term = TERMS.get(type);
     const items = POINT_LAYERS.includes(type) ? pointsAt(ex, level).filter(a => a.type === type)
       : BOS_DIRECTION[type] ? swings.filter(w => w.direction === BOS_DIRECTION[type]).map(w => ({ type, direction: w.direction, time: w.breakOfStructure.time, price: w.breakOfStructure.price }))
-      : ex.annotations.filter(a => a.type === type);
+      : marketStructureBreaksFor(ex).filter(m => m.type === type).map(m => ({ type, time: m.break.time, price: m.break.price }));
     if (!term || !items.length) continue;
     const isFocus = type === focus;
     traces.push({
@@ -517,7 +630,7 @@ function draw(el, ex, focus) {
   }
 
   const detected = new Set(ex.annotations.filter(a => a.type === ex.term).map(key));
-  const missing = ex.expected.filter(a => !detected.has(key(a)));
+  const missing = ex.term ? ex.expected.filter(a => !detected.has(key(a))) : [];
   if (missing.length) {
     traces.push({ type: 'scatter', mode: 'markers', name: 'Expected, not detected', x: missing.map(a => a.time), y: missing.map(a => a.price),
       marker: { symbol: 'circle-open', size: 20, color: css('--bad'), line: { width: 2 } }, hoverinfo: 'x+y' });
@@ -541,7 +654,7 @@ function draw(el, ex, focus) {
 }
 
 function findExample(id) {
-  return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id);
+  return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id) ?? DATA.interims?.examples?.find(e => e.id === id);
 }
 
 function renderStructure() {
@@ -550,7 +663,7 @@ function renderStructure() {
   selected.clear();
 
   currentPage = 'Sawtooth';
-  let html = layerBar() + `<section class="term-head">
+  let html = `<section class="term-head">
     <h2>Sawtooth levels</h2>
     ${DATA.structure?.summary ? `<p>${prose(DATA.structure.summary)}</p>` : ''}
     <p class="remarks">The dashed line is the incomplete final leg, ending at the latest price. Until a new high breaks structure, it is treated as a presumed downleg.
@@ -566,15 +679,71 @@ function renderStructure() {
     </article>`;
   }
   main.innerHTML = html;
-  wireLayerBar(main);
+  renderLayers();
   drawAll('Sawtooth');
+}
+
+const swingKey = s => `swing|${s.level}|${s.direction}|${s.start}`;
+const swingId = s => `${swingKey(s)}|${s.break}|${s.parent ?? ''}`;
+
+function swingTreeTable(ex) {
+  const detected = new Set(ex.detected.map(swingId));
+  const expected = new Set(ex.expected.map(swingId));
+  const rows = [
+    ...ex.detected.map(s => ({ s, status: expected.has(swingId(s)) ? 'matched' : 'extra' })),
+    ...ex.expected.filter(s => !detected.has(swingId(s))).map(s => ({ s, status: 'missing' })),
+  ];
+  const interims = s => ex.detected.filter(x => x.level === s.level + 1 && x.parent === s.start).length;
+  return `<details open><summary>Expected swing tree (${ex.expected.length}) · asserted by the example test · click a row to pick out a swing and its interims</summary>
+    <table><tr><th>Swing</th><th>Start (UTC)</th><th>Break (UTC)</th><th>Interims</th><th>Status</th></tr>
+    ${rows.map(({ s, status }) => `<tr class="pick" tabindex="0" data-ex="${esc(ex.id)}" data-key="${esc(swingKey(s))}">
+      <td style="padding-left:${(s.level - ex.level) * 22}px">${s.level > ex.level ? '└ ' : ''}${s.direction === 'Up' ? 'Upswing ↑' : 'Downswing ↓'} <span class="id">level ${s.level}</span></td>
+      <td>${esc(fmtTime(s.start))}</td><td>${esc(fmtTime(s.break))}</td><td>${interims(s) || ''}</td>
+      <td class="${status === 'matched' ? '' : 'miss'}">${status}</td></tr>`).join('')}
+    </table></details>`;
+}
+
+function renderInterims() {
+  const main = document.getElementById('main');
+  const examples = DATA.interims?.examples ?? [];
+  selected.clear();
+
+  currentPage = 'InterimSwings';
+  let html = `<section class="term-head">
+    <h2>Interim swings</h2>
+    ${DATA.interims?.summary ? `<p>${prose(DATA.interims.summary)}</p>` : ''}
+    <p class="remarks">A swing at one sawtooth level is built from swings one level finer: its interim swings, drawn dotted inside it.
+    Click a row to pick out a swing and its interims. Swings follow the finest sawtooth level shown, so turn on a finer level to see the next generation.</p>
+  </section>`;
+
+  if (!examples.length) html += '<div class="empty">No interim swing examples. Add a CSV and sidecar under <code>TestData/Structure/InterimSwings/</code>.</div>';
+  for (const ex of examples) {
+    const badges = [
+      ex.reviewed ? '<span class="badge ok">Reviewed</span>' : '<span class="badge warn" title="Expected values were captured from the detector and not yet checked by a human">Unreviewed</span>',
+      ex.matches ? '' : '<span class="badge bad">Detector differs from expected</span>',
+    ].join('');
+    html += `<article class="example" id="ex-${esc(ex.id)}">
+      <header><h3>${esc(ex.title)}</h3>${badges}<span class="id">${esc(ex.id)} · level ${ex.level} · depth ${ex.depth}</span></header>
+      ${ex.description ? `<p>${prose(ex.description)}</p>` : ''}
+      <div class="chart" data-id="${esc(ex.id)}"></div>
+      ${swingTreeTable(ex)}
+    </article>`;
+  }
+  main.innerHTML = html;
+
+  renderLayers();
+  main.querySelectorAll('tr.pick').forEach(row => {
+    row.addEventListener('click', () => toggleSelection(row, currentPage));
+    row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelection(row, currentPage); } });
+  });
+  drawAll(currentPage);
 }
 
 function route() {
   let type = decodeURIComponent(location.hash.slice(1));
-  if (type === 'Sawtooth') {
+  if (STRUCTURE_PAGES.includes(type)) {
     renderNav(type);
-    renderStructure();
+    if (type === 'Sawtooth') renderStructure(); else renderInterims();
     window.scrollTo(0, 0);
     return;
   }

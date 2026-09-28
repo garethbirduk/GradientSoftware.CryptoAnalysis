@@ -1,7 +1,7 @@
 {
   "term": "BullishMarketStructureBreak",
   "title": "Downswing reversal",
-  "description": "Price drifts lower through 25 and 26 Feb. On 26 Feb 14:00 it closes at 51,704, above the last lower high: a bullish market structure break. At level 1 the drift is a single dip to 50,941, and the rally that follows makes seven bullish breaks of structure, up to 57,370.",
+  "description": "Price drifts lower through 25 and 26 Feb. On 26 Feb 14:00 it closes at 51,704, above the last lower high: a bullish market structure break. At level 1 the drift is a single dip to 50,941, and the rally that follows makes seven bullish breaks of structure, up to 57,370. The snippet ends at its high, so at level 1 it is one upleg holding only upswings; the downswings, and so these breaks, are at level 2.",
   "reviewed": false,
   "closeType": "Close",
   "expected": [
@@ -12,5 +12,5 @@
       "price": 51703.91
     }
   ],
-  "level": 1
+  "level": 2
 }

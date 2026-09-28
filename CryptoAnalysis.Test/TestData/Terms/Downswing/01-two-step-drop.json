@@ -1,0 +1,22 @@
+{
+  "term": "Downswing",
+  "title": "Two-step drop",
+  "description": "Price peaks at 69,808 an hour in (12 Jun 17:00); the rest is the incomplete leg down to 66,860. Inside it are two downswings. The 67,520 low (12 Jun 19:00) bounces to 68,505 and is closed below at 13 Jun 03:00 (67,450); the 67,314 low (04:00) bounces to 67,812 and is closed below at 15:00 (66,420).",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Downswing",
+      "direction": "Down",
+      "time": "2024-06-12T19:00:00Z",
+      "price": 67520
+    },
+    {
+      "type": "Downswing",
+      "direction": "Down",
+      "time": "2024-06-13T04:00:00Z",
+      "price": 67313.97
+    }
+  ]
+}
