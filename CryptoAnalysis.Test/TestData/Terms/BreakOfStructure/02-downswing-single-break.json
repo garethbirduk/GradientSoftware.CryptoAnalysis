@@ -1,0 +1,15 @@
+{
+  "term": "BreakOfStructure",
+  "title": "Single downward break",
+  "description": "Price makes a lower low, bounces to a lower high, then closes below the lower low. That first close below is the break of structure. Later in the snippet price closes back above the lower high, a market structure break.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "BreakOfStructure",
+      "direction": "Down",
+      "time": "2024-08-01T15:00:00Z",
+      "price": 62863.31
+    }
+  ]
+}

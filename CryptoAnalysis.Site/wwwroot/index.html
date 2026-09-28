@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market Structure Terms</title>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<script src="data.js"></script>
+<style>
+  :root {
+    --bg: #fafaf9; --panel: #ffffff; --text: #1c1917; --muted: #78716c; --border: #e7e5e4;
+    --accent: #0f766e; --chip: #f5f5f4; --code: #f1f5f9;
+    --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+    --up: #26a69a; --down: #ef5350; --close: #a8a29e; --grid: #eeeceb;
+    --upswing: #2563eb; --downswing: #9333ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0c0a09; --panel: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --border: #292524;
+      --accent: #2dd4bf; --chip: #292524; --code: #292524;
+      --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --close: #78716c; --grid: #292524;
+      --upswing: #60a5fa; --downswing: #c084fc;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  nav { border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  nav h1 { font-size: 15px; margin: 0 0 16px; }
+  nav h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 6px; }
+  nav a { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--text); text-decoration: none; }
+  nav a:hover { background: var(--chip); }
+  nav a.active { background: var(--chip); color: var(--accent); font-weight: 600; }
+  nav .count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  nav .foot { margin-top: 24px; font-size: 12px; color: var(--muted); }
+  main { padding: 28px 32px 64px; max-width: 1200px; min-width: 0; }
+  .term-head h2 { margin: 0; font-size: 26px; }
+  .term-head .label { font-family: ui-monospace, Consolas, monospace; font-size: 14px; color: var(--muted); margin-left: 8px; }
+  .term-head p { margin: 8px 0 0; max-width: 72ch; }
+  .term-head .remarks { color: var(--muted); font-size: 14px; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 20px 0 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  .toolbar .lead { color: var(--muted); font-size: 13px; margin-right: 4px; }
+  .toolbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--chip); color: var(--text); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .chip[aria-pressed="false"] { opacity: .45; }
+  .chip[aria-pressed="false"] .dot { background: transparent !important; outline: 1px solid var(--muted); }
+  .chip:disabled { cursor: default; }
+  .example { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-top: 18px; }
+  .example header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+  .example h3 { margin: 0; font-size: 17px; }
+  .example .id { color: var(--muted); font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  .badge { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 1px 9px; border: 1px solid currentColor; }
+  .badge.ok { color: var(--ok); } .badge.warn { color: var(--warn); } .badge.bad { color: var(--bad); }
+  .example p { margin: 8px 0 0; max-width: 80ch; }
+  .chart { height: 440px; margin-top: 10px; }
+  details { margin-top: 8px; font-size: 14px; }
+  summary { cursor: pointer; color: var(--muted); }
+  table { border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 3px 14px 3px 0; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  td.miss { color: var(--bad); font-weight: 600; }
+  tr.pick { cursor: pointer; }
+  tr.pick:hover td { background: var(--chip); }
+  tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  tr.pick.selected td { background: var(--chip); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 600; }
+  .empty { margin-top: 24px; padding: 20px; border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+    main { padding: 20px 16px 48px; }
+    .chart { height: 360px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav id="nav"></nav>
+  <main id="main"></main>
+</div>
+<script>
+const DATA = window.SITE_DATA || { terms: [], examples: [] };
+const TERMS = new Map(DATA.terms.map(t => [t.type, t]));
+const ARROW = { Up: '↑', Down: '↓' };
+const STORE_KEY = 'terms-site:v1';
+
+function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } }
+function save(state) { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { } }
+const state = Object.assign({ context: [], mode: 'candles', swings: ['Up', 'Down'] }, load());
+const SWINGS = [{ dir: 'Up', name: 'Upswings', color: '--upswing' }, { dir: 'Down', name: 'Downswings', color: '--downswing' }];
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const prose = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const fmtTime = t => String(t).slice(0, 16).replace('T', ' ');
+const fmtPrice = p => p.toLocaleString(undefined, { maximumFractionDigits: 2 });
+const key = a => `${a.type}|${a.direction}|${a.time}|${a.price}`;
+
+function examplesFor(type) { return DATA.examples.filter(e => e.term === type); }
+
+function renderNav(active) {
+  const byCat = new Map();
+  for (const t of DATA.terms) (byCat.get(t.category) ?? byCat.set(t.category, []).get(t.category)).push(t);
+  let html = '<h1>Market structure terms</h1>';
+  for (const [cat, terms] of byCat) {
+    html += `<h2>${esc(cat)}</h2>`;
+    for (const t of terms) {
+      const n = examplesFor(t.type).length;
+      html += `<a href="#${t.type}" class="${t.type === active ? 'active' : ''}"><span>${esc(t.name)}</span><span class="count">${n || ''}</span></a>`;
+    }
+  }
+  html += `<div class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC · ${DATA.examples.length} examples</div>`;
+  document.getElementById('nav').innerHTML = html;
+}
+
+function chip(t, pressed, disabled) {
+  return `<button class="chip" data-type="${t.type}" aria-pressed="${pressed}" ${disabled ? 'disabled title="Focus term"' : ''}>
+    <span class="dot" style="background:${esc(t.color)}"></span>${esc(t.label)}</button>`;
+}
+
+function renderTerm(type) {
+  const term = TERMS.get(type);
+  const main = document.getElementById('main');
+  if (!term) { main.innerHTML = '<div class="empty">Unknown term.</div>'; return; }
+
+  const examples = examplesFor(type);
+  selected.clear();
+  const others = DATA.terms.filter(t => t.type !== type && DATA.examples.some(e => e.annotations.some(a => a.type === t.type)));
+
+  let html = `<section class="term-head">
+    <h2>${esc(term.name)}<span class="label">${esc(term.label)}</span></h2>
+    ${term.summary ? `<p>${prose(term.summary)}</p>` : ''}
+    ${term.remarks ? `<p class="remarks">${prose(term.remarks)}</p>` : ''}
+  </section>`;
+
+  if (!examples.length) {
+    html += `<div class="empty">No examples yet. Add a CSV and sidecar under <code>TestData/Terms/${esc(type)}/</code>.</div>`;
+    main.innerHTML = html;
+    return;
+  }
+
+  html += `<div class="toolbar"><span class="lead">Show</span>${chip(term, true, true)}
+    ${others.map(t => chip(t, state.context.includes(t.type), false)).join('')}
+    <span class="sep"></span>
+    ${SWINGS.map(s => `<button class="chip" data-swing="${s.dir}" aria-pressed="${state.swings.includes(s.dir)}">
+      <span class="dot" style="background:${css(s.color)}"></span>${s.name}</button>`).join('')}
+    <span class="sep"></span>
+    <button class="chip" data-mode="candles" aria-pressed="${state.mode === 'candles'}">Candles</button>
+    <button class="chip" data-mode="line" aria-pressed="${state.mode === 'line'}">Close line</button>
+  </div>`;
+
+  for (const ex of examples) {
+    const badges = [
+      ex.reviewed ? '<span class="badge ok">Reviewed</span>' : '<span class="badge warn" title="Expected values were captured from the detector and not yet checked by a human">Unreviewed</span>',
+      ex.matches ? '' : '<span class="badge bad">Detector differs from expected</span>',
+    ].join('');
+    html += `<article class="example" id="ex-${esc(ex.id)}">
+      <header><h3>${esc(ex.title || ex.id)}</h3>${badges}<span class="id">${esc(ex.id)}</span></header>
+      ${ex.description ? `<p>${prose(ex.description)}</p>` : ''}
+      <div class="chart" data-id="${esc(ex.id)}"></div>
+      ${expectedTable(ex, term)}
+    </article>`;
+  }
+  main.innerHTML = html;
+
+  main.querySelectorAll('.toolbar .chip[data-type]:not(:disabled)').forEach(b => b.addEventListener('click', () => {
+    const t = b.dataset.type;
+    state.context = state.context.includes(t) ? state.context.filter(x => x !== t) : [...state.context, t];
+    b.setAttribute('aria-pressed', state.context.includes(t));
+    save(state); drawAll(type);
+  }));
+  main.querySelectorAll('.toolbar .chip[data-swing]').forEach(b => b.addEventListener('click', () => {
+    const d = b.dataset.swing;
+    state.swings = state.swings.includes(d) ? state.swings.filter(x => x !== d) : [...state.swings, d];
+    b.setAttribute('aria-pressed', state.swings.includes(d));
+    save(state); drawAll(type);
+  }));
+  main.querySelectorAll('.toolbar .chip[data-mode]').forEach(b => b.addEventListener('click', () => {
+    state.mode = b.dataset.mode;
+    main.querySelectorAll('.toolbar .chip[data-mode]').forEach(x => x.setAttribute('aria-pressed', x.dataset.mode === state.mode));
+    save(state); drawAll(type);
+  }));
+  main.querySelectorAll('tr.pick').forEach(row => {
+    row.addEventListener('click', () => toggleSelection(row, type));
+    row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelection(row, type); } });
+  });
+  drawAll(type);
+}
+
+function expectedTable(ex, term) {
+  const detected = new Set(ex.annotations.filter(a => a.type === ex.term).map(key));
+  const expected = new Set(ex.expected.map(key));
+  const rows = [
+    ...ex.expected.map(a => ({ a, status: detected.has(key(a)) ? 'matched' : 'missing' })),
+    ...ex.annotations.filter(a => a.type === ex.term && !expected.has(key(a))).map(a => ({ a, status: 'extra' })),
+  ].sort((x, y) => x.a.time.localeCompare(y.a.time));
+  return `<details ${ex.matches ? '' : 'open'}><summary>Expected ${esc(term.label)} (${ex.expected.length}) · asserted by the example test · click a row to highlight it</summary>
+    <table><tr><th>Time (UTC)</th><th>Direction</th><th>Close</th><th>Status</th></tr>
+    ${rows.map(r => `<tr class="pick" tabindex="0" data-ex="${esc(ex.id)}" data-key="${esc(key(r.a))}"><td>${esc(fmtTime(r.a.time))}</td><td>${esc(r.a.direction)} ${ARROW[r.a.direction]}</td><td>${fmtPrice(r.a.price)}</td>
+      <td class="${r.status === 'matched' ? '' : 'miss'}">${r.status}</td></tr>`).join('')}
+    </table></details>`;
+}
+
+const selected = new Map();
+
+function toggleSelection(row, type) {
+  const id = row.dataset.ex, k = row.dataset.key;
+  if (selected.get(id) === k) selected.delete(id); else selected.set(id, k);
+  document.querySelectorAll(`tr.pick[data-ex="${CSS.escape(id)}"]`).forEach(r => r.classList.toggle('selected', selected.get(id) === r.dataset.key));
+  const el = document.querySelector(`.chart[data-id="${CSS.escape(id)}"]`);
+  draw(el, DATA.examples.find(e => e.id === id), type);
+  if (selected.has(id)) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function owningSwing(ex, a) {
+  const at = {
+    BreakOfStructure: w => w.breakOfStructure,
+    MarketStructureBreak: w => w.marketStructureBreak,
+    HigherHigh: w => w.start, LowerLow: w => w.start,
+    HigherLow: w => w.extreme, LowerHigh: w => w.extreme,
+  }[a.type];
+  return at && ex.swings.find(w => w.direction === a.direction && at(w)?.time === a.time);
+}
+
+function drawAll(type) {
+  document.querySelectorAll('.chart').forEach(el => draw(el, DATA.examples.find(e => e.id === el.dataset.id), type));
+}
+
+function withAlpha(hex, a) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : hex;
+}
+
+function referenceLines(traces, name, color, dash, refs) {
+  if (!refs.length) return;
+  const x = [], y = [], hover = [];
+  for (const r of refs) {
+    const h = `${name}: ${r.what}<br>${fmtPrice(r.level)} from ${fmtTime(r.from.time)} to ${fmtTime(r.to.time)}<extra></extra>`;
+    x.push(r.from.time, r.to.time, null); y.push(r.level, r.level, null); hover.push(h, h, '');
+  }
+  traces.push({ type: 'scatter', mode: 'lines', name, x, y, line: { color, width: 1.5, dash }, hovertemplate: hover });
+}
+
+function highlight(ex, traces, labels) {
+  const k = selected.get(ex.id);
+  const a = k && [...ex.expected, ...ex.annotations].find(x => key(x) === k);
+  if (!a) return [];
+
+  const accent = css('--accent');
+  const term = TERMS.get(a.type);
+  const shapes = [{ type: 'line', xref: 'x', yref: 'paper', x0: a.time, x1: a.time, y0: 0, y1: 1, layer: 'below',
+    line: { color: accent, width: 1, dash: 'dot' } }];
+
+  const w = owningSwing(ex, a);
+  if (w) {
+    const color = css(SWINGS.find(s => s.dir === w.direction).color);
+    shapes.push({ type: 'rect', xref: 'x', yref: 'y', layer: 'below', x0: w.start.time, x1: w.end.time,
+      y0: Math.min(w.start.price, w.extreme.price), y1: Math.max(w.start.price, w.extreme.price),
+      line: { color, width: 2.5 }, fillcolor: withAlpha(color, 0.18) });
+
+    const ref = a.type === 'BreakOfStructure' ? { from: w.start, to: w.breakOfStructure, level: w.start.price }
+      : a.type === 'MarketStructureBreak' && w.msbReference ? { from: w.msbReference, to: w.marketStructureBreak, level: w.msbReference.price }
+      : null;
+    if (ref) shapes.push({ type: 'line', xref: 'x', yref: 'y', x0: ref.from.time, x1: ref.to.time, y0: ref.level, y1: ref.level,
+      line: { color: term.color, width: 3 } });
+  }
+
+  traces.push({ type: 'scatter', mode: 'markers', name: 'Selected', showlegend: false, hoverinfo: 'skip', x: [a.time], y: [a.price],
+    marker: { symbol: 'circle-open', size: 26, color: accent, line: { width: 2.5 } } });
+  labels.push({ x: a.time, y: a.price, text: `<b>${term.label} ${ARROW[a.direction]}</b> ${fmtTime(a.time)} · ${fmtPrice(a.price)}`,
+    showarrow: true, arrowcolor: accent, arrowwidth: 1.5, ax: 0, ay: term.position === 'Below' ? 60 : -60,
+    bgcolor: css('--panel'), bordercolor: accent, borderpad: 4, font: { color: css('--text'), size: 12 } });
+  return shapes;
+}
+
+function draw(el, ex, focus) {
+  const p = ex.prices;
+  const text = css('--text'), muted = css('--muted'), grid = css('--grid');
+  const traces = [];
+  const shown = [focus, ...state.context.filter(t => t !== focus)];
+
+  for (const s of SWINGS.filter(s => state.swings.includes(s.dir))) {
+    const color = css(s.color);
+    ex.swings.filter(w => w.direction === s.dir).forEach((w, i) => {
+      const top = Math.max(w.start.price, w.extreme.price), bottom = Math.min(w.start.price, w.extreme.price);
+      const [hi, lo] = s.dir === 'Up' ? ['HH', 'HL'] : ['LH', 'LL'];
+      const hiPt = s.dir === 'Up' ? w.start : w.extreme, loPt = s.dir === 'Up' ? w.extreme : w.start;
+      traces.push({
+        type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', legendgroup: s.dir, showlegend: i === 0, name: s.name,
+        x: [w.start.time, w.end.time, w.end.time, w.start.time, w.start.time], y: [top, top, bottom, bottom, top],
+        line: { color, width: 1, dash: w.breakOfStructure ? 'solid' : 'dash' }, fillcolor: withAlpha(color, 0.08),
+        hovertemplate: `${s.name.slice(0, -1)} ${ARROW[s.dir]}${w.breakOfStructure ? '' : ' (not yet broken)'}<br>${fmtTime(w.start.time)} → ${fmtTime(w.end.time)}<br>${hi} ${fmtPrice(hiPt.price)} · ${lo} ${fmtPrice(loPt.price)}<extra></extra>`,
+      });
+    });
+  }
+
+  if (state.mode === 'candles') {
+    traces.push({ type: 'candlestick', name: 'Price', x: p.t, open: p.o, high: p.h, low: p.l, close: p.c,
+      increasing: { line: { color: css('--up'), width: 1 } }, decreasing: { line: { color: css('--down'), width: 1 } }, hoverinfo: 'x+y' });
+  }
+  traces.push({ type: 'scatter', mode: 'lines', name: 'Close', x: p.t, y: p.c, hoverinfo: 'skip',
+    line: { color: state.mode === 'candles' ? css('--close') : text, width: state.mode === 'candles' ? 1 : 1.6 } });
+
+  const visibleSwings = ex.swings.filter(w => state.swings.includes(w.direction));
+  if (shown.includes('BreakOfStructure')) {
+    const refs = visibleSwings.filter(w => w.breakOfStructure);
+    referenceLines(traces, 'BoS level', TERMS.get('BreakOfStructure').color, 'dash',
+      refs.map(w => ({ from: w.start, to: w.breakOfStructure, level: w.start.price, what: `${w.direction === 'Up' ? 'HH' : 'LL'} level broken` })));
+  }
+  if (shown.includes('MarketStructureBreak')) {
+    const refs = visibleSwings.filter(w => w.marketStructureBreak && w.msbReference);
+    referenceLines(traces, 'MSB level', TERMS.get('MarketStructureBreak').color, 'dot',
+      refs.map(w => ({ from: w.msbReference, to: w.marketStructureBreak, level: w.msbReference.price, what: `previous ${w.direction === 'Up' ? 'HL' : 'LH'} broken` })));
+  }
+
+  const labels = [];
+  const stacks = new Map();
+
+  for (const type of shown) {
+    const term = TERMS.get(type);
+    const items = ex.annotations.filter(a => a.type === type);
+    if (!term || !items.length) continue;
+    const isFocus = type === focus;
+    traces.push({
+      type: 'scatter', mode: 'markers', name: term.label, x: items.map(a => a.time), y: items.map(a => a.price),
+      marker: { color: term.color, symbol: term.symbol, size: isFocus ? 13 : 10, line: { width: 1, color: css('--panel') } },
+      opacity: isFocus ? 1 : 0.8,
+      hovertemplate: items.map(a => `${term.name} ${ARROW[a.direction]}<br>${fmtTime(a.time)}<br>${fmtPrice(a.price)}<extra></extra>`),
+    });
+    for (const a of items) {
+      const below = term.position === 'Below';
+      const sk = `${a.time}|${below}`;
+      const n = stacks.get(sk) ?? 0;
+      stacks.set(sk, n + 1);
+      labels.push({ x: a.time, y: a.price, text: `${term.label}${ARROW[a.direction]}`, showarrow: false,
+        yshift: (below ? -1 : 1) * (16 + n * 14), font: { size: isFocus ? 12 : 11, color: isFocus ? text : muted } });
+    }
+  }
+
+  const detected = new Set(ex.annotations.filter(a => a.type === ex.term).map(key));
+  const missing = ex.expected.filter(a => !detected.has(key(a)));
+  if (missing.length) {
+    traces.push({ type: 'scatter', mode: 'markers', name: 'Expected, not detected', x: missing.map(a => a.time), y: missing.map(a => a.price),
+      marker: { symbol: 'circle-open', size: 20, color: css('--bad'), line: { width: 2 } }, hoverinfo: 'x+y' });
+  }
+
+  const shapes = highlight(ex, traces, labels);
+
+  Plotly.react(el, traces, {
+    margin: { t: 10, r: 10, b: 36, l: 56 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
+    xaxis: { rangeslider: { visible: false }, gridcolor: grid, linecolor: grid },
+    yaxis: { gridcolor: grid, linecolor: grid, tickformat: ',.0f' },
+    legend: { orientation: 'h', y: 1.02, yanchor: 'bottom', x: 0, font: { color: text } },
+    annotations: labels, shapes, hovermode: 'closest', showlegend: true,
+  }, { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['select2d', 'lasso2d'] });
+}
+
+function route() {
+  let type = decodeURIComponent(location.hash.slice(1));
+  if (!TERMS.has(type)) type = (DATA.terms.find(t => examplesFor(t.type).length) || DATA.terms[0] || {}).type;
+  renderNav(type);
+  renderTerm(type);
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', route);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => route());
+route();
+</script>
+</body>
+</html>

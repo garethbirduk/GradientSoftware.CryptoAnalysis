@@ -1,0 +1,15 @@
+{
+  "term": "BreakOfStructure",
+  "title": "Single upward break",
+  "description": "Price makes a higher high, pulls back to a higher low, then closes above the higher high. That first close above is the break of structure. The later spike to 20.86k is not marked because no swing follows it inside the snippet.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "BreakOfStructure",
+      "direction": "Up",
+      "time": "2023-03-10T23:00:00Z",
+      "price": 20230.08
+    }
+  ]
+}

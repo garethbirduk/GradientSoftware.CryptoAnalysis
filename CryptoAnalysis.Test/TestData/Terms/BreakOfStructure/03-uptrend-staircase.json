@@ -1,0 +1,39 @@
+{
+  "term": "BreakOfStructure",
+  "title": "Uptrend staircase",
+  "description": "A trend continuing through repeated breaks: each break of structure is followed by a new higher high and higher low. The break candle often becomes the next higher high. Mid-snippet a market structure break interrupts the run before price recovers and breaks higher again.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "BreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-12T14:00:00Z",
+      "price": 48822.53
+    },
+    {
+      "type": "BreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-12T20:00:00Z",
+      "price": 50212.91
+    },
+    {
+      "type": "BreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-13T09:00:00Z",
+      "price": 50222.9
+    },
+    {
+      "type": "BreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-14T08:00:00Z",
+      "price": 50784.6
+    },
+    {
+      "type": "BreakOfStructure",
+      "direction": "Up",
+      "time": "2024-02-14T12:00:00Z",
+      "price": 51592.38
+    }
+  ]
+}

@@ -12,6 +12,9 @@ namespace Gradient.CryptoAnalysis
             NextPrice = nextPrice;
         }
 
+        /// <summary>
+        /// The first close above the swing's initial higher high, or the next price after the swing if none inside it closes higher.
+        /// </summary>
         public override Price? BreakOfStructure
         {
             get
@@ -26,6 +29,10 @@ namespace Gradient.CryptoAnalysis
             }
         }
 
+        /// <summary>
+        /// The first close in this swing below the previous upswing's swing low (its higher low).
+        /// Null when there is no previous upswing.
+        /// </summary>
         public override Price? MarketStructureBreak
         {
             get

@@ -12,6 +12,9 @@ public class Downswing : Swing
         NextPrice = nextPrice;
     }
 
+    /// <summary>
+    /// The first close below the swing's initial lower low, or the next price after the swing if none inside it closes lower.
+    /// </summary>
     public override Price? BreakOfStructure
     {
         get
@@ -26,6 +29,10 @@ public class Downswing : Swing
         }
     }
 
+    /// <summary>
+    /// The first close in this swing above the previous downswing's swing high (its lower high).
+    /// Null when there is no previous downswing.
+    /// </summary>
     public override Price? MarketStructureBreak
     {
         get

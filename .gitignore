@@ -8,3 +8,5 @@ TestResults/
 ConcatenateCsFiles.ps1
 Combined/CryptoAnalysis.Test_Combined.cs
 Combined/CryptoAnalysis_Combined.cs
+
+artifacts/

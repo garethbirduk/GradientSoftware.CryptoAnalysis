@@ -2,40 +2,80 @@
 
 namespace Gradient.CryptoAnalysis
 {
+    /// <summary>
+    /// The vocabulary of market-structure terms. Each member's <see cref="TermAttribute"/> sets how it is drawn;
+    /// its summary is the definition shown in the term library, and its remarks describe how the code detects it.
+    /// </summary>
     public enum EnumAnnotationType
     {
         None,
 
-        [Name("HH")]
-        [Position(EnumPosition.Above)]
+        /// <summary>
+        /// A close that exceeds every close before it in the current run. It is the high an upswing starts from.
+        /// </summary>
+        /// <remarks>
+        /// Detected as the first price of each <see cref="Upswing"/>.
+        /// </remarks>
+        [Term("HH", "Higher high", TermCategories.StructurePoints, EnumPosition.Above, "green", "triangle-down")]
         HigherHigh,
 
-        [Name("HL")]
-        [Position(EnumPosition.Below)]
+        /// <summary>
+        /// The lowest close in the pullback that follows a higher high, before price breaks above that high again.
+        /// </summary>
+        /// <remarks>
+        /// Detected as <see cref="Upswing.SwingLow"/> of each <see cref="Upswing"/>.
+        /// </remarks>
+        [Term("HL", "Higher low", TermCategories.StructurePoints, EnumPosition.Below, "red", "triangle-up")]
         HigherLow,
 
-        [Name("LH")]
-        [Position(EnumPosition.Above)]
+        /// <summary>
+        /// The highest close in the bounce that follows a lower low, before price breaks below that low again.
+        /// </summary>
+        /// <remarks>
+        /// Detected as <see cref="Downswing.SwingHigh"/> of each <see cref="Downswing"/>.
+        /// </remarks>
+        [Term("LH", "Lower high", TermCategories.StructurePoints, EnumPosition.Above, "green", "triangle-down")]
         LowerHigh,
 
-        [Name("LL")]
-        [Position(EnumPosition.Below)]
+        /// <summary>
+        /// A close that is below every close before it in the current run. It is the low a downswing starts from.
+        /// </summary>
+        /// <remarks>
+        /// Detected as <see cref="Downswing.SwingLow"/> of each <see cref="Downswing"/>.
+        /// </remarks>
+        [Term("LL", "Lower low", TermCategories.StructurePoints, EnumPosition.Below, "red", "triangle-up")]
         LowerLow,
 
-        [Name("BoS")]
-        [Position(EnumPosition.Left)]
+        /// <summary>
+        /// The first close beyond the swing's starting point, continuing the trend: above the higher high in an upswing,
+        /// below the lower low in a downswing.
+        /// </summary>
+        /// <remarks>
+        /// Detected by <see cref="Upswing.BreakOfStructure"/> and <see cref="Downswing.BreakOfStructure"/>.
+        /// </remarks>
+        [Term("BoS", "Break of structure", TermCategories.StructureBreaks, EnumPosition.Left, "cyan", "diamond")]
         BreakOfStructure,
 
-        [Name("MSB")]
-        [Position(EnumPosition.Left)]
+        /// <summary>
+        /// The first close that breaks the previous swing's protective point, signalling a possible trend change:
+        /// below the previous higher low in an upswing, above the previous lower high in a downswing.
+        /// </summary>
+        /// <remarks>
+        /// Detected by <see cref="Upswing.MarketStructureBreak"/> and <see cref="Downswing.MarketStructureBreak"/>.
+        /// </remarks>
+        [Term("MSB", "Market structure break", TermCategories.StructureBreaks, EnumPosition.Left, "orange", "x")]
         MarketStructureBreak,
 
-        [Name("G")]
-        [Position(EnumPosition.Above)]
+        /// <summary>
+        /// A run of consecutive green candles (close above open).
+        /// </summary>
+        [Term("G", "Successive green candles", TermCategories.CandlePatterns, EnumPosition.Above, "green", "circle")]
         SuccessiveGreenCandles,
 
-        [Name("R")]
-        [Position(EnumPosition.Above)]
+        /// <summary>
+        /// A run of consecutive red candles (close below open).
+        /// </summary>
+        [Term("R", "Successive red candles", TermCategories.CandlePatterns, EnumPosition.Above, "red", "circle")]
         SuccessiveRedCandles,
     }
 
@@ -99,39 +139,20 @@ namespace Gradient.CryptoAnalysis
 
         public EnumPosition Position { get; set; } = EnumPosition.None;
 
+        /// <summary>
+        /// Creates an annotation, defaulting the note and position from the term registry.
+        /// </summary>
         public static Annotation Create(EnumAnnotationType annotationType, string? note = null, EnumPosition? position = null)
         {
-            var finalNote = note ?? annotationType
-                .GetType()
-                .GetField(annotationType.ToString())?
-                .GetCustomAttributes(typeof(NameAttribute), false)
-                .Cast<NameAttribute>()
-                .FirstOrDefault()?.Names?.FirstOrDefault() ?? annotationType.ToString();
-
-            var finalPosition = position ?? annotationType
-                .GetType()
-                .GetField(annotationType.ToString())?
-                .GetCustomAttributes(typeof(PositionAttribute), false)
-                .Cast<PositionAttribute>()
-                .FirstOrDefault()?.Position ?? EnumPosition.None;
+            var term = annotationType == EnumAnnotationType.None ? null : Terms.Get(annotationType);
 
             return new Annotation
             {
                 AnnotationType = annotationType,
-                Note = finalNote,
-                Position = finalPosition
+                Note = note ?? term?.Label ?? annotationType.ToString(),
+                Position = position ?? term?.Position ?? EnumPosition.None
             };
         }
-    }
-
-    public sealed class PositionAttribute : Attribute
-    {
-        public PositionAttribute(EnumPosition position)
-        {
-            Position = position;
-        }
-
-        public EnumPosition Position { get; }
     }
 
     public class Price
