@@ -105,7 +105,15 @@
   .badge { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 1px 9px; border: 1px solid currentColor; }
   .badge.ok { color: var(--ok); } .badge.warn { color: var(--warn); } .badge.bad { color: var(--bad); }
   .example p { margin: 8px 0 0; max-width: 80ch; }
-  .chart { height: 440px; margin-top: 10px; }
+  .chart { height: 440px; margin-top: 10px; position: relative; }
+  .chart .nsewdrag { cursor: crosshair !important; }
+  .crosshair { position: absolute; inset: 0; pointer-events: none; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .crosshair i { position: absolute; border: 0 dashed var(--muted); opacity: 0.7; }
+  .crosshair .v { border-left-width: 1px; }
+  .crosshair .h { border-top-width: 1px; }
+  .crosshair b { position: absolute; background: var(--text); color: var(--panel); padding: 1px 5px; border-radius: 3px; font-weight: 500; white-space: nowrap; }
+  .crosshair .time { transform: translateX(-50%); }
+  .crosshair .price { transform: translateY(-50%); }
   details { margin-top: 8px; font-size: 14px; }
   summary { cursor: pointer; color: var(--muted); }
   table { border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
@@ -1174,9 +1182,10 @@ function drawSawtooth(ex, traces, labels, stacks, withLabels) {
   if (!levels.length) return;
 
   const finest = levels[levels.length - 1];
-  for (const level of levels) {
+  // Coarsest last, so it is drawn in front: a finer level shows only where its path leaves the coarser ones.
+  for (const level of [...levels].reverse()) {
     const color = levelColor(level);
-    // Every level is drawn at the same width; where levels share a leg, the finer one is drawn on top.
+    // Every level is drawn at the same width, with its pivots marked; a pivot shared by several levels shows the coarsest.
     const width = 2;
     const pivots = ex.sawtooth[level];
     const turns = pivots.filter(p => p.kind !== 'Current');
@@ -1187,7 +1196,7 @@ function drawSawtooth(ex, traces, labels, stacks, withLabels) {
     // Pivots are turning points, so the hover says when price turned away; the label does not wait for that.
     traces.push({ type: 'scatter', mode: 'lines+markers', name: `Level ${level}`,
       x: turns.map(p => p.time), y: turns.map(p => p.price),
-      line: { color, width }, marker: { color, size: level === finest ? 6 : 0 },
+      line: { color, width }, marker: { color, size: 6 },
       hovertemplate: turns.map(p => `Level ${level} · ${name(p)}<br>${fmtTime(p.time)}<br>${fmtPrice(p.price)}` +
         `<br>${p.confirmedTime ? `turned ${fmtTime(p.confirmedTime)}` : 'price has not turned away yet'}<extra></extra>`) });
 
@@ -1373,57 +1382,191 @@ function draw(el, ex, focus) {
   const shapes = [...trendShapes(ex), ...highlight(ex, traces, labels)];
   if (ex.hindsight) shapes.push(...drawReplayExtras(ex, traces, level));
 
-  // A fixed default view of the whole snippet, so toggling layers never rescales; uirevision keeps any zoom or pan across redraws.
+  // A fixed default view of the whole snippet, so toggling layers never rescales; a zoom or pan is kept across redraws.
   // While replaying, the view still spans the whole snippet, so the time still to come stays in frame; a long replay instead
-  // follows the cursor with a moving window, which resets zoom on each step.
+  // follows the cursor with a moving window.
   const full = (ex.hindsight ?? ex).prices, w = ex.window;
   const span = a => w ? a.slice(w.from, w.to + 1) : a;
-  const fp = { t: span(full.t), h: span(full.h), l: span(full.l) };
-  const low = fp.l.reduce((a, b) => Math.min(a, b)), high = fp.h.reduce((a, b) => Math.max(a, b)), pad = (high - low) * 0.06;
-  const first = Date.parse(fp.t[0]), last = Date.parse(fp.t[fp.t.length - 1]), candle = (last - first) / Math.max(1, fp.t.length - 1);
-  const zoom = zoomedRanges(ex);
-  const xRange = zoom?.x ?? [new Date(first - candle).toISOString(), new Date(last + candle).toISOString()];
-  const yRange = zoom?.y ?? [low - pad, high + pad];
+  const times = span(full.t).map(Date.parse), first = times[0], last = times[times.length - 1], candle = (last - first) / Math.max(1, times.length - 1);
+  const view = { t: times, h: span(full.h), l: span(full.l), candle, x: [new Date(first - candle).toISOString(), new Date(last + candle).toISOString()] };
+  view.y = fitPrices(view, view.x);
+  views.set(ex.id, view);
+  const { x: xRange, y: yRange, manual } = shownRanges(zoomedRanges(ex, view), view);
   if (ex.loading) labels.push({ xref: 'paper', yref: 'paper', x: 0.5, y: 0.5, showarrow: false, text: 'Loading from the local server…',
     font: { size: 14, color: muted }, bgcolor: css('--panel') });
 
   Plotly.react(el, traces, {
     uirevision: ex.id,
-    margin: { t: 10, r: 10, b: 36, l: 56 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    margin: { t: 10, r: 56, b: 36, l: 10 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
     font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
+    dragmode: 'pan',
     xaxis: { type: 'date', rangeslider: { visible: false }, gridcolor: grid, linecolor: grid, range: xRange },
-    yaxis: { type: 'linear', gridcolor: grid, linecolor: grid, tickformat: ',.0f', range: yRange },
+    yaxis: { type: 'linear', gridcolor: grid, linecolor: grid, tickformat: ',.0f', side: 'right', range: yRange, fixedrange: !manual },
     annotations: labels, shapes, hovermode: 'closest', showlegend: false,
-  }, { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['select2d', 'lasso2d'] });
+  }, { responsive: true, displaylogo: false, doubleClick: false, modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d', 'resetScale2d'],
+    modeBarButtonsToAdd: [{ name: 'Reset view', icon: Plotly.Icons.home, click: gd => moveView(gd, null) }] });
   wireZoom(el);
 }
 
+// Charts navigate like a trading chart: dragging pans, the wheel zooms time around the pointer, and the price axis fits the
+// candles in view until it is scaled by hand, by dragging it or turning the wheel over it. Double-clicking the price axis
+// goes back to fitting; double-clicking the chart goes back to the default view.
 // A zoom or pan is kept across every redraw: layer toggles, level changes and replay steps. Plotly's own way of keeping a
 // user's zoom does not survive these redraws reliably, so the page remembers each chart's zoom and supplies it. The view
 // only moves when a replay step carries the cursor out of it: then it slides along, keeping its width. Redraws that do not
-// move the cursor never move the view. Double-clicking goes back to the default view.
+// move the cursor never move the view.
+// A chart's zoom holds x once the time axis has been moved and y once the price axis has been scaled by hand.
 const zooms = new Map();
+// Each chart's default ranges and the candles it spans, for fitting the price axis.
+const views = new Map();
+const viewsToMove = new Set();
+let movingViews = 0;
 const axisTime = v => Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(String(v)) ? v : `${String(v).replace(' ', 'T')}Z`);
+
+// The price range of the candles between two times, with a little room above and below; null when there are none.
+function fitPrices(view, x) {
+  const [from, to] = x.map(axisTime);
+  let low = Infinity, high = -Infinity;
+  for (let i = 0; i < view.t.length; i++) {
+    if (view.t[i] < from || view.t[i] > to) continue;
+    low = Math.min(low, view.l[i]);
+    high = Math.max(high, view.h[i]);
+  }
+  if (low > high) return null;
+  const pad = (high - low) * 0.06 || high * 0.001;
+  return [low - pad, high + pad];
+}
+
+function shownRanges(zoom, view) {
+  const x = zoom?.x ?? view.x;
+  return { x, y: zoom?.y ?? fitPrices(view, x) ?? view.y, manual: zoom?.y != null };
+}
+
+// Records a chart's zoom (none for the default view) and shows it on the next frame, so a run of wheel or drag events
+// costs one redraw. A move that would leave no candles in view keeps the time range as it was.
+function moveView(el, zoom) {
+  const id = el.dataset.id, view = views.get(id);
+  if (zoom?.x && view && !fitPrices(view, zoom.x)) zoom = { ...zoom, x: zooms.get(id)?.x };
+  if (zoom?.x || zoom?.y) zooms.set(id, zoom); else zooms.delete(id);
+  if (viewsToMove.has(el)) return;
+  viewsToMove.add(el);
+  requestAnimationFrame(async () => {
+    viewsToMove.delete(el);
+    const view = views.get(id);
+    if (!view || !el.isConnected || !el._fullLayout) return;
+    const { x, y, manual } = shownRanges(zooms.get(id), view);
+    movingViews++;
+    try { await Plotly.relayout(el, { 'xaxis.range': x, 'yaxis.range': y, 'yaxis.fixedrange': !manual }); }
+    finally { movingViews--; }
+  });
+}
+
+// Where a mouse event is on a chart, in pixels from the top left of the plot area, with the plot area's place and size.
+function plotPoint(el, e) {
+  const size = el._fullLayout?._size;
+  if (!size) return null;
+  const box = el.getBoundingClientRect(), x = e.clientX - box.left - size.l, y = e.clientY - box.top - size.t;
+  return { x, y, left: size.l, top: size.t, w: size.w, h: size.h, onPrices: x > size.w && y >= 0 && y <= size.h, onPlot: x >= 0 && x <= size.w && y >= 0 && y <= size.h };
+}
 
 function wireZoom(el) {
   if (el.dataset.zoomWired) return;
   el.dataset.zoomWired = '1';
+  const id = el.dataset.id;
+  const iso = v => new Date(v).toISOString();
+
+  // Plotly's own pans and zooms; the page's moves are already recorded.
   el.on('plotly_relayout', e => {
-    const id = el.dataset.id;
-    if (e['xaxis.autorange'] || e.autosize) { zooms.delete(id); return; }
+    if (movingViews) return;
     const pick = axis => e[`${axis}.range`] ?? (e[`${axis}.range[0]`] !== undefined ? [e[`${axis}.range[0]`], e[`${axis}.range[1]`]] : null);
     const x = pick('xaxis'), y = pick('yaxis');
     if (!x && !y) return;
-    const zoom = zooms.get(id) ?? {};
-    if (x) zoom.x = x.map(v => new Date(axisTime(v)).toISOString());
+    const zoom = { ...zooms.get(id) };
+    if (x) zoom.x = x.map(v => iso(axisTime(v)));
     if (y) zoom.y = y.map(Number);
-    zooms.set(id, zoom);
+    moveView(el, zoom);
   });
+  el.on('plotly_doubleclick', () => moveView(el, null));
+
+  el.addEventListener('wheel', e => {
+    const p = plotPoint(el, e), view = views.get(id);
+    if (!p || !view || p.y < 0 || p.x < 0 || (p.x > p.w && !p.onPrices)) return;
+    e.preventDefault();
+    const zoom = { ...zooms.get(id) }, shown = shownRanges(zoom, view), lines = e.deltaMode === 1 ? 33 : 1;
+    const k = Math.exp(e.deltaY * lines * 0.0015);
+    if (p.onPrices) {
+      const [low, high] = shown.y, at = high - (high - low) * p.y / p.h;
+      zoom.y = [at - (at - low) * k, at + (high - at) * k];
+    } else {
+      const [from, to] = shown.x.map(axisTime), width = to - from;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        const shift = width * e.deltaX * lines / p.w;
+        zoom.x = [from + shift, to + shift].map(iso);
+      } else {
+        const full = view.x.map(axisTime);
+        if (k < 1 ? width * k < view.candle * 5 : width * k > (full[1] - full[0]) * 4) return;
+        const at = from + width * p.x / p.w;
+        zoom.x = [at - (at - from) * k, at + (to - at) * k].map(iso);
+      }
+    }
+    moveView(el, zoom);
+  }, { passive: false });
+
+  // Dragging the price axis scales prices about the middle of the view, in place of Plotly's own axis drag.
+  el.addEventListener('mousedown', e => {
+    cross.hidden = true;
+    const view = views.get(id);
+    if (e.button !== 0 || !view || !plotPoint(el, e)?.onPrices) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const [low, high] = shownRanges(zooms.get(id), view).y, middle = (low + high) / 2, half = (high - low) / 2;
+    const drag = m => {
+      const k = Math.exp((m.clientY - e.clientY) * 0.005);
+      moveView(el, { ...zooms.get(id), y: [middle - half * k, middle + half * k] });
+    };
+    const drop = () => { document.removeEventListener('mousemove', drag); document.removeEventListener('mouseup', drop); };
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', drop);
+  }, true);
+  el.addEventListener('dblclick', e => {
+    if (!plotPoint(el, e)?.onPrices) return;
+    const { y, ...zoom } = zooms.get(id) ?? {};
+    moveView(el, zoom);
+  });
+
+  // A crosshair at the pointer, its time snapped to the nearest candle, with the time and price on the axes.
+  const cross = document.createElement('div');
+  cross.className = 'crosshair';
+  cross.hidden = true;
+  cross.innerHTML = '<i class="v"></i><i class="h"></i><b class="time"></b><b class="price"></b>';
+  el.append(cross);
+  const [v, h, timeLabel, priceLabel] = cross.children;
+  let mouse = null;
+  const aim = () => {
+    const p = mouse && plotPoint(el, mouse), view = views.get(id);
+    el.style.cursor = p?.onPrices ? 'ns-resize' : '';
+    cross.hidden = !p?.onPlot || !view;
+    if (cross.hidden) return;
+    const [from, to] = el._fullLayout.xaxis.range.map(axisTime), [low, high] = el._fullLayout.yaxis.range;
+    const at = from + (to - from) * p.x / p.w, time = view.candle ? view.t[0] + Math.round((at - view.t[0]) / view.candle) * view.candle : at;
+    const x = p.left + (time - from) / (to - from) * p.w, y = p.top + p.y;
+    v.style.cssText = `left:${x}px;top:${p.top}px;height:${p.h}px`;
+    h.style.cssText = `left:${p.left}px;top:${y}px;width:${p.w}px`;
+    timeLabel.style.cssText = `left:${x}px;top:${p.top + p.h + 3}px`;
+    timeLabel.textContent = fmtTime(iso(time));
+    priceLabel.style.cssText = `left:${p.left + p.w + 3}px;top:${y}px`;
+    priceLabel.textContent = Math.floor(high - (high - low) * p.y / p.h).toLocaleString('en-US');
+  };
+  el.addEventListener('mousemove', e => { mouse = e; aim(); });
+  el.addEventListener('mouseleave', () => { mouse = null; aim(); });
+  el.on('plotly_afterplot', aim);
 }
 
 // The x and y ranges of a chart the user has zoomed; null when not zoomed. While replaying, a step that takes the cursor
 // out of view slides the view along; a redraw that leaves the cursor where it was changes nothing.
-function zoomedRanges(ex) {
+// A view is never left without candles, as the moving window of a long replay would otherwise leave one that stayed behind:
+// it goes back to the cursor, keeping its width, and a price range scaled by hand that misses the candles in view is dropped.
+function zoomedRanges(ex, view) {
   const zoom = zooms.get(ex.id);
   if (!zoom) return null;
   if (zoom.x && ex.cursor != null && zoom.cursor !== undefined && zoom.cursor !== ex.cursor) {
@@ -1436,6 +1579,16 @@ function zoomedRanges(ex) {
       zoom.x = [new Date(from).toISOString(), new Date(to).toISOString()];
     }
   }
+  if (zoom.x && !fitPrices(view, zoom.x)) {
+    const [from, to] = zoom.x.map(Date.parse), width = to - from;
+    if (ex.cursor != null) {
+      const now = Date.parse(ex.hindsight.prices.t[ex.cursor]);
+      zoom.x = [new Date(now - width * 0.9).toISOString(), new Date(now + width * 0.1).toISOString()];
+    } else delete zoom.x;
+    delete zoom.y;
+  }
+  const fit = zoom.y && fitPrices(view, zoom.x ?? view.x);
+  if (fit && (fit[0] > zoom.y[1] || fit[1] < zoom.y[0])) delete zoom.y;
   zoom.cursor = ex.cursor ?? undefined;
   return { x: zoom.x ?? null, y: zoom.y ?? null };
 }
