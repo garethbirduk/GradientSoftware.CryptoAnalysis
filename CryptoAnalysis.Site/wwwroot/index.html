@@ -12,17 +12,17 @@
     --accent: #0f766e; --chip: #f5f5f4; --code: #f1f5f9;
     --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
     --up: #26a69a; --down: #ef5350; --close: #a8a29e; --grid: #eeeceb;
-    --upswing: #2563eb; --downswing: #9333ea; --saw: #334155;
-    /* Sawtooth levels: no blue or violet, which are the up and down swing fills. Validated with the dataviz checks, light and dark. */
-    --lv1: #eb6834; --lv2: #1baf7a; --lv3: #eda100; --lv4: #e87ba4; --lv5: #008300; --lv6: #c93a77; --lv7: #b0652a; --lv8: #0b8fa8;
+    --upswing: #16a34a; --downswing: #dc2626; --saw: #000000;
+    /* Sawtooth levels: level 0 is --saw, then blue, yellow, magenta, sky, violet, pink, brown, slate. No red, green or orange, which would read as the swing fills and candles. Every pair of levels is at least 15 apart (OKLab x100) in both themes. */
+    --lv1: #3b82f6; --lv2: #f0b400; --lv3: #f01fd0; --lv4: #38bdf8; --lv5: #5b21b6; --lv6: #ff8fc7; --lv7: #854d0e; --lv8: #64748b;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #0c0a09; --panel: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --border: #292524;
       --accent: #2dd4bf; --chip: #292524; --code: #292524;
       --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --close: #78716c; --grid: #292524;
-      --upswing: #60a5fa; --downswing: #c084fc; --saw: #e2e8f0;
-      --lv1: #d95926; --lv2: #199e70; --lv3: #c98500; --lv4: #d55181; --lv5: #008300; --lv6: #e0548f; --lv7: #b8712f; --lv8: #1a9fb8;
+      --upswing: #4ade80; --downswing: #f87171; --saw: #ffffff;
+      --lv1: #60a5fa; --lv2: #facc15; --lv3: #ff5fd8; --lv4: #67e8f9; --lv5: #8b5cf6; --lv6: #ffb3d9; --lv7: #a16207; --lv8: #64748b;
     }
   }
   * { box-sizing: border-box; }
