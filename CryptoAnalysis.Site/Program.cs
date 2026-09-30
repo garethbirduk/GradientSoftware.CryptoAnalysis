@@ -4,8 +4,14 @@ using Gradient.CryptoAnalysis.Csv;
 using Gradient.CryptoAnalysis.Site;
 using System.Text.Json;
 
-// Usage: CryptoAnalysis.Site [examplesRoot] [outDir]
+// Usage: CryptoAnalysis.Site [examplesRoot] [outDir] [--serve] [--port=5178]
 // Defaults: CryptoAnalysis.Test/TestData/Terms and artifacts/site, relative to the repo root.
+// Builds the static site; with --serve it then serves it on localhost, with replay batches for the full history.
+
+const string FullHistoryDataset = "btc-1h";
+var serve = args.Contains("--serve");
+var port = args.Where(x => x.StartsWith("--port=")).Select(x => int.Parse(x["--port=".Length..])).DefaultIfEmpty(5178).First();
+args = args.Where(x => !x.StartsWith("--")).ToArray();
 
 var repoRoot = FindRepoRoot(AppContext.BaseDirectory);
 var examplesRoot = Path.GetFullPath(args.Length > 0 ? args[0] : Path.Combine(repoRoot, "CryptoAnalysis.Test", "TestData", "Terms"));
@@ -76,16 +82,8 @@ var fullPath = Path.Combine(repoRoot, "CryptoAnalysis.Test", "TestData", "Prices
 var full = File.Exists(fullPath)
     ? new CsvReaderHelper().ReadData<Price, PriceClassMap>(fullPath).ToList()
     : [];
+// The full history is not built into the page: the Replay page loads it from the local server.
 var sawtoothExamples = new List<object>();
-if (full.Count > 0)
-{
-    var high = full.First(p => p.Close == full.Max(x => x.Close));
-    sawtoothExamples.Add(SawtoothExample("Sawtooth/full-history", "Full history",
-        $"All {full.Count:N0} hourly BTC candles in the dataset ({full[0].DateTime:d MMM yyyy} to {full[^1].DateTime:d MMM yyyy}), starting at {full[0].Close:N0}. " +
-        $"Level 0 is the widest view: the first price up to the highest close ({high.Close:N0} on {high.DateTime:d MMM yyyy}), then the incomplete leg to the latest close ({full[^1].Close:N0}). " +
-        "Step through the levels to see the upleg and the presumed death-leg split into their own highs and lows.",
-        full));
-}
 
 foreach (var (id, title, description) in new[]
 {
@@ -144,6 +142,9 @@ File.WriteAllText(Path.Combine(outDir, "data.js"), $"window.SITE_DATA = {json};\
 
 var mismatched = examples.Count(x => !x.Matches);
 Console.WriteLine($"{terms.Count} terms, {examples.Count} examples ({mismatched} mismatched) -> {Path.Combine(outDir, "index.html")}");
+
+if (serve && full.Count > 0)
+    await ReplayServer.Run(outDir, [new Dataset(FullHistoryDataset, "BTC/USD hourly (Coinbase)", full)], port);
 return 0;
 
 // The sawtooth levels, each level's swings (with the indexes of their interims in the next level's list) and each level's
@@ -154,10 +155,20 @@ static object StructureOf(List<Price> prices)
     var swings = Enumerable.Range(0, levels.Count)
         .Select(l => Sawtooth.Swings(prices, levels, EnumPriceBasis.Close, l).OrderBy(x => x.Start.Time).ToList())
         .ToList();
+    var breaks = swings.Select(list => Sawtooth.MarketStructureBreaks(prices, list, EnumPriceBasis.Close)).ToList();
+    // Replaying candle by candle is quadratic, so the page carries replays of up to about a week of hourly candles; longer
+    // ones come from the local server.
+    const int liveReplayLimit = 200;
 
     return new
     {
-        Sawtooth = levels.Select(level => level.Pivots.Select(p => new { p.Kind, p.Time, p.Price })),
+        Sawtooth = levels.Select(level => level.Pivots.Select(p => new
+        {
+            p.Kind,
+            p.Time,
+            p.Price,
+            ConfirmedTime = p.ConfirmedIndex is int c ? prices[c].DateTime : (DateTime?)null,
+        })),
         SwingsByLevel = swings.Select((list, l) => list.Select(w => new
         {
             w.Level,
@@ -169,7 +180,13 @@ static object StructureOf(List<Price> prices)
             w.Confirmed,
             Interims = l + 1 < swings.Count ? Sawtooth.Interims(w, swings[l + 1]).Select(x => swings[l + 1].IndexOf(x)).ToList() : [],
         })),
-        MarketStructureBreaksByLevel = swings.Select(list => Sawtooth.MarketStructureBreaks(prices, list, EnumPriceBasis.Close)),
+        PointsByLevel = levels.Select(level => Sawtooth.Points(prices, level, EnumPriceBasis.Close)),
+        MarketStructureBreaksByLevel = breaks,
+        TrendsByLevel = swings.Select((list, l) => Sawtooth.Trends(list, breaks[l])),
+        LiveByLevel = prices.Count <= liveReplayLimit
+            ? Enumerable.Range(0, levels.Count).Select(l => l == 0 ? [] : MarketStructure.Replay(prices, EnumPriceBasis.Close, l))
+            : null,
+        Replay = prices.Count <= liveReplayLimit ? MarketStructure.Timeline(prices, EnumPriceBasis.Close, maxLevel: 8) : null,
         CandleRuns = CandleRuns.Runs(prices, minLength: 2),
         Prices = new
         {

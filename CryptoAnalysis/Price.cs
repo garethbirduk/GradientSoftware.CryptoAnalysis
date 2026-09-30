@@ -91,6 +91,30 @@ namespace Gradient.CryptoAnalysis
         BearishBreakOfStructure,
 
         /// <summary>
+        /// Upswings following one another at the same level: higher highs broken again and again, with no downswing between them.
+        /// It is confirmed by the second upswing's break of structure and lasts until a downswing breaks structure.
+        /// </summary>
+        /// <remarks>
+        /// Detected on the sawtooth (see <see cref="Sawtooth.Trends"/>): a run of at least two consecutive upswings at a level,
+        /// in the order they broke structure. Market structure breaks against it are counted, but do not end it. Asserted at
+        /// the confirming break of structure.
+        /// </remarks>
+        [Term("T↑", "Uptrend", TermCategories.Trends, EnumPosition.Above, "#0d9488", "diamond")]
+        Uptrend,
+
+        /// <summary>
+        /// Downswings following one another at the same level: lower lows broken again and again, with no upswing between them.
+        /// It is confirmed by the second downswing's break of structure and lasts until an upswing breaks structure.
+        /// </summary>
+        /// <remarks>
+        /// Detected on the sawtooth (see <see cref="Sawtooth.Trends"/>): a run of at least two consecutive downswings at a
+        /// level, in the order they broke structure. Market structure breaks against it are counted, but do not end it.
+        /// Asserted at the confirming break of structure.
+        /// </remarks>
+        [Term("T↓", "Downtrend", TermCategories.Trends, EnumPosition.Below, "#e11d48", "diamond")]
+        Downtrend,
+
+        /// <summary>
         /// The first close above a downswing's protective high (the bounce high before its break of structure): a warning that
         /// the fall may be ending. It is a signal, not structure: the downswing can still continue.
         /// </summary>

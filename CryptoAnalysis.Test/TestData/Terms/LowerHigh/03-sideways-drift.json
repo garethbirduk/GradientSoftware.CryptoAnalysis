@@ -1,9 +1,10 @@
 {
   "term": "LowerHigh",
   "title": "Sideways drift",
-  "description": "After a first lower high at 24,412, two more sit almost level with each other, 24,012 and 24,006, while price drifts sideways for a day under 24k. A lower high only has to be below the previous one, by any margin. The break at 23,347 ends the drift.",
+  "description": "After a first lower high at 24,412, two more sit almost level with each other, 24,012 and 24,006, while price drifts sideways for a day under 24k. A lower high only has to be below the previous one, by any margin. The break at 23,347 ends the drift, and the bounce after it, 23,191 so far, is already another lower high.",
   "reviewed": false,
   "closeType": "Close",
+  "level": 1,
   "expected": [
     {
       "type": "LowerHigh",
@@ -22,7 +23,12 @@
       "direction": "Down",
       "time": "2023-02-24T01:00:00Z",
       "price": 24005.84
+    },
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2023-02-24T19:00:00Z",
+      "price": 23191.22
     }
-  ],
-  "level": 1
+  ]
 }

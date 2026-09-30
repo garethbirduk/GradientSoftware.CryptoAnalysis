@@ -18,10 +18,35 @@ public enum EnumPivotKind
 }
 
 /// <summary>
-/// A point on a sawtooth. Start is the first price, which is neither a high nor a low; Current is the last price,
+/// A turning point on a sawtooth. Start is the first price, which is neither a high nor a low; Current is the last price,
 /// which ends the final, incomplete leg. Index is the candle index.
+/// ConfirmedIndex is the candle from which the point can no longer move: for a high or low that ends a run of new extremes,
+/// the candle after it; for a pullback low or bounce high, the candle that starts the next run. It is null while the point can
+/// still move (the current price, or an extreme on the last candle). Its level can still change, because a later new high redraws
+/// the levels.
+/// A pivot is not the same as a structure point: a pivot needs price to turn away from it, but a high is a high (and an HH is an
+/// HH) the moment price makes it. See <see cref="Sawtooth.Points"/>.
 /// </summary>
-public sealed record SawtoothPivot(EnumPivotKind Kind, int Index, DateTime Time, double Price);
+public sealed record SawtoothPivot(EnumPivotKind Kind, int Index, DateTime Time, double Price)
+{
+    public int? ConfirmedIndex { get; init; }
+}
+
+/// <summary>
+/// A high or low at a level, as currently known, with its label: H or L for the first of its kind, HH, LH, HL or LL against the
+/// previous one of its kind (Type is then the matching term), and EQH or EQL when equal. Provisional is true while price can
+/// still extend it, which moves it: a new higher close moves an HH forward. LegStart is the time of the point its leg starts
+/// from, which stays the same while the point moves.
+/// </summary>
+public sealed record StructurePoint(
+    int Level,
+    EnumPivotKind Kind,
+    DateTime Time,
+    double Price,
+    string Label,
+    EnumAnnotationType? Type,
+    DateTime LegStart,
+    bool Provisional);
 
 /// <summary>
 /// One resolution of the sawtooth: the start, then alternating highs and lows, optionally ending at the current price.
@@ -60,7 +85,8 @@ public static class Sawtooth
     /// <summary>
     /// Returns the confirmed swings at a level (1 or above). A swing lies inside one leg of the level above and runs in that
     /// leg's direction: in an upleg, a high, the low after it, and the break of structure (the first price beyond the high);
-    /// in a downleg the mirror. A leg's last high or low that has not been broken is not yet a swing.
+    /// in a downleg the mirror. A leg's last high or low that has not been broken is not yet a swing. In the final, incomplete
+    /// leg a break on the last candle counts, so a swing is known on the candle that breaks structure.
     /// </summary>
     public static List<SwingOutline> Swings(List<Price> prices, IReadOnlyList<SawtoothLevel> levels, EnumPriceBasis basis, int level)
     {
@@ -71,6 +97,7 @@ public static class Sawtooth
         var parent = levels[level - 1].Pivots;
         var child = levels[level].Pivots.Where(p => p.Kind is EnumPivotKind.High or EnumPivotKind.Low).ToList();
         var last = prices.Count - 1;
+        var first = 0;
 
         for (var i = 0; i + 1 < parent.Count; i++)
         {
@@ -80,16 +107,30 @@ public static class Sawtooth
             var up = to.Kind == EnumPivotKind.High || (to.Kind == EnumPivotKind.Current && from.Kind == EnumPivotKind.Low);
             var extremeKind = up ? EnumPivotKind.High : EnumPivotKind.Low;
 
-            var turns = child.Where(p => p.Index >= from.Index && p.Index <= end).ToList();
-            for (var t = 0; t + 2 < turns.Count; t++)
+            // Pivots are in candle order and legs follow on from each other, so one pass finds each leg's turns.
+            while (first < child.Count && child[first].Index < from.Index)
+                first++;
+            var turns = new List<SawtoothPivot>();
+            for (var k = first; k < child.Count && child[k].Index <= end; k++)
+                turns.Add(child[k]);
+            for (var t = 0; t + 1 < turns.Count; t++)
             {
                 var start = turns[t];
                 var counter = turns[t + 1];
-                var next = turns[t + 2];
                 if (start.Kind != extremeKind)
                     continue;
 
-                for (var c = counter.Index + 1; c <= next.Index; c++)
+                // The next extreme bounds the search; in the final leg an extreme still running on the last candle is not a
+                // pivot yet, so the search runs to the last candle.
+                int limit;
+                if (t + 2 < turns.Count)
+                    limit = turns[t + 2].Index;
+                else if (to.Kind == EnumPivotKind.Current)
+                    limit = last;
+                else
+                    continue;
+
+                for (var c = counter.Index + 1; c <= limit; c++)
                 {
                     var value = up ? HighOf(prices[c], basis) : LowOf(prices[c], basis);
                     if (up ? value > start.Price : value < start.Price)
@@ -109,6 +150,117 @@ public static class Sawtooth
         }
 
         return swings;
+    }
+
+    /// <summary>
+    /// Returns a level's highs and lows as currently known, labelled against the previous one of their kind. These are the
+    /// level's high and low pivots plus, when the level ends in an incomplete leg, that leg's furthest point so far: it is a high
+    /// (or low) now, whether or not price has turned away from it, and it moves while price extends the leg.
+    /// </summary>
+    public static List<StructurePoint> Points(List<Price> prices, SawtoothLevel level, EnumPriceBasis basis)
+    {
+        var pivots = level.Pivots;
+        var extremes = new List<(EnumPivotKind Kind, DateTime Time, double Price, DateTime LegStart, bool Provisional)>();
+        for (var i = 0; i < pivots.Count; i++)
+        {
+            var p = pivots[i];
+            if (p.Kind is EnumPivotKind.High or EnumPivotKind.Low)
+                extremes.Add((p.Kind, p.Time, p.Price, i > 0 ? pivots[i - 1].Time : p.Time, p.ConfirmedIndex == null));
+        }
+
+        // The incomplete leg's furthest point so far: the first candle to reach it, since an equal close does not extend it.
+        if (pivots.Count >= 2 && pivots[^1].Kind == EnumPivotKind.Current && pivots[^2].Kind is EnumPivotKind.High or EnumPivotKind.Low)
+        {
+            var from = pivots[^2];
+            var up = from.Kind == EnumPivotKind.Low;
+            var best = from.Index + 1;
+            for (var i = best + 1; i < prices.Count; i++)
+            {
+                if (up ? HighOf(prices[i], basis) > HighOf(prices[best], basis) : LowOf(prices[i], basis) < LowOf(prices[best], basis))
+                    best = i;
+            }
+
+            if (best < prices.Count)
+                extremes.Add((up ? EnumPivotKind.High : EnumPivotKind.Low, prices[best].DateTime,
+                    up ? HighOf(prices[best], basis) : LowOf(prices[best], basis), from.Time, true));
+        }
+
+        var points = new List<StructurePoint>();
+        double? lastHigh = null, lastLow = null;
+        foreach (var e in extremes)
+        {
+            var high = e.Kind == EnumPivotKind.High;
+            var previous = high ? lastHigh : lastLow;
+            var (label, type) = previous switch
+            {
+                null => (high ? "H" : "L", (EnumAnnotationType?)null),
+                double p when e.Price == p => (high ? "EQH" : "EQL", null),
+                double p when e.Price > p => (high ? "HH" : "HL", high ? EnumAnnotationType.HigherHigh : EnumAnnotationType.HigherLow),
+                _ => (high ? "LH" : "LL", high ? EnumAnnotationType.LowerHigh : EnumAnnotationType.LowerLow),
+            };
+            points.Add(new StructurePoint(level.Level, e.Kind, e.Time, e.Price, label, type, e.LegStart, e.Provisional));
+            if (high)
+                lastHigh = e.Price;
+            else
+                lastLow = e.Price;
+        }
+
+        return points;
+    }
+
+    /// <summary>
+    /// Returns the candidate swings at a level (1 or above): a swing that has its start and a pullback (or bounce) so far,
+    /// but no break of structure yet. It is not a swing: it becomes one if price breaks its start before a new high redraws the levels,
+    /// at this level, or a coarser one when the same candle also breaks a coarser level's extreme. Candidates only exist in
+    /// the final, incomplete leg: its last high (in an upleg) or low (in a downleg) with the counter-move since; and at level 1,
+    /// the series high with the pullback since, which a new high would break.
+    /// </summary>
+    public static List<CandidateSwing> Candidates(List<Price> prices, IReadOnlyList<SawtoothLevel> levels, EnumPriceBasis basis, int level)
+    {
+        var candidates = new List<CandidateSwing>();
+        if (level < 1 || levels.Count == 0)
+            return candidates;
+
+        var last = prices.Count - 1;
+        var parent = levels[Math.Min(level - 1, levels.Count - 1)].Pivots;
+        var child = levels[Math.Min(level, levels.Count - 1)].Pivots;
+        if (parent.Count < 2 || parent[^1].Kind != EnumPivotKind.Current || child.Count < 2)
+            return candidates;
+
+        // The series high with the pullback since: a close above it breaks structure at level 1. A high on the first candle
+        // becomes the start when it is broken, not a high, so it has no candidate.
+        var from = parent[^2];
+        if (level == 1 && from.Kind == EnumPivotKind.High && parent[0].Kind == EnumPivotKind.Start)
+            AddCandidate(from, up: true);
+
+        // The final leg's last extreme with the counter-move since.
+        var up = from.Kind == EnumPivotKind.Low;
+        var extreme = child[^2];
+        if (extreme.Index != from.Index && extreme.Kind == (up ? EnumPivotKind.High : EnumPivotKind.Low))
+            AddCandidate(extreme, up);
+
+        return candidates;
+
+        void AddCandidate(SawtoothPivot start, bool up)
+        {
+            if (start.Index >= last)
+                return;
+
+            var counter = start.Index + 1;
+            for (var i = start.Index + 1; i <= last; i++)
+            {
+                var high = HighOf(prices[i], basis);
+                var low = LowOf(prices[i], basis);
+                if (up ? high > start.Price : low < start.Price)
+                    return;
+                if (up ? low < LowOf(prices[counter], basis) : high > HighOf(prices[counter], basis))
+                    counter = i;
+            }
+
+            var counterPrice = up ? LowOf(prices[counter], basis) : HighOf(prices[counter], basis);
+            candidates.Add(new CandidateSwing(level, up ? EnumSwingDirection.Up : EnumSwingDirection.Down,
+                new PricePoint(start.Time, start.Price), new PricePoint(prices[counter].DateTime, counterPrice)));
+        }
     }
 
     /// <summary>
@@ -183,6 +335,38 @@ public static class Sawtooth
         return breaks.OrderBy(x => x.Break.Time).ThenBy(x => x.Type).ToList();
     }
 
+    /// <summary>
+    /// Returns the trends in a level's swings: runs of at least minSwings consecutive swings in the same direction, taken in
+    /// the order they broke structure. A trend is confirmed by the break of structure of its minSwings-th swing and ends when a
+    /// swing in the other direction breaks structure; until then it is ongoing. Market structure breaks against the trend are
+    /// counted but do not end it.
+    /// </summary>
+    public static List<TrendOutline> Trends(IReadOnlyList<SwingOutline> swings, IReadOnlyList<MarketStructureBreakOutline> breaks, int minSwings = 2)
+    {
+        var ordered = swings.Where(x => x.BreakOfStructure != null).OrderBy(x => x.BreakOfStructure!.Time).ToList();
+        var trends = new List<TrendOutline>();
+
+        for (var i = 0; i < ordered.Count;)
+        {
+            var j = i;
+            while (j + 1 < ordered.Count && ordered[j + 1].Direction == ordered[i].Direction)
+                j++;
+
+            if (j - i + 1 >= Math.Max(1, minSwings))
+            {
+                var first = ordered[i];
+                var end = j + 1 < ordered.Count ? ordered[j + 1].BreakOfStructure : null;
+                var against = first.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
+                var msbs = breaks.Count(b => b.Type == against && b.Break.Time > first.BreakOfStructure!.Time && (end == null || b.Break.Time <= end.Time));
+                trends.Add(new TrendOutline(first.Level, first.Direction, first.Start, ordered[i + Math.Max(1, minSwings) - 1].BreakOfStructure!, end, j - i + 1, msbs));
+            }
+
+            i = j + 1;
+        }
+
+        return trends;
+    }
+
     private static double HighOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.High : price.Close;
 
     private static double LowOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.Low : price.Close;
@@ -198,11 +382,11 @@ public static class Sawtooth
         }
 
         var pivots = new List<SawtoothPivot>();
-        var athPivot = Pivot(EnumPivotKind.High, prices, ath, basis);
+        var athPivot = Pivot(EnumPivotKind.High, prices, ath, basis) with { ConfirmedIndex = ath < last ? ath + 1 : null };
 
         // When the first candle is the high, the start and the high are the same point.
         if (ath != 0)
-            pivots.Add(Pivot(EnumPivotKind.Start, prices, 0, basis));
+            pivots.Add(Pivot(EnumPivotKind.Start, prices, 0, basis) with { ConfirmedIndex = 0 });
         pivots.Add(athPivot);
 
         var current = Pivot(EnumPivotKind.Current, prices, last, basis);
@@ -286,16 +470,17 @@ public static class Sawtooth
                 if (Beats(Counter(prices[first]), Counter(prices[i])))
                     first = i;
             }
-            chain.Add(Pivot(counterKind, prices, first, basis));
+            chain.Add(Pivot(counterKind, prices, first, basis) with { ConfirmedIndex = runStarts[0] });
         }
 
+        // An extreme is fixed once its run ends (the next candle); a counter-move once the next run starts.
         for (var r = 0; r < runEnds.Count; r++)
         {
             var isLast = r == runEnds.Count - 1;
             if (isLast && !includeLastExtreme)
                 break;
 
-            chain.Add(Pivot(extremeKind, prices, runEnds[r], basis));
+            chain.Add(Pivot(extremeKind, prices, runEnds[r], basis) with { ConfirmedIndex = runEnds[r] + 1 < prices.Count ? runEnds[r] + 1 : null });
             if (isLast)
                 break;
 
@@ -305,7 +490,7 @@ public static class Sawtooth
                 if (Beats(Counter(prices[counter]), Counter(prices[i])))
                     counter = i;
             }
-            chain.Add(Pivot(counterKind, prices, counter, basis));
+            chain.Add(Pivot(counterKind, prices, counter, basis) with { ConfirmedIndex = runStarts[r + 1] });
         }
 
         return chain;

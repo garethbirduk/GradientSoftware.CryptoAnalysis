@@ -172,6 +172,53 @@ public class SawtoothTests
     }
 
     [TestMethod]
+    public void ConfirmedIndex_ExtremeAfterItsRun_CounterAtTheNextRun()
+    {
+        var levels = Sawtooth.Levels(Closes(10, 12, 11, 13, 12), EnumPriceBasis.Close);
+
+        Assert.AreEqual("S0@0 H1@2 L2@3 H3@4 C4@-",
+            string.Join(" ", levels[1].Pivots.Select(p => $"{p.Kind.ToString()[0]}{p.Index}@{p.ConfirmedIndex?.ToString() ?? "-"}")));
+    }
+
+    [TestMethod]
+    public void Swings_BreakOnTheLastCandle_CountsInTheFinalLeg()
+    {
+        Assert.AreEqual("Down:18>19>17", DescribeSwings(Closes(20, 18, 19, 17), 1));
+    }
+
+    private static string DescribeTrends(List<Price> prices, int level)
+    {
+        var levels = Sawtooth.Levels(prices, EnumPriceBasis.Close);
+        var swings = Sawtooth.Swings(prices, levels, EnumPriceBasis.Close, level);
+        return string.Join(" ", Sawtooth.Trends(swings, Sawtooth.MarketStructureBreaks(prices, swings, EnumPriceBasis.Close))
+            .Select(t => $"{t.Direction}:{t.Confirmed.Price}>{t.End?.Price.ToString() ?? "-"}:{t.Swings}s:{t.MarketStructureBreaks}m"));
+    }
+
+    [TestMethod]
+    public void Trends_SecondSwingConfirms()
+    {
+        Assert.AreEqual("Up:15>-:2s:0m", DescribeTrends(Closes(10, 12, 11, 13, 12, 15, 14), 1));
+    }
+
+    [TestMethod]
+    public void Trends_OneSwing_IsNotATrend()
+    {
+        Assert.AreEqual("", DescribeTrends(Closes(10, 12, 11, 13, 12), 1));
+    }
+
+    [TestMethod]
+    public void Trends_EndAtTheFirstSwingTheOtherWay()
+    {
+        Assert.AreEqual("Up:15>12.5:2s:0m Down:12>-:2s:0m", DescribeTrends(Closes(10, 12, 11, 13, 12, 15, 14, 13, 13.5, 12.5, 13, 12), 1));
+    }
+
+    [TestMethod]
+    public void Trends_CountMarketStructureBreaksAgainstThem()
+    {
+        Assert.AreEqual("Up:14>-:2s:1m", DescribeTrends(Closes(10, 12, 11, 13, 10.5, 14), 1));
+    }
+
+    [TestMethod]
     public void SwingTree_PullbackDownswingsAreInterimsOfTheUpswing()
     {
         var prices = Closes(10, 20, 17, 18, 15, 16, 14, 21);

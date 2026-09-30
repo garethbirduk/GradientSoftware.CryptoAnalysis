@@ -1,18 +1,12 @@
-﻿namespace Gradient.CryptoAnalysis.Conditions.PriceConditions;
+namespace Gradient.CryptoAnalysis.Conditions.PriceConditions;
 
-public class IsUptrendCondition : PriceCondition, IAdjustableCandles
+/// <summary>
+/// Met while an uptrend is ongoing at a sawtooth level, as seen from the prices up to the current candle.
+/// </summary>
+public class IsUptrendCondition : IsTrendCondition
 {
-    protected override bool IsMet()
+    public IsUptrendCondition(int successiveCandles = DefaultAdditionalCandles, int level = 1, int minSwings = 2, int? maxMarketStructureBreaks = null)
+        : base(EnumSwingDirection.Up, successiveCandles, level, minSwings, maxMarketStructureBreaks)
     {
-        return true;
-    }
-
-    public IsUptrendCondition(int successiveCandles = DefaultAdditionalCandles) : base(successiveCandles)
-    {
-    }
-
-    public void SetAdditionalCandles(int additionalCandles)
-    {
-        AdditionalCandles = additionalCandles;
     }
 }

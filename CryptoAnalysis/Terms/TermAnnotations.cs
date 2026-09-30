@@ -34,6 +34,26 @@ public sealed record SwingOutline(
 }
 
 /// <summary>
+/// A swing still forming: its start (the high or low to break) and the furthest counter-move so far. It has no break of
+/// structure yet, so it is not a swing; see <see cref="Sawtooth.Candidates"/>.
+/// </summary>
+public sealed record CandidateSwing(int Level, EnumSwingDirection Direction, PricePoint Start, PricePoint Extreme);
+
+/// <summary>
+/// A trend at a sawtooth level: consecutive swings in one direction. Start is the first swing's start, Confirmed the break of
+/// structure that made it a trend, and End the break of structure of the first swing the other way (null while ongoing).
+/// Swings counts its swings and MarketStructureBreaks the market structure breaks against it.
+/// </summary>
+public sealed record TrendOutline(
+    int Level,
+    EnumSwingDirection Direction,
+    PricePoint Start,
+    PricePoint Confirmed,
+    PricePoint? End,
+    int Swings,
+    int MarketStructureBreaks);
+
+/// <summary>
 /// A swing and its interim swings: the swings one level finer that start inside it, each with its own interims.
 /// </summary>
 public sealed record SwingNode(SwingOutline Swing, IReadOnlyList<SwingNode> Interims);
@@ -58,8 +78,8 @@ public static class TermAnnotations
 
     /// <summary>
     /// Returns the structure points (HH, HL, LH, LL), swings, breaks of structure and market structure breaks from the
-    /// sawtooth at the given level, plus candle runs. A swing is asserted at its start. An upswing's MSB is a bearish break,
-    /// a downswing's a bullish one.
+    /// sawtooth at the given level, plus trends and candle runs. A swing is asserted at its start and a trend at its
+    /// confirming break of structure. An upswing's MSB is a bearish break, a downswing's a bullish one.
     /// </summary>
     public static List<TermAnnotation> Annotate(List<Price> prices, EnumCloseType closeType, int level = 1)
     {
@@ -76,10 +96,16 @@ public static class TermAnnotations
                 x.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BullishBreakOfStructure : EnumAnnotationType.BearishBreakOfStructure,
                 x.Direction, x.BreakOfStructure!.Time, x.BreakOfStructure.Price)));
 
-        annotations.AddRange(MarketStructureBreaks(prices, closeType, level)
+        var breaks = Sawtooth.MarketStructureBreaks(prices, swings, Basis(closeType));
+        annotations.AddRange(breaks
             .Select(x => new TermAnnotation(x.Type,
                 x.Type == EnumAnnotationType.BullishMarketStructureBreak ? EnumSwingDirection.Up : EnumSwingDirection.Down,
                 x.Break.Time, x.Break.Price)));
+
+        annotations.AddRange(Sawtooth.Trends(swings, breaks)
+            .Select(x => new TermAnnotation(
+                x.Direction == EnumSwingDirection.Up ? EnumAnnotationType.Uptrend : EnumAnnotationType.Downtrend,
+                x.Direction, x.Confirmed.Time, x.Confirmed.Price)));
 
         annotations.AddRange(CandleRuns.Runs(prices)
             .Select(x => new TermAnnotation(
@@ -105,6 +131,15 @@ public static class TermAnnotations
     }
 
     /// <summary>
+    /// Returns the trends at a sawtooth level.
+    /// </summary>
+    public static List<TrendOutline> Trends(List<Price> prices, EnumCloseType closeType, int level)
+    {
+        var swings = Swings(prices, closeType, level);
+        return Sawtooth.Trends(swings, Sawtooth.MarketStructureBreaks(prices, swings, Basis(closeType)));
+    }
+
+    /// <summary>
     /// Returns the confirmed swings at a sawtooth level, ordered by start time.
     /// </summary>
     public static List<SwingOutline> Swings(List<Price> prices, EnumCloseType closeType, int level)
@@ -127,40 +162,24 @@ public static class TermAnnotations
     private static EnumPriceBasis Basis(EnumCloseType closeType) => closeType == EnumCloseType.Close ? EnumPriceBasis.Close : EnumPriceBasis.Wick;
 
     /// <summary>
-    /// Classifies each pivot of a sawtooth level against the previous pivot of the same kind:
-    /// a high above the previous high is HH, below it LH; a low above the previous low is HL, below it LL.
-    /// The first high and first low have nothing to compare with, and equal pivots are neither, so those are left out.
-    /// A pivot on the last candle is also left out: its run has not ended, so it is not yet a formed high or low.
+    /// Returns the structure points at a sawtooth level (see <see cref="Sawtooth.Points"/>): each high or low as currently
+    /// known, against the previous one of its kind. A high above the previous high is HH, below it LH; a low above the previous
+    /// low is HL, below it LL. The first high and first low have nothing to compare with, and equal ones are neither, so those
+    /// are left out. The latest high or low counts as soon as price makes it, even while price may still extend it.
     /// </summary>
     public static List<TermAnnotation> StructurePoints(List<Price> prices, EnumCloseType closeType, int level)
     {
         var basis = Basis(closeType);
         var levels = Sawtooth.Levels(prices, basis, level);
-        var pivots = levels.Count == 0 ? [] : levels[Math.Min(level, levels.Count - 1)].Pivots;
+        if (levels.Count == 0)
+            return [];
 
-        var points = new List<TermAnnotation>();
-        double? lastHigh = null, lastLow = null;
-        foreach (var pivot in pivots.Where(p => p.Index != prices.Count - 1))
-        {
-            if (pivot.Kind == EnumPivotKind.High)
-            {
-                if (lastHigh is double previous && pivot.Price != previous)
-                    points.Add(pivot.Price > previous
-                        ? new TermAnnotation(EnumAnnotationType.HigherHigh, EnumSwingDirection.Up, pivot.Time, pivot.Price)
-                        : new TermAnnotation(EnumAnnotationType.LowerHigh, EnumSwingDirection.Down, pivot.Time, pivot.Price));
-                lastHigh = pivot.Price;
-            }
-            else if (pivot.Kind == EnumPivotKind.Low)
-            {
-                if (lastLow is double previous && pivot.Price != previous)
-                    points.Add(pivot.Price > previous
-                        ? new TermAnnotation(EnumAnnotationType.HigherLow, EnumSwingDirection.Up, pivot.Time, pivot.Price)
-                        : new TermAnnotation(EnumAnnotationType.LowerLow, EnumSwingDirection.Down, pivot.Time, pivot.Price));
-                lastLow = pivot.Price;
-            }
-        }
-
-        return points;
+        return Sawtooth.Points(prices, levels[Math.Min(level, levels.Count - 1)], basis)
+            .Where(x => x.Type != null)
+            .Select(x => new TermAnnotation(x.Type!.Value,
+                x.Type is EnumAnnotationType.HigherHigh or EnumAnnotationType.HigherLow ? EnumSwingDirection.Up : EnumSwingDirection.Down,
+                x.Time, x.Price))
+            .ToList();
     }
 
     private static void Add(List<TermAnnotation> annotations, EnumAnnotationType type, EnumSwingDirection direction, Price? price, EnumCloseType closeType)

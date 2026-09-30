@@ -1,0 +1,16 @@
+{
+  "term": "Downtrend",
+  "title": "Steady slide",
+  "description": "Price tops at 41,626 two hours in and slides to 38,814 in five downswings. The second break of structure (40,461 on 22 Jan 16:00) confirms the downtrend, and no upswing breaks structure after it, so it is still running at the end.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Downtrend",
+      "direction": "Down",
+      "time": "2024-01-22T16:00:00Z",
+      "price": 40460.66
+    }
+  ]
+}

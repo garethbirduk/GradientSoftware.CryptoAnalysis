@@ -77,5 +77,14 @@
         {
             Price = Prices.Last();
         }
+
+        /// <summary>
+        /// Returns the prices up to and including the current price, at most AdditionalCandles + 1 of them: everything the
+        /// condition may see without looking ahead.
+        /// </summary>
+        protected List<Price> PricesToCurrent()
+        {
+            return Prices.Take(CurrentIndex + 1).TakeLast(AdditionalCandles + 1).ToList();
+        }
     }
 }

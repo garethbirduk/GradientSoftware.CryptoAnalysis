@@ -1,0 +1,16 @@
+{
+  "term": "Uptrend",
+  "title": "Survives a break",
+  "description": "Five upswings from 61,761 to 65,327. On 3 Mar 07:00 the pullback closes at 61,633, below the previous pullback low (61,788): a bearish market structure break. No downswing breaks structure, so the uptrend, confirmed at 62,206 on 3 Mar 12:00, carries on and counts one break against it.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Uptrend",
+      "direction": "Up",
+      "time": "2024-03-03T12:00:00Z",
+      "price": 62206.1
+    }
+  ]
+}

@@ -22,6 +22,7 @@ public static class TermCategories
     public const string StructurePoints = "Structure points";
     public const string Swings = "Swings";
     public const string StructureBreaks = "Structure breaks";
+    public const string Trends = "Trends";
     public const string Indicators = "Indicators";
     public const string CandlePatterns = "Candle patterns";
 }
