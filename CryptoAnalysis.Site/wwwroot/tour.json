@@ -85,26 +85,119 @@
       ]
     },
     {
+      "chapter": "Upswing",
       "cues": [
         { "text": "An Upswing is characterised by a downleg from the HH to the Swing Low, followed by an upleg from the Swing Low to the BoS." }
       ]
     },
     {
-      "chapter": "Candles",
-      "layers": ["close", "candles"],
+      "chapter": "Upswings",
+      "remove": ["BullishBreakOfStructure", "HigherHigh", "HigherLow"],
+      "from": 15,
+      "until": 45,
+      "speed": 5,
       "cues": [
-        { "text": "The same hours drawn as candles. A candle shows where price went during its hour, not only where it ended." },
-        { "at": 62, "on": "open", "text": "Open: the price when the hour began" },
-        { "at": 62, "on": "close", "text": "Close: the price when the hour ended" },
-        { "at": 62, "text": "The body of a candle runs from its open to its close. Green closed higher than it opened; red closed lower." },
-        { "at": 62, "on": "high", "text": "High: the top of the wick" },
-        { "at": 62, "on": "low", "text": "Low: the bottom of the wick" },
-        { "at": 62, "text": "The wicks reach the highest and lowest prices traded during the hour." }
+        { "text": "Let's observe the upswings in real time." }
       ]
     },
     {
+      "chapter": "Downswings",
+      "add": ["LowerHigh"],
+      "remove": ["sawtooth"],
+      "from": 45,
+      "until": 67,
+      "speed": 5,
       "cues": [
-        { "text": "From here the chart keeps both. Market structure is read from the closes; the candles stay for detail." }
+        { "text": "Similarly we can plot the sawtooth in a downward trend where the highs are not Higher Highs, but Lower Highs (LH)." }
+      ]
+    },
+    {
+      "add": ["bosLevelDown"],
+      "cues": [
+        { "text": "Even though it may peak, it keeps returning to the previous low and heads lower. We can note the position where this happens." }
+      ]
+    },
+    {
+      "add": ["BearishBreakOfStructure"],
+      "cues": [
+        { "text": "Where this happens we also call it a Break of Structure (BoS)." }
+      ]
+    },
+    {
+      "add": ["Downswing"],
+      "remove": ["bosLevelDown"],
+      "cues": [
+        { "text": "And we can define a Downswing, characterised by an upleg from the LL to the Swing High, followed by a downleg from the Swing High to the BoS." }
+      ]
+    },
+    {
+      "remove": ["LowerLow", "LowerHigh", "BearishBreakOfStructure"],
+      "until": 74,
+      "cues": [
+        { "text": "We might notice the price heading back up." }
+      ]
+    },
+    {
+      "until": 75,
+      "cues": [
+        { "text": "If it breaks the previous HH", "hold": 0 },
+        { "at": 45, "on": "high", "text": "HH", "keep": "chapter" },
+        { "at": 75, "on": "high", "place": "above", "text": "BoS", "keep": "chapter" },
+        { "text": "then it turns out the Downswings were just part of a longer term Upswing." }
+      ]
+    },
+    {
+      "chapter": "Ghost swings",
+      "add": ["ghosts"],
+      "from": 74,
+      "until": 74,
+      "cues": [
+        { "text": "Our real time analysis might have considered this a Downswing, and we may have strategised according to this observation." }
+      ]
+    },
+    {
+      "until": 75,
+      "cues": [
+        { "text": "Where we may have considered something to have been observed, that later disappears with new data, we call it a Ghost, and in this case Ghost Downswings." }
+      ]
+    },
+    {
+      "add": ["level2", "sawtooth", "HigherHigh", "LowerLow", "LowerHigh", "HigherLow"],
+      "remove": ["Upswing", "Downswing", "ghosts"],
+      "cues": [
+        { "text": "But the data Ghosts hide can be useful. Zooming in we can see the sawtooth pattern at a lower level." }
+      ]
+    },
+    {
+      "chapter": "2nd order swings",
+      "add": ["BullishBreakOfStructure", "bosLevelUp", "BearishBreakOfStructure", "bosLevelDown"],
+      "remove": ["HigherHigh", "LowerLow", "LowerHigh", "HigherLow"],
+      "cues": [
+        { "text": "revealing the BoS at this level too." }
+      ]
+    },
+    {
+      "add": ["Downswing", "Upswing"],
+      "remove": ["BullishBreakOfStructure", "bosLevelUp", "BearishBreakOfStructure", "bosLevelDown"],
+      "cues": [
+        { "text": "and swings within swings." }
+      ]
+    },
+    {
+      "remove": ["sawtooth"],
+      "until": 100,
+      "cues": [
+        { "text": "Recursive swings are common." },
+        { "at": 6, "on": "high", "place": "above", "text": "2nd order swing" },
+        { "at": 30, "on": "close", "place": "above", "text": "2nd order swing" },
+        { "at": 55, "on": "close", "place": "above", "text": "2nd order swing" }
+      ]
+    },
+    {
+      "add": ["level3"],
+      "cues": [
+        { "text": "Or even 3rd order swings within swings within swings." },
+        { "at": 50, "on": "close", "place": "above", "text": "3rd order swing" }
       ]
     }
   ]
