@@ -1,0 +1,110 @@
+{
+  "title": "Market structure basics",
+  "dataset": "btc-1h",
+  "start": { "time": "2023-01-01T00:00", "view": [0, 168], "speed": 5, "layers": [] },
+  "sections": [
+    {
+      "chapter": "Closes",
+      "add": ["close"],
+      "from": 0,
+      "until": 31,
+      "view": [0, 93],
+      "speed": 5,
+      "cues": [
+        { "text": "Each point on this line is the price of Bitcoin at the end of one hour: the close." },
+        { "text": "Joined together, the hourly closes show where price has been." }
+      ]
+    },
+    {
+      "chapter": "Candles",
+      "add": ["candles"],
+      "until": 75,
+      "view": [0, 93],
+      "speed": 5,
+      "cues": [
+        { "text": "The same hours drawn as candles. A candle shows where price went during its hour, not only where it ended." },
+        { "at": 62, "on": "open", "text": "Open: the price when the hour began" },
+        { "at": 62, "on": "close", "text": "Close: the price when the hour ended" },
+        { "text": "The body of a candle runs from its open to its close. Green closed higher than it opened; red closed lower." },
+        { "at": 62, "on": "high", "text": "High: the top of the wick" },
+        { "at": 62, "on": "low", "text": "Low: the bottom of the wick" },
+        { "text": "The wicks reach the highest and lowest prices traded during the hour." }
+      ]
+    },
+    {
+      "until": 100,
+      "view": [0, 100],
+      "cues": [
+        { "text": "From here the chart keeps both. Market structure is read from the closes; the candles stay for detail." }
+      ]
+    },
+    {
+      "chapter": "HH",
+      "add": ["HigherHigh", "sawtooth", "HigherLow"],
+      "remove": ["candles"],
+      "cues": [
+        { "text": "We can plot the positions every time we create a new high. We label these positions as a Higher Highs (HH).", "hold": 0.5 }
+      ]
+    },
+    {
+      "chapter": "HL",
+      "cues": [
+        { "text": "And also plot the positions where we make a new low between each HH. We label these positions as a Higher Lows (HL)." }
+      ]
+    },
+    {
+      "chapter": "Sawtooth",
+      "cues": [
+        { "text": "When we plot between the HH and HL positions we see a less noisy sawtooth gradually increasing on a lower-resolution plot." }
+      ]
+    },
+    {
+      "chapter": "LL",
+      "add": ["LowerLow"],
+      "cues": [
+        { "text": "Sometimes we don't a dip where the low is not increasing. This cannot be called a Higher Low. They are called Lower Lows (LL)." }
+      ]
+    },
+    {
+      "remove": ["LowerLow"],
+      "cues": [
+        { "text": "We will come back to LL later." }
+      ]
+    },
+    {
+      "chapter": "Breaks of structure",
+      "remove": ["HigherHigh", "HigherLow"],
+      "cues": [
+        { "text": "We can see from the sawtooth we are trending upwards." }
+      ]
+    },
+    {
+      "add": ["bosLevelUp"],
+      "cues": [
+        { "text": "Even though it may dip, it it keeps returning to the previous high and beyond. We can note the position where this happens." }
+      ]
+    },
+    {
+      "add": ["BullishBreakOfStructure"],
+      "cues": [
+        { "text": "Where this happens we call it a Break of Structure (BoS)." }
+      ]
+    },
+    {
+      "cues": [
+        { "at": 45, "on": "high", "place": "above", "text": "This may coincide with a HH" },
+        { "at": 89, "on": "close", "place": "below", "text": "Or not." }
+      ]
+    },
+    {
+      "chapter": "Swings",
+      "add": ["Upswing", "LowerLow", "HigherHigh"],
+      "remove": ["bosLevelUp"],
+      "cues": [
+        { "text": "The swing is range of prices between the HH and the BoS." },
+        { "text": "An Upswing is a swing that trends upwards." },
+        { "text": "It is characterised by a downleg from the HH to the LL, followed by an upleg from the LL to the BoS." }
+      ]
+    }
+  ]
+}

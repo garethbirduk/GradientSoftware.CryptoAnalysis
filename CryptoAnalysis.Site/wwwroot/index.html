@@ -54,10 +54,13 @@
     border-radius: 5px; padding: 3px 6px; }
   .replay-big .chart { height: 600px; }
   .topnav .foot { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
-  .layout { display: grid; grid-template-columns: 230px 1fr; min-height: calc(100vh - var(--nav-h, 50px)); }
+  .layout { display: grid; grid-template-columns: 72px 230px 1fr; min-height: calc(100vh - var(--nav-h, 50px)); }
   aside { border-right: 1px solid var(--border); padding: 14px 12px 24px; position: sticky; top: var(--nav-h, 50px);
     height: calc(100vh - var(--nav-h, 50px)); overflow-y: auto; }
-  main { padding: 24px 32px 64px; max-width: 1200px; min-width: 0; }
+  #levels { padding: 14px 6px 24px; }
+  .centre { display: flex; flex-direction: column; min-width: 0; min-height: calc(100vh - var(--nav-h, 50px)); }
+  main { flex: 1; padding: 24px 32px 64px; max-width: 1200px; min-width: 0; }
+  #replaybar { position: sticky; bottom: 0; z-index: 10; }
   .term-head h2 { margin: 0; font-size: 26px; }
   .term-head .label { font-family: ui-monospace, Consolas, monospace; font-size: 14px; color: var(--muted); margin-left: 8px; }
   .term-head p { margin: 8px 0 0; max-width: 72ch; }
@@ -70,13 +73,24 @@
   .layerbar .lead:hover { background: var(--chip); color: var(--text); }
   .layerbar .lead:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .layerbar .lead .state { margin-left: auto; font-size: 10px; font-weight: 500; letter-spacing: 0; text-transform: none; opacity: .8; }
+  .layerbar .head { display: flex; align-items: center; margin: 0 0 3px; }
+  .layerbar .head .lead { flex: 1; width: auto; min-width: 0; margin: 0; }
+  .layerbar .fold { flex: none; width: 18px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: none; color: var(--muted);
+    font: inherit; font-size: 11px; line-height: 1; cursor: pointer; }
+  .layerbar .fold::before { content: ''; display: inline-block; border: 4px solid transparent; border-top-color: currentColor; margin-top: 4px; }
+  .layerbar .section.folded .fold::before { border-top-color: transparent; border-left-color: currentColor; margin: 0 0 0 4px; }
+  .layerbar .fold:hover { background: var(--chip); color: var(--text); }
+  .layerbar .fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .layerbar .section.folded .items { display: none; }
   .layerbar .all-none { display: flex; gap: 4px; margin: 0 0 12px; }
   .layerbar .all-none button { flex: 1; font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border);
     border-radius: 5px; padding: 3px 0; cursor: pointer; }
   .layerbar .all-none button:hover { background: var(--chip); }
   .layerbar .all-none button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .layerbar .items { display: flex; flex-direction: column; align-items: stretch; }
-  .layerbar .items.levels { flex-direction: row; flex-wrap: wrap; gap: 2px; }
+  .layerbar .items.levels { gap: 2px; }
+  .levelbar .lead { flex-direction: column; align-items: flex-start; gap: 0; }
+  .levelbar .lead .state { margin-left: 0; }
   .layerbar .item { display: flex; align-items: center; }
   .layerbar .item .layer { flex: 1; }
   .layer { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; background: none; color: var(--text);
@@ -92,12 +106,6 @@
   .runmin { width: 3.4em; margin: 0 0 0 4px; padding: 1px 2px; font: inherit; font-size: 12px; color: var(--text);
     background: var(--panel); border: 1px solid var(--border); border-radius: 4px; }
   .runmin:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .stepper { display: inline-flex; align-items: center; margin-left: 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); }
-  .stepper button { width: 22px; height: 22px; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; line-height: 1; cursor: pointer; }
-  .stepper button:hover:not(:disabled) { background: var(--chip); }
-  .stepper button:disabled { color: var(--muted); opacity: .4; cursor: default; }
-  .stepper button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .stepper output { min-width: 1.6em; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
   .example { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-top: 18px; }
   .example header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
   .example h3 { margin: 0; font-size: 17px; }
@@ -124,26 +132,27 @@
   tr.pick:hover td { background: var(--chip); }
   tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   tr.pick.selected td { background: var(--chip); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 600; }
-  .replay-controls { display: none; margin: 8px 0 0 4px; font-size: 12px; }
-  body.replaying .replay-controls { display: block; }
-  .replay-controls .rp-title { color: var(--muted); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .replay-controls { display: none; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 32px; font-size: 12px;
+    background: var(--bg); border-top: 1px solid var(--border); }
+  body.replaying .replay-controls { display: flex; }
+  .replay-controls .rp-title { max-width: 220px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .replay-controls .rp-title b { color: var(--text); font-weight: 600; }
-  .replay-controls .rp-row { display: flex; gap: 3px; margin-top: 4px; }
-  .replay-controls button, .replay-controls select { flex: 1; min-width: 0; font: inherit; font-size: 12px; color: var(--text); background: var(--panel);
-    border: 1px solid var(--border); border-radius: 5px; padding: 3px 0; cursor: pointer; font-variant-numeric: tabular-nums; }
-  .replay-controls select { flex: 1.4; padding: 2px; }
+  .replay-controls .rp-row { display: flex; gap: 3px; }
+  .replay-controls button, .replay-controls select { min-width: 34px; font: inherit; font-size: 12px; color: var(--text); background: var(--panel);
+    border: 1px solid var(--border); border-radius: 5px; padding: 3px 7px; cursor: pointer; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .replay-controls select { padding: 2px; }
   .replay-controls button:hover:not(:disabled) { background: var(--chip); }
   .replay-controls button:disabled { opacity: .35; cursor: default; }
-  .replay-controls button.play { flex: 1.3; font-weight: 700; color: var(--accent); }
+  .replay-controls button.play { min-width: 42px; font-weight: 700; color: var(--accent); }
   .replay-controls :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .replay-controls .scrub { width: 100%; margin: 8px 0 2px; accent-color: var(--accent); }
-  .replay-controls label { display: block; margin-top: 6px; color: var(--muted); }
-  .replay-controls input[type="datetime-local"] { width: 100%; margin-top: 2px; font: inherit; font-size: 12px; color: var(--text);
+  .replay-controls .scrub { flex: 1 1 160px; min-width: 120px; margin: 0; accent-color: var(--accent); }
+  .replay-controls label { display: flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; }
+  .replay-controls input[type="datetime-local"] { font: inherit; font-size: 12px; color: var(--text);
     background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 2px 4px; color-scheme: light dark; }
-  .replay-controls .readout { margin-top: 6px; font-variant-numeric: tabular-nums; }
-  .replay-controls .keys { margin-top: 4px; color: var(--muted); font-size: 11px; }
+  .replay-controls .readout { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .replay-controls .keys { color: var(--muted); font-size: 11px; white-space: nowrap; }
   #events { display: none; border-right: 0; border-left: 1px solid var(--border); padding: 0; flex-direction: column; }
-  body.replaying.show-eventlog .layout { grid-template-columns: 230px minmax(0, 1fr) 300px; }
+  body.replaying.show-eventlog .layout { grid-template-columns: 72px 230px minmax(0, 1fr) 300px; }
   body.replaying.show-eventlog #events { display: flex; }
   #events h4 { margin: 0; padding: 12px 12px 8px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
   #events .for { padding: 0 12px 8px; font-size: 13px; border-bottom: 1px solid var(--border); }
@@ -162,19 +171,100 @@
   .eventlog .empty-log { color: var(--muted); padding: 10px; cursor: default; display: block; }
   body.replaying .example.replay-active { box-shadow: 0 0 0 2px var(--accent); }
   body.replaying .example .chart { cursor: pointer; }
-  @media (max-width: 1100px) { body.replaying.show-eventlog .layout { grid-template-columns: 230px minmax(0, 1fr); }
-    body.replaying.show-eventlog #events { grid-column: 2; position: static; height: 320px; border-left: 0; border-top: 1px solid var(--border); } }
+  @media (max-width: 1100px) { body.replaying.show-eventlog .layout { grid-template-columns: 72px 230px minmax(0, 1fr); }
+    body.replaying.show-eventlog #events { grid-column: 3; position: static; height: 320px; border-left: 0; border-top: 1px solid var(--border); } }
   .empty { margin-top: 24px; padding: 20px; border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); }
+  body.touring .replay-controls { display: none; }
+  body.touring .example.replay-active { box-shadow: none; }
+  body.touring .replay-big .chart { height: clamp(320px, calc(100vh - 440px), 600px); }
+  .tour-chapters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+  .tour-chapters a { padding: 3px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text);
+    font-size: 13px; text-decoration: none; }
+  .tour-chapters a:hover { background: var(--chip); }
+  .tour-chapters a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tour-chapters a.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .tour-caption { min-height: 4.4em; margin-top: 12px; max-width: 62ch; font-size: 19px; line-height: 1.45; }
+  .tour-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .tour-controls button { min-width: 38px; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+  .tour-controls button:hover { background: var(--chip); }
+  .tour-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tour-controls button.play { min-width: 46px; font-weight: 700; color: var(--accent); }
+  .tour-controls .readout { color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tour-controls .keys { font-size: 11px; white-space: nowrap; }
+  .tour-controls button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  .tour-controls .edit { margin-left: auto; }
+  .tour-warning { color: var(--warn); font-size: 13px; }
+  .tour-errors ul { margin: 6px 0 0; padding-left: 20px; }
+  body.picking .chart .nsewdrag { cursor: cell !important; }
+  #tour-editor { display: none; flex-direction: column; border-right: 0; border-left: 1px solid var(--border); padding: 0; font-size: 13px; }
+  body.touring.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr) 400px; }
+  body.touring.editing #tour-editor { display: flex; }
+  body.touring.editing #events { display: none; }
+  #tour-editor button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 5px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
+  #tour-editor button:hover:not(:disabled) { background: var(--chip); }
+  #tour-editor button:disabled { opacity: .35; cursor: default; }
+  #tour-editor button.dirty, #tour-editor button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  #tour-editor :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #tour-editor input, #tour-editor select, #tour-editor textarea { width: 100%; min-width: 0; font: inherit; font-size: 13px; color: var(--text);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; color-scheme: light dark; }
+  #tour-editor textarea { display: block; min-height: 2.9em; line-height: 1.4; resize: vertical; field-sizing: content; }
+  #tour-editor :disabled { opacity: .45; }
+  .ed-head { display: flex; align-items: center; gap: 6px; padding: 10px 12px 6px; }
+  .ed-head h4 { flex: 1; margin: 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .ed-status { min-height: 1.5em; padding: 0 12px 8px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .ed-status.warn { color: var(--warn); }
+  .ed-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 32px; }
+  .ed-body > * { flex: none; }
+  .ed-card { min-width: 0; margin: 0; padding: 8px 10px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  .ed-card.open { border-color: var(--accent); }
+  .ed-card > header, #tour-editor .ed-section { display: flex; align-items: baseline; gap: 8px; }
+  #tour-editor .ed-section { width: 100%; padding: 6px 10px; border-radius: 8px; text-align: left; font-size: 13px; }
+  .ed-num { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ed-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .ed-name.chapter { color: var(--text); font-weight: 600; }
+  .ed-meta { font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #tour-editor .ed-fold { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 0; border: 0; background: none; text-align: left; font-size: 13px; }
+  #tour-editor .ed-fold:hover { background: none; }
+  .ed-ops { display: flex; gap: 2px; }
+  #tour-editor .ed-ops button { padding: 1px 6px; }
+  .ed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-top: 6px; }
+  .ed-grid .wide { grid-column: 1 / -1; }
+  .ed-grid label, .ed-row label { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 11px; color: var(--muted); }
+  .ed-pick { display: flex; gap: 3px; }
+  .ed-use { display: flex; align-items: end; }
+  .ed-use button { flex: 1; }
+  #tour-editor .ed-pick button { padding: 1px 6px; }
+  .ed-layers { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+  .ed-chip { padding: 0 7px; border-radius: 999px; background: var(--chip); color: var(--text); }
+  .ed-chip.added { box-shadow: inset 0 0 0 1px var(--accent); }
+  .ed-chip.removed { text-decoration: line-through; opacity: .6; }
+  .ed-hint { flex-basis: 100%; }
+  .ed-cue { margin-top: 10px; padding-left: 8px; border-left: 3px solid var(--border); }
+  .ed-cue.shown { border-left-color: var(--muted); }
+  .ed-cue.active { border-left-color: var(--accent); }
+  .ed-cue > .ed-meta { margin-bottom: 2px; white-space: normal; }
+  .ed-row { display: none; grid-template-columns: 1.15fr 1fr 1fr; align-items: end; gap: 5px 8px; margin-top: 5px; }
+  .ed-cue:focus-within .ed-row { display: grid; }
+  .ed-row .ed-ops { justify-content: flex-end; }
+  .ed-split { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+  .ed-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  @media (max-width: 1100px) { body.touring.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr); }
+    body.touring.editing #tour-editor { grid-column: 3; position: static; height: auto; border-left: 0; border-top: 1px solid var(--border); } }
   @media (max-width: 800px) {
     .topnav { padding: 8px 16px; }
     .topnav .foot { display: none; }
     .dropdown { position: fixed; left: 16px; right: 16px; top: var(--nav-h, 50px); min-width: 0; }
-    .layout, body.replaying.show-eventlog .layout { grid-template-columns: 1fr; }
-    body.replaying.show-eventlog #events { grid-column: 1; }
-    aside { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 12px 16px; }
+    .layout, body.replaying.show-eventlog .layout, body.touring.editing .layout { grid-template-columns: 1fr; }
+    body.replaying.show-eventlog #events, body.touring.editing #tour-editor { grid-column: 1; }
+    aside, #levels { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 12px 16px; }
     .layerbar { display: flex; flex-wrap: wrap; gap: 10px 18px; }
     .layerbar .section + .section { margin-top: 0; }
     .layerbar .items { flex-direction: row; flex-wrap: wrap; }
+    .levelbar .lead { flex-direction: row; }
+    .centre { min-height: 0; }
+    .replay-controls { padding: 8px 16px; }
     main { padding: 20px 16px 48px; }
     .chart { height: 360px; }
   }
@@ -183,13 +273,18 @@
 <body>
 <nav class="topnav" id="nav" aria-label="Pages"></nav>
 <div class="layout">
+  <aside id="levels" aria-label="Sawtooth levels"></aside>
   <aside id="layers" aria-label="Chart layers"></aside>
-  <main id="main"></main>
+  <div class="centre">
+    <main id="main"></main>
+    <div id="replaybar"></div>
+  </div>
   <aside id="events" aria-label="Replay events">
     <h4>Events so far</h4>
     <div class="for" data-events-for></div>
     <ol class="eventlog" aria-label="Events up to the replay cursor"></ol>
   </aside>
+  <aside id="tour-editor" aria-label="Tour editor"></aside>
 </div>
 <script>
 const DATA = window.SITE_DATA || { terms: [], examples: [] };
@@ -202,7 +297,7 @@ const LEVELS = 9;
 const SWINGS = { Up: { name: 'Upswings', layer: 'Upswing', color: '--upswing' }, Down: { name: 'Downswings', layer: 'Downswing', color: '--downswing' } };
 const SWING_DIRECTION = { Upswing: 'Up', Downswing: 'Down' };
 const TREND_DIRECTION = { Uptrend: 'Up', Downtrend: 'Down' };
-const STRUCTURE_PAGES = ['Sawtooth', 'InterimSwings', 'Replay'];
+const STRUCTURE_PAGES = ['Sawtooth', 'InterimSwings', 'Replay', 'Tour'];
 
 // Every layer a chart can show, grouped into sections that appear in the same order on every page.
 const SECTIONS = [
@@ -216,7 +311,6 @@ const SECTIONS = [
   { name: 'Points', layers: ['HigherHigh', 'LowerHigh', 'LowerLow', 'HigherLow'].map(id => ({ id })) },
   { name: 'Upswings', layers: [{ id: 'Upswing', label: 'Upswing' }, { id: 'BullishBreakOfStructure' }, { id: 'bosLevelUp', label: 'BoS level', term: 'BullishBreakOfStructure' }] },
   { name: 'Downswings', layers: [{ id: 'Downswing', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' }] },
-  { name: 'Interims', layers: [{ id: 'interims', label: 'Interim swings' }] },
   { name: 'Trends', layers: [{ id: 'Uptrend', label: 'Uptrend' }, { id: 'Downtrend', label: 'Downtrend' }] },
   { name: 'Indicators', layers: [{ id: 'BullishMarketStructureBreak' }, { id: 'msbLevelUp', label: 'MSB↑ level', term: 'BullishMarketStructureBreak' },
     { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' }] },
@@ -236,7 +330,7 @@ const PAGE_DEFAULTS = {
   BullishMarketStructureBreak: ['price', 'BullishMarketStructureBreak', 'msbLevelUp'],
   BearishMarketStructureBreak: ['price', 'BearishMarketStructureBreak', 'msbLevelDown'],
   Sawtooth: ['price', 'sawtooth', 'level0', 'level1'],
-  InterimSwings: ['price', 'Upswing', 'Downswing', 'interims'],
+  InterimSwings: ['price', 'Upswing', 'Downswing', 'level1', 'level2', 'level3'],
   Replay: ['replay', 'price', 'sawtooth', 'level1', 'Upswing', 'Downswing', 'BullishBreakOfStructure', 'BearishBreakOfStructure'],
 };
 // Replay extras are on by default, so switching Replay on shows them; they only draw while replaying.
@@ -247,9 +341,15 @@ function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}
 function save(state) { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { } }
 const state = Object.assign({ pages: {} }, load());
 let currentPage = null;
-const layersOf = page => state.pages[page] ?? defaultsFor(page);
+// The tour sets its own layers section by section, and it is always replaying. Layers set by hand there are not remembered:
+// they go into the section being edited when the tour's editor is open, and last until the next section otherwise.
+let tourLayers = ['replay'];
+const layersOf = page => page === 'Tour' ? tourLayers : state.pages[page] ?? defaultsFor(page);
 const on = id => layersOf(currentPage).includes(id);
-const setLayers = layers => { state.pages[currentPage] = layers; save(state); };
+const setLayers = layers => {
+  if (currentPage === 'Tour') { tourLayers = [...new Set(['replay', ...layers])]; recordTourLayers(); return; }
+  state.pages[currentPage] = layers; save(state);
+};
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const prose = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -281,9 +381,10 @@ function renderNav(active) {
         `<a href="#${p.id}" class="${p.id === active ? 'active' : ''}"${p.id === active ? ' aria-current="page"' : ''}><span>${esc(p.name)}</span><span class="count">${p.count || ''}</span></a>`).join('')}</div>
     </div>`;
   };
+  const link = page => `<a class="navlink${active === page ? ' active' : ''}" href="#${page}"${active === page ? ' aria-current="page"' : ''}>${page}</a>`;
   const nav = document.getElementById('nav');
   nav.innerHTML = `<h1>Market structure terms</h1>${[...navGroups()].map(menu).join('')}
-    <a class="navlink${active === 'Replay' ? ' active' : ''}" href="#Replay"${active === 'Replay' ? ' aria-current="page"' : ''}>Replay</a>
+    ${link('Replay')}${link('Tour')}
     <span class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC · ${DATA.examples.length} examples</span>`;
 
   nav.querySelectorAll('.menu > button').forEach(b => b.addEventListener('click', () => {
@@ -337,8 +438,6 @@ function swatch(layer) {
   if (layer.id === 'sawtooth') return svg(`<path d="M1 11 L6 4 L10 8 L15 2 L21 9" fill="none" stroke="${levelColor(1)}" stroke-width="2"/>`);
   if (layer.level !== undefined) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${levelColor(layer.level)}" stroke-width="3"/><circle cx="11" cy="7" r="3" fill="${levelColor(layer.level)}"/>`);
   if (SWING_DIRECTION[layer.id]) { const c = css(SWINGS[SWING_DIRECTION[layer.id]].color); return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(c, 0.15)}" stroke="${c}"/>`); }
-  if (layer.id === 'interims') return svg(`<rect x="1" y="1" width="20" height="12" fill="none" stroke="${css('--muted')}"/>
-    <rect x="4" y="4" width="6" height="6" fill="${withAlpha(css('--downswing'), 0.25)}" stroke="${levelColor(2)}"/><rect x="12" y="4" width="6" height="6" fill="${withAlpha(css('--upswing'), 0.25)}" stroke="${levelColor(2)}"/>`);
   if (layer.id.startsWith('Successive')) { const c = TERMS.get(layer.id)?.color, up = layer.id.includes('Green'); const [y1, y2] = up ? [12, 2] : [2, 12];
     return svg(`<line x1="2" y1="${y1}" x2="18" y2="${y2}" stroke="${c}" stroke-width="2"/><path d="M${up ? '13 2 L19 1 L17 7' : '13 12 L19 13 L17 7'}" fill="none" stroke="${c}" stroke-width="2"/>`); }
   if (TREND_DIRECTION[layer.id]) { const c = TERMS.get(layer.id)?.color, y = layer.id === 'Uptrend' ? 1 : 9;
@@ -358,30 +457,38 @@ function swatch(layer) {
 
 const RUN_MIN_DEFAULT = 5;
 const runMin = type => state.runMin?.[type] ?? RUN_MIN_DEFAULT;
-const INTERIM_DEPTH_MAX = LEVELS - 1;
-const interimDepth = () => state.interimDepth ?? 1;
 
-function layerBar() {
+// One section of the layer bar. Its heading turns the whole section on, or off when it is all on already; the arrow
+// beside it folds the section away, leaving the heading and its count. Folded sections are remembered across pages.
+const isFolded = s => (state.folded ?? []).includes(s.name);
+
+function layerSection(s, i, foldable = true) {
   const runInput = l => l.id.startsWith('Successive')
     ? `<input class="runmin" type="number" min="2" max="99" step="1" value="${runMin(l.id)}" data-run="${l.id}" title="Minimum run length" aria-label="Minimum ${esc(l.label.toLowerCase())} length">`
-    : l.id === 'interims'
-      ? `<span class="stepper" role="group" aria-label="Interim depth" title="How many levels of interims to show">
-          <button type="button" data-depth-step="-1" aria-label="Fewer interim levels" ${interimDepth() <= 1 ? 'disabled' : ''}>−</button>
-          <output aria-live="polite">${interimDepth()}</output>
-          <button type="button" data-depth-step="1" aria-label="More interim levels" ${interimDepth() >= INTERIM_DEPTH_MAX ? 'disabled' : ''}>+</button></span>`
-      : '';
+    : '';
   const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>`;
   const items = s => s.levels
     ? `<div class="items levels"><button class="layer text" data-levels="none">None</button>${s.layers.map(button).join('')}<button class="layer text" data-levels="all">All</button></div>`
     : `<div class="items">${s.layers.map(l => `<div class="item">${button(l)}${runInput(l)}</div>`).join('')}</div>`;
-  // Each heading turns its whole section on, or off when it is all on already.
-  const section = (s, i) => `<div class="section" role="group" aria-label="${esc(s.name)}">
-    <button type="button" class="lead" data-section="${i}" title="Show all or none of ${esc(s.name.toLowerCase())}">${esc(s.name)}<span class="state"></span></button>
-    ${items(s)}${s.name === 'Replay' ? replayControls() : ''}</div>`;
+  const lead = `<button type="button" class="lead" data-section="${i}" title="Show all or none of ${esc(s.name.toLowerCase())}">${esc(s.name)}<span class="state"></span></button>`;
+  if (!foldable) return `<div class="section" role="group" aria-label="${esc(s.name)}">${lead}${items(s)}</div>`;
+  const folded = isFolded(s);
+  return `<div class="section${folded ? ' folded' : ''}" role="group" aria-label="${esc(s.name)}">
+    <div class="head"><button type="button" class="fold" data-fold="${i}" aria-expanded="${!folded}" title="Fold or unfold ${esc(s.name.toLowerCase())}" aria-label="Fold or unfold ${esc(s.name.toLowerCase())}"></button>${lead}</div>
+    ${items(s)}</div>`;
+}
+
+function layerBar() {
   return `<div class="layerbar" role="toolbar" aria-orientation="vertical" aria-label="Chart layers">
     <div class="all-none"><button type="button" data-all="all" title="Show every chart layer (the replay settings and the levels stay as they are)">All</button>
       <button type="button" data-all="none" title="Hide every chart layer (the replay settings and the levels stay as they are)">None</button></div>
-    ${SECTIONS.map(section).join('')}</div>`;
+    ${SECTIONS.map((s, i) => s.levels ? '' : layerSection(s, i)).join('')}</div>`;
+}
+
+// The Levels filter has a column of its own, beside the layers.
+function levelBar() {
+  const i = SECTIONS.findIndex(s => s.levels);
+  return `<div class="layerbar levelbar" role="toolbar" aria-orientation="vertical" aria-label="Sawtooth levels">${layerSection(SECTIONS[i], i, false)}</div>`;
 }
 
 const sectionIds = s => s.layers.map(l => l.id);
@@ -396,17 +503,24 @@ function updateSectionStates(root) {
   });
 }
 
+// The levels column, the layers beside it and the replay bar under the charts are wired as one bar.
 function renderLayers() {
-  const aside = document.getElementById('layers');
-  aside.innerHTML = layerBar();
-  wireLayerBar(aside);
+  document.getElementById('levels').innerHTML = levelBar();
+  document.getElementById('layers').innerHTML = layerBar();
+  document.getElementById('replaybar').innerHTML = replayControls();
+  wireLayerBar(document.querySelector('.layout'));
+}
+
+// Shows on the buttons which layers are on.
+function syncLayerButtons(root = document.querySelector('.layout')) {
+  root.querySelectorAll('.layer[data-layer]').forEach(b => b.setAttribute('aria-pressed', on(b.dataset.layer)));
+  updateSectionStates(root);
 }
 
 function wireLayerBar(root) {
   const sync = layers => {
     setLayers([...new Set(layers)]);
-    root.querySelectorAll('.layer[data-layer]').forEach(b => b.setAttribute('aria-pressed', on(b.dataset.layer)));
-    updateSectionStates(root);
+    syncLayerButtons(root);
     drawAll(currentPage);
   };
   updateSectionStates(root);
@@ -427,6 +541,13 @@ function wireLayerBar(root) {
   root.querySelectorAll('.layer[data-levels]').forEach(b => b.addEventListener('click', () => {
     sync([...layersOf(currentPage).filter(x => !LEVEL_IDS.includes(x)), ...(b.dataset.levels === 'all' ? LEVEL_IDS : [])]);
   }));
+  root.querySelectorAll('[data-fold]').forEach(b => b.addEventListener('click', () => {
+    const s = SECTIONS[Number(b.dataset.fold)], fold = !isFolded(s);
+    state.folded = fold ? [...(state.folded ?? []), s.name] : state.folded.filter(name => name !== s.name);
+    save(state);
+    b.closest('.section').classList.toggle('folded', fold);
+    b.setAttribute('aria-expanded', !fold);
+  }));
   root.querySelectorAll('.runmin').forEach(input => input.addEventListener('input', () => {
     const value = Math.round(Number(input.value));
     if (!Number.isFinite(value) || value < 2) return;
@@ -434,15 +555,6 @@ function wireLayerBar(root) {
     save(state); drawAll(currentPage);
   }));
   wireReplayControls(root);
-  root.querySelectorAll('[data-depth-step]').forEach(b => b.addEventListener('click', () => {
-    state.interimDepth = Math.min(INTERIM_DEPTH_MAX, Math.max(1, interimDepth() + Number(b.dataset.depthStep)));
-    save(state);
-    const stepper = b.closest('.stepper');
-    stepper.querySelector('output').textContent = interimDepth();
-    stepper.querySelector('[data-depth-step="-1"]').disabled = interimDepth() <= 1;
-    stepper.querySelector('[data-depth-step="1"]').disabled = interimDepth() >= INTERIM_DEPTH_MAX;
-    drawAll(currentPage);
-  }));
 }
 
 function renderTerm(type) {
@@ -526,10 +638,6 @@ function structureLevel(ex) {
   return Math.max(...(existing.length ? existing : levels));
 }
 
-function swingsFor(ex) {
-  return ex.swingsByLevel?.[structureLevel(ex)] ?? [];
-}
-
 // Swings belong to their sawtooth level, so each level selected brings its own swings, coarsest first: selecting level 2 as
 // well adds the interims of the level-1 swings rather than replacing them. Level 0 has no swings.
 function swingLevels(ex) {
@@ -546,8 +654,8 @@ function interimsOf(ex, w) {
   return (w.interims ?? []).map(i => finer[i]).filter(Boolean);
 }
 
-// Interims down to the chosen depth, each with how many levels below the swing it sits.
-function interimsTo(ex, w, depth = interimDepth(), d = 1) {
+// Interims down to the example's depth, each with how many levels below the swing it sits.
+function interimsTo(ex, w, depth = ex.depth ?? 1, d = 1) {
   return d > depth ? [] : interimsOf(ex, w).flatMap(s => [{ swing: s, depth: d }, ...interimsTo(ex, s, depth, d + 1)]);
 }
 
@@ -593,7 +701,7 @@ function drawAll(page) {
   document.body.classList.toggle('show-eventlog', on('eventlog'));
   if (!on('replay')) stopPlaying();
   // Showing or hiding the event panel changes the chart's width, which Plotly only notices on a window resize.
-  const mode = `${on('replay')}|${on('eventlog')}`, resized = mode !== layoutMode;
+  const mode = `${on('replay')}|${on('eventlog')}|${page === 'Tour' && editorOn()}`, resized = mode !== layoutMode;
   layoutMode = mode;
   document.querySelectorAll('.chart').forEach(el => {
     draw(el, viewFor(findExample(el.dataset.id)), focusOf(page));
@@ -637,7 +745,13 @@ function fetchBatch(ex, t) {
   if (start < 0 || start >= ex.prices.t.length) return Promise.resolve(null);
   const cache = remote.get(ex.id) ?? remote.set(ex.id, new Map()).get(ex.id);
   if (!cache.has(start)) {
-    const request = fetch(`api/replay?dataset=${encodeURIComponent(ex.dataset)}&from=${start}`).then(r => r.json()).then(batch => {
+    const anchor = ex.anchor ? `&anchor=${ex.anchor}` : '';
+    const request = fetch(`api/replay?dataset=${encodeURIComponent(ex.dataset)}&from=${start}${anchor}`).then(r => r.json()).then(batch => {
+      // A server started before anchors existed ignores the anchor: its batch is of other candles, so its structure is dropped.
+      if ((batch.anchor ?? 0) !== (ex.anchor ?? 0)) {
+        ex.unanchored = true;
+        batch.timeline = { pivots: [], swings: [], candidates: [], marketStructureBreaks: [], trends: [], points: [], candleRuns: [] };
+      }
       cache.set(start, batch);
       if (Math.abs(batchStart(cursorOf(ex)) - start) <= REMOTE_BATCH) redrawExample(ex);
       return batch;
@@ -682,7 +796,8 @@ function chartRow(ex) {
 function liveView(ex, t) {
   const r = timelineAt(ex, t), holds = holdsAt(t), time = ex.prices.t[t];
   // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
-  const window = isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
+  const window = ex.tour ? tourWindow(ex, t)
+    : isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
   const cut = a => a.slice(window?.from ?? 0, t + 1);
   const prices = { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) };
   if (!r) {
@@ -719,7 +834,9 @@ function liveView(ex, t) {
 // Candidates, ghosts, future candles, unbroken protective levels, the cursor line and the selected log entry.
 function drawReplayExtras(ex, traces, level) {
   const t = ex.cursor, full = ex.hindsight, r = ex.timeline, now = full.prices.t[t];
-  const shapes = [{ type: 'line', xref: 'x', yref: 'paper', x0: now, x1: now, y0: 0, y1: 1, layer: 'below', line: { color: css('--accent'), width: 1.5 } }];
+  // The cursor is a faint dotted line, so the wick of the candle it stands on shows through it.
+  const shapes = [{ type: 'line', xref: 'x', yref: 'paper', x0: now, x1: now, y0: 0, y1: 1, layer: 'below',
+    line: { color: withAlpha(css('--accent'), 0.6), width: 1, dash: 'dot' } }];
   const box = (start, end, a, b) => ({ x: [start, end, end, start, start], y: [a, a, b, b, a] });
 
   if (on('future') && t + 1 < full.prices.t.length) {
@@ -1061,6 +1178,11 @@ function updateReplayControls() {
 document.addEventListener('keydown', e => {
   const inside = selector => e.target instanceof Element && e.target.closest(selector);
   if (!on('replay') || e.ctrlKey || e.metaKey || e.altKey || inside('input, select, textarea, .menu')) return;
+  if (currentPage === 'Tour') {
+    const step = { ArrowLeft: 'prev', ArrowRight: 'next' }[e.key] ?? (e.key === ' ' && !inside('button') ? 'play' : null);
+    if (step) { e.preventDefault(); tourGo(step); }
+    return;
+  }
   const actions = { ArrowLeft: e.shiftKey ? '-day' : '-hour', ArrowRight: e.shiftKey ? '+day' : '+hour', Home: 'start', End: 'end', ',': '-event', '.': '+event' };
   const action = actions[e.key] ?? (e.key === ' ' && !inside('button, li') ? 'play' : null);
   if (!action) return;
@@ -1103,7 +1225,7 @@ function referenceLines(traces, name, color, dash, refs) {
   traces.push({ type: 'scatter', mode: 'lines', name, x, y, line: { color, width: 1.5, dash }, hovertemplate: hover });
 }
 
-// The selected swing as a bold box with its break level, and its interims (to the chosen depth) inside it. Fills say up or
+// The selected swing as a bold box with its break level, and its interims (to the example's depth) inside it. Fills say up or
 // down; borders are each swing's sawtooth level colour.
 function swingShapes(ex, w, breakColor) {
   const color = css(SWINGS[w.direction].color);
@@ -1127,7 +1249,7 @@ function highlightSwing(ex, k, labels) {
   if (!w) return [];
 
   const accent = css('--accent');
-  const n = interimsTo(ex, w).length, depth = interimDepth();
+  const n = interimsTo(ex, w).length, depth = ex.depth ?? 1;
   labels.push({ x: w.start.time, y: w.start.price, text: `<b>Level ${level} ${direction === 'Up' ? 'upswing' : 'downswing'}</b> · ${n} interim${n === 1 ? '' : 's'}${depth > 1 ? ` (${depth} levels)` : ''}`,
     showarrow: true, arrowcolor: accent, arrowwidth: 1.5, ax: 0, ay: direction === 'Up' ? -60 : 60,
     bgcolor: css('--panel'), bordercolor: accent, borderpad: 4, font: { color: css('--text'), size: 12 } });
@@ -1173,10 +1295,49 @@ const PROVISIONAL_NOTE = '<br>so far: moves if price goes further';
 
 function pointsAt(ex, level) {
   return pointsFor(ex, level).filter(p => p.type).map(p => ({ type: p.type, direction: ['HigherHigh', 'HigherLow'].includes(p.type) ? 'Up' : 'Down',
-    time: p.time, price: p.price, detail: p.provisional ? PROVISIONAL_NOTE : '' }));
+    level, time: p.time, price: p.price, detail: `<br>level ${level}${p.provisional ? PROVISIONAL_NOTE : ''}` }));
 }
 
-function drawSawtooth(ex, traces, labels, stacks, withLabels) {
+// Labels at one spot stack away from the candle, each taking the height it needs.
+function stackShift(stacks, time, below, height = 14) {
+  const k = `${time}|${below}`, base = stacks.get(k) ?? 9;
+  stacks.set(k, base + height);
+  return (below ? -1 : 1) * (base + height / 2);
+}
+
+// A point's label, in a box of its sawtooth level's colour.
+function levelBox(stacks, p, below, level, text, font) {
+  return { level, time: Date.parse(p.time), label: { x: p.time, y: p.price, text, showarrow: false, yshift: stackShift(stacks, p.time, below, BOX_HEIGHT), font,
+    bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: levelColor(level), borderwidth: 1.5, borderpad: 1 } };
+}
+
+// Every point in view has its box. Boxes may overlap, and where they do the later point's is in front. Points well out of
+// view (more than a view's width away) get none, which keeps down the number Plotly has to draw, so a chart is redrawn
+// once a pan or zoom settles if that brought other points near (refitBoxes).
+const BOX_HEIGHT = 19;
+const boxSets = new Map();
+const boxTimers = new WeakMap();
+const boxKey = labels => labels.map(l => `${l.x}|${l.yshift}`).join();
+
+function shownBoxes(boxes, x) {
+  const [from, to] = x.map(axisTime), width = to - from;
+  return boxes.filter(b => b.time >= from - width && b.time <= to + width).sort((a, b) => a.time - b.time || a.level - b.level).map(b => b.label);
+}
+
+// Redraws a chart if the boxes its view should have are no longer the ones drawn.
+function refitBoxes(el) {
+  const id = el.dataset.id, set = boxSets.get(id), view = views.get(id);
+  if (!set?.boxes.length || !view || !el.isConnected) return;
+  if (boxKey(shownBoxes(set.boxes, shownRanges(zooms.get(id), view).x)) !== set.shown) draw(el, viewFor(findExample(id)), focusOf(currentPage));
+}
+
+function refitBoxesSoon(el) {
+  clearTimeout(boxTimers.get(el));
+  boxTimers.set(el, setTimeout(() => refitBoxes(el), 150));
+}
+
+// The sawtooth draws its lines and pivots only: labels belong to the point layers, so the two toggle independently.
+function drawSawtooth(ex, traces) {
   if (!on('sawtooth')) return;
   const levels = selectedLevels(ex).filter(l => l < (ex.sawtooth?.length ?? 0));
   if (!levels.length) return;
@@ -1214,19 +1375,6 @@ function drawSawtooth(ex, traces, labels, stacks, withLabels) {
         marker: { color, size: 8, symbol: 'circle-open', line: { width: 2, color } },
         hovertemplate: latest.map(p => `Level ${level} · ${p.label}<br>${fmtTime(p.time)}<br>${fmtPrice(p.price)}${PROVISIONAL_NOTE}<extra></extra>`) });
     }
-  }
-
-  if (!withLabels || levels.length !== 1) return;
-  const points = pointsFor(ex, finest);
-  if (points.length > 60) return;
-  for (const p of points) {
-    if (p.type && on(p.type)) continue;
-    const below = p.kind === 'Low';
-    const sk = `${p.time}|${below}`;
-    const n = stacks.get(sk) ?? 0;
-    stacks.set(sk, n + 1);
-    labels.push({ x: p.time, y: p.price, text: p.label, showarrow: false, yshift: (below ? -1 : 1) * (16 + n * 14),
-      font: { size: 11, color: css('--muted') } });
   }
 }
 
@@ -1269,7 +1417,6 @@ function draw(el, ex, focus) {
   const p = ex.prices;
   const text = css('--text'), muted = css('--muted'), grid = css('--grid');
   const traces = [];
-  const swings = swingsFor(ex);
   const swingBox = (w, interim) => {
     const s = SWINGS[w.direction], color = css(s.color);
     const top = Math.max(w.start.price, w.extreme.price), bottom = Math.min(w.start.price, w.extreme.price);
@@ -1285,14 +1432,7 @@ function draw(el, ex, focus) {
     };
   };
 
-  // Interims of the swings shown (or of every swing when neither direction is shown) to the chosen depth, drawn dotted
-  // beneath them, deepest first so each level sits over the one inside it.
-  if (on('interims')) {
-    const parents = swings.filter(w => on(SWINGS[w.direction].layer));
-    const interims = (parents.length ? parents : swings).flatMap(w => interimsTo(ex, w)).sort((a, b) => b.depth - a.depth);
-    for (const { swing, depth } of interims) traces.push(swingBox(swing, depth));
-  }
-  // Every level shown draws its own swings; finer levels are drawn like interims, lighter and dotted, over the coarser ones.
+  // Every level shown draws its own swings; finer levels are drawn lighter, over the coarser ones.
   const levelsShown = swingLevels(ex);
   for (const [depth, level] of levelsShown.entries())
     for (const w of (ex.swingsByLevel?.[level] ?? []).filter(w => w.confirmed && on(SWINGS[w.direction].layer))) traces.push(swingBox(w, depth || false));
@@ -1321,39 +1461,52 @@ function draw(el, ex, focus) {
         .map(m => ({ from: m.reference, to: m.break, level: m.reference.price, what: `protective ${type.startsWith('Bullish') ? 'bounce high' : 'pullback low'} broken` })));
   }
 
-  const labels = [];
+  const labels = [], boxes = [];
   const stacks = new Map();
   drawCandleRuns(ex, labels, traces);
-  drawSawtooth(ex, traces, labels, stacks, focus === null);
+  drawSawtooth(ex, traces);
 
   const level = structureLevel(ex);
   const BOS_DIRECTION = { BullishBreakOfStructure: 'Up', BearishBreakOfStructure: 'Down' };
   const markerTypes = [...POINT_LAYERS, 'BullishBreakOfStructure', 'BearishBreakOfStructure', 'Uptrend', 'Downtrend', 'BullishMarketStructureBreak', 'BearishMarketStructureBreak'].filter(on);
-  const markers = markerTypes.map(type => ({ type, term: TERMS.get(type), items: POINT_LAYERS.includes(type) ? pointsAt(ex, level).filter(a => a.type === type)
+  // Points are shown for every level selected that exists. A point that is the same at several levels shows once, as the
+  // coarsest; where a pivot is a different point at different levels, each level's shows.
+  const pointLevels = selectedLevels(ex).filter(l => l < (ex.pointsByLevel?.length ?? 0)).sort((a, b) => a - b);
+  const pointsOf = type => {
+    const seen = new Set();
+    return pointLevels.flatMap(l => pointsAt(ex, l).filter(a => a.type === type && !seen.has(a.time) && seen.add(a.time)));
+  };
+  const markers = markerTypes.map(type => ({ type, term: TERMS.get(type), items: POINT_LAYERS.includes(type) ? pointsOf(type)
       : BOS_DIRECTION[type] ? allSwings.filter(w => w.direction === BOS_DIRECTION[type]).map(w => ({ type, direction: w.direction, time: w.breakOfStructure.time, price: w.breakOfStructure.price, detail: `<br>level ${w.level}` }))
       : TREND_DIRECTION[type] ? trendsFor(ex).filter(t => t.direction === TREND_DIRECTION[type]).map(t => ({ type, time: t.confirmed.time, price: t.confirmed.price,
           detail: `<br>from ${fmtTime(t.start.time)} · ${t.end ? `ended ${fmtTime(t.end.time)}` : 'ongoing'}<br>${t.swings} swings · ${t.marketStructureBreaks} MSB against` }))
       : marketStructureBreaksFor(ex).filter(m => m.type === type).map(m => ({ type, time: m.break.time, price: m.break.price })) }));
-  const bulkLabels = markers.reduce((n, m) => n + m.items.length, 0) > ANNOTATION_LIMIT;
+  const isPointType = type => POINT_LAYERS.includes(type);
+  const bulkLabels = markers.filter(m => !isPointType(m.type)).reduce((n, m) => n + m.items.length, 0) > ANNOTATION_LIMIT;
+  // Point labels sit in a box of their level's colour, stacked with the coarsest level nearest the candle. The marker is
+  // outlined in the level's colour too, so a point still says its level where another box covers its own.
+  const points = markers.filter(m => m.term && isPointType(m.type)).flatMap(m => m.items.map(a => ({ a, m }))).sort((p, q) => p.a.level - q.a.level);
+  for (const { a, m } of points) {
+    const isFocus = m.type === focus;
+    boxes.push(levelBox(stacks, a, m.term.position === 'Below', a.level, m.term.label, { size: isFocus ? 12 : 11, color: isFocus ? text : muted }));
+  }
   for (const { type, term, items } of markers) {
     if (!term || !items.length) continue;
-    const isFocus = type === focus, below = term.position === 'Below';
+    const isFocus = type === focus, below = term.position === 'Below', isPoint = isPointType(type), asText = bulkLabels && !isPoint;
     traces.push({
-      type: 'scatter', mode: bulkLabels ? 'markers+text' : 'markers', name: term.label, x: items.map(a => a.time), y: items.map(a => a.price),
+      type: 'scatter', mode: asText ? 'markers+text' : 'markers', name: term.label, x: items.map(a => a.time), y: items.map(a => a.price),
       marker: term.symbol.endsWith('-open')
         ? { color: term.color, symbol: term.symbol, size: isFocus ? 20 : 17, line: { width: 2, color: term.color } }
-        : { color: term.color, symbol: term.symbol, size: isFocus ? 13 : 10, line: { width: 1, color: css('--panel') } },
+        : { color: term.color, symbol: term.symbol, size: isFocus ? 13 : 10,
+            line: isPoint ? { width: 1.5, color: items.map(a => levelColor(a.level)) } : { width: 1, color: css('--panel') } },
       opacity: isFocus ? 1 : 0.85,
-      ...(bulkLabels ? { text: items.map(() => term.label), textposition: below ? 'bottom center' : 'top center', textfont: { size: 10, color: muted } } : {}),
+      ...(asText ? { text: items.map(() => term.label), textposition: below ? 'bottom center' : 'top center', textfont: { size: 10, color: muted } } : {}),
       hovertemplate: items.map(a => `${term.name}${TREND_DIRECTION[type] ? ' confirmed' : ''}<br>${fmtTime(a.time)}<br>${fmtPrice(a.price)}${a.detail ?? ''}<extra></extra>`),
     });
-    if (bulkLabels) continue;
+    if (bulkLabels || isPoint) continue;
     for (const a of items) {
-      const sk = `${a.time}|${below}`;
-      const n = stacks.get(sk) ?? 0;
-      stacks.set(sk, n + 1);
       labels.push({ x: a.time, y: a.price, text: term.label, showarrow: false,
-        yshift: (below ? -1 : 1) * (16 + n * 14), font: { size: isFocus ? 12 : 11, color: isFocus ? text : muted } });
+        yshift: stackShift(stacks, a.time, below), font: { size: isFocus ? 12 : 11, color: isFocus ? text : muted } });
     }
   }
 
@@ -1381,6 +1534,7 @@ function draw(el, ex, focus) {
 
   const shapes = [...trendShapes(ex), ...highlight(ex, traces, labels)];
   if (ex.hindsight) shapes.push(...drawReplayExtras(ex, traces, level));
+  for (const pin of ex.pins ?? []) labels.push(pinLabel(pin));
 
   // A fixed default view of the whole snippet, so toggling layers never rescales; a zoom or pan is kept across redraws.
   // While replaying, the view still spans the whole snippet, so the time still to come stays in frame; a long replay instead
@@ -1388,12 +1542,17 @@ function draw(el, ex, focus) {
   const full = (ex.hindsight ?? ex).prices, w = ex.window;
   const span = a => w ? a.slice(w.from, w.to + 1) : a;
   const times = span(full.t).map(Date.parse), first = times[0], last = times[times.length - 1], candle = (last - first) / Math.max(1, times.length - 1);
-  const view = { t: times, h: span(full.h), l: span(full.l), candle, x: [new Date(first - candle).toISOString(), new Date(last + candle).toISOString()] };
+  const view = { t: times, h: span(full.h), l: span(full.l), candle, x: [new Date(first - candle).toISOString(), new Date(last + candle).toISOString()],
+    from: w?.from ?? 0, numbered: !!ex.tour, floor: ex.tour ? 0.01 : 0,
+    until: ex.tour && !on('future') ? Date.parse(full.t[ex.cursor]) : undefined, now: ex.tour ? [full.l[ex.cursor], full.h[ex.cursor]] : null,
+    pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46) };
   view.y = fitPrices(view, view.x);
   views.set(ex.id, view);
   const { x: xRange, y: yRange, manual } = shownRanges(zoomedRanges(ex, view), view);
   if (ex.loading) labels.push({ xref: 'paper', yref: 'paper', x: 0.5, y: 0.5, showarrow: false, text: 'Loading from the local server…',
     font: { size: 14, color: muted }, bgcolor: css('--panel') });
+  const shown = shownBoxes(boxes, xRange);
+  boxSets.set(ex.id, { boxes, shown: boxKey(shown) });
 
   Plotly.react(el, traces, {
     uirevision: ex.id,
@@ -1402,7 +1561,7 @@ function draw(el, ex, focus) {
     dragmode: 'pan',
     xaxis: { type: 'date', rangeslider: { visible: false }, gridcolor: grid, linecolor: grid, range: xRange },
     yaxis: { type: 'linear', gridcolor: grid, linecolor: grid, tickformat: ',.0f', side: 'right', range: yRange, fixedrange: !manual },
-    annotations: labels, shapes, hovermode: 'closest', showlegend: false,
+    annotations: [...shown, ...labels], shapes, hovermode: 'closest', showlegend: false,
   }, { responsive: true, displaylogo: false, doubleClick: false, modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d', 'resetScale2d'],
     modeBarButtonsToAdd: [{ name: 'Reset view', icon: Plotly.Icons.home, click: gd => moveView(gd, null) }] });
   wireZoom(el);
@@ -1424,17 +1583,36 @@ let movingViews = 0;
 const axisTime = v => Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(String(v)) ? v : `${String(v).replace(' ', 'T')}Z`);
 
 // The price range of the candles between two times, with a little room above and below; null when there are none.
+// A tour fits only the candles shown so far (view.until), so the prices still to come do not squash them, and never
+// closer than a share of the price (view.floor), so its first few candles do not fill the chart. Where its view has none
+// of them, it fits the candle the replay is at (view.now), so there is always a range.
 function fitPrices(view, x) {
-  const [from, to] = x.map(axisTime);
+  const [from, to] = x.map(axisTime), last = Math.min(to, view.until ?? Infinity);
   let low = Infinity, high = -Infinity;
   for (let i = 0; i < view.t.length; i++) {
-    if (view.t[i] < from || view.t[i] > to) continue;
+    if (view.t[i] < from || view.t[i] > last) continue;
     low = Math.min(low, view.l[i]);
     high = Math.max(high, view.h[i]);
   }
-  if (low > high) return null;
+  if (low > high && !view.now) return null;
+  if (low > high) [low, high] = view.now;
+  const least = (high + low) / 2 * (view.floor ?? 0);
+  if (high - low < least) [low, high] = [(high + low - least) / 2, (high + low + least) / 2];
   const pad = (high - low) * 0.06 || high * 0.001;
-  return [low - pad, high + pad];
+  return roomForPins([low - pad, high + pad], (view.pins ?? []).filter(p => p.time >= from && p.time <= to), view.height);
+}
+
+// Widens a price range until each pinned text in view has the room it needs, in pixels of the chart's height, above and
+// below its point: its box would otherwise be cut off at the top or bottom of the chart.
+function roomForPins([low, high], pins, height) {
+  for (let pass = 0; pass < 6; pass++) {
+    for (const p of pins) {
+      const up = Math.min(0.45, p.up / height), down = Math.min(0.45, p.down / height);
+      if (high - p.price < up * (high - low)) high = (p.price - up * low) / (1 - up);
+      if (p.price - low < down * (high - low)) low = (p.price - down * high) / (1 - down);
+    }
+  }
+  return [low, high];
 }
 
 function shownRanges(zoom, view) {
@@ -1458,6 +1636,7 @@ function moveView(el, zoom) {
     movingViews++;
     try { await Plotly.relayout(el, { 'xaxis.range': x, 'yaxis.range': y, 'yaxis.fixedrange': !manual }); }
     finally { movingViews--; }
+    refitBoxesSoon(el);
   });
 }
 
@@ -1553,7 +1732,9 @@ function wireZoom(el) {
     v.style.cssText = `left:${x}px;top:${p.top}px;height:${p.h}px`;
     h.style.cssText = `left:${p.left}px;top:${y}px;width:${p.w}px`;
     timeLabel.style.cssText = `left:${x}px;top:${p.top + p.h + 3}px`;
-    timeLabel.textContent = fmtTime(iso(time));
+    // A tour numbers its candles from its start, so the crosshair gives the number to write in tour.json.
+    const number = view.numbered ? view.t.indexOf(time) : -1;
+    timeLabel.textContent = (number < 0 ? '' : `#${view.from + number} · `) + fmtTime(iso(time));
     priceLabel.style.cssText = `left:${p.left + p.w + 3}px;top:${y}px`;
     priceLabel.textContent = Math.floor(high - (high - low) * p.y / p.h).toLocaleString('en-US');
   };
@@ -1619,14 +1800,14 @@ async function loadDataset(info) {
 const LOCAL_SERVER = 'http://localhost:5178';
 
 async function checkLocalServer() {
-  const box = document.querySelector('[data-server-check]');
+  const box = document.querySelector('[data-server-check]'), page = currentPage;
   if (!box) return;
   const running = await fetch(`${LOCAL_SERVER}/api/health`).then(r => r.ok).catch(() => false);
-  if (currentPage !== 'Replay') return;
+  if (currentPage !== page) return;
   box.innerHTML = running
-    ? `The local server is running. <a href="${LOCAL_SERVER}/#Replay">Open the Replay page there</a>: this copy of the page is opened as a file, so it cannot load data from it.`
+    ? `The local server is running. <a href="${LOCAL_SERVER}/#${page}">Open the ${page} page there</a>: this copy of the page is opened as a file, so it cannot load data from it.`
     : `Replaying a whole dataset needs the local server, and it is not running. In the repository folder run <code>./build-site.ps1 -Serve</code>,
-       then <button type="button" class="layer text" data-recheck>check again</button> or open <a href="${LOCAL_SERVER}/#Replay">${LOCAL_SERVER}/#Replay</a>.`;
+       then <button type="button" class="layer text" data-recheck>check again</button> or open <a href="${LOCAL_SERVER}/#${page}">${LOCAL_SERVER}/#${page}</a>.`;
   box.querySelector('[data-recheck]')?.addEventListener('click', () => { box.textContent = 'Checking for the local server…'; checkLocalServer(); });
 }
 
@@ -1667,7 +1848,773 @@ async function renderReplayPage() {
 
 function findExample(id) {
   return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id) ?? DATA.interims?.examples?.find(e => e.id === id)
-    ?? replayDatasets.find(e => e.id === id);
+    ?? replayDatasets.find(e => e.id === id) ?? (tour?.ex.id === id ? tour.ex : undefined);
+}
+
+// ---- Tour ------------------------------------------------------------------------------------------------------------
+// A scripted walk through a dataset, read from tour.json: a start state, then sections that each say which layers are on,
+// how far the replay runs and what text appears. A section begins where the one before it ended, so the tour plays as one
+// continuous replay. Candles are numbered from the tour's start time (#0), and the structure is anchored there too.
+//   start    time (the dataset time of #0), view (the first and last candle the chart shows, as [0, 168]), speed (candles
+//            a second) and layers.
+//   section  chapter (starts a chapter, which has a link of its own), layers (replaces the layers) or add and remove,
+//            from (the candle the section starts at; without it, where the section before ended: an earlier candle takes
+//            the replay back), until (the candle the replay runs to; without it the replay stays where it is), view
+//            (without it, the view as before), speed, cues.
+//   cue      text, shown under the chart as the section begins; with at, when the replay reaches that candle, which waits
+//            there while the text is read; with on as well ('open', 'high', 'low', 'close' or a price), pinned to that
+//            point of the candle (place: 'above', 'below', 'left' or 'right'). hold is the seconds the text stays before
+//            the next, by default the time it takes to read; keep is how long a pin stays: 'section', 'chapter' or 'always'.
+const DEFAULT_VIEW = [0, 168];
+const LAYER_ALIASES = { candles: 'price', closes: 'close' };
+// How the editor writes a layer whose id is not what it is called on the page.
+const LAYER_NAMES = { price: 'candles' };
+const PIN_PRICES = { open: 'o', high: 'h', low: 'l', close: 'c' };
+const PIN_PLACES = { above: [0, -55], below: [0, 55], left: [-70, 0], right: [70, 0] };
+const TOUR_TICK = 40;
+let tour = null, tourLoading = null;
+
+const slugOf = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const readingSeconds = text => Math.max(2.5, text.length / 14);
+const tourSection = () => tour.sections[tour.index];
+
+// Every section's full state, worked out from the start state and the sections before it, so any section can be entered
+// directly. Whatever the tour gets wrong is listed rather than guessed at.
+function compileTour(def, candles) {
+  const errors = [], known = new Set(LAYERS.map(l => l.id)), chapters = [];
+  const ids = (list, where) => (list ?? []).map(id => LAYER_ALIASES[id] ?? id).filter(id => known.has(id) || void errors.push(`${where}: unknown layer "${id}"`));
+  const range = (v, where) => Array.isArray(v) && v.length === 2 && v.every(Number.isInteger) && v[0] >= 0 && v[1] > v[0] ? v
+    : (errors.push(`${where}: the view is the first and last candle shown, the last after the first`), null);
+  const renamed = (o, where) => { if (o.window != null) errors.push(`${where}: "window" is now "view", the first and last candle shown`); };
+  const rate = (s, where) => s > 0 ? s : (errors.push(`${where}: speed must be more than 0`), 4);
+  const start = def.start ?? {}, startLayers = ids(start.layers, 'start');
+  const startView = (start.view != null ? range(start.view, 'start') : null) ?? DEFAULT_VIEW;
+  let layers = startLayers, view = startView, speed = rate(start.speed ?? 4, 'start'), at = 0;
+  renamed(start, 'start');
+
+  const sections = (def.sections ?? []).map((s, i) => {
+    const where = `section ${i + 1}`;
+    if (s.chapter) chapters.push({ name: s.chapter, slug: slugOf(s.chapter), section: i });
+    if (s.layers) layers = ids(s.layers, where);
+    const removed = ids(s.remove, where);
+    layers = [...new Set([...layers, ...ids(s.add, where)])].filter(id => !removed.includes(id));
+    if (s.view != null) view = range(s.view, where) ?? view;
+    renamed(s, where);
+    if (s.speed != null) speed = rate(s.speed, where);
+    const from = Number.isInteger(s.from) && s.from >= 0 && s.from < candles ? s.from : at, until = s.until ?? from;
+    if (s.from != null && s.from !== from) errors.push(`${where}: from #${s.from} is not a candle of the tour, which has #0 to #${candles - 1}`);
+    if (until < from) errors.push(`${where}: until #${until} is before the section's start, #${from}`);
+    if (until >= candles) errors.push(`${where}: until #${until} is past the last candle, #${candles - 1}`);
+    at = Math.max(from, Math.min(until, candles - 1));
+
+    const cues = (s.cues ?? []).map((c, j) => {
+      const what = `${where}, text ${j + 1}`, text = c.text ?? '';
+      if (!text) errors.push(`${what}: no text`);
+      if (c.at != null && (c.at < 0 || c.at > at)) errors.push(`${what}: at #${c.at} is not reached, as the section ends at #${at}`);
+      if (c.on != null && c.at == null) errors.push(`${what}: a pin needs a candle`);
+      if (c.on != null && typeof c.on !== 'number' && !PIN_PRICES[c.on]) errors.push(`${what}: unknown "on" "${c.on}"`);
+      if (c.place != null && !PIN_PLACES[c.place]) errors.push(`${what}: unknown place "${c.place}"`);
+      if (!['section', 'chapter', 'always'].includes(c.keep ?? 'section')) errors.push(`${what}: unknown keep "${c.keep}"`);
+      return { text, at: c.at ?? null, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', hold: c.hold > 0 ? c.hold : readingSeconds(text) };
+    });
+    return { index: i, chapter: chapters.length - 1, layers, view, speed, from, until: at, cues };
+  });
+  return { chapters, sections, errors, startLayers, startView };
+}
+
+async function loadTour() {
+  const def = await fetch('tour.json', { cache: 'no-store' }).then(r => r.json());
+  const list = await loadDatasets();
+  const info = list.find(d => d.id === def.dataset) ?? list[0];
+  if (!info) throw new Error('the server has no datasets');
+  const loaded = { def, whole: await loadDataset(info), ex: null, saved: JSON.stringify(def), history: [], lastEdit: null, picking: null, note: '',
+    index: 0, view: DEFAULT_VIEW, queue: [], shown: [], fired: new Set(), kept: [], active: null, activeUntil: 0, nextCandle: 0, timer: null };
+  anchorTour(loaded);
+  return Object.assign(loaded, compileTour(def, loaded.ex.prices.t.length));
+}
+
+// The tour's candles are the dataset's from its start time on, so a candle's number is its place in them. A new start
+// time makes them anew, and what the server worked out from the old one is dropped.
+function anchorTour(t = tour) {
+  const time = axisTime(t.def.start?.time ?? ''), anchor = Number.isNaN(time) ? 0 : indexAtOrAfter(t.whole, time);
+  if (t.ex?.anchor === anchor) return;
+  const id = `Tour/${t.whole.dataset}`, cut = a => a.slice(anchor), p = t.whole.prices;
+  remote.delete(id);
+  eventCache.clear();
+  zooms.delete(id);
+  cursors.set(id, 0);
+  t.ex = { id, dataset: t.whole.dataset, anchor, tour: true, title: 'Tour', level: 1, expected: [], annotations: [],
+    prices: { t: cut(p.t), o: cut(p.o), h: cut(p.h), l: cut(p.l), c: cut(p.c) } };
+}
+
+// The candles a section shows are its view, which is what the chart shows as the section begins, wherever the replay is.
+// A replay that then runs past the end of the view takes the view along with it.
+function sectionView(t) {
+  const [first, last] = tour.view, moved = Math.max(0, t - Math.max(last, tourSection()?.from ?? 0));
+  return [first + moved, last + moved];
+}
+
+// A view that is not the one on show is not cut to: the chart eases from the one to the other, so it reads as the same
+// chart zooming or moving.
+const TOUR_ZOOM_MS = 1500;
+
+function tourView(t) {
+  const view = sectionView(t), zoom = tour.zoom;
+  if (!zoom) return view;
+  const k = Math.min(1, (performance.now() - zoom.start) / TOUR_ZOOM_MS), eased = k < 0.5 ? 2 * k * k : 1 - (2 - 2 * k) ** 2 / 2;
+  return view.map((v, i) => Math.round(zoom.from[i] + (v - zoom.from[i]) * eased));
+}
+
+function tourWindow(ex, t) {
+  const [from, to] = tourView(t), last = ex.prices.t.length - 1;
+  return { from: Math.min(from, last - 1), to: Math.min(Math.max(to, from + 1), last) };
+}
+
+function zoomTour(from) {
+  tour.zoom = { from, start: performance.now() };
+  if (tour.zooming) return;
+  // The next frame is asked for before this one is drawn, so a frame that fails does not leave the view part way.
+  const step = () => {
+    tour.zooming = !!tour.zoom && performance.now() - tour.zoom.start < TOUR_ZOOM_MS;
+    if (tour.zooming) requestAnimationFrame(step); else tour.zoom = null;
+    if (currentPage === 'Tour') redrawExample(tour.ex);
+  };
+  tour.zooming = true;
+  requestAnimationFrame(step);
+}
+
+function pinOf(ex, cue) {
+  return { time: ex.prices.t[cue.at], price: typeof cue.on === 'number' ? cue.on : ex.prices[PIN_PRICES[cue.on]]?.[cue.at], text: cue.text,
+    place: cue.place ?? { high: 'above', low: 'below', open: 'left' }[cue.on] ?? 'right' };
+}
+
+// A pinned cue: its text in a box beside the point, with an arrow to it.
+const pinLines = text => text.split(' ').reduce((out, word) => {
+  if (out.length && `${out[out.length - 1]} ${word}`.length <= 30) out[out.length - 1] += ` ${word}`; else out.push(word);
+  return out;
+}, []);
+
+// The room a pinned text's box needs above and below its point, in pixels, to be inside the chart.
+function pinRoom(pin) {
+  const box = pinLines(pin.text).length * 17 + 14, [, ay] = PIN_PLACES[pin.place] ?? PIN_PLACES.above, clear = 8;
+  const beside = box / 2 + clear, beyond = Math.abs(ay) + box + clear;
+  return { time: Date.parse(pin.time), price: pin.price, up: ay < 0 ? beyond : ay > 0 ? clear : beside, down: ay > 0 ? beyond : ay < 0 ? clear : beside };
+}
+
+function pinLabel(pin) {
+  const accent = css('--accent'), [ax, ay] = PIN_PLACES[pin.place] ?? PIN_PLACES.above;
+  return { x: pin.time, y: pin.price, text: pinLines(pin.text).join('<br>'), showarrow: true, arrowhead: 2, arrowwidth: 1.5, arrowcolor: accent, ax, ay,
+    xanchor: { left: 'right', right: 'left' }[pin.place] ?? 'center', yanchor: { above: 'bottom', below: 'top' }[pin.place] ?? 'middle', align: 'left',
+    bgcolor: css('--panel'), bordercolor: accent, borderpad: 5, font: { color: css('--text'), size: 13 } };
+}
+
+// Moves the replay to a candle and queues the cues it has reached: text with no candle is reached as the section begins.
+function advanceTo(t) {
+  const s = tourSection(), ex = tour.ex;
+  cursors.set(ex.id, t);
+  prefetch(ex, t);
+  for (const c of s.cues) if (!tour.fired.has(c) && (c.at ?? s.from) <= t) { tour.fired.add(c); tour.queue.push(c); }
+}
+
+function showNextCue() {
+  const cue = tour.queue.shift();
+  if (!cue) return;
+  tour.active = cue;
+  tour.activeUntil = performance.now() + cue.hold * 1000;
+  tour.shown.push(cue);
+}
+
+// Sets the tour at the start of a section, with nothing of it shown yet.
+function openSection(i) {
+  const s = tour.sections[i], ex = tour.ex, shown = tourView(cursorOf(ex)), moved = i !== tour.index;
+  Object.assign(tour, { index: i, view: s.view, queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, nextCandle: 0 });
+  tour.kept = tour.sections.slice(0, i).flatMap(earlier => earlier.cues.filter(c => c.on != null
+    && (c.keep === 'always' || (c.keep === 'chapter' && earlier.chapter === s.chapter))));
+  // While a candle is being picked, the candles still to come are shown, to pick from.
+  tourLayers = ['replay', ...s.layers, ...(tour.picking ? ['future'] : [])];
+  const chapter = tour.chapters[s.chapter];
+  history.replaceState(null, '', chapter ? `#Tour/${chapter.slug}` : '#Tour');
+  advanceTo(s.from);
+  // The section sets the view: the chart eases to it, and a zoom or pan made by hand goes.
+  const view = sectionView(s.from), changed = view[0] !== shown[0] || view[1] !== shown[1];
+  if (moved || changed) zooms.delete(ex.id);
+  if (changed) zoomTour(shown);
+}
+
+function enterSection(i) {
+  openSection(i);
+  showNextCue();
+  refreshTour();
+}
+
+// Puts the tour at a place in a section: a candle and how many of the section's texts have been shown, or the point at
+// which one of its texts appears. An edit uses this to leave the tour where it was, or to show what was edited.
+function seekTour(i, { t = 0, shown = 1, cue = null } = {}) {
+  if (!tour.sections.length) {
+    Object.assign(tour, { index: 0, queue: [], shown: [], fired: new Set(), kept: [], active: null });
+    tourLayers = ['replay', ...tour.startLayers];
+    cursors.set(tour.ex.id, 0);
+    return refreshTour();
+  }
+  openSection(Math.max(0, Math.min(i, tour.sections.length - 1)));
+  const s = tourSection(), target = cue == null ? null : s.cues[cue];
+  const pending = () => s.cues.filter(c => !tour.fired.has(c)).map(c => c.at);
+  if (target) {
+    while (!tour.shown.includes(target)) {
+      if (!tour.queue.length) {
+        if (cursorOf(tour.ex) >= s.until) break;
+        advanceTo(Math.min(s.until, ...pending()));
+      }
+      showNextCue();
+    }
+  } else {
+    advanceTo(Math.max(s.from, Math.min(t, s.until)));
+    while (tour.queue.length && tour.shown.length < shown) showNextCue();
+  }
+  refreshTour();
+}
+
+function refreshTour() {
+  const ex = tour.ex;
+  const pins = cues => cues.filter(c => c.on != null && c.at != null).map(c => pinOf(ex, c)).filter(p => p.time && Number.isFinite(p.price));
+  ex.pins = pins([...tour.kept, ...tour.shown]);
+  // Room is kept for all of the section's pins from its start, so the prices do not move each time one appears.
+  ex.pinRoom = pins([...tour.kept, ...(tourSection()?.cues ?? [])]);
+  syncLayerButtons();
+  if (editorSection !== tour.index) renderTourEditor();
+  drawAll('Tour');
+  updateTourPanel();
+}
+
+function updateTourPanel() {
+  const part = name => document.querySelector(`[data-tour="${name}"]`);
+  if (currentPage !== 'Tour' || !part('caption')) return;
+  const s = tourSection(), ex = tour.ex, t = cursorOf(ex);
+  // Text pinned to a candle is on the chart; the caption keeps the last text that was not.
+  const caption = [...tour.shown].reverse().find(c => c.on == null);
+  part('title').textContent = tour.def.title || 'Tour';
+  part('chapter').textContent = tour.chapters[s?.chapter]?.name ?? tour.def.title ?? 'Tour';
+  part('where').textContent = s ? `section ${s.index + 1} of ${tour.sections.length} · #${s.from}${s.until > s.from ? ` to #${s.until}` : ''}` : 'no sections yet';
+  part('caption').textContent = caption?.text ?? '';
+  part('readout').textContent = `#${t} · ${fmtTime(ex.prices.t[t])} UTC`;
+  const warning = part('warning');
+  warning.hidden = !ex.unanchored;
+  warning.textContent = ex.unanchored ? 'The local server was started before the tour existed, so it cannot work out the structure from the tour\'s start: only candles and closes are shown. Restart ./build-site.ps1 -Serve.' : '';
+
+  // The chapters and the problems change as the tour is edited, so they are redrawn when they differ.
+  const fill = (el, html) => { if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; } };
+  fill(part('errors'), tour.errors.length ? `<div class="empty tour-errors"><b>The tour has problems</b><ul>${tour.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>` : '');
+  fill(part('chapters'), tour.chapters.map((c, i) => `<a href="#Tour/${c.slug}" data-chapter="${i}">${i + 1}. ${esc(c.name)}</a>`).join(''));
+  part('chapters').querySelectorAll('a').forEach(a => a.classList.toggle('active', Number(a.dataset.chapter) === s?.chapter));
+
+  const play = document.querySelector('[data-tour-go="play"]');
+  play.textContent = tour.timer ? '❚❚' : '▶';
+  play.setAttribute('aria-label', tour.timer ? 'Pause (Space)' : 'Play (Space)');
+  document.querySelector('[data-tour-go="edit"]').setAttribute('aria-pressed', editorOn());
+
+  // The editor marks the texts shown so far, and the one on show.
+  document.querySelectorAll('#tour-editor .ed-cue').forEach((el, j) => {
+    const cue = s?.cues[j], active = !!cue && cue === tour.active;
+    el.classList.toggle('shown', tour.shown.includes(cue));
+    if (active && !el.classList.contains('active') && tour.timer) el.scrollIntoView({ block: 'nearest' });
+    el.classList.toggle('active', active);
+  });
+}
+
+// One beat of a playing tour: the next text once the one on show has been read, else the next candle, else the next section.
+function tourTick() {
+  if (currentPage !== 'Tour' || !tour.sections.length) return pauseTour();
+  const s = tourSection(), ex = tour.ex, now = performance.now(), t = cursorOf(ex);
+  const reading = tour.active && now < tour.activeUntil;
+  if (!reading && tour.queue.length) { showNextCue(); return refreshTour(); }
+  if (t < s.until) {
+    // The replay waits at a cue that has a candle; text with no candle is read while the replay runs.
+    const waiting = (reading && tour.active.at != null) || tour.queue.some(c => c.at != null);
+    if (waiting || now < tour.nextCandle) return;
+    if (!timelineAt(ex, t + 1)) return prefetch(ex, t + 1);
+    const gap = 1000 / s.speed;
+    tour.nextCandle = (now - tour.nextCandle < gap ? tour.nextCandle : now) + gap;
+    advanceTo(t + 1);
+    return refreshTour();
+  }
+  if (reading) return;
+  if (tour.index + 1 < tour.sections.length) enterSection(tour.index + 1); else pauseTour();
+}
+
+function playTour() {
+  const s = tourSection();
+  if (tour.index === tour.sections.length - 1 && cursorOf(tour.ex) >= s.until && !tour.queue.length) enterSection(0);
+  // The text on show gets its reading time again.
+  if (tour.active) tour.activeUntil = performance.now() + tour.active.hold * 1000;
+  tour.timer = setInterval(tourTick, TOUR_TICK);
+  updateTourPanel();
+}
+
+function pauseTour() {
+  if (!tour?.timer) return;
+  clearInterval(tour.timer);
+  tour.timer = null;
+  updateTourPanel();
+}
+
+// Stepping by hand: back to the start of the section (or of the one before), or on to the next text, candle with a cue, or section.
+function tourGo(action) {
+  if (!tour?.sections.length) return;
+  if (action === 'play') return tour.timer ? pauseTour() : playTour();
+  pauseTour();
+  const s = tourSection(), t = cursorOf(tour.ex);
+  if (action === 'prev') return enterSection(t > s.from || tour.shown.length > 1 ? tour.index : Math.max(0, tour.index - 1));
+  if (!tour.queue.length && t >= s.until) {
+    if (tour.index + 1 < tour.sections.length) enterSection(tour.index + 1);
+    return;
+  }
+  if (!tour.queue.length) advanceTo(Math.min(s.until, ...s.cues.filter(c => !tour.fired.has(c)).map(c => c.at)));
+  showNextCue();
+  refreshTour();
+}
+
+async function renderTourPage(chapter) {
+  const main = document.getElementById('main');
+  selected.clear();
+  currentPage = 'Tour';
+  const show = body => {
+    main.innerHTML = `<section class="term-head"><h2 data-tour="title">${esc(tour?.def.title || 'Tour')}</h2>
+      <p class="remarks">A scripted replay, read from <code>tour.json</code> and changed with the editor beside the chart. Candles are numbered
+      from the tour's start: the crosshair shows a candle's number.</p></section>${body}`;
+    renderLayers(); wireReplayExamples(main); drawAll(currentPage);
+  };
+
+  if (!serverOn) {
+    show(`<div class="empty" data-server-check>Checking for the local server…</div>`);
+    return checkLocalServer();
+  }
+  if (!tour) {
+    show('<div class="empty">Loading the tour…</div>');
+    try { tour = await (tourLoading ??= loadTour()); }
+    catch (e) {
+      tourLoading = null;
+      if (currentPage === 'Tour') show(`<div class="empty">The tour could not be loaded: ${esc(e.message)}.</div>`);
+      return;
+    }
+    if (currentPage !== 'Tour') return;
+  }
+
+  const ex = tour.ex;
+  show(`<div data-tour="errors"></div>
+    <nav class="tour-chapters" aria-label="Chapters" data-tour="chapters"></nav>
+    <article class="example replay-big" id="ex-${esc(ex.id)}">
+      <header><h3 data-tour="chapter"></h3><span class="id" data-tour="where"></span></header>
+      ${chartRow(ex)}
+      <div class="tour-caption" data-tour="caption" aria-live="polite"></div>
+      <div class="tour-controls" role="group" aria-label="Tour controls">
+        <button type="button" data-tour-go="prev" title="Back to the start of this section, or of the one before (←)" aria-label="Back">⏮</button>
+        <button type="button" class="play" data-tour-go="play" title="Play or pause (Space)">▶</button>
+        <button type="button" data-tour-go="next" title="On to the next text, candle with a cue, or section (→)" aria-label="Next">⏭</button>
+        <span class="readout" data-tour="readout"></span>
+        <span class="keys">Keys: ← → step · Space play</span>
+        <button type="button" class="edit" data-tour-go="edit" title="Show or hide the editor">Editor</button>
+      </div>
+      <div class="tour-warning" data-tour="warning" hidden></div>
+    </article>`);
+  main.querySelectorAll('[data-tour-go]').forEach(b => b.addEventListener('click', () => b.dataset.tourGo === 'edit' ? toggleTourEditor() : tourGo(b.dataset.tourGo)));
+  editorSection = -1;
+  const wanted = tour.chapters.find(c => c.slug === chapter), first = wanted ? wanted.section : tour.index;
+  // Opening the page shows its section's view at once, with no zoom to it.
+  tour.view = tour.sections[first]?.view ?? tour.view;
+  tour.zoom = null;
+  seekTour(first);
+}
+
+// ---- Tour editor -----------------------------------------------------------------------------------------------------
+// Beside the chart, where the event log is on other pages: the tour's definition as a form. It shows the section the tour
+// is at, so what is edited is what is on the chart, and every change is applied at once. The layer buttons set the layers
+// of that section. Save writes tour.json back through the local server.
+let editorSection = -1;
+const editorOn = () => state.tourEditor !== false;
+const tourDirty = () => !!tour && JSON.stringify(tour.def) !== tour.saved;
+const TOUR_KEYS = { tour: ['title', 'dataset', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
+  section: ['chapter', 'layers', 'add', 'remove', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'text', 'hold', 'keep'] };
+
+// tour.json as text: a line for each text and for each of a section's settings, so a change shows as a small diff.
+function formatTour(def) {
+  const ordered = (o, keys) => [...keys.filter(k => k in o), ...Object.keys(o).filter(k => !keys.includes(k))].map(k => [k, o[k]]);
+  const inline = (v, keys = []) => Array.isArray(v) ? `[${v.map(x => inline(x)).join(', ')}]`
+    : v && typeof v === 'object' ? (Object.keys(v).length ? `{ ${ordered(v, keys).map(([k, x]) => `${JSON.stringify(k)}: ${inline(x)}`).join(', ')} }` : '{}')
+    : JSON.stringify(v);
+  const lines = (entries, pad) => entries.map(([k, text]) => `${pad}${JSON.stringify(k)}: ${text}`).join(',\n');
+  const list = (items, pad, each) => items.length ? `[\n${items.map(each).join(',\n')}\n${pad}]` : '[]';
+  const section = s => `    {\n${lines(ordered(s, TOUR_KEYS.section).map(([k, v]) =>
+    [k, k === 'cues' && Array.isArray(v) ? list(v, '      ', c => `        ${inline(c, TOUR_KEYS.cue)}`) : inline(v)]), '      ')}\n    }`;
+  return `{\n${lines(ordered(def, TOUR_KEYS.tour).map(([k, v]) =>
+    [k, k === 'sections' && Array.isArray(v) ? list(v, '  ', section) : inline(v, k === 'start' ? TOUR_KEYS.start : [])]), '  ')}\n}\n`;
+}
+
+// How long a section takes to play: the replay waits at each text that has a candle, and the rest is read while it runs.
+function sectionSeconds(s) {
+  const sum = cues => cues.reduce((n, c) => n + c.hold, 0);
+  return sum(s.cues.filter(c => c.at != null)) + Math.max((s.until - s.from) / s.speed, sum(s.cues.filter(c => c.at == null)));
+}
+
+function renderTourEditor() {
+  const box = document.getElementById('tour-editor');
+  if (!tour || currentPage !== 'Tour' || !editorOn()) { box.innerHTML = ''; editorSection = -1; return; }
+  const { def, sections } = tour, start = def.start ?? {};
+  editorSection = tour.index;
+  const value = v => esc(v ?? '');
+  const options = (list, current) => list.map(([v, label]) => `<option value="${esc(v)}" ${String(current ?? '') === String(v) ? 'selected' : ''}>${esc(label)}</option>`).join('');
+  // The first and last candle shown. Left empty, the view is as before, which the boxes then say.
+  const viewBoxes = (scope, view, before, otherwise = 'as before') => [['View from candle', 0], ['View to candle', 1]].map(([label, k]) =>
+    `<label>${label}<input type="number" min="0" step="1" data-scope="${scope}" data-field="view${k}" placeholder="#${before[k]}, ${otherwise}" value="${value(view?.[k])}"></label>`).join('');
+  const ops = (kind, what) => `<span class="ed-ops"><button type="button" data-ed="${kind}-up" title="Move this ${what} up" aria-label="Move this ${what} up">↑</button>` +
+    `<button type="button" data-ed="${kind}-down" title="Move this ${what} down" aria-label="Move this ${what} down">↓</button>` +
+    `<button type="button" data-ed="${kind}-delete" title="Delete this ${what}" aria-label="Delete this ${what}">✕</button></span>`;
+  const pick = (field, what) => `<button type="button" data-ed="pick" data-pick="${field}" title="Pick ${what} on the chart">Pick</button>`;
+  const head = i => `<span class="ed-num">${i + 1}</span><span class="ed-name" data-ed-name></span><span class="ed-meta" data-ed-meta></span>`;
+  const layerName = id => { const l = LAYERS.find(x => x.id === id); return l?.level !== undefined ? `level ${l.level}` : l?.label ?? id; };
+
+  const cueCard = (c, j) => {
+    const pinned = c.on != null;
+    return `<div class="ed-cue" data-cue="${j}">
+      <div class="ed-meta" data-ed-cue></div>
+      <textarea data-scope="cue" data-field="text" placeholder="Text" aria-label="Text ${j + 1}">${value(c.text)}</textarea>
+      <div class="ed-row">
+        <label>At candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="cue" data-field="at" data-type="number" placeholder="start" value="${value(c.at)}">${pick('at', 'the candle')}</span></label>
+        <label>Pinned to<select data-scope="cue" data-field="on" data-type="auto" data-render>${options([['', 'not pinned'], ['open', 'open'], ['high', 'high'], ['low', 'low'], ['close', 'close'],
+          ...(typeof c.on === 'number' ? [[c.on, `price ${c.on}`]] : [])], c.on)}</select></label>
+        <label>Side<select data-scope="cue" data-field="place" ${pinned ? '' : 'disabled'}>${options([['', 'auto'], ['above', 'above'], ['below', 'below'], ['left', 'left'], ['right', 'right']], c.place)}</select></label>
+        <label>Seconds<input type="number" min="0.5" step="0.5" data-scope="cue" data-field="hold" data-type="number" placeholder="${readingSeconds(c.text ?? '').toFixed(1)}" value="${value(c.hold)}"></label>
+        <label>Pin stays<select data-scope="cue" data-field="keep" ${pinned ? '' : 'disabled'}>${options([['', 'this section'], ['chapter', 'this chapter'], ['always', 'to the end']], c.keep === 'section' ? '' : c.keep)}</select></label>
+        ${ops('cue', 'text')}
+        ${j ? `<span class="ed-split"><button type="button" data-ed="cue-split" title="Start a new section with this text and those after it, so it can have layers of its own">Split the section here</button></span>` : ''}
+      </div>
+    </div>`;
+  };
+
+  const openCard = (d, i) => {
+    const s = sections[i], before = i ? sections[i - 1] : null, was = before?.layers ?? tour.startLayers;
+    const chips = [...s.layers.map(id => `<span class="ed-chip${was.includes(id) ? '' : ' added'}">${was.includes(id) ? '' : '+ '}${esc(layerName(id))}</span>`),
+      ...was.filter(id => !s.layers.includes(id)).map(id => `<span class="ed-chip removed">${esc(layerName(id))}</span>`)];
+    return `<section class="ed-card open" data-section="${i}">
+      <header>${head(i)}${ops('section', 'section')}</header>
+      <div class="ed-grid">
+        <label class="wide">Chapter<input data-scope="section" data-field="chapter" placeholder="${before ? `continues ${esc(tour.chapters[before.chapter]?.name ?? 'the section before')}` : 'Name a chapter to start one'}" value="${value(d.chapter)}"></label>
+        <label>Runs from candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="section" data-field="from" data-type="number" placeholder="#${before?.until ?? 0}, as before" value="${value(d.from)}">${pick('from', 'the first candle')}</span></label>
+        <label>Runs to candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="section" data-field="until" data-type="number" placeholder="stays at #${s.from}" value="${value(d.until)}">${pick('until', 'the last candle')}</span></label>
+        ${viewBoxes('section', d.view, before?.view ?? tour.startView)}
+        <label>Candles a second<input type="number" min="0.5" step="0.5" data-scope="section" data-field="speed" data-type="number" placeholder="${before?.speed ?? start.speed ?? 4}" value="${value(d.speed)}"></label>
+        <span class="ed-use"><button type="button" data-ed="view-chart" title="Zoom or pan the chart to what this section should show, then press this">Use the chart's view</button></span>
+      </div>
+      <div class="ed-layers"><span>Layers</span>${chips.join('') || '<span class="ed-chip">none</span>'}<span class="ed-hint">Set with the layer buttons on the left.</span></div>
+      ${(d.cues ?? []).map(cueCard).join('')}
+      <div class="ed-foot"><button type="button" data-ed="add-cue">+ Text</button><button type="button" data-ed="add-section">+ Section after</button>
+        <button type="button" data-ed="section-copy" title="Add a copy of this section after it">Duplicate</button>
+        <button type="button" data-ed="play-here" title="Play from the start of this section">▶ From here</button></div>
+    </section>`;
+  };
+
+  // The tour's own settings fold away like a section, as they are seldom changed.
+  const tourHead = `<span class="ed-num">Tour</span><span class="ed-name chapter" data-ed-title></span><span class="ed-meta" data-ed-total></span>`;
+  const tourCard = state.tourCardOpen
+    ? `<section class="ed-card">
+        <button type="button" class="ed-fold" data-ed="tour-card" aria-expanded="true" title="Fold the tour's settings away">${tourHead}</button>
+        <div class="ed-grid">
+          <label class="wide">Title<input data-scope="tour" data-field="title" value="${value(def.title)}"></label>
+          <label class="wide">Starts at (candle #0, UTC)<input type="datetime-local" step="3600" data-scope="start" data-field="time" data-commit value="${value(start.time)}"></label>
+          ${viewBoxes('start', start.view, DEFAULT_VIEW, 'if left empty')}
+          <label>Candles a second<input type="number" min="0.5" step="0.5" data-scope="start" data-field="speed" data-type="number" placeholder="4" value="${value(start.speed)}"></label>
+        </div></section>`
+    : `<button type="button" class="ed-section" data-ed="tour-card" aria-expanded="false" title="Show the tour's settings">${tourHead}</button>`;
+
+  box.innerHTML = `<div class="ed-head"><h4>Tour editor</h4>
+      <button type="button" data-ed="undo" title="Undo the last change">Undo</button>
+      <button type="button" data-ed="revert" title="Load tour.json again, dropping what is not saved (Undo brings it back)">Revert</button>
+      <button type="button" data-ed="save" title="Save to tour.json (Ctrl+S)">Save</button></div>
+    <div class="ed-status" data-ed-status aria-live="polite"></div>
+    <div class="ed-body">
+      ${tourCard}
+      ${(def.sections ?? []).map((d, i) => i === tour.index ? openCard(d, i)
+        : `<button type="button" class="ed-section" data-ed="go" data-section="${i}" title="Go to this section">${head(i)}</button>`).join('')}
+      ${sections.length ? '' : '<button type="button" data-ed="add-section">+ Section</button>'}
+    </div>`;
+  updateEditorMeta();
+  updateEditorStatus();
+}
+
+// The names, candles and running times shown on the section cards, which change as the tour is edited.
+function updateEditorMeta() {
+  document.querySelectorAll('#tour-editor [data-section]').forEach(card => {
+    const i = Number(card.dataset.section), d = tour.def.sections[i], s = tour.sections[i];
+    if (!d || !s) return;
+    const name = card.querySelector('[data-ed-name]');
+    name.textContent = d.chapter || `↳ ${d.cues?.find(c => c.on == null && c.text)?.text ?? 'no text yet'}`;
+    name.classList.toggle('chapter', !!d.chapter);
+    card.querySelector('[data-ed-meta]').textContent = `#${s.from}${s.until > s.from ? ` → #${s.until}` : ''} · ${Math.round(sectionSeconds(s))}s`;
+  });
+  // A text's settings are folded away until it is being edited, so each says when it appears and for how long.
+  document.querySelectorAll('#tour-editor [data-ed-cue]').forEach((el, j) => {
+    const c = tourSection()?.cues[j];
+    if (c) el.textContent = `${j + 1} · ${c.at != null ? `at #${c.at}` : 'as the section begins'}${c.on != null ? ` · pinned to ${typeof c.on === 'number' ? c.on : `the ${c.on}`}` : ''} · ${c.hold.toFixed(1)}s`;
+  });
+  const total = document.querySelector('[data-ed-total]'), seconds = Math.round(tour.sections.reduce((n, s) => n + sectionSeconds(s), 0));
+  if (total) total.textContent = `${tour.sections.length} section${tour.sections.length === 1 ? '' : 's'} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  const title = document.querySelector('[data-ed-title]');
+  if (title) title.textContent = tour.def.title || 'no title yet';
+}
+
+function updateEditorStatus() {
+  document.body.classList.toggle('picking', !!tour?.picking);
+  const status = document.querySelector('[data-ed-status]');
+  if (!status) return;
+  const problems = tour.errors.length, dirty = tourDirty();
+  status.textContent = tour.picking ? 'Click a candle on the chart. Esc cancels.'
+    : tour.note || (problems ? `${problems} problem${problems === 1 ? '' : 's'}, listed above the chart` : dirty ? 'Changes not saved' : 'Saved in tour.json');
+  status.classList.toggle('warn', !tour.picking && (!!tour.note || problems > 0));
+  const save = document.querySelector('[data-ed="save"]');
+  save.disabled = !dirty;
+  save.classList.toggle('dirty', dirty);
+  document.querySelector('[data-ed="undo"]').disabled = !tour.history.length;
+  document.querySelectorAll('[data-ed="pick"]').forEach(b => b.setAttribute('aria-pressed',
+    tour.picking?.field === b.dataset.pick && (b.dataset.pick !== 'at' || tour.picking.cue === Number(b.closest('.ed-cue')?.dataset.cue))));
+}
+
+function toggleTourEditor() {
+  state.tourEditor = !editorOn();
+  save(state);
+  document.body.classList.toggle('editing', editorOn());
+  renderTourEditor();
+  drawAll('Tour');
+  updateTourPanel();
+}
+
+// Keeps the definition as it is before a change, for Undo. Typing in one box is one change.
+function rememberTour(key = null) {
+  if (key && key === tour.lastEdit) return;
+  tour.history.push(JSON.stringify(tour.def));
+  if (tour.history.length > 200) tour.history.shift();
+  tour.lastEdit = key;
+}
+
+// Applies the definition as it now is: works the sections out again, then puts the tour back where it was, at the start or
+// end of its section, or where one of the section's texts appears.
+function applyTour({ render = false, cue = null, end = false, start = false } = {}) {
+  pauseTour();
+  const was = { t: cursorOf(tour.ex), shown: tour.shown.length };
+  tour.note = '';
+  anchorTour();
+  Object.assign(tour, compileTour(tour.def, tour.ex.prices.t.length));
+  if (render) editorSection = -1;
+  seekTour(tour.index, start ? {} : end ? { t: Infinity, shown: Infinity } : cue != null ? { cue } : was);
+  updateEditorMeta();
+  updateEditorStatus();
+}
+
+function editTourField(el) {
+  const cueEl = el.closest('.ed-cue'), j = cueEl ? Number(cueEl.dataset.cue) : null, { scope, field, type } = el.dataset, def = tour.def;
+  rememberTour(`${scope}|${tour.index}|${j}|${field}`);
+  const target = scope === 'tour' ? def : scope === 'start' ? (def.start ??= {}) : scope === 'cue' ? def.sections[tour.index].cues[j] : def.sections[tour.index];
+  const raw = el.value, value = raw !== '' && (type === 'number' || (type === 'auto' && /^\d+(\.\d+)?$/.test(raw))) ? Number(raw) : raw;
+  if (field === 'view0' || field === 'view1') {
+    // The two boxes of a view are one setting: with both empty it is left out, and with one empty that end is as before.
+    const read = k => { const v = el.closest('.ed-grid').querySelector(`[data-field="view${k}"]`).value; return v === '' ? null : Number(v); };
+    const first = read(0), last = read(1), before = scope === 'start' ? DEFAULT_VIEW : tour.index ? tour.sections[tour.index - 1].view : tour.startView;
+    if (first == null && last == null) delete target.view; else target.view = [first ?? before[0], last ?? before[1]];
+  }
+  // An empty box leaves the setting out, so it is as before; a text stays, empty, until it is written.
+  else if ((value === '' && field !== 'text') || Number.isNaN(value)) delete target[field]; else target[field] = value;
+  if (field === 'text') cueEl.querySelector('[data-field="hold"]').placeholder = readingSeconds(value).toFixed(1);
+  applyTour(scope === 'cue' ? { cue: j, render: el.hasAttribute('data-render') } : { end: field === 'until', start: field === 'from' });
+  // Where the change redrew the editor, the box that was being used is found again: a text's settings only show once
+  // the text has the focus.
+  if (!el.isConnected && cueEl) focusCue(j);
+  if (!el.isConnected) document.querySelector(`#tour-editor ${cueEl ? `.ed-cue[data-cue="${j}"] ` : ''}[data-scope="${scope}"][data-field="${field}"]`)?.focus();
+}
+
+// The layer buttons, while the editor is open, set the layers of the section the tour is at: written as what the section
+// adds to the layers before it and what it takes away.
+function recordTourLayers() {
+  const s = tour?.sections[tour.index];
+  if (!s || !editorOn() || tour.picking) return;
+  const wanted = tourLayers.filter(id => id !== 'replay'), before = tour.index ? tour.sections[tour.index - 1].layers : tour.startLayers;
+  if (wanted.length === s.layers.length && wanted.every(id => s.layers.includes(id))) return;
+  const d = tour.def.sections[tour.index], name = id => LAYER_NAMES[id] ?? id;
+  const add = wanted.filter(id => !before.includes(id)).map(name), remove = before.filter(id => !wanted.includes(id)).map(name);
+  rememberTour(`layers|${tour.index}`);
+  delete d.layers;
+  if (add.length) d.add = add; else delete d.add;
+  if (remove.length) d.remove = remove; else delete d.remove;
+  applyTour({ render: true });
+}
+
+// Picking a candle on the chart for a section's first or last candle or a text's candle, in place of typing its number.
+function pickFromChart(field, cue = null) {
+  pauseTour();
+  const same = tour.picking?.field === field && tour.picking.cue === cue;
+  tour.picking = same ? null : { field, cue };
+  seekTour(tour.index, { t: cursorOf(tour.ex), shown: tour.shown.length });
+  updateEditorStatus();
+}
+
+function pickCandle(i) {
+  const { field, cue } = tour.picking, d = tour.def.sections[tour.index];
+  tour.picking = null;
+  rememberTour();
+  if (field === 'at') d.cues[cue].at = i; else d[field] = i;
+  applyTour(field === 'at' ? { render: true, cue } : { render: true, end: field === 'until', start: field === 'from' });
+  if (cue != null) focusCue(cue);
+}
+
+const focusCue = j => document.querySelectorAll('#tour-editor .ed-cue textarea')[j]?.focus();
+
+// The candle under the pointer, by its number in the tour.
+function candleAt(el, e) {
+  const p = plotPoint(el, e), view = views.get(el.dataset.id);
+  if (!p?.onPlot || !view) return null;
+  const [from, to] = el._fullLayout.xaxis.range.map(axisTime), at = from + (to - from) * p.x / p.w;
+  return view.from + view.t.reduce((best, v, i) => Math.abs(v - at) < Math.abs(view.t[best] - at) ? i : best, 0);
+}
+
+async function saveTour() {
+  if (!tourDirty()) return;
+  const def = JSON.stringify(tour.def);
+  const response = await fetch('api/tour', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formatTour(tour.def) }).catch(() => null);
+  if (response?.ok) tour.saved = def;
+  tour.note = response?.ok ? '' : response?.status === 404 || response?.status === 405
+    ? 'Not saved: the local server was started before the editor existed. Restart ./build-site.ps1 -Serve.' : 'Not saved: the local server did not take it.';
+  updateEditorStatus();
+}
+
+async function revertTour() {
+  const def = await fetch('tour.json', { cache: 'no-store' }).then(r => r.json()).catch(() => null);
+  if (!def) { tour.note = 'tour.json could not be loaded.'; return updateEditorStatus(); }
+  rememberTour();
+  tour.def = def;
+  tour.saved = JSON.stringify(def);
+  applyTour({ render: true, start: true });
+}
+
+function tourAction(action, el) {
+  const def = tour.def, i = tour.index, sections = def.sections ??= [], d = sections[i];
+  const cueEl = el.closest('.ed-cue'), j = cueEl ? Number(cueEl.dataset.cue) : null;
+  // Swaps two neighbours of a list, when both are there.
+  const swap = (list, a, b) => b >= 0 && b < list.length && ([list[a], list[b]] = [list[b], list[a]]);
+  switch (action) {
+    case 'go': pauseTour(); return enterSection(Number(el.dataset.section));
+    case 'play-here': pauseTour(); enterSection(i); return playTour();
+    case 'save': return saveTour();
+    case 'revert': return revertTour();
+    case 'undo': {
+      const before = tour.history.pop();
+      if (!before) return;
+      tour.def = JSON.parse(before);
+      tour.lastEdit = null;
+      return applyTour({ render: true });
+    }
+    case 'pick': return pickFromChart(el.dataset.pick, j);
+    case 'tour-card':
+      state.tourCardOpen = !state.tourCardOpen;
+      save(state);
+      return renderTourEditor();
+    case 'view-chart': {
+      // The candles across the chart as it has been zoomed or panned to become the section's view.
+      const ex = tour.ex, chart = document.querySelector('#main .chart'), view = views.get(ex.id);
+      if (!d || !view || !chart?._fullLayout) return;
+      const [from, to] = chart._fullLayout.xaxis.range.map(axisTime);
+      const first = indexAtOrAfter(ex, from + view.candle / 2), last = Math.max(first + 1, indexAtOrBefore(ex, to - view.candle / 2));
+      rememberTour();
+      d.view = [first, last];
+      zooms.delete(ex.id);
+      return applyTour({ render: true });
+    }
+    case 'add-section':
+      rememberTour();
+      sections.splice(sections.length ? i + 1 : 0, 0, { cues: [{ text: '' }] });
+      tour.index = sections.length === 1 ? 0 : i + 1;
+      applyTour({ render: true, start: true });
+      return document.querySelector('#tour-editor .ed-cue textarea')?.focus();
+    case 'section-delete':
+      rememberTour();
+      sections.splice(i, 1);
+      tour.index = Math.max(0, Math.min(i, sections.length - 1));
+      return applyTour({ render: true, start: true });
+    case 'section-up': case 'section-down': {
+      const to = i + (action === 'section-up' ? -1 : 1);
+      if (to < 0 || to >= sections.length) return;
+      rememberTour();
+      swap(sections, i, to);
+      tour.index = to;
+      return applyTour({ render: true, start: true });
+    }
+    case 'add-cue':
+      rememberTour();
+      (d.cues ??= []).push({ text: '' });
+      applyTour({ render: true, cue: d.cues.length - 1 });
+      return focusCue(d.cues.length - 1);
+    case 'section-copy': {
+      // The copy carries on the chapter, rather than starting another of the same name.
+      rememberTour();
+      const { chapter, ...copy } = JSON.parse(JSON.stringify(d));
+      sections.splice(i + 1, 0, copy);
+      tour.index = i + 1;
+      return applyTour({ render: true, start: true });
+    }
+    case 'cue-split': {
+      // The text and those after it become a section of their own, straight after this one. It has the same layers, view
+      // and speed until they are changed. A text at a candle inside the section's run splits the run there as well.
+      rememberTour();
+      const next = { cues: d.cues.splice(j) }, at = next.cues[0].at, s = tourSection();
+      if (at != null && at > s.from && at < s.until) { next.until = d.until; d.until = at; }
+      sections.splice(i + 1, 0, next);
+      tour.index = i + 1;
+      applyTour({ render: true, start: true });
+      return focusCue(0);
+    }
+    case 'cue-delete':
+      rememberTour();
+      d.cues.splice(j, 1);
+      return applyTour({ render: true });
+    case 'cue-up': case 'cue-down': {
+      const to = j + (action === 'cue-up' ? -1 : 1);
+      if (to < 0 || to >= d.cues.length) return;
+      rememberTour();
+      swap(d.cues, j, to);
+      applyTour({ render: true, cue: to });
+      return focusCue(to);
+    }
+  }
+}
+
+{
+  const box = document.getElementById('tour-editor');
+  // A box is applied as it is typed in; the start time only once it is complete.
+  box.addEventListener('input', e => { const el = e.target.closest('[data-field]'); if (el && !el.hasAttribute('data-commit')) editTourField(el); });
+  box.addEventListener('change', e => { const el = e.target.closest('[data-field][data-commit]'); if (el) editTourField(el); });
+  box.addEventListener('click', e => { const b = e.target.closest('[data-ed]'); if (b && !b.disabled) tourAction(b.dataset.ed, b); });
+  // Going into one of a text's boxes shows that text on the chart.
+  box.addEventListener('focusin', e => {
+    const cueEl = e.target.closest('.ed-cue'), cue = cueEl && tourSection()?.cues[Number(cueEl.dataset.cue)];
+    if (!cue || !e.target.matches('[data-field]') || cue === tour.active) return;
+    pauseTour();
+    seekTour(tour.index, { cue: Number(cueEl.dataset.cue) });
+  });
+
+  // A click on the chart picks a candle; a drag still pans. Plotly covers the page while the button is down, so the
+  // release is caught on the window.
+  let down = null;
+  window.addEventListener('pointerdown', e => { down = tour?.picking && e.target.closest?.('.chart') ? [e.clientX, e.clientY] : null; }, true);
+  window.addEventListener('pointerup', e => {
+    const chart = document.querySelector('#main .chart'), from = down;
+    down = null;
+    if (!from || !tour?.picking || !chart || currentPage !== 'Tour' || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 4) return;
+    const i = candleAt(chart, e);
+    if (i != null) pickCandle(i);
+  }, true);
+
+  document.addEventListener('keydown', e => {
+    if (currentPage !== 'Tour' || !tour) return;
+    if (e.key === 'Escape' && tour.picking) { e.preventDefault(); pickFromChart(tour.picking.field, tour.picking.cue); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && editorOn()) { e.preventDefault(); saveTour(); }
+  });
+  window.addEventListener('beforeunload', e => { if (tourDirty()) e.preventDefault(); });
 }
 
 function renderStructure() {
@@ -1726,8 +2673,8 @@ function renderInterims() {
   let html = `<section class="term-head">
     <h2>Interim swings</h2>
     ${DATA.interims?.summary ? `<p>${prose(DATA.interims.summary)}</p>` : ''}
-    <p class="remarks">A swing at one sawtooth level is built from swings one level finer: its interim swings, drawn dotted inside it.
-    Click a row to pick out a swing and its interims. Swings follow the finest sawtooth level shown, so turn on a finer level to see the next generation.</p>
+    <p class="remarks">A swing at one sawtooth level is built from swings one level finer: its interim swings, drawn lighter inside it.
+    Click a row to pick out a swing and its interims. Each sawtooth level shown brings its own swings, so turn on a finer level to see the next generation.</p>
   </section>`;
 
   if (!examples.length) html += '<div class="empty">No interim swing examples. Add a CSV and sidecar under <code>TestData/Structure/InterimSwings/</code>.</div>';
@@ -1756,7 +2703,18 @@ function renderInterims() {
 
 function route() {
   stopPlaying();
+  pauseTour();
   let type = decodeURIComponent(location.hash.slice(1));
+  // The tour's chapters have links of their own: #Tour/<chapter>.
+  const [page, chapter] = type.split('/');
+  document.body.classList.toggle('touring', page === 'Tour');
+  document.body.classList.toggle('editing', page === 'Tour' && editorOn());
+  if (page === 'Tour') {
+    renderNav('Tour');
+    renderTourPage(chapter);
+    window.scrollTo(0, 0);
+    return;
+  }
   if (STRUCTURE_PAGES.includes(type)) {
     renderNav(type);
     if (type === 'Sawtooth') renderStructure(); else if (type === 'Replay') renderReplayPage(); else renderInterims();

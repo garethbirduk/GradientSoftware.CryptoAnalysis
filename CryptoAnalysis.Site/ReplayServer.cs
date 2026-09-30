@@ -16,7 +16,7 @@ public sealed record Dataset(string Id, string Name, List<Price> Prices);
 
 /// <summary>
 /// Serves the built site and, for replays too long to build into it, the replay in batches: the structure as known at each
-/// candle of a range, computed from the dataset's first candle. Local only.
+/// candle of a range, computed from the dataset's first candle, or from a later candle given as the anchor. Local only.
 /// </summary>
 public static class ReplayServer
 {
@@ -31,9 +31,10 @@ public static class ReplayServer
     private static readonly JsonSerializerOptions Json = new(TermAnnotations.JsonOptions) { WriteIndented = false };
 
     /// <summary>
-    /// Runs the server on localhost until stopped.
+    /// Runs the server on localhost until stopped. Files in the source folder, when given, are served as they are now rather
+    /// than as they were built, so the page and the tour can be edited without rebuilding.
     /// </summary>
-    public static async Task Run(string siteDir, IReadOnlyList<Dataset> datasets, int port)
+    public static async Task Run(string siteDir, IReadOnlyList<Dataset> datasets, int port, string? sourceDir = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls($"http://localhost:{port}");
@@ -41,7 +42,9 @@ public static class ReplayServer
         var app = builder.Build();
         app.UseResponseCompression();
 
-        var files = new PhysicalFileProvider(siteDir);
+        IFileProvider files = Directory.Exists(sourceDir)
+            ? new CompositeFileProvider(new PhysicalFileProvider(sourceDir), new PhysicalFileProvider(siteDir))
+            : new PhysicalFileProvider(siteDir);
         app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
         // The site is rebuilt in place, so the browser must check for a newer page and data each time.
         app.UseStaticFiles(new StaticFileOptions
@@ -51,7 +54,7 @@ public static class ReplayServer
         });
 
         var byId = datasets.ToDictionary(x => x.Id);
-        var batches = new ConcurrentDictionary<(string, int), Lazy<string>>();
+        var batches = new ConcurrentDictionary<(string Dataset, int Anchor, int Start), Lazy<string>>();
 
         // The static page, opened as a file, asks whether the server is running so it can link to it.
         app.MapGet("/api/health", (HttpContext context) =>
@@ -74,15 +77,39 @@ public static class ReplayServer
             }, Json)
             : Results.NotFound());
 
-        app.MapGet("/api/replay", (string dataset, int from) =>
+        // With an anchor, the replay is of the dataset from that candle on: from counts from it, and so does the batch.
+        app.MapGet("/api/replay", (string dataset, int from, int? anchor) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
 
-            var start = Math.Clamp(from / BatchSize * BatchSize, 0, data.Prices.Count - 1);
-            var json = batches.GetOrAdd((dataset, start), key => new Lazy<string>(() => Batch(data, key.Item2))).Value;
+            var first = Math.Clamp(anchor ?? 0, 0, data.Prices.Count - 1);
+            var start = Math.Clamp(from / BatchSize * BatchSize, 0, data.Prices.Count - first - 1);
+            var json = batches.GetOrAdd((dataset, first, start), key => new Lazy<string>(() => Batch(data, key.Anchor, key.Start))).Value;
             return Results.Text(json, "application/json");
         });
+
+        // The tour's editor on the page saves the tour back to its source file.
+        if (Directory.Exists(sourceDir))
+        {
+            var tourPath = Path.Combine(sourceDir, "tour.json");
+            app.MapPut("/api/tour", async (HttpRequest request) =>
+            {
+                using var reader = new StreamReader(request.Body);
+                var text = await reader.ReadToEndAsync();
+                try
+                {
+                    using var parsed = JsonDocument.Parse(text);
+                }
+                catch (JsonException)
+                {
+                    return Results.BadRequest("The tour is not valid JSON.");
+                }
+
+                await File.WriteAllTextAsync(tourPath, text);
+                return Results.NoContent();
+            });
+        }
 
         Console.WriteLine($"Serving {siteDir} with replay for {string.Join(", ", datasets.Select(x => x.Id))} on http://localhost:{port}");
         await app.RunAsync();
@@ -90,13 +117,14 @@ public static class ReplayServer
 
     /// <summary>
     /// One batch: the timeline for candles start to start + BatchSize, plus the candle before so items already holding at the
-    /// start are known to be carried over rather than new.
+    /// start are known to be carried over rather than new. The candles are counted from the anchor.
     /// </summary>
-    private static string Batch(Dataset data, int start)
+    private static string Batch(Dataset data, int anchor, int start)
     {
-        var to = Math.Min(start + BatchSize, data.Prices.Count);
-        var timeline = MarketStructure.Timeline(data.Prices, EnumPriceBasis.Close, MaxLevel, from: Math.Max(0, start - 1), to: to,
+        var prices = anchor == 0 ? data.Prices : data.Prices.GetRange(anchor, data.Prices.Count - anchor);
+        var to = Math.Min(start + BatchSize, prices.Count);
+        var timeline = MarketStructure.Timeline(prices, EnumPriceBasis.Close, MaxLevel, from: Math.Max(0, start - 1), to: to,
             keepFrom: Math.Max(0, start - Window));
-        return JsonSerializer.Serialize(new { From = start, To = to, Timeline = timeline }, Json);
+        return JsonSerializer.Serialize(new { Anchor = anchor, From = start, To = to, Timeline = timeline }, Json);
     }
 }
