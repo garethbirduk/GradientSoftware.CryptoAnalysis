@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CryptoAnalysis\CryptoAnalysis.csproj" />
+    <ProjectReference Include="..\CryptoAnalysis.Site\CryptoAnalysis.Site.csproj" />
   </ItemGroup>
 
   <ItemGroup>

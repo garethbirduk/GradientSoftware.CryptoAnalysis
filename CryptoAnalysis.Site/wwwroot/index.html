@@ -197,6 +197,14 @@
   .tour-warning { color: var(--warn); font-size: 13px; }
   .tour-errors ul { margin: 6px 0 0; padding-left: 20px; }
   body.picking .chart .nsewdrag { cursor: cell !important; }
+  body.video .topnav, body.video aside, body.video #replaybar, body.video .term-head, body.video .tour-chapters, body.video .tour-controls,
+    body.video .tour-warning, body.video [data-tour="errors"] { display: none !important; }
+  body.video .layout { grid-template-columns: 1fr; min-height: 100vh; }
+  body.video main { max-width: none; padding: 12px 24px 0; }
+  body.video .example { margin: 0; border: 0; padding: 12px 20px; }
+  body.video .example h3 { font-size: 22px; }
+  body.video .replay-big .chart { height: calc(100vh - 230px); }
+  body.video .tour-caption { font-size: 26px; max-width: none; min-height: 3em; }
   #tour-editor { display: none; flex-direction: column; border-right: 0; border-left: 1px solid var(--border); padding: 0; font-size: 13px; }
   body.touring.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr) 400px; }
   body.touring.editing #tour-editor { display: flex; }
@@ -235,6 +243,7 @@
   .ed-grid .wide { grid-column: 1 / -1; }
   .ed-grid label, .ed-row label { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 11px; color: var(--muted); }
   .ed-pick { display: flex; gap: 3px; }
+  #tour-editor input.ed-event { border-color: var(--accent); border-style: dashed; }
   .ed-use { display: flex; align-items: end; }
   .ed-use button { flex: 1; }
   #tour-editor .ed-pick button { padding: 1px 6px; }
@@ -1181,7 +1190,7 @@ document.addEventListener('keydown', e => {
   const inside = selector => e.target instanceof Element && e.target.closest(selector);
   if (!on('replay') || e.ctrlKey || e.metaKey || e.altKey || inside('input, select, textarea, .menu')) return;
   if (currentPage === 'Tour') {
-    const step = { ArrowLeft: 'prev', ArrowRight: 'next' }[e.key] ?? (e.key === ' ' && !inside('button') ? 'play' : null);
+    const step = { ArrowLeft: 'prev', ArrowRight: 'next', Home: 'first', End: 'last' }[e.key] ?? (e.key === ' ' && !inside('button') ? 'play' : null);
     if (step) { e.preventDefault(); tourGo(step); }
     return;
   }
@@ -1866,7 +1875,7 @@ function findExample(id) {
 //   cue      text, shown under the chart as the section begins; with at, when the replay reaches that candle, which waits
 //            there while the text is read; with on as well ('open', 'high', 'low', 'close' or a price), pinned to that
 //            point of the candle (place: 'above', 'below', 'left' or 'right'). hold is the seconds the text stays before
-//            the next, by default the time it takes to read; keep is how long a pin stays: 'section', 'chapter' or 'always'.
+//            the next, by default the time it takes to read (0 moves straight on, leaving the caption up while pins show); keep is how long a pin stays: 'section', 'chapter' or 'always'.
 const DEFAULT_VIEW = [0, 168];
 const LAYER_ALIASES = { candles: 'price', closes: 'close' };
 // How the editor writes a layer whose id is not what it is called on the page.
@@ -1875,6 +1884,15 @@ const PIN_PRICES = { open: 'o', high: 'h', low: 'l', close: 'c' };
 const PIN_PLACES = { above: [0, -55], below: [0, 55], left: [-70, 0], right: [70, 0] };
 const TOUR_TICK = 40;
 let tour = null, tourLoading = null;
+// Opened with ?video, the page shows the tour alone, for tools/tour-video to record.
+const videoMode = new URLSearchParams(location.search).has('video');
+
+// The short hash of a text that names its narration clip in tour-audio (FNV-1a, 32 bits; the same as tools/tour-video).
+function textKey(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, '0');
+}
 
 const slugOf = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const readingSeconds = text => Math.max(2.5, text.length / 14);
@@ -1882,8 +1900,24 @@ const tourSection = () => tour.sections[tour.index];
 
 // Every section's full state, worked out from the start state and the sections before it, so any section can be entered
 // directly. Whatever the tour gets wrong is listed rather than guessed at.
-function compileTour(def, candles) {
-  const errors = [], known = new Set(LAYERS.map(l => l.id)), chapters = [];
+// A candle in the file is a number, or an event to wait for from a candle on: { "event": "BullishBreakOfStructure",
+// "level": 1, "nth": 1 }, the nth time that becomes known at that level. The local server looks those up, one lookup for
+// each event and starting candle (see resolveTour), and until it has, the section is listed as waiting.
+const eventKey = (spec, from) => `${spec.event}|${spec.level ?? 1}|${spec.nth ?? 1}|${from}`;
+const eventName = (spec, from) => `${{ 1: 'the first', 2: 'the second', 3: 'the third' }[spec.nth ?? 1] ?? `the ${spec.nth}th`} ${TERMS.get(spec.event)?.name ?? spec.event} at level ${spec.level ?? 1} after #${from}`;
+
+// A text stays for its narration clip's length when there is one (plus a breath), else for the time it takes to read.
+function compileTour(def, candles, resolved = new Map(), audio = {}) {
+  const errors = [], known = new Set(LAYERS.map(l => l.id)), chapters = [], wanted = [];
+  // A candle number as given, or looked up for an event; null when it is not known (yet).
+  const candle = (v, from, where, field) => {
+    if (v == null || typeof v === 'number') return { index: v ?? null, spec: null };
+    if (typeof v !== 'object' || !TERMS.has(v.event)) { errors.push(`${where}: ${field} must be a candle number or a known event`); return { index: null, spec: null }; }
+    const key = eventKey(v, from), spec = eventName(v, from);
+    if (!resolved.has(key)) { wanted.push({ key, spec: v, from }); errors.push(`${where}: ${field} is being looked up: ${spec}`); return { index: null, spec }; }
+    if (resolved.get(key) == null) errors.push(`${where}: ${field} waits for ${spec}, which does not happen`);
+    return { index: resolved.get(key), spec: `${spec} → #${resolved.get(key)}` };
+  };
   const ids = (list, where) => (list ?? []).map(id => LAYER_ALIASES[id] ?? id).filter(id => known.has(id) || void errors.push(`${where}: unknown layer "${id}"`));
   const range = (v, where) => Array.isArray(v) && v.length === 2 && v.every(Number.isInteger) && v[0] >= 0 && v[1] > v[0] ? v
     : (errors.push(`${where}: the view is the first and last candle shown, the last after the first`), null);
@@ -1903,8 +1937,9 @@ function compileTour(def, candles) {
     if (s.view != null) view = range(s.view, where) ?? view;
     renamed(s, where);
     if (s.speed != null) speed = rate(s.speed, where);
-    const from = Number.isInteger(s.from) && s.from >= 0 && s.from < candles ? s.from : at, until = s.until ?? from;
-    if (s.from != null && s.from !== from) errors.push(`${where}: from #${s.from} is not a candle of the tour, which has #0 to #${candles - 1}`);
+    const fromGiven = candle(s.from, at, where, 'from'), from = Number.isInteger(fromGiven.index) && fromGiven.index >= 0 && fromGiven.index < candles ? fromGiven.index : at;
+    if (fromGiven.index != null && fromGiven.index !== from) errors.push(`${where}: from #${fromGiven.index} is not a candle of the tour, which has #0 to #${candles - 1}`);
+    const untilGiven = candle(s.until, from, where, 'until'), until = untilGiven.index ?? from;
     if (until < from) errors.push(`${where}: until #${until} is before the section's start, #${from}`);
     if (until >= candles) errors.push(`${where}: until #${until} is past the last candle, #${candles - 1}`);
     at = Math.max(from, Math.min(until, candles - 1));
@@ -1912,16 +1947,40 @@ function compileTour(def, candles) {
     const cues = (s.cues ?? []).map((c, j) => {
       const what = `${where}, text ${j + 1}`, text = c.text ?? '';
       if (!text) errors.push(`${what}: no text`);
-      if (c.at != null && (c.at < 0 || c.at > at)) errors.push(`${what}: at #${c.at} is not reached, as the section ends at #${at}`);
+      const atGiven = candle(c.at, from, what, 'at');
+      if (atGiven.index != null && (atGiven.index < 0 || atGiven.index > at)) errors.push(`${what}: at #${atGiven.index} is not reached, as the section ends at #${at}`);
       if (c.on != null && c.at == null) errors.push(`${what}: a pin needs a candle`);
       if (c.on != null && typeof c.on !== 'number' && !PIN_PRICES[c.on]) errors.push(`${what}: unknown "on" "${c.on}"`);
       if (c.place != null && !PIN_PLACES[c.place]) errors.push(`${what}: unknown place "${c.place}"`);
       if (!['section', 'chapter', 'always'].includes(c.keep ?? 'section')) errors.push(`${what}: unknown keep "${c.keep}"`);
-      return { text, at: c.at ?? null, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', hold: c.hold > 0 ? c.hold : readingSeconds(text) };
+      return { text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', hold: c.hold >= 0 ? c.hold : audio[textKey(text)]?.seconds > 0 ? audio[textKey(text)].seconds + 0.4 : readingSeconds(text) };
     });
-    return { index: i, chapter: chapters.length - 1, layers, view, speed, from, until: at, cues };
+    return { index: i, chapter: chapters.length - 1, layers, view, speed, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
-  return { chapters, sections, errors, startLayers, startView };
+  return { chapters, sections, errors, startLayers, startView, wanted };
+}
+
+// Looks up the events a compiled tour is waiting for, then compiles again, until nothing is waiting: a lookup can move a
+// section's start, and with it what the next section waits from.
+async function resolveTour(retry = 0) {
+  const ex = tour.ex, pending = tour.wanted;
+  if (!pending.length || retry > 12) return;
+  tour.resolving = true;
+  updateEditorStatus();
+  for (const { key, spec, from } of pending) {
+    if (tour.resolved.has(key)) continue;
+    const query = `dataset=${encodeURIComponent(ex.dataset)}&anchor=${ex.anchor}&from=${from}&type=${encodeURIComponent(spec.event)}&level=${spec.level ?? 1}&nth=${spec.nth ?? 1}`;
+    const found = await fetch(`api/event?${query}`).then(r => r.ok ? r.json() : null).catch(() => null);
+    tour.resolved.set(key, found?.index ?? null);
+  }
+  tour.resolving = false;
+  if (tour.ex !== ex || currentPage !== 'Tour') return;
+  Object.assign(tour, compileTour(tour.def, ex.prices.t.length, tour.resolved, tour.audio));
+  if (tour.wanted.length) return resolveTour(retry + 1);
+  editorSection = -1;
+  seekTour(tour.index, { t: cursorOf(ex), shown: tour.shown.length });
+  updateEditorMeta();
+  updateEditorStatus();
 }
 
 async function loadTour() {
@@ -1929,10 +1988,11 @@ async function loadTour() {
   const list = await loadDatasets();
   const info = list.find(d => d.id === def.dataset) ?? list[0];
   if (!info) throw new Error('the server has no datasets');
-  const loaded = { def, whole: await loadDataset(info), ex: null, saved: JSON.stringify(def), history: [], lastEdit: null, picking: null, note: '',
+  const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+  const loaded = { def, audio, whole: await loadDataset(info), ex: null, saved: JSON.stringify(def), history: [], lastEdit: null, picking: null, note: '', resolved: new Map(), resolving: false,
     index: 0, view: DEFAULT_VIEW, queue: [], shown: [], fired: new Set(), kept: [], active: null, activeUntil: 0, nextCandle: 0, timer: null };
   anchorTour(loaded);
-  return Object.assign(loaded, compileTour(def, loaded.ex.prices.t.length));
+  return Object.assign(loaded, compileTour(def, loaded.ex.prices.t.length, loaded.resolved, loaded.audio));
 }
 
 // The tour's candles are the dataset's from its start time on, so a candle's number is its place in them. A new start
@@ -1941,6 +2001,8 @@ function anchorTour(t = tour) {
   const time = axisTime(t.def.start?.time ?? ''), anchor = Number.isNaN(time) ? 0 : indexAtOrAfter(t.whole, time);
   if (t.ex?.anchor === anchor) return;
   const id = `Tour/${t.whole.dataset}`, cut = a => a.slice(anchor), p = t.whole.prices;
+  // Events were looked up from the old start, so they are looked up again.
+  t.resolved?.clear();
   remote.delete(id);
   eventCache.clear();
   zooms.delete(id);
@@ -2024,7 +2086,32 @@ function showNextCue() {
   tour.active = cue;
   tour.activeUntil = performance.now() + cue.hold * 1000;
   tour.shown.push(cue);
+  tour.recording?.cues.push({ key: textKey(cue.text), at: Date.now() });
+  speak(cue);
 }
+
+// Reads a text aloud from its clip in tour-audio, when the Voice button is on and the tour is playing.
+function speak(cue) {
+  tour.player?.pause();
+  const clip = tour.audio[textKey(cue.text)];
+  if (!voiceOn() || !tour.timer || !clip || tour.recording) return;
+  tour.player = new Audio(`tour-audio/${clip.file}`);
+  tour.player.play().catch(() => { });
+}
+
+const voiceOn = () => state.tourVoice === true;
+
+// What tools/tour-video drives: plays the whole tour once and reports when each text and chapter appeared.
+window.tourVideo = {
+  ready: () => currentPage === 'Tour' && !!tour?.sections.length && !tour.wanted.length && !viewFor(tour.ex).loading,
+  play: () => new Promise(resolve => {
+    pauseTour();
+    tour.recording = { started: Date.now(), cues: [], chapters: [] };
+    tour.onEnd = () => { const done = { ...tour.recording, ended: Date.now() }; tour.recording = null; resolve(done); };
+    enterSection(0);
+    playTour();
+  }),
+};
 
 // Sets the tour at the start of a section, with nothing of it shown yet.
 function openSection(i) {
@@ -2035,6 +2122,7 @@ function openSection(i) {
   // While a candle is being picked, the candles still to come are shown, to pick from.
   tourLayers = ['replay', ...s.layers, ...(tour.picking ? ['future'] : [])];
   const chapter = tour.chapters[s.chapter];
+  if (chapter?.section === i) tour.recording?.chapters.push({ name: chapter.name, at: Date.now() });
   history.replaceState(null, '', chapter ? `#Tour/${chapter.slug}` : '#Tour');
   advanceTo(s.from);
   // The section sets the view: the chart eases to it, and a zoom or pan made by hand goes.
@@ -2113,6 +2201,10 @@ function updateTourPanel() {
   play.textContent = tour.timer ? '❚❚' : '▶';
   play.setAttribute('aria-label', tour.timer ? 'Pause (Space)' : 'Play (Space)');
   document.querySelector('[data-tour-go="edit"]').setAttribute('aria-pressed', editorOn());
+  const voice = document.querySelector('[data-tour-go="voice"]'), clips = Object.keys(tour.audio ?? {}).length;
+  voice.setAttribute('aria-pressed', voiceOn());
+  voice.disabled = !clips;
+  if (!clips) voice.title = 'No clips yet: run npm run narrate in tools/tour-video';
 
   // The editor marks the texts shown so far, and the one on show.
   document.querySelectorAll('#tour-editor .ed-cue').forEach((el, j) => {
@@ -2140,7 +2232,10 @@ function tourTick() {
     return refreshTour();
   }
   if (reading) return;
-  if (tour.index + 1 < tour.sections.length) enterSection(tour.index + 1); else pauseTour();
+  if (tour.index + 1 < tour.sections.length) return enterSection(tour.index + 1);
+  pauseTour();
+  tour.onEnd?.();
+  tour.onEnd = null;
 }
 
 function playTour() {
@@ -2156,6 +2251,7 @@ function pauseTour() {
   if (!tour?.timer) return;
   clearInterval(tour.timer);
   tour.timer = null;
+  tour.player?.pause();
   updateTourPanel();
 }
 
@@ -2166,6 +2262,8 @@ function tourGo(action) {
   pauseTour();
   const s = tourSection(), t = cursorOf(tour.ex);
   if (action === 'prev') return enterSection(t > s.from || tour.shown.length > 1 ? tour.index : Math.max(0, tour.index - 1));
+  if (action === 'first') return enterSection(0);
+  if (action === 'last') return enterSection(tour.sections.length - 1);
   if (!tour.queue.length && t >= s.until) {
     if (tour.index + 1 < tour.sections.length) enterSection(tour.index + 1);
     return;
@@ -2213,18 +2311,21 @@ async function renderTourPage(chapter) {
         <button type="button" class="play" data-tour-go="play" title="Play or pause (Space)">▶</button>
         <button type="button" data-tour-go="next" title="On to the next text, candle with a cue, or section (→)" aria-label="Next">⏭</button>
         <span class="readout" data-tour="readout"></span>
-        <span class="keys">Keys: ← → step · Space play</span>
+        <span class="keys">Keys: ← → step · Home End first last · Space play</span>
+        <button type="button" data-tour-go="voice" title="Read each text aloud from its clip in tour-audio, made by tools/tour-video">Voice</button>
         <button type="button" class="edit" data-tour-go="edit" title="Show or hide the editor">Editor</button>
       </div>
       <div class="tour-warning" data-tour="warning" hidden></div>
     </article>`);
-  main.querySelectorAll('[data-tour-go]').forEach(b => b.addEventListener('click', () => b.dataset.tourGo === 'edit' ? toggleTourEditor() : tourGo(b.dataset.tourGo)));
+  main.querySelectorAll('[data-tour-go]').forEach(b => b.addEventListener('click', () =>
+    b.dataset.tourGo === 'edit' ? toggleTourEditor() : b.dataset.tourGo === 'voice' ? toggleTourVoice() : tourGo(b.dataset.tourGo)));
   editorSection = -1;
   const wanted = tour.chapters.find(c => c.slug === chapter), first = wanted ? wanted.section : tour.index;
   // Opening the page shows its section's view at once, with no zoom to it.
   tour.view = tour.sections[first]?.view ?? tour.view;
   tour.zoom = null;
   seekTour(first);
+  if (tour.wanted.length) resolveTour();
 }
 
 // ---- Tour editor -----------------------------------------------------------------------------------------------------
@@ -2233,7 +2334,7 @@ async function renderTourPage(chapter) {
 // of that section. Save writes tour.json back through the local server.
 // The section the tour is at is open in the editor unless it has been folded away, which lasts until a section is picked.
 let editorSection = -1, editorFolded = false;
-const editorOn = () => state.tourEditor !== false;
+const editorOn = () => state.tourEditor !== false && !videoMode;
 const tourDirty = () => !!tour && JSON.stringify(tour.def) !== tour.saved;
 const TOUR_KEYS = { tour: ['title', 'dataset', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
   section: ['chapter', 'layers', 'add', 'remove', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'text', 'hold', 'keep'] };
@@ -2268,24 +2369,28 @@ function renderTourEditor() {
   // The first and last candle shown. Left empty, the view is as before, which the boxes then say.
   const viewBoxes = (scope, view, before, otherwise = 'as before') => [['View from candle', 0], ['View to candle', 1]].map(([label, k]) =>
     `<label>${label}<input type="number" min="0" step="1" data-scope="${scope}" data-field="view${k}" placeholder="#${before[k]}, ${otherwise}" value="${value(view?.[k])}"></label>`).join('');
-  const ops = (kind, what) => `<span class="ed-ops"><button type="button" data-ed="${kind}-up" title="Move this ${what} up" aria-label="Move this ${what} up">↑</button>` +
+  const ops = (kind, what) => `<span class="ed-ops">${kind === 'cue' ? `<button type="button" data-ed="cue-copy" title="Add a copy of this text after it">Copy</button>` : ''}` +
+    `<button type="button" data-ed="${kind}-up" title="Move this ${what} up" aria-label="Move this ${what} up">↑</button>` +
     `<button type="button" data-ed="${kind}-down" title="Move this ${what} down" aria-label="Move this ${what} down">↓</button>` +
     `<button type="button" data-ed="${kind}-delete" title="Delete this ${what}" aria-label="Delete this ${what}">✕</button></span>`;
   const pick = (field, what) => `<button type="button" data-ed="pick" data-pick="${field}" title="Pick ${what} on the chart">Pick</button>`;
   const head = i => `<span class="ed-num">${i + 1}</span><span class="ed-name" data-ed-name></span><span class="ed-meta" data-ed-meta></span>`;
   const layerName = id => { const l = LAYERS.find(x => x.id === id); return l?.level !== undefined ? `level ${l.level}` : l?.label ?? id; };
 
-  const cueCard = (c, j) => {
+  // A candle given as an event shows the candle it was found at, and says so; typing a number replaces the event.
+  const numberOr = v => typeof v === 'number' ? v : '';
+  const eventBox = spec => spec ? ` class="ed-event" title="${esc(spec)}"` : '';
+  const cueCard = (c, j, compiled) => {
     const pinned = c.on != null;
     return `<div class="ed-cue" data-cue="${j}">
       <div class="ed-meta" data-ed-cue></div>
       <textarea data-scope="cue" data-field="text" placeholder="Text" aria-label="Text ${j + 1}">${value(c.text)}</textarea>
       <div class="ed-row">
-        <label>At candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="cue" data-field="at" data-type="number" placeholder="start" value="${value(c.at)}">${pick('at', 'the candle')}</span></label>
+        <label>At candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="cue" data-field="at" data-type="number" placeholder="${esc(compiled?.atSpec ?? 'start')}" value="${numberOr(c.at)}"${eventBox(compiled?.atSpec)}>${pick('at', 'the candle')}</span></label>
         <label>Pinned to<select data-scope="cue" data-field="on" data-type="auto" data-render>${options([['', 'not pinned'], ['open', 'open'], ['high', 'high'], ['low', 'low'], ['close', 'close'],
           ...(typeof c.on === 'number' ? [[c.on, `price ${c.on}`]] : [])], c.on)}</select></label>
         <label>Side<select data-scope="cue" data-field="place" ${pinned ? '' : 'disabled'}>${options([['', 'auto'], ['above', 'above'], ['below', 'below'], ['left', 'left'], ['right', 'right']], c.place)}</select></label>
-        <label>Seconds<input type="number" min="0.5" step="0.5" data-scope="cue" data-field="hold" data-type="number" placeholder="${readingSeconds(c.text ?? '').toFixed(1)}" value="${value(c.hold)}"></label>
+        <label>Seconds<input type="number" min="0" step="0.5" data-scope="cue" data-field="hold" data-type="number" placeholder="${readingSeconds(c.text ?? '').toFixed(1)}" value="${value(c.hold)}"></label>
         <label>Pin stays<select data-scope="cue" data-field="keep" ${pinned ? '' : 'disabled'}>${options([['', 'this section'], ['chapter', 'this chapter'], ['always', 'to the end']], c.keep === 'section' ? '' : c.keep)}</select></label>
         ${ops('cue', 'text')}
         ${j ? `<span class="ed-split"><button type="button" data-ed="cue-split" title="Start a new section with this text and those after it, so it can have layers of its own">Split the section here</button></span>` : ''}
@@ -2301,14 +2406,14 @@ function renderTourEditor() {
       <header><button type="button" class="ed-fold" data-ed="section-fold" aria-expanded="true" title="Fold this section away">${head(i)}</button>${ops('section', 'section')}</header>
       <div class="ed-grid">
         <label class="wide">Chapter<input data-scope="section" data-field="chapter" placeholder="${before ? `continues ${esc(tour.chapters[before.chapter]?.name ?? 'the section before')}` : 'Name a chapter to start one'}" value="${value(d.chapter)}"></label>
-        <label>Runs from candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="section" data-field="from" data-type="number" placeholder="#${before?.until ?? 0}, as before" value="${value(d.from)}">${pick('from', 'the first candle')}</span></label>
-        <label>Runs to candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="section" data-field="until" data-type="number" placeholder="stays at #${s.from}" value="${value(d.until)}">${pick('until', 'the last candle')}</span></label>
+        <label>Runs from candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="section" data-field="from" data-type="number" placeholder="${esc(s.fromSpec ?? `#${before?.until ?? 0}, as before`)}" value="${numberOr(d.from)}"${eventBox(s.fromSpec)}>${pick('from', 'the first candle')}</span></label>
+        <label>Runs to candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="section" data-field="until" data-type="number" placeholder="${esc(s.untilSpec ?? `stays at #${s.from}`)}" value="${numberOr(d.until)}"${eventBox(s.untilSpec)}>${pick('until', 'the last candle')}</span></label>
         ${viewBoxes('section', d.view, before?.view ?? tour.startView)}
         <label>Candles a second<input type="number" min="0.5" step="0.5" data-scope="section" data-field="speed" data-type="number" placeholder="${before?.speed ?? start.speed ?? 4}" value="${value(d.speed)}"></label>
         <span class="ed-use"><button type="button" data-ed="view-chart" title="Zoom or pan the chart to what this section should show, then press this">Use the chart's view</button></span>
       </div>
       <div class="ed-layers"><span>Layers</span>${chips.join('') || '<span class="ed-chip">none</span>'}<span class="ed-hint">Set with the layer buttons on the left.</span></div>
-      ${(d.cues ?? []).map(cueCard).join('')}
+      ${(d.cues ?? []).map((c, j) => cueCard(c, j, s.cues[j])).join('')}
       <div class="ed-foot"><button type="button" data-ed="add-cue">+ Text</button><button type="button" data-ed="add-section">+ Section after</button>
         <button type="button" data-ed="section-copy" title="Add a copy of this section after it">Duplicate</button>
         <button type="button" data-ed="play-here" title="Play from the start of this section">▶ From here</button></div>
@@ -2371,6 +2476,7 @@ function updateEditorStatus() {
   if (!status) return;
   const problems = tour.errors.length, dirty = tourDirty();
   status.textContent = tour.picking ? 'Click a candle on the chart. Esc cancels.'
+    : tour.resolving ? 'Looking up the events the tour waits for…'
     : tour.note || (problems ? `${problems} problem${problems === 1 ? '' : 's'}, listed above the chart` : dirty ? 'Changes not saved' : 'Saved in tour.json');
   status.classList.toggle('warn', !tour.picking && (!!tour.note || problems > 0));
   const save = document.querySelector('[data-ed="save"]');
@@ -2379,6 +2485,13 @@ function updateEditorStatus() {
   document.querySelector('[data-ed="undo"]').disabled = !tour.history.length;
   document.querySelectorAll('[data-ed="pick"]').forEach(b => b.setAttribute('aria-pressed',
     tour.picking?.field === b.dataset.pick && (b.dataset.pick !== 'at' || tour.picking.cue === Number(b.closest('.ed-cue')?.dataset.cue))));
+}
+
+function toggleTourVoice() {
+  state.tourVoice = !voiceOn();
+  save(state);
+  if (!voiceOn()) tour?.player?.pause();
+  updateTourPanel();
 }
 
 function toggleTourEditor() {
@@ -2405,11 +2518,12 @@ function applyTour({ render = false, cue = null, end = false, start = false } = 
   const was = { t: cursorOf(tour.ex), shown: tour.shown.length };
   tour.note = '';
   anchorTour();
-  Object.assign(tour, compileTour(tour.def, tour.ex.prices.t.length));
+  Object.assign(tour, compileTour(tour.def, tour.ex.prices.t.length, tour.resolved, tour.audio));
   if (render) editorSection = -1;
   seekTour(tour.index, start ? {} : end ? { t: Infinity, shown: Infinity } : cue != null ? { cue } : was);
   updateEditorMeta();
   updateEditorStatus();
+  if (tour.wanted.length) resolveTour();
 }
 
 function editTourField(el) {
@@ -2581,6 +2695,11 @@ function tourAction(action, el) {
       applyTour({ render: true, start: true });
       return focusCue(0);
     }
+    case 'cue-copy':
+      rememberTour();
+      d.cues.splice(j + 1, 0, JSON.parse(JSON.stringify(d.cues[j])));
+      applyTour({ render: true, cue: j + 1 });
+      return focusCue(j + 1);
     case 'cue-delete':
       rememberTour();
       d.cues.splice(j, 1);
@@ -2721,6 +2840,7 @@ function route() {
   // The tour's chapters have links of their own: #Tour/<chapter>.
   const [page, chapter] = type.split('/');
   document.body.classList.toggle('touring', page === 'Tour');
+  document.body.classList.toggle('video', page === 'Tour' && videoMode);
   document.body.classList.toggle('editing', page === 'Tour' && editorOn());
   if (page === 'Tour') {
     renderNav('Tour');

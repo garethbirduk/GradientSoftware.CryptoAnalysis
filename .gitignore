@@ -10,3 +10,6 @@ Combined/CryptoAnalysis.Test_Combined.cs
 Combined/CryptoAnalysis_Combined.cs
 
 artifacts/
+
+CryptoAnalysis.Site/wwwroot/tour-audio/
+tools/tour-video/node_modules/

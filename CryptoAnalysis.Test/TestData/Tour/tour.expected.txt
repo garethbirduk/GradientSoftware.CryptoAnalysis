@@ -1,0 +1,15 @@
+#100 · section 1 (Closes) runs to it: nothing
+#45 · section 9 text 1 "This may coincide with an HH" on high · seen at #100: L1 HH · L1 upswing BoS · L1 upswing start
+#89 · section 9 text 2 "Or not." on close · seen at #100: L1 upswing BoS
+#45 · section 13 (Upswings) runs to it: L1 HH* · L1 upswing BoS
+#67 · section 14 (Downswings) runs to it: nothing
+#74 · section 18 runs to it: L1 HH*
+#75 · section 19 runs to it: L1 HH* · L1 upswing BoS
+#45 · section 19 text 2 "HH" on high · seen at #75: L1 HH · L1 upswing BoS · L1 upswing start
+#75 · section 19 text 3 "BoS" on high · seen at #75: L1 HH* · L1 upswing BoS
+#75 · section 21 runs to it: L1 HH* · L1 upswing BoS
+#100 · section 25 runs to it: nothing
+#6 · section 25 text 2 "2nd order swing" on high · seen at #100: L2 LH · L2 downswing high
+#30 · section 25 text 3 "2nd order swing" on close · seen at #100: L2 HL · L2 upswing low
+#55 · section 25 text 4 "2nd order swing" on close · seen at #100: nothing
+#50 · section 26 text 2 "3rd order swing" on close · seen at #100: L3 HL · L3 upswing low

@@ -1,0 +1,15 @@
+{
+  "name": "tour-video",
+  "private": true,
+  "type": "module",
+  "description": "Narrates the site's tour with an open-source voice and records it as a video with chapters.",
+  "scripts": {
+    "narrate": "node narrate.mjs",
+    "record": "node record.mjs",
+    "video": "node narrate.mjs && node record.mjs"
+  },
+  "dependencies": {
+    "kokoro-js": "^1.2.1",
+    "playwright": "^1.52.0"
+  }
+}

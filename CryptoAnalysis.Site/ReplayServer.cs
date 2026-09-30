@@ -89,6 +89,21 @@ public static class ReplayServer
             return Results.Text(json, "application/json");
         });
 
+        // A tour can wait for an event rather than a candle number: the nth time something becomes known at a level, looking
+        // from a candle on, with only the prices up to each candle.
+        var events = new ConcurrentDictionary<(string, int, int, EnumAnnotationType, int, int), Lazy<int?>>();
+        app.MapGet("/api/event", (string dataset, int from, string type, int? anchor, int? level, int? nth) =>
+        {
+            if (!byId.TryGetValue(dataset, out var data) || !Enum.TryParse<EnumAnnotationType>(type, out var kind))
+                return Results.NotFound();
+
+            var first = Math.Clamp(anchor ?? 0, 0, data.Prices.Count - 1);
+            var key = (dataset, first, from, kind, level ?? 1, nth ?? 1);
+            var index = events.GetOrAdd(key, k => new Lazy<int?>(() =>
+                Tours.FindEvent(data.Prices.GetRange(k.Item2, data.Prices.Count - k.Item2), k.Item3, k.Item4, k.Item5, k.Item6))).Value;
+            return Results.Json(new { Index = index }, Json);
+        });
+
         // The tour's editor on the page saves the tour back to its source file.
         if (Directory.Exists(sourceDir))
         {
