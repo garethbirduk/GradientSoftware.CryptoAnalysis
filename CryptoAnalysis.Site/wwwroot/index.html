@@ -221,6 +221,8 @@
   .ed-card.open { border-color: var(--accent); }
   .ed-card > header, #tour-editor .ed-section { display: flex; align-items: baseline; gap: 8px; }
   #tour-editor .ed-section { width: 100%; padding: 6px 10px; border-radius: 8px; text-align: left; font-size: 13px; }
+  #tour-editor .ed-section.current { border-color: var(--accent); }
+  #tour-editor .ed-card > header .ed-fold { flex: 1; width: auto; min-width: 0; }
   .ed-num { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
   .ed-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
   .ed-name.chapter { color: var(--text); font-weight: 600; }
@@ -2229,7 +2231,8 @@ async function renderTourPage(chapter) {
 // Beside the chart, where the event log is on other pages: the tour's definition as a form. It shows the section the tour
 // is at, so what is edited is what is on the chart, and every change is applied at once. The layer buttons set the layers
 // of that section. Save writes tour.json back through the local server.
-let editorSection = -1;
+// The section the tour is at is open in the editor unless it has been folded away, which lasts until a section is picked.
+let editorSection = -1, editorFolded = false;
 const editorOn = () => state.tourEditor !== false;
 const tourDirty = () => !!tour && JSON.stringify(tour.def) !== tour.saved;
 const TOUR_KEYS = { tour: ['title', 'dataset', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
@@ -2295,7 +2298,7 @@ function renderTourEditor() {
     const chips = [...s.layers.map(id => `<span class="ed-chip${was.includes(id) ? '' : ' added'}">${was.includes(id) ? '' : '+ '}${esc(layerName(id))}</span>`),
       ...was.filter(id => !s.layers.includes(id)).map(id => `<span class="ed-chip removed">${esc(layerName(id))}</span>`)];
     return `<section class="ed-card open" data-section="${i}">
-      <header>${head(i)}${ops('section', 'section')}</header>
+      <header><button type="button" class="ed-fold" data-ed="section-fold" aria-expanded="true" title="Fold this section away">${head(i)}</button>${ops('section', 'section')}</header>
       <div class="ed-grid">
         <label class="wide">Chapter<input data-scope="section" data-field="chapter" placeholder="${before ? `continues ${esc(tour.chapters[before.chapter]?.name ?? 'the section before')}` : 'Name a chapter to start one'}" value="${value(d.chapter)}"></label>
         <label>Runs from candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="section" data-field="from" data-type="number" placeholder="#${before?.until ?? 0}, as before" value="${value(d.from)}">${pick('from', 'the first candle')}</span></label>
@@ -2332,12 +2335,13 @@ function renderTourEditor() {
     <div class="ed-status" data-ed-status aria-live="polite"></div>
     <div class="ed-body">
       ${tourCard}
-      ${(def.sections ?? []).map((d, i) => i === tour.index ? openCard(d, i)
-        : `<button type="button" class="ed-section" data-ed="go" data-section="${i}" title="Go to this section">${head(i)}</button>`).join('')}
+      ${(def.sections ?? []).map((d, i) => i === tour.index && !editorFolded ? openCard(d, i)
+        : `<button type="button" class="ed-section${i === tour.index ? ' current' : ''}" data-ed="go" data-section="${i}" aria-expanded="false" title="${i === tour.index ? 'Open this section' : 'Go to this section'}">${head(i)}</button>`).join('')}
       ${sections.length ? '' : '<button type="button" data-ed="add-section">+ Section</button>'}
     </div>`;
   updateEditorMeta();
   updateEditorStatus();
+  updateTourPanel();
 }
 
 // The names, candles and running times shown on the section cards, which change as the tour is edited.
@@ -2498,7 +2502,16 @@ function tourAction(action, el) {
   // Swaps two neighbours of a list, when both are there.
   const swap = (list, a, b) => b >= 0 && b < list.length && ([list[a], list[b]] = [list[b], list[a]]);
   switch (action) {
-    case 'go': pauseTour(); return enterSection(Number(el.dataset.section));
+    case 'go': {
+      const to = Number(el.dataset.section), here = to === tour.index;
+      editorFolded = false;
+      if (here) return renderTourEditor();
+      pauseTour();
+      return enterSection(to);
+    }
+    case 'section-fold':
+      editorFolded = true;
+      return renderTourEditor();
     case 'play-here': pauseTour(); enterSection(i); return playTour();
     case 'save': return saveTour();
     case 'revert': return revertTour();
