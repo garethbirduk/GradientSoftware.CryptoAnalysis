@@ -185,14 +185,23 @@
   .tour-chapters a.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .tour-caption { min-height: 4.4em; margin-top: 12px; max-width: 62ch; font-size: 19px; line-height: 1.45; }
   .tour-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 8px; font-size: 13px; color: var(--muted); }
-  .tour-controls button { min-width: 38px; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border);
-    border-radius: 5px; padding: 3px 9px; cursor: pointer; }
-  .tour-controls button:hover { background: var(--chip); }
-  .tour-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tour-controls button, .tour-controls a.button, .tour-glossary button { min-width: 38px; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 5px; padding: 3px 9px; cursor: pointer; text-decoration: none; }
+  .tour-controls button:hover, .tour-controls a.button:hover, .tour-glossary button:hover { background: var(--chip); }
+  .tour-controls button:focus-visible, .tour-controls a.button:focus-visible, .tour-glossary :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tour-controls button:disabled, .tour-glossary button:disabled { opacity: .45; cursor: default; background: var(--panel); }
+  .tour-controls .warn, .tour-glossary .warn { color: var(--warn); }
+  .tour-glossary { max-width: 760px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; }
+  .gl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 12px; color: var(--muted); }
+  .gl-head h4 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .gl-rows { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+  .gl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.4fr) auto; align-items: center; gap: 8px; color: var(--muted); }
+  .tour-glossary input { min-width: 0; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; }
+  .gl-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); }
   .tour-controls button.play { min-width: 46px; font-weight: 700; color: var(--accent); }
   .tour-controls .readout { color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .tour-controls .keys { font-size: 11px; white-space: nowrap; }
-  .tour-controls button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  .tour-controls button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--bg); }
   .tour-controls .edit { margin-left: auto; }
   .tour-warning { color: var(--warn); font-size: 13px; }
   .tour-errors ul { margin: 6px 0 0; padding-left: 20px; }
@@ -258,7 +267,9 @@
   .ed-cue > .ed-meta { margin-bottom: 2px; white-space: normal; }
   .ed-row { display: none; grid-template-columns: 1.15fr 1fr 1fr; align-items: end; gap: 5px 8px; margin-top: 5px; }
   .ed-cue:focus-within .ed-row { display: grid; }
-  .ed-row .ed-ops { justify-content: flex-end; }
+  .ed-row .ed-ops { grid-column: 1 / -1; justify-content: flex-end; }
+  .ed-row label.ed-check { flex-direction: row; align-items: center; gap: 5px; padding-bottom: 4px; font-size: 13px; color: var(--text); cursor: pointer; }
+  #tour-editor input[type="checkbox"] { width: auto; margin: 0; accent-color: var(--accent); }
   .ed-split { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
   .ed-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
   @media (max-width: 1100px) { body.touring.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr); }
@@ -312,8 +323,11 @@ const STRUCTURE_PAGES = ['Sawtooth', 'InterimSwings', 'Replay', 'Tour'];
 
 // Every layer a chart can show, grouped into sections that appear in the same order on every page.
 const SECTIONS = [
-  { name: 'Replay', layers: [{ id: 'replay', label: 'Replay' }, { id: 'candidates', label: 'Candidate swings' }, { id: 'ghosts', label: 'Ghosts' },
+  { name: 'Replay', layers: [{ id: 'replay', label: 'Replay' }, { id: 'candidates', label: 'Candidate swings' },
     { id: 'future', label: 'Future candles' }, { id: 'eventlog', label: 'Event log' }, { id: 'live', label: 'Seen live' }] },
+  // What a replay once showed and has since taken back, a layer for each kind of thing, so each can be shown on its own.
+  { name: 'Ghosts', layers: [{ id: 'ghostSwings', label: 'Ghost swings' }, { id: 'ghostCandidates', label: 'Ghost candidates' }, { id: 'ghostPoints', label: 'Ghost points' },
+    { id: 'ghostTrends', label: 'Ghost trends' }, { id: 'ghostMsbs', label: 'Ghost MSBs' }] },
   // A filter, not a layer: which sawtooth levels the sawtooth, swings and points are shown at.
   { name: 'Levels', levels: true, layers: Array.from({ length: LEVELS }, (_, l) => ({ id: `level${l}`, label: `${l}`, level: l })) },
   { name: 'Price', layers: [{ id: 'price', label: 'Candles' }, { id: 'close', label: 'Closes' }] },
@@ -345,12 +359,15 @@ const PAGE_DEFAULTS = {
   Replay: ['replay', 'price', 'sawtooth', 'level1', 'Upswing', 'Downswing', 'BullishBreakOfStructure', 'BearishBreakOfStructure'],
 };
 // Replay extras are on by default, so switching Replay on shows them; they only draw while replaying.
-const REPLAY_DEFAULTS = ['candidates', 'ghosts', 'eventlog'];
+const GHOST_IDS = SECTIONS.find(s => s.name === 'Ghosts').layers.map(l => l.id);
+const REPLAY_DEFAULTS = ['candidates', ...GHOST_IDS, 'eventlog'];
 const defaultsFor = page => [...(PAGE_DEFAULTS[page] ?? ['price', page]), ...REPLAY_DEFAULTS];
 
 function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } }
 function save(state) { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { } }
 const state = Object.assign({ pages: {} }, load());
+// Ghosts was one layer before it was a section: a page remembered with it on has every kind of ghost on.
+for (const [page, layers] of Object.entries(state.pages)) if (layers.includes('ghosts')) state.pages[page] = layers.flatMap(id => id === 'ghosts' ? GHOST_IDS : [id]);
 let currentPage = null;
 // The tour sets its own layers section by section, and it is always replaying. Layers set by hand there are not remembered:
 // they go into the section being edited when the tour's editor is open, and last until the next section otherwise.
@@ -456,7 +473,11 @@ function swatch(layer) {
   if (layer.id === 'live') return svg(`<path d="M7 3 L15 11 M15 3 L7 11" stroke="${css('--text')}" stroke-width="1.8"/>`);
   if (layer.id === 'replay') return svg(`<polygon points="7,2 17,7 7,12" fill="${css('--accent')}"/>`);
   if (layer.id === 'candidates') return svg(`<rect x="2" y="2" width="18" height="10" fill="none" stroke="${css('--upswing')}" stroke-dasharray="3 2"/>`);
-  if (layer.id === 'ghosts') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(css('--close'), 0.15)}" stroke="${css('--close')}" stroke-dasharray="1.5 2"/>`);
+  if (layer.id === 'ghostSwings') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(css('--close'), 0.15)}" stroke="${css('--close')}" stroke-dasharray="1.5 2"/>`);
+  if (layer.id === 'ghostCandidates') return svg(`<rect x="2" y="2" width="18" height="10" fill="none" stroke="${css('--close')}" stroke-dasharray="3 2"/>`);
+  if (layer.id === 'ghostTrends') return svg(`<rect x="1" y="5" width="20" height="4" fill="${withAlpha(css('--close'), 0.15)}" stroke="${css('--close')}" stroke-dasharray="1.5 2"/>`);
+  if (layer.id === 'ghostPoints' || layer.id === 'ghostMsbs') return `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">${
+    markerSvg(TERMS.get(layer.id === 'ghostPoints' ? 'HigherHigh' : 'BullishMarketStructureBreak')?.symbol, css('--close'))}</svg>`;
   if (layer.id === 'future') return svg(`<line x1="6" y1="2" x2="6" y2="12" stroke="${css('--close')}" opacity=".5"/><rect x="3.5" y="4" width="5" height="6" fill="${css('--close')}" opacity=".5"/>
     <line x1="15" y1="1" x2="15" y2="13" stroke="${css('--close')}" opacity=".5"/><rect x="12.5" y="3" width="5" height="7" fill="${css('--close')}" opacity=".5"/>`);
   if (layer.id === 'eventlog') return svg(`<path d="M3 3 H19 M3 7 H19 M3 11 H13" stroke="${css('--muted')}" stroke-width="1.6"/>`);
@@ -879,35 +900,36 @@ function drawReplayExtras(ex, traces, level) {
       [{ from: latest.breakOfStructure, to: { time: now }, level: latest.extreme.price, what: `${dir === 'Up' ? 'pullback low' : 'bounce high'} not broken yet` }]);
   }
 
-  if (on('ghosts')) {
+  // Each kind of ghost is a layer of its own, so a ghost swing can be shown without the ghost of something else.
+  {
     const grey = css('--close'), gone = e => e.value.level === level && e.ended === 'Removed' && e.until <= t;
     const when = e => fmtTime(full.prices.t[e.until]);
-    for (const e of r.swings.filter(gone)) {
+    for (const e of on('ghostSwings') ? r.swings.filter(gone) : []) {
       const w = e.value;
       traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: 'Ghost swing', ...box(w.start.time, w.end.time, w.start.price, w.extreme.price),
         line: { color: grey, width: 1, dash: 'dot' }, fillcolor: withAlpha(grey, 0.08),
         hovertemplate: `Ghost: ${w.direction === 'Up' ? 'upswing' : 'downswing'} from ${fmtPrice(w.start.price)}<br>removed ${when(e)}, when a later new high redrew the levels<extra></extra>` });
     }
-    for (const e of r.candidates.filter(gone)) {
+    for (const e of on('ghostCandidates') ? r.candidates.filter(gone) : []) {
       const c = e.value;
       traces.push({ type: 'scatter', mode: 'lines', name: 'Ghost candidate', ...box(c.start.time, full.prices.t[e.until - 1], c.start.price, c.extreme.price),
         line: { color: grey, width: 1, dash: 'dash' },
         hovertemplate: `Ghost: abandoned candidate ${c.direction === 'Up' ? 'upswing' : 'downswing'} from ${fmtPrice(c.start.price)}<br>gone ${when(e)}<extra></extra>` });
     }
-    const msbs = r.marketStructureBreaks.filter(gone);
+    const msbs = on('ghostMsbs') ? r.marketStructureBreaks.filter(gone) : [];
     if (msbs.length) traces.push({ type: 'scatter', mode: 'markers', name: 'Ghost MSB', x: msbs.map(e => e.value.break.break.time), y: msbs.map(e => e.value.break.break.price),
       marker: { symbol: msbs.map(e => TERMS.get(e.value.break.type).symbol), size: 15, color: grey, line: { width: 1.5, color: grey } },
       hovertemplate: msbs.map(e => `Ghost: ${TERMS.get(e.value.break.type).name}<br>removed ${when(e)}<extra></extra>`) });
     // Where a point was before it moved: the last position each point held before its current one.
     const moved = new Map();
-    for (const e of r.points.filter(e => e.value.level === level && e.value.type && e.ended === 'Updated' && e.until <= t))
+    for (const e of on('ghostPoints') ? r.points.filter(e => e.value.level === level && e.value.type && e.ended === 'Updated' && e.until <= t) : [])
       moved.set(`${e.value.kind}|${e.value.legStart}`, e);
     const current = new Map(r.points.filter(e => e.value.level === level && holdsAt(t)(e)).map(e => [`${e.value.kind}|${e.value.legStart}`, e.value]));
     const was = [...moved].filter(([id, e]) => current.get(id) && current.get(id).time !== e.value.time && on(e.value.type)).map(([, e]) => e);
     if (was.length) traces.push({ type: 'scatter', mode: 'markers', name: 'Ghost point', x: was.map(e => e.value.time), y: was.map(e => e.value.price),
       marker: { symbol: was.map(e => TERMS.get(e.value.type).symbol), size: 10, color: withAlpha(grey, 0.35), line: { width: 1, color: grey } },
       hovertemplate: was.map(e => `Ghost: ${e.value.label} was here until ${when(e)}, then moved<extra></extra>`) });
-    for (const e of r.trends.filter(gone)) {
+    for (const e of on('ghostTrends') ? r.trends.filter(gone) : []) {
       const [y0, y1] = e.value.direction === 'Up' ? [0.965, 1] : [0, 0.035];
       shapes.push({ type: 'rect', xref: 'x', yref: 'paper', x0: e.value.start.time, x1: full.prices.t[e.until - 1], y0, y1, layer: 'below',
         line: { color: grey, width: 1, dash: 'dot' }, fillcolor: withAlpha(grey, 0.15) });
@@ -1894,6 +1916,17 @@ function textKey(text) {
   return h.toString(16).padStart(8, '0');
 }
 
+// What the voice says in place of what is written, from the tour's glossary (the same as tools/tour-video): an entry stands
+// for a whole word in the case it is written in, and the longest entry that fits is used.
+function spokenText(def) {
+  const entries = Object.entries(def.glossary ?? {}).map(([from, to]) => [from.trim(), String(to)]).filter(([from]) => from)
+    .sort((a, b) => b[0].length - a[0].length);
+  if (!entries.length) return text => text;
+  const lookup = new Map(entries), escaped = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const words = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${entries.map(([from]) => escaped(from)).join('|')})(?![\\p{L}\\p{N}_])`, 'gu');
+  return text => text.replace(words, match => lookup.get(match));
+}
+
 const slugOf = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const readingSeconds = text => Math.max(2.5, text.length / 14);
 const tourSection = () => tour.sections[tour.index];
@@ -1953,7 +1986,11 @@ function compileTour(def, candles, resolved = new Map(), audio = {}) {
       if (c.on != null && typeof c.on !== 'number' && !PIN_PRICES[c.on]) errors.push(`${what}: unknown "on" "${c.on}"`);
       if (c.place != null && !PIN_PLACES[c.place]) errors.push(`${what}: unknown place "${c.place}"`);
       if (!['section', 'chapter', 'always'].includes(c.keep ?? 'section')) errors.push(`${what}: unknown keep "${c.keep}"`);
-      return { text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', hold: c.hold >= 0 ? c.hold : audio[textKey(text)]?.seconds > 0 ? audio[textKey(text)].seconds + 0.4 : readingSeconds(text) };
+      if (c.voice != null && typeof c.voice !== 'boolean') errors.push(`${what}: voice is true or false`);
+      // A text with "voice": false is shown but not read aloud, so it stays for the time it takes to read.
+      const silent = c.voice === false, clip = silent ? null : audio[textKey(text)];
+      return { text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
+        hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + 0.4 : readingSeconds(text) };
     });
     return { index: i, chapter: chapters.length - 1, layers, view, speed, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
@@ -1990,7 +2027,8 @@ async function loadTour() {
   if (!info) throw new Error('the server has no datasets');
   const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
   const loaded = { def, audio, whole: await loadDataset(info), ex: null, saved: JSON.stringify(def), history: [], lastEdit: null, picking: null, note: '', resolved: new Map(), resolving: false,
-    index: 0, view: DEFAULT_VIEW, queue: [], shown: [], fired: new Set(), kept: [], active: null, activeUntil: 0, nextCandle: 0, timer: null };
+    index: 0, view: DEFAULT_VIEW, queue: [], shown: [], fired: new Set(), kept: [], active: null, activeUntil: 0, nextCandle: 0, timer: null,
+    voice: { now: null, waiting: [] } };
   anchorTour(loaded);
   return Object.assign(loaded, compileTour(def, loaded.ex.prices.t.length, loaded.resolved, loaded.audio));
 }
@@ -2086,17 +2124,42 @@ function showNextCue() {
   tour.active = cue;
   tour.activeUntil = performance.now() + cue.hold * 1000;
   tour.shown.push(cue);
-  tour.recording?.cues.push({ key: textKey(cue.text), at: Date.now() });
   speak(cue);
 }
 
-// Reads a text aloud from its clip in tour-audio, when the Voice button is on and the tour is playing.
+// Reads a text aloud from its clip in tour-audio, when the Voice button is on and the tour is playing. One text is read at
+// a time: a text shown while another is being read waits for it rather than cutting it off, and its time on show starts
+// as its reading does. A recording makes no sound but keeps the same time, and notes when each reading began, which is
+// where tools/tour-video lays the clip.
 function speak(cue) {
-  tour.player?.pause();
-  const clip = tour.audio[textKey(cue.text)];
-  if (!voiceOn() || !tour.timer || !clip || tour.recording) return;
+  if (!tour.timer || !(voiceOn() || tour.recording)) return hush();
+  if (cue.silent || !tour.audio[textKey(cue.text)]) return;
+  if (tour.voice.now) tour.voice.waiting.push(cue); else readAloud(cue);
+}
+
+function readAloud(cue) {
+  const clip = tour.audio[textKey(cue.text)], turn = tour.voice.now = { timer: null };
+  const done = () => {
+    if (tour.voice.now !== turn) return;
+    tour.voice.now = null;
+    if (tour.voice.waiting.length) readAloud(tour.voice.waiting.shift());
+  };
+  if (cue === tour.active) tour.activeUntil = performance.now() + cue.hold * 1000;
+  if (tour.recording) {
+    tour.recording.cues.push({ key: textKey(cue.text), at: Date.now() });
+    turn.timer = setTimeout(done, clip.seconds * 1000);
+    return;
+  }
   tour.player = new Audio(`tour-audio/${clip.file}`);
-  tour.player.play().catch(() => { });
+  tour.player.addEventListener('ended', done);
+  tour.player.addEventListener('error', done);
+  tour.player.play().catch(done);
+}
+
+function hush() {
+  tour.player?.pause();
+  clearTimeout(tour.voice.now?.timer);
+  tour.voice = { now: null, waiting: [] };
 }
 
 const voiceOn = () => state.tourVoice === true;
@@ -2201,10 +2264,11 @@ function updateTourPanel() {
   play.textContent = tour.timer ? '❚❚' : '▶';
   play.setAttribute('aria-label', tour.timer ? 'Pause (Space)' : 'Play (Space)');
   document.querySelector('[data-tour-go="edit"]').setAttribute('aria-pressed', editorOn());
+  document.querySelector('[data-tour-go="glossary"]').setAttribute('aria-pressed', glossaryOn());
   const voice = document.querySelector('[data-tour-go="voice"]'), clips = Object.keys(tour.audio ?? {}).length;
   voice.setAttribute('aria-pressed', voiceOn());
   voice.disabled = !clips;
-  if (!clips) voice.title = 'No clips yet: run npm run narrate in tools/tour-video';
+  if (!clips) voice.title = 'No clips yet: press Update audio';
 
   // The editor marks the texts shown so far, and the one on show.
   document.querySelectorAll('#tour-editor .ed-cue').forEach((el, j) => {
@@ -2219,7 +2283,8 @@ function updateTourPanel() {
 function tourTick() {
   if (currentPage !== 'Tour' || !tour.sections.length) return pauseTour();
   const s = tourSection(), ex = tour.ex, now = performance.now(), t = cursorOf(ex);
-  const reading = tour.active && now < tour.activeUntil;
+  // A text still waiting for the voice has not begun its time on show.
+  const reading = tour.active && (now < tour.activeUntil || tour.voice.waiting.includes(tour.active));
   if (!reading && tour.queue.length) { showNextCue(); return refreshTour(); }
   if (t < s.until) {
     // The replay waits at a cue that has a candle; text with no candle is read while the replay runs.
@@ -2241,9 +2306,10 @@ function tourTick() {
 function playTour() {
   const s = tourSection();
   if (tour.index === tour.sections.length - 1 && cursorOf(tour.ex) >= s.until && !tour.queue.length) enterSection(0);
-  // The text on show gets its reading time again.
+  // The text on show gets its reading time again, and is read aloud from its start: it was shown while the tour was not playing.
   if (tour.active) tour.activeUntil = performance.now() + tour.active.hold * 1000;
   tour.timer = setInterval(tourTick, TOUR_TICK);
+  if (tour.active) speak(tour.active);
   updateTourPanel();
 }
 
@@ -2251,7 +2317,7 @@ function pauseTour() {
   if (!tour?.timer) return;
   clearInterval(tour.timer);
   tour.timer = null;
-  tour.player?.pause();
+  hush();
   updateTourPanel();
 }
 
@@ -2313,12 +2379,24 @@ async function renderTourPage(chapter) {
         <span class="readout" data-tour="readout"></span>
         <span class="keys">Keys: ← → step · Home End first last · Space play</span>
         <button type="button" data-tour-go="voice" title="Read each text aloud from its clip in tour-audio, made by tools/tour-video">Voice</button>
+        <button type="button" data-tour-go="glossary" title="Show or hide the glossary: what the voice says in place of what is written, such as Break of Structure for BoS">Glossary</button>
+        <button type="button" data-tour-go="audio" title="Read aloud the texts of the tour as saved in tour.json that are new or changed, or that the glossary now has said differently, for Voice to play">Update audio</button>
+        <button type="button" data-tour-go="video" title="Make the video of the tour as saved in tour.json, to download: the audio is updated, then the tour is recorded with it, which takes as long as the tour">Generate video</button>
+        <a class="button" data-tour="download" href="api/video/file" download="tour.mp4" hidden>Download video</a>
+        <span data-tour="video" aria-live="polite"></span>
         <button type="button" class="edit" data-tour-go="edit" title="Show or hide the editor">Editor</button>
       </div>
+      <div class="tour-glossary" data-tour="glossary" role="group" aria-label="Glossary" hidden></div>
       <div class="tour-warning" data-tour="warning" hidden></div>
     </article>`);
   main.querySelectorAll('[data-tour-go]').forEach(b => b.addEventListener('click', () =>
-    b.dataset.tourGo === 'edit' ? toggleTourEditor() : b.dataset.tourGo === 'voice' ? toggleTourVoice() : tourGo(b.dataset.tourGo)));
+    b.dataset.tourGo === 'edit' ? toggleTourEditor() : b.dataset.tourGo === 'voice' ? toggleTourVoice() : b.dataset.tourGo === 'glossary' ? toggleTourGlossary()
+      : b.dataset.tourGo === 'video' || b.dataset.tourGo === 'audio' ? generateTour(b.dataset.tourGo === 'audio') : tourGo(b.dataset.tourGo)));
+  const glossary = main.querySelector('[data-tour="glossary"]');
+  glossary.addEventListener('input', e => { const row = e.target.closest('.gl-row'); if (row) readGlossary(`glossary|${[...row.parentElement.children].indexOf(row)}|${e.target.dataset.gl}`); });
+  glossary.addEventListener('click', e => { const b = e.target.closest('button[data-gl]'); if (b && !b.disabled) glossaryAction(b.dataset.gl, b); });
+  renderTourGlossary();
+  if (!videoMode) refreshTourExport();
   editorSection = -1;
   const wanted = tour.chapters.find(c => c.slug === chapter), first = wanted ? wanted.section : tour.index;
   // Opening the page shows its section's view at once, with no zoom to it.
@@ -2326,6 +2404,104 @@ async function renderTourPage(chapter) {
   tour.zoom = null;
   seekTour(first);
   if (tour.wanted.length) resolveTour();
+}
+
+// The tour's audio and video are made by the local server, which runs tools/tour-video. Update audio reads the texts aloud,
+// which is all that Voice needs; Generate video does that and then records the tour, for Download video to fetch. Either
+// is started here, and the page asks how it is going until it is done.
+let tourExport = null, tourExportNote = '', tourExportDone = '', tourExportPoll = null;
+
+async function refreshTourExport(start = false, audioOnly = false) {
+  const response = await fetch(`api/video${start && audioOnly ? '?audio=true' : ''}`, { method: start ? 'POST' : 'GET' }).catch(() => null), was = tourExport;
+  tourExport = response?.ok ? await response.json() : null;
+  if (start && !tourExport) tourExportNote = `The local server was started before it could make the ${audioOnly ? 'audio' : 'video'}. Restart ./build-site.ps1 -Serve.`;
+  clearTimeout(tourExportPoll);
+  if (tourExport?.running && currentPage === 'Tour') tourExportPoll = setTimeout(refreshTourExport, 2000);
+  const finished = was?.running && tourExport && !tourExport.running;
+  if (finished && tourExport.audioOnly && !tourExport.error) tourExportDone = 'Audio updated';
+  updateTourExport();
+  // The changed texts have been read aloud again, so the clips and their lengths are loaded again.
+  if (finished && tour) {
+    const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+    if (audio && JSON.stringify(audio) !== JSON.stringify(tour.audio)) { tour.audio = audio; applyTour(); }
+  }
+}
+
+function generateTour(audioOnly) {
+  if (tourExport?.running) return;
+  tourExportDone = '';
+  tourExportNote = tourDirty() ? `Save the tour first: the ${audioOnly ? 'audio' : 'video'} is made from tour.json.` : '';
+  if (tourExportNote) return updateTourExport();
+  refreshTourExport(true, audioOnly);
+}
+
+function updateTourExport() {
+  const status = document.querySelector('[data-tour="video"]');
+  if (!status) return;
+  const v = tourExport ?? {}, clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const made = v.made ? new Date(v.made).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  document.querySelectorAll('[data-tour-go="video"], [data-tour-go="audio"]').forEach(b => { b.disabled = !!v.running; });
+  document.querySelector('[data-tour="download"]').hidden = !v.made;
+  status.classList.toggle('warn', !v.running && !!(tourExportNote || v.error));
+  status.textContent = v.running ? `${v.stage}… ${clock(v.seconds)}`
+    : tourExportNote || (v.error ? `The ${v.audioOnly ? 'audio was not updated' : 'video was not made'}: ${v.error}`
+    : [tourExportDone, made ? `Video made ${made}${v.stale ? ', before the tour was last saved' : ''}` : ''].filter(Boolean).join(' · '));
+}
+
+// ---- Tour glossary ---------------------------------------------------------------------------------------------------
+// What the voice says in place of what is written, edited in a panel of its own under the controls, which the Glossary
+// button opens. The boxes are the glossary as it is being written, and the tour's definition follows them: an entry with
+// nothing written yet is only in its boxes. The clips are read with it when the audio is next updated.
+const glossaryOn = () => state.tourGlossary === true && !videoMode;
+const glossaryRow = ([from, to]) => `<div class="gl-row"><input data-gl="from" placeholder="Written, as BoS" aria-label="Written" value="${esc(from)}"><span aria-hidden="true">→</span>` +
+  `<input data-gl="to" placeholder="Said, as Break of Structure" aria-label="Said" value="${esc(to)}"><button type="button" data-gl="delete" title="Delete this entry" aria-label="Delete this entry">✕</button></div>`;
+
+function toggleTourGlossary() {
+  state.tourGlossary = !glossaryOn();
+  save(state);
+  renderTourGlossary();
+  updateTourPanel();
+}
+
+function renderTourGlossary() {
+  const box = document.querySelector('[data-tour="glossary"]');
+  if (!box || !tour) return;
+  box.hidden = !glossaryOn();
+  box.innerHTML = box.hidden ? '' : `<div class="gl-head"><h4>Glossary</h4><span>What the voice says in place of what is written. An entry stands for a whole word,
+      in the case it is written in, and the longest entry that fits is used.</span></div>
+    <div class="gl-rows">${Object.entries(tour.def.glossary ?? {}).map(glossaryRow).join('')}</div>
+    <div class="gl-foot"><button type="button" data-gl="add">+ Entry</button><button type="button" data-gl="save" title="Save to tour.json (Ctrl+S)">Save</button>
+      <span data-gl-status aria-live="polite"></span></div>`;
+  updateGlossaryStatus();
+}
+
+// Writes the boxes into the tour's definition. Typing in one box is one change to undo.
+function readGlossary(key = null) {
+  const entries = [...document.querySelectorAll('[data-tour="glossary"] .gl-row')]
+    .map(row => [row.querySelector('[data-gl="from"]').value.trim(), row.querySelector('[data-gl="to"]').value]).filter(([from]) => from);
+  rememberTour(key);
+  if (entries.length) tour.def.glossary = Object.fromEntries(entries); else delete tour.def.glossary;
+  tour.note = '';
+  updateEditorStatus();
+}
+
+function glossaryAction(action, el) {
+  if (action === 'save') return saveTour();
+  if (action === 'delete') { el.closest('.gl-row').remove(); return readGlossary(); }
+  const rows = document.querySelector('[data-tour="glossary"] .gl-rows');
+  rows.insertAdjacentHTML('beforeend', glossaryRow(['', '']));
+  rows.lastElementChild.querySelector('input').focus();
+}
+
+// Says whether the glossary is saved, and how many of the clips were read before it was as it is now.
+function updateGlossaryStatus() {
+  const status = document.querySelector('[data-gl-status]');
+  if (!status) return;
+  const dirty = tourDirty(), said = spokenText(tour.def), old = Object.values(tour.audio ?? {}).filter(c => (c.spoken ?? c.text) !== said(c.text)).length;
+  document.querySelector('button[data-gl="save"]').disabled = !dirty;
+  status.textContent = tour.note || [dirty ? 'Changes not saved' : 'Saved in tour.json',
+    old ? `${old} text${old === 1 ? ' is' : 's are'} still read as before, until the audio is updated` : ''].filter(Boolean).join(' · ');
+  status.classList.toggle('warn', !!tour.note);
 }
 
 // ---- Tour editor -----------------------------------------------------------------------------------------------------
@@ -2336,8 +2512,8 @@ async function renderTourPage(chapter) {
 let editorSection = -1, editorFolded = false;
 const editorOn = () => state.tourEditor !== false && !videoMode;
 const tourDirty = () => !!tour && JSON.stringify(tour.def) !== tour.saved;
-const TOUR_KEYS = { tour: ['title', 'dataset', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
-  section: ['chapter', 'layers', 'add', 'remove', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'text', 'hold', 'keep'] };
+const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
+  section: ['chapter', 'layers', 'add', 'remove', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'text', 'hold', 'keep', 'voice'] };
 
 // tour.json as text: a line for each text and for each of a section's settings, so a change shows as a small diff.
 function formatTour(def) {
@@ -2359,9 +2535,17 @@ function sectionSeconds(s) {
   return sum(s.cues.filter(c => c.at != null)) + Math.max((s.until - s.from) / s.speed, sum(s.cues.filter(c => c.at == null)));
 }
 
-function renderTourEditor() {
+// The list is drawn anew each time, so it is put back where it was rather than at its top: the section the tour is at stays
+// where it was in view, or the tour's own card when that is the anchor, as it is when that card is folded or unfolded.
+function renderTourEditor(anchor = 'section') {
   const box = document.getElementById('tour-editor');
   if (!tour || currentPage !== 'Tour' || !editorOn()) { box.innerHTML = ''; editorSection = -1; return; }
+  const spot = body => {
+    const el = body && (anchor === 'tour' ? body.firstElementChild : body.querySelector(`:scope > [data-section="${tour.index}"]`));
+    return el ? { top: el.getBoundingClientRect().top - body.getBoundingClientRect().top, height: el.offsetHeight } : null;
+  };
+  const before = box.querySelector('.ed-body'), scrolled = before?.scrollTop ?? 0, was = spot(before);
+  const seen = !!was && was.top + was.height > 0 && was.top < before.clientHeight;
   const { def, sections } = tour, start = def.start ?? {};
   editorSection = tour.index;
   const value = v => esc(v ?? '');
@@ -2392,6 +2576,7 @@ function renderTourEditor() {
         <label>Side<select data-scope="cue" data-field="place" ${pinned ? '' : 'disabled'}>${options([['', 'auto'], ['above', 'above'], ['below', 'below'], ['left', 'left'], ['right', 'right']], c.place)}</select></label>
         <label>Seconds<input type="number" min="0" step="0.5" data-scope="cue" data-field="hold" data-type="number" placeholder="${readingSeconds(c.text ?? '').toFixed(1)}" value="${value(c.hold)}"></label>
         <label>Pin stays<select data-scope="cue" data-field="keep" ${pinned ? '' : 'disabled'}>${options([['', 'this section'], ['chapter', 'this chapter'], ['always', 'to the end']], c.keep === 'section' ? '' : c.keep)}</select></label>
+        <label class="ed-check" title="Shown but not read aloud by the voice, in the page or in the video"><input type="checkbox" data-scope="cue" data-field="voice" ${c.voice === false ? 'checked' : ''}>Silent</label>
         ${ops('cue', 'text')}
         ${j ? `<span class="ed-split"><button type="button" data-ed="cue-split" title="Start a new section with this text and those after it, so it can have layers of its own">Split the section here</button></span>` : ''}
       </div>
@@ -2447,6 +2632,12 @@ function renderTourEditor() {
   updateEditorMeta();
   updateEditorStatus();
   updateTourPanel();
+  const body = box.querySelector('.ed-body');
+  body.scrollTop = scrolled;
+  const now = spot(body);
+  if (now && seen) body.scrollTop += now.top - was.top;
+  // An editor just opened, or a tour playing on to a section that was out of view, brings the section into view.
+  else if (now && (!before || tour.timer) && (now.top < 0 || now.top > body.clientHeight - 80)) body.scrollTop += now.top - 8;
 }
 
 // The names, candles and running times shown on the section cards, which change as the tour is edited.
@@ -2462,7 +2653,7 @@ function updateEditorMeta() {
   // A text's settings are folded away until it is being edited, so each says when it appears and for how long.
   document.querySelectorAll('#tour-editor [data-ed-cue]').forEach((el, j) => {
     const c = tourSection()?.cues[j];
-    if (c) el.textContent = `${j + 1} · ${c.at != null ? `at #${c.at}` : 'as the section begins'}${c.on != null ? ` · pinned to ${typeof c.on === 'number' ? c.on : `the ${c.on}`}` : ''} · ${c.hold.toFixed(1)}s`;
+    if (c) el.textContent = `${j + 1} · ${c.at != null ? `at #${c.at}` : 'as the section begins'}${c.on != null ? ` · pinned to ${typeof c.on === 'number' ? c.on : `the ${c.on}`}` : ''} · ${c.hold.toFixed(1)}s${c.silent ? ' · silent' : ''}`;
   });
   const total = document.querySelector('[data-ed-total]'), seconds = Math.round(tour.sections.reduce((n, s) => n + sectionSeconds(s), 0));
   if (total) total.textContent = `${tour.sections.length} section${tour.sections.length === 1 ? '' : 's'} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -2471,6 +2662,7 @@ function updateEditorMeta() {
 }
 
 function updateEditorStatus() {
+  updateGlossaryStatus();
   document.body.classList.toggle('picking', !!tour?.picking);
   const status = document.querySelector('[data-ed-status]');
   if (!status) return;
@@ -2490,7 +2682,7 @@ function updateEditorStatus() {
 function toggleTourVoice() {
   state.tourVoice = !voiceOn();
   save(state);
-  if (!voiceOn()) tour?.player?.pause();
+  if (!voiceOn() && tour) hush();
   updateTourPanel();
 }
 
@@ -2519,7 +2711,7 @@ function applyTour({ render = false, cue = null, end = false, start = false } = 
   tour.note = '';
   anchorTour();
   Object.assign(tour, compileTour(tour.def, tour.ex.prices.t.length, tour.resolved, tour.audio));
-  if (render) editorSection = -1;
+  if (render) { editorSection = -1; renderTourGlossary(); }
   seekTour(tour.index, start ? {} : end ? { t: Infinity, shown: Infinity } : cue != null ? { cue } : was);
   updateEditorMeta();
   updateEditorStatus();
@@ -2531,7 +2723,9 @@ function editTourField(el) {
   rememberTour(`${scope}|${tour.index}|${j}|${field}`);
   const target = scope === 'tour' ? def : scope === 'start' ? (def.start ??= {}) : scope === 'cue' ? def.sections[tour.index].cues[j] : def.sections[tour.index];
   const raw = el.value, value = raw !== '' && (type === 'number' || (type === 'auto' && /^\d+(\.\d+)?$/.test(raw))) ? Number(raw) : raw;
-  if (field === 'view0' || field === 'view1') {
+  // Silent is the one tick box: ticked, the text has "voice": false, and otherwise it has no "voice" at all.
+  if (el.type === 'checkbox') { if (el.checked) target[field] = false; else delete target[field]; }
+  else if (field === 'view0' || field === 'view1') {
     // The two boxes of a view are one setting: with both empty it is left out, and with one empty that end is as before.
     const read = k => { const v = el.closest('.ed-grid').querySelector(`[data-field="view${k}"]`).value; return v === '' ? null : Number(v); };
     const first = read(0), last = read(1), before = scope === 'start' ? DEFAULT_VIEW : tour.index ? tour.sections[tour.index - 1].view : tour.startView;
@@ -2640,7 +2834,7 @@ function tourAction(action, el) {
     case 'tour-card':
       state.tourCardOpen = !state.tourCardOpen;
       save(state);
-      return renderTourEditor();
+      return renderTourEditor('tour');
     case 'view-chart': {
       // The candles across the chart as it has been zoomed or panned to become the section's view.
       const ex = tour.ex, chart = document.querySelector('#main .chart'), view = views.get(ex.id);
@@ -2744,7 +2938,7 @@ function tourAction(action, el) {
   document.addEventListener('keydown', e => {
     if (currentPage !== 'Tour' || !tour) return;
     if (e.key === 'Escape' && tour.picking) { e.preventDefault(); pickFromChart(tour.picking.field, tour.picking.cue); }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && editorOn()) { e.preventDefault(); saveTour(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && (editorOn() || glossaryOn())) { e.preventDefault(); saveTour(); }
   });
   window.addEventListener('beforeunload', e => { if (tourDirty()) e.preventDefault(); });
 }

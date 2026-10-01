@@ -18,10 +18,23 @@ export function readTour() {
   return JSON.parse(readFileSync(tourPath, 'utf8'));
 }
 
+// The texts that are read aloud: a text marked "voice": false is shown but not read.
 export function tourTexts(tour) {
   const texts = new Map();
-  for (const section of tour.sections ?? []) for (const cue of section.cues ?? []) if (cue.text) texts.set(textKey(cue.text), cue.text);
+  for (const section of tour.sections ?? []) for (const cue of section.cues ?? []) if (cue.text && cue.voice !== false) texts.set(textKey(cue.text), cue.text);
   return texts;
+}
+
+// What the voice says in place of what is written, from the tour's glossary: "BoS" can be read as "Break of Structure" while
+// the text on screen stays as it is. An entry stands for a whole word in the case it is written in, and the longest entry
+// that fits is used, so "Break of Structure (BoS)" can have an entry of its own that does not say the name twice.
+export function spokenText(tour) {
+  const entries = Object.entries(tour.glossary ?? {}).map(([from, to]) => [from.trim(), String(to)]).filter(([from]) => from)
+    .sort((a, b) => b[0].length - a[0].length);
+  if (!entries.length) return text => text;
+  const lookup = new Map(entries), escaped = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const words = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${entries.map(([from]) => escaped(from)).join('|')})(?![\\p{L}\\p{N}_])`, 'gu');
+  return text => text.replace(words, match => lookup.get(match));
 }
 
 export function arg(name, fallback) {

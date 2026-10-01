@@ -144,8 +144,12 @@ var mismatched = examples.Count(x => !x.Matches);
 Console.WriteLine($"{terms.Count} terms, {examples.Count} examples ({mismatched} mismatched) -> {Path.Combine(outDir, "index.html")}");
 
 if (serve && full.Count > 0)
-    await ReplayServer.Run(outDir, [new Dataset(FullHistoryDataset, "BTC/USD hourly (Coinbase)", full)], port,
-        Path.Combine(repoRoot, "CryptoAnalysis.Site", "wwwroot"));
+{
+    var sourceDir = Path.Combine(repoRoot, "CryptoAnalysis.Site", "wwwroot");
+    var video = new TourVideo(Path.Combine(repoRoot, "tools", "tour-video"), Path.Combine(repoRoot, "artifacts", "tour-video", "tour.mp4"),
+        Path.Combine(sourceDir, "tour.json"), $"http://localhost:{port}");
+    await ReplayServer.Run(outDir, [new Dataset(FullHistoryDataset, "BTC/USD hourly (Coinbase)", full)], port, sourceDir, video);
+}
 return 0;
 
 // The sawtooth levels, each level's swings (with the indexes of their interims in the next level's list) and each level's

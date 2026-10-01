@@ -34,7 +34,7 @@ public static class ReplayServer
     /// Runs the server on localhost until stopped. Files in the source folder, when given, are served as they are now rather
     /// than as they were built, so the page and the tour can be edited without rebuilding.
     /// </summary>
-    public static async Task Run(string siteDir, IReadOnlyList<Dataset> datasets, int port, string? sourceDir = null)
+    public static async Task Run(string siteDir, IReadOnlyList<Dataset> datasets, int port, string? sourceDir = null, TourVideo? video = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls($"http://localhost:{port}");
@@ -124,6 +124,21 @@ public static class ReplayServer
                 await File.WriteAllTextAsync(tourPath, text);
                 return Results.NoContent();
             });
+        }
+
+        // The tour's Update audio and Generate video buttons run tools/tour-video, and its Download button fetches the video
+        // that made.
+        if (video != null)
+        {
+            app.MapGet("/api/video", () => Results.Json(video.Status(), Json));
+            app.MapPost("/api/video", (bool? audio) =>
+            {
+                video.Start(audio == true);
+                return Results.Json(video.Status(), Json);
+            });
+            app.MapGet("/api/video/file", () => File.Exists(video.VideoPath)
+                ? Results.File(video.VideoPath, "video/mp4", "tour.mp4")
+                : Results.NotFound());
         }
 
         Console.WriteLine($"Serving {siteDir} with replay for {string.Join(", ", datasets.Select(x => x.Id))} on http://localhost:{port}");

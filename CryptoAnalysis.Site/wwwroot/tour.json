@@ -1,6 +1,7 @@
 {
   "title": "Market structure basics",
   "dataset": "btc-1h",
+  "glossary": { "BoS": "Break of Structure", "(BoS)": "", "HH": "Higher High", "(HH)": "", "HL": "Higher Low", "(HL)": "", "LL": "Lower Low", "(LL)": "", "LH": "Lower High", "(LH)": "", "MSB": "Market Structure Break", "(MSB)": "" },
   "start": { "time": "2023-01-01T00:00", "view": [0, 168], "speed": 5, "layers": ["level1"] },
   "sections": [
     {
@@ -95,6 +96,7 @@
       "remove": ["BullishBreakOfStructure", "HigherHigh", "HigherLow"],
       "from": 15,
       "until": 45,
+      "view": [0, 75],
       "speed": 5,
       "cues": [
         { "text": "Let's observe the upswings in real time." }
@@ -141,14 +143,14 @@
       "until": 75,
       "cues": [
         { "text": "If it breaks the previous HH", "hold": 0 },
-        { "at": 45, "on": "high", "text": "HH", "keep": "chapter" },
-        { "at": 75, "on": "high", "place": "above", "text": "BoS", "keep": "chapter" },
+        { "at": 45, "on": "high", "text": "HH", "keep": "chapter", "voice": false },
+        { "at": 75, "on": "high", "place": "above", "text": "BoS", "keep": "chapter", "voice": false },
         { "text": "then it turns out the Downswings were just part of a longer term Upswing." }
       ]
     },
     {
       "chapter": "Ghost swings",
-      "add": ["ghosts"],
+      "add": ["ghostSwings"],
       "from": 74,
       "until": 74,
       "cues": [
@@ -163,7 +165,8 @@
     },
     {
       "add": ["level2", "sawtooth", "HigherHigh", "LowerLow", "LowerHigh", "HigherLow"],
-      "remove": ["Upswing", "Downswing", "ghosts"],
+      "remove": ["Upswing", "Downswing", "ghostSwings"],
+      "view": [45, 75],
       "cues": [
         { "text": "But the data Ghosts hide can be useful. Zooming in we can see the sawtooth pattern at a lower level." }
       ]
@@ -185,19 +188,95 @@
     },
     {
       "remove": ["sawtooth"],
-      "until": 100,
+      "view": [0, 75],
       "cues": [
         { "text": "Recursive swings are common." },
-        { "at": 6, "on": "high", "place": "above", "text": "2nd order swing" },
-        { "at": 30, "on": "close", "place": "above", "text": "2nd order swing" },
-        { "at": 55, "on": "close", "place": "above", "text": "2nd order swing" }
+        { "at": 6, "on": "high", "place": "above", "text": "2nd order swing", "hold": 1, "voice": false },
+        { "at": 30, "on": "close", "place": "above", "text": "2nd order swing", "hold": 1, "voice": false },
+        { "at": 55, "on": "close", "place": "above", "text": "2nd order swing", "hold": 1, "voice": false }
       ]
     },
     {
       "add": ["level3"],
+      "view": [45, 63],
       "cues": [
         { "text": "Or even 3rd order swings within swings within swings." },
-        { "at": 50, "on": "close", "place": "above", "text": "3rd order swing" }
+        { "at": 50, "on": "close", "place": "above", "text": "3rd order swing", "voice": false }
+      ]
+    },
+    {
+      "add": ["level4"],
+      "view": [45, 55],
+      "cues": [
+        { "text": "Or 4th order swings. You get the picture." }
+      ]
+    },
+    {
+      "chapter": "Market Structure Break",
+      "add": ["HigherHigh", "HigherLow"],
+      "remove": ["level2", "Downswing", "Upswing", "level3", "level4"],
+      "from": 19,
+      "until": 23,
+      "view": [15, 27],
+      "cues": [
+        { "text": "Now we will consider another observation that leads to a useful indicator." }
+      ]
+    },
+    {
+      "add": ["LowerLow"],
+      "until": 24,
+      "cues": [
+        { "text": "Recall that sometimes the low dips below the previous HL" }
+      ]
+    },
+    {
+      "add": ["msbLevelDown"],
+      "cues": [
+        { "text": "Where this breaks the prior HL, we can note the position where this happens." }
+      ]
+    },
+    {
+      "add": ["BearishMarketStructureBreak"],
+      "cues": [
+        { "text": "Where this happens we call it a Market Structure Break (MSB). Sometimes it is called a Change of Character." }
+      ]
+    },
+    {
+      "add": ["sawtooth"],
+      "until": 24,
+      "cues": [
+        { "text": "Like the BoS, it may coincide with a turning point on the Sawtooth." }
+      ]
+    },
+    {
+      "until": 25,
+      "cues": [
+        { "text": "Or not." },
+        { "text": "At this point we don't know if it will continue down or complete an Upswing." },
+        { "text": "A swing does not need to be completed to observe a MSB." }
+      ]
+    },
+    {
+      "add": ["Upswing"],
+      "until": 27,
+      "cues": [
+        { "text": "Here, it happens we see the price bottom out and complete an Upswing." }
+      ]
+    },
+    {
+      "add": ["BullishMarketStructureBreak", "BullishBreakOfStructure"],
+      "remove": ["HigherLow", "Upswing"],
+      "until": 71,
+      "view": [0, 100],
+      "speed": 10,
+      "cues": []
+    },
+    {
+      "add": ["msbLevelUp", "LowerHigh"],
+      "until": 74,
+      "speed": 5,
+      "cues": [
+        { "text": "A MSB can happen on an upward leg of a Sawtooth, where the price closes higher than the prior LH." }
       ]
     }
   ]

@@ -31,7 +31,7 @@ await browser.close();
 const recording = await video.path();
 console.log(`Recorded ${recording}: ${played.cues.length} texts, ${played.chapters.length} chapters, ${Math.round((played.ended - played.started) / 1000)}s`);
 
-// Each clip starts where its text appeared; the chapters become the file's chapters.
+// Each clip starts where the page began reading its text, one at a time; the chapters become the file's chapters.
 const inputs = [], filters = [], mixed = [];
 for (const [i, cue] of played.cues.entries()) {
   const clip = clips[cue.key];

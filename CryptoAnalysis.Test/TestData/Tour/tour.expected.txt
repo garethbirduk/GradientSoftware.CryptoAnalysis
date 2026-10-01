@@ -8,8 +8,13 @@
 #45 · section 19 text 2 "HH" on high · seen at #75: L1 HH · L1 upswing BoS · L1 upswing start
 #75 · section 19 text 3 "BoS" on high · seen at #75: L1 HH* · L1 upswing BoS
 #75 · section 21 runs to it: L1 HH* · L1 upswing BoS
-#100 · section 25 runs to it: nothing
-#6 · section 25 text 2 "2nd order swing" on high · seen at #100: L2 LH · L2 downswing high
-#30 · section 25 text 3 "2nd order swing" on close · seen at #100: L2 HL · L2 upswing low
-#55 · section 25 text 4 "2nd order swing" on close · seen at #100: nothing
-#50 · section 26 text 2 "3rd order swing" on close · seen at #100: L3 HL · L3 upswing low
+#6 · section 25 text 2 "2nd order swing" on high · seen at #75: L2 LH · L2 downswing high
+#30 · section 25 text 3 "2nd order swing" on close · seen at #75: L2 HL · L2 upswing low
+#55 · section 25 text 4 "2nd order swing" on close · seen at #75: nothing
+#50 · section 26 text 2 "3rd order swing" on close · seen at #75: L3 HL · L3 upswing low
+#23 · section 28 (Market Structure Break) runs to it: L1 HH* · L1 upswing BoS
+#24 · section 29 runs to it: L1 LL* · L1 MSB↓
+#25 · section 33 runs to it: L1 LL*
+#27 · section 34 runs to it: L1 HH* · L1 upswing BoS
+#71 · section 35 runs to it: nothing
+#74 · section 36 runs to it: L1 HH*
