@@ -104,7 +104,8 @@ public static class ReplayServer
             return Results.Json(new { Index = index }, Json);
         });
 
-        // The tour's editor on the page saves the tour back to its source file.
+        // The tour's editor on the page saves the tour back to its source file. The page says which version of the file it
+        // started from, so a file that has changed since, as when it is edited by hand, is not written over.
         if (Directory.Exists(sourceDir))
         {
             var tourPath = Path.Combine(sourceDir, "tour.json");
@@ -120,6 +121,9 @@ public static class ReplayServer
                 {
                     return Results.BadRequest("The tour is not valid JSON.");
                 }
+
+                if (File.Exists(tourPath) && request.Headers["X-Tour-Base"].ToString() != TextKey(await File.ReadAllTextAsync(tourPath)))
+                    return Results.Conflict("tour.json has changed on disk since the page loaded it.");
 
                 await File.WriteAllTextAsync(tourPath, text);
                 return Results.NoContent();
@@ -143,6 +147,17 @@ public static class ReplayServer
 
         Console.WriteLine($"Serving {siteDir} with replay for {string.Join(", ", datasets.Select(x => x.Id))} on http://localhost:{port}");
         await app.RunAsync();
+    }
+
+    /// <summary>
+    /// The page's short hash of a text (FNV-1a, 32 bits, over its UTF-16 units), which names the version of tour.json it holds.
+    /// </summary>
+    private static string TextKey(string text)
+    {
+        var hash = 0x811c9dc5u;
+        foreach (var unit in text)
+            hash = unchecked((hash ^ unit) * 0x01000193u);
+        return hash.ToString("x8");
     }
 
     /// <summary>

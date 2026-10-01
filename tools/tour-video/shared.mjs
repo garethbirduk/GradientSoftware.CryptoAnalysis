@@ -27,14 +27,15 @@ export function tourTexts(tour) {
 
 // What the voice says in place of what is written, from the tour's glossary: "BoS" can be read as "Break of Structure" while
 // the text on screen stays as it is. An entry stands for a whole word in the case it is written in, and the longest entry
-// that fits is used, so "Break of Structure (BoS)" can have an entry of its own that does not say the name twice.
+// that fits is used, so "Break of Structure (BoS)" can have an entry of its own that does not say the name twice. An entry
+// that says nothing, as "(BoS)" may, leaves no gap behind: a space before punctuation goes, and so do doubled spaces.
 export function spokenText(tour) {
   const entries = Object.entries(tour.glossary ?? {}).map(([from, to]) => [from.trim(), String(to)]).filter(([from]) => from)
     .sort((a, b) => b[0].length - a[0].length);
   if (!entries.length) return text => text;
   const lookup = new Map(entries), escaped = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const words = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${entries.map(([from]) => escaped(from)).join('|')})(?![\\p{L}\\p{N}_])`, 'gu');
-  return text => text.replace(words, match => lookup.get(match));
+  return text => text.replace(words, match => lookup.get(match)).replace(/\s+([.,;:!?])/g, '$1').replace(/ {2,}/g, ' ').trim();
 }
 
 export function arg(name, fallback) {
