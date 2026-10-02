@@ -284,11 +284,28 @@
       ]
     },
     {
-      "add": ["msbLevelUp", "LowerHigh"],
+      "add": ["msbLevelUp"],
+      "remove": ["HigherHigh", "LowerLow", "msbLevelDown", "BullishBreakOfStructure", "BearishBreakOfStructure"],
       "until": 74,
       "speed": 5,
       "cues": [
         { "text": "An MSB can also happen on an Upleg of a Sawtooth, where the price closes higher than the prior Swing High." }
+      ]
+    },
+    {
+      "add": ["ghostMsbs", "ghostSwings"],
+      "until": 75,
+      "cues": [
+        { "text": "As we return to the longer-term Upswing, we now see a Ghost MSB in addition to the Ghost Downswings we saw earlier." },
+        { "text": "The MSB referred to the Swing High of a Downswing that is now a Ghost." }
+      ]
+    },
+    {
+      "add": ["level2"],
+      "remove": ["ghostMsbs", "ghostSwings"],
+      "view": [45, 75],
+      "cues": [
+        { "text": "As with the Ghost Downswings, the Ghost MSB is still here when we increase the resolution, and may be useful in its own right." }
       ]
     }
   ]

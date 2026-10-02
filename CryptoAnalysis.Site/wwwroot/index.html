@@ -663,8 +663,8 @@ function selectedLevels(ex) {
   return chosen.length ? chosen : [ex.level ?? 1];
 }
 
-// Points, market structure breaks, trends and the event log follow the finest level selected that exists: early in a replay
-// the finer levels are not there yet, so these move to them as they appear.
+// Trends, candidates and the event log follow the finest level selected that exists: early in a replay the finer levels are
+// not there yet, so these move to them as they appear.
 function structureLevel(ex) {
   const levels = selectedLevels(ex), existing = levels.filter(l => l < (ex.sawtooth?.length ?? 0));
   return Math.max(...(existing.length ? existing : levels));
@@ -693,6 +693,14 @@ function interimsTo(ex, w, depth = ex.depth ?? 1, d = 1) {
 
 function marketStructureBreaksFor(ex) {
   return ex.marketStructureBreaksByLevel?.[structureLevel(ex)] ?? [];
+}
+
+// On the chart, market structure breaks are drawn for every level selected, as swings and points are, each saying its
+// level. One that is the same at several levels shows once, as the coarsest. The event log still follows the finest level.
+function shownMarketStructureBreaks(ex) {
+  const seen = new Set(), key = m => `${m.type}|${m.reference.time}|${m.break.time}`;
+  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level =>
+    (ex.marketStructureBreaksByLevel?.[level] ?? []).filter(m => !seen.has(key(m)) && seen.add(key(m))).map(m => ({ ...m, level })));
 }
 
 function trendsFor(ex) {
@@ -890,21 +898,26 @@ function drawReplayExtras(ex, traces, level) {
     }
   }
 
-  // Protective levels that have not broken yet run on to the cursor.
+  // Protective levels that have not broken yet run on to the cursor, at every level selected.
+  const levels = selectedLevels(ex);
   for (const [layer, dir, type] of [['msbLevelDown', 'Up', 'BearishMarketStructureBreak'], ['msbLevelUp', 'Down', 'BullishMarketStructureBreak']]) {
     if (!on(layer)) continue;
-    const latest = (ex.swingsByLevel?.[level] ?? []).filter(w => w.direction === dir)
-      .sort((a, b) => a.breakOfStructure.time.localeCompare(b.breakOfStructure.time)).pop();
-    if (!latest || (ex.marketStructureBreaksByLevel?.[level] ?? []).some(m => m.reference.time === latest.extreme.time)) continue;
-    referenceLines(traces, 'Protective level', TERMS.get(type).color, 'dot',
-      [{ from: latest.breakOfStructure, to: { time: now }, level: latest.extreme.price, what: `${dir === 'Up' ? 'pullback low' : 'bounce high'} not broken yet` }]);
+    for (const l of levels) {
+      const latest = (ex.swingsByLevel?.[l] ?? []).filter(w => w.direction === dir)
+        .sort((a, b) => a.breakOfStructure.time.localeCompare(b.breakOfStructure.time)).pop();
+      if (!latest || (ex.marketStructureBreaksByLevel?.[l] ?? []).some(m => m.reference.time === latest.extreme.time)) continue;
+      referenceLines(traces, 'Protective level', TERMS.get(type).color, 'dot',
+        [{ from: latest.breakOfStructure, to: { time: now }, level: latest.extreme.price, what: `level ${l} ${dir === 'Up' ? 'pullback low' : 'bounce high'} not broken yet` }]);
+    }
   }
 
-  // Each kind of ghost is a layer of its own, so a ghost swing can be shown without the ghost of something else.
+  // Each kind of ghost is a layer of its own, so a ghost swing can be shown without the ghost of something else. A ghost
+  // is drawn at the levels its kind is: swings, market structure breaks and points at every level selected, candidates
+  // and trends at the finest.
   {
-    const grey = css('--close'), gone = e => e.value.level === level && e.ended === 'Removed' && e.until <= t;
+    const grey = css('--close'), removed = e => e.ended === 'Removed' && e.until <= t, gone = e => e.value.level === level && removed(e);
     const when = e => fmtTime(full.prices.t[e.until]);
-    for (const e of on('ghostSwings') ? r.swings.filter(gone) : []) {
+    for (const e of on('ghostSwings') ? r.swings.filter(e => swingLevels(ex).includes(e.value.level) && removed(e)) : []) {
       const w = e.value;
       traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: 'Ghost swing', ...box(w.start.time, w.end.time, w.start.price, w.extreme.price),
         line: { color: grey, width: 1, dash: 'dot' }, fillcolor: withAlpha(grey, 0.08),
@@ -916,15 +929,19 @@ function drawReplayExtras(ex, traces, level) {
         line: { color: grey, width: 1, dash: 'dash' },
         hovertemplate: `Ghost: abandoned candidate ${c.direction === 'Up' ? 'upswing' : 'downswing'} from ${fmtPrice(c.start.price)}<br>gone ${when(e)}<extra></extra>` });
     }
-    const msbs = on('ghostMsbs') ? r.marketStructureBreaks.filter(gone) : [];
+    // A market structure break that left one level is often found at the next: its ghost is then drawn larger, around the
+    // one that is there now.
+    const msbs = on('ghostMsbs') ? r.marketStructureBreaks.filter(e => levels.includes(e.value.level) && removed(e)) : [];
+    const there = new Set(shownMarketStructureBreaks(ex).map(m => `${m.type}|${m.break.time}`));
     if (msbs.length) traces.push({ type: 'scatter', mode: 'markers', name: 'Ghost MSB', x: msbs.map(e => e.value.break.break.time), y: msbs.map(e => e.value.break.break.price),
-      marker: { symbol: msbs.map(e => TERMS.get(e.value.break.type).symbol), size: 15, color: grey, line: { width: 1.5, color: grey } },
-      hovertemplate: msbs.map(e => `Ghost: ${TERMS.get(e.value.break.type).name}<br>removed ${when(e)}<extra></extra>`) });
+      marker: { symbol: msbs.map(e => TERMS.get(e.value.break.type).symbol), size: msbs.map(e => there.has(`${e.value.break.type}|${e.value.break.break.time}`) ? 27 : 15),
+        color: grey, line: { width: 1.5, color: grey } },
+      hovertemplate: msbs.map(e => `Ghost: ${TERMS.get(e.value.break.type).name} · level ${e.value.level}<br>removed ${when(e)}<extra></extra>`) });
     // Where a point was before it moved: the last position each point held before its current one.
-    const moved = new Map();
-    for (const e of on('ghostPoints') ? r.points.filter(e => e.value.level === level && e.value.type && e.ended === 'Updated' && e.until <= t) : [])
-      moved.set(`${e.value.kind}|${e.value.legStart}`, e);
-    const current = new Map(r.points.filter(e => e.value.level === level && holdsAt(t)(e)).map(e => [`${e.value.kind}|${e.value.legStart}`, e.value]));
+    const moved = new Map(), pointKey = v => `${v.level}|${v.kind}|${v.legStart}`;
+    for (const e of on('ghostPoints') ? r.points.filter(e => levels.includes(e.value.level) && e.value.type && e.ended === 'Updated' && e.until <= t) : [])
+      moved.set(pointKey(e.value), e);
+    const current = new Map(r.points.filter(e => levels.includes(e.value.level) && holdsAt(t)(e)).map(e => [pointKey(e.value), e.value]));
     const was = [...moved].filter(([id, e]) => current.get(id) && current.get(id).time !== e.value.time && on(e.value.type)).map(([, e]) => e);
     if (was.length) traces.push({ type: 'scatter', mode: 'markers', name: 'Ghost point', x: was.map(e => e.value.time), y: was.map(e => e.value.price),
       marker: { symbol: was.map(e => TERMS.get(e.value.type).symbol), size: 10, color: withAlpha(grey, 0.35), line: { width: 1, color: grey } },
@@ -1490,8 +1507,8 @@ function draw(el, ex, focus) {
   for (const [layer, type] of [['msbLevelUp', 'BullishMarketStructureBreak'], ['msbLevelDown', 'BearishMarketStructureBreak']]) {
     if (!on(layer)) continue;
     referenceLines(traces, 'MSB level', TERMS.get(type).color, 'dot',
-      marketStructureBreaksFor(ex).filter(m => m.type === type)
-        .map(m => ({ from: m.reference, to: m.break, level: m.reference.price, what: `protective ${type.startsWith('Bullish') ? 'bounce high' : 'pullback low'} broken` })));
+      shownMarketStructureBreaks(ex).filter(m => m.type === type)
+        .map(m => ({ from: m.reference, to: m.break, level: m.reference.price, what: `level ${m.level} protective ${type.startsWith('Bullish') ? 'bounce high' : 'pullback low'} broken` })));
   }
 
   const labels = [], boxes = [];
@@ -1513,9 +1530,9 @@ function draw(el, ex, focus) {
       : BOS_DIRECTION[type] ? allSwings.filter(w => w.direction === BOS_DIRECTION[type]).map(w => ({ type, direction: w.direction, time: w.breakOfStructure.time, price: w.breakOfStructure.price, detail: `<br>level ${w.level}` }))
       : TREND_DIRECTION[type] ? trendsFor(ex).filter(t => t.direction === TREND_DIRECTION[type]).map(t => ({ type, time: t.confirmed.time, price: t.confirmed.price,
           detail: `<br>from ${fmtTime(t.start.time)} · ${t.end ? `ended ${fmtTime(t.end.time)}` : 'ongoing'}<br>${t.swings} swings · ${t.marketStructureBreaks} MSB against` }))
-      : marketStructureBreaksFor(ex).filter(m => m.type === type).map(m => ({ type, time: m.break.time, price: m.break.price })) }));
-  const isPointType = type => POINT_LAYERS.includes(type);
-  const bulkLabels = markers.filter(m => !isPointType(m.type)).reduce((n, m) => n + m.items.length, 0) > ANNOTATION_LIMIT;
+      : shownMarketStructureBreaks(ex).filter(m => m.type === type).map(m => ({ type, level: m.level, time: m.break.time, price: m.break.price, detail: `<br>level ${m.level}` })) }));
+  const isPointType = type => POINT_LAYERS.includes(type), severalLevels = selectedLevels(ex).length > 1;
+  const bulkLabels =markers.filter(m => !isPointType(m.type)).reduce((n, m) => n + m.items.length, 0) > ANNOTATION_LIMIT;
   // Point labels sit in a box of their level's colour, stacked with the coarsest level nearest the candle. The marker is
   // outlined in the level's colour too, so a point still says its level where another box covers its own.
   const points = markers.filter(m => m.term && isPointType(m.type)).flatMap(m => m.items.map(a => ({ a, m }))).sort((p, q) => p.a.level - q.a.level);
@@ -1538,8 +1555,11 @@ function draw(el, ex, focus) {
     });
     if (bulkLabels || isPoint) continue;
     for (const a of items) {
+      // With several levels shown, a market structure break's label is in a box of its level's colour, as a point's is.
+      const boxed = severalLevels && a.level != null;
       labels.push({ x: a.time, y: a.price, text: term.label, showarrow: false,
-        yshift: stackShift(stacks, a.time, below), font: { size: isFocus ? 12 : 11, color: isFocus ? text : muted } });
+        yshift: stackShift(stacks, a.time, below, boxed ? BOX_HEIGHT : undefined), font: { size: isFocus ? 12 : 11, color: isFocus ? text : muted },
+        ...(boxed ? { bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: levelColor(a.level), borderwidth: 1.5, borderpad: 1 } : {}) });
     }
   }
 
@@ -2764,6 +2784,25 @@ function editTourField(el) {
   if (!el.isConnected) document.querySelector(`#tour-editor ${cueEl ? `.ed-cue[data-cue="${j}"] ` : ''}[data-scope="${scope}"][data-field="${field}"]`)?.focus();
 }
 
+// The number an empty box stands for: the setting as it is with nothing written, as its placeholder says.
+function inheritedOf(el) {
+  const { scope, field } = el.dataset, s = tourSection(), cueEl = el.closest('.ed-cue'), cue = cueEl && s?.cues[Number(cueEl.dataset.cue)];
+  const view = field === 'view0' ? 0 : field === 'view1' ? 1 : null;
+  if (scope === 'start') return view != null ? DEFAULT_VIEW[view] : field === 'speed' ? 4 : null;
+  if (scope === 'cue') return field === 'at' ? cue?.at ?? s?.from : field === 'hold' ? cue?.hold : null;
+  return scope !== 'section' ? null : view != null ? s?.view[view] : ['from', 'until', 'speed'].includes(field) ? s?.[field] : null;
+}
+
+// An empty number box steps from the number it stands for, not from 0: it is given that number just before the arrow keys
+// or the box's own arrows step it, and emptied again when no step follows.
+function stepFromInherited(el) {
+  if (el?.type !== 'number' || el.value !== '') return;
+  const base = inheritedOf(el);
+  if (!Number.isFinite(base)) return;
+  const seeded = el.value = String(Math.round(base * 10) / 10);
+  setTimeout(() => { if (el.value === seeded) el.value = ''; });
+}
+
 // The layer buttons, while the editor is open, set the layers of the section the tour is at: written as what the section
 // adds to the layers before it and what it takes away.
 function recordTourLayers() {
@@ -2938,6 +2977,8 @@ function tourAction(action, el) {
   // A box is applied as it is typed in; the start time only once it is complete.
   box.addEventListener('input', e => { const el = e.target.closest('[data-field]'); if (el && !el.hasAttribute('data-commit')) editTourField(el); });
   box.addEventListener('change', e => { const el = e.target.closest('[data-field][data-commit]'); if (el) editTourField(el); });
+  box.addEventListener('keydown', e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') stepFromInherited(e.target.closest('input[data-field]')); });
+  box.addEventListener('mousedown', e => stepFromInherited(e.target.closest('input[data-field]')));
   box.addEventListener('click', e => { const b = e.target.closest('[data-ed]'); if (b && !b.disabled) tourAction(b.dataset.ed, b); });
   // Going into one of a text's boxes shows that text on the chart.
   box.addEventListener('focusin', e => {
