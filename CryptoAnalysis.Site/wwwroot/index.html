@@ -337,7 +337,7 @@ const SECTIONS = [
   { name: 'Points', layers: ['HigherHigh', 'LowerHigh', 'LowerLow', 'HigherLow'].map(id => ({ id })) },
   { name: 'Upswings', layers: [{ id: 'Upswing', label: 'Upswing' }, { id: 'BullishBreakOfStructure' }, { id: 'bosLevelUp', label: 'BoS level', term: 'BullishBreakOfStructure' }] },
   { name: 'Downswings', layers: [{ id: 'Downswing', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' }] },
-  { name: 'Trends', layers: [{ id: 'Uptrend', label: 'Uptrend' }, { id: 'Downtrend', label: 'Downtrend' }] },
+  { name: 'Trends', layers: [{ id: 'Uptrend', label: 'Uptrend' }, { id: 'Downtrend', label: 'Downtrend' }, { id: 'trendArrows', label: 'Trend arrows' }] },
   { name: 'Indicators', layers: [{ id: 'BullishMarketStructureBreak' }, { id: 'msbLevelUp', label: 'MSB↑ level', term: 'BullishMarketStructureBreak' },
     { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' }] },
 ].map(s => ({ ...s, layers: s.layers.map(l => ({ ...l, label: l.label ?? TERMS.get(l.id)?.label ?? l.id })) }));
@@ -471,6 +471,8 @@ function swatch(layer) {
     return svg(`<line x1="2" y1="${y1}" x2="18" y2="${y2}" stroke="${c}" stroke-width="2"/><path d="M${up ? '13 2 L19 1 L17 7' : '13 12 L19 13 L17 7'}" fill="none" stroke="${c}" stroke-width="2"/>`); }
   if (TREND_DIRECTION[layer.id]) { const c = TERMS.get(layer.id)?.color, y = layer.id === 'Uptrend' ? 1 : 9;
     return svg(`<rect x="1" y="${y}" width="20" height="4" fill="${withAlpha(c, 0.5)}"/><polygon points="11,${y - 1} 14,${y + 2} 11,${y + 5} 8,${y + 2}" fill="${c}"/>`); }
+  if (layer.id === 'trendArrows') return svg(`<line x1="2" y1="12" x2="18" y2="2" stroke="${levelColor(1)}" stroke-width="2"/><path d="M13 2 L19 1 L17 7" fill="none" stroke="${levelColor(1)}" stroke-width="2"/>
+    <rect x="6" y="4" width="8" height="6" fill="${css('--panel')}" stroke="${levelColor(1)}"/>`);
   if (layer.id === 'live') return svg(`<path d="M7 3 L15 11 M15 3 L7 11" stroke="${css('--text')}" stroke-width="1.8"/>`);
   if (layer.id === 'replay') return svg(`<polygon points="7,2 17,7 7,12" fill="${css('--accent')}"/>`);
   if (layer.id === 'candidates') return svg(`<rect x="2" y="2" width="18" height="10" fill="none" stroke="${css('--upswing')}" stroke-dasharray="3 2"/>`);
@@ -717,17 +719,54 @@ function hindsightKeys(ex, level) {
   return keys;
 }
 
-// A trend as a strip along the top (up) or bottom (down) of the chart, from its first swing to the swing that ended it.
+// A trend as a strip along the top (up) or bottom (down) of the chart, from its first swing to the swing that ended it: a
+// segment for each of its swings, paler for a weak one, and faint after the last, where no swing has broken structure yet.
+// With several levels selected, each level that has a trend that way has a strip of its own, the coarsest at the edge, and
+// each strip carries a thin stripe in its level's colour on its outer side. Together they keep within the room the chart
+// leaves around the prices, so the strips get thinner as there are more of them.
+const TREND_STRIP = 0.035, TREND_ROOM = 0.054, TREND_STRIPE = 0.22;
+
 function trendShapes(ex) {
-  const last = ex.prices.t[ex.prices.t.length - 1];
-  return trendsFor(ex).filter(t => on(t.direction === 'Up' ? 'Uptrend' : 'Downtrend')).flatMap(t => {
-    const color = TERMS.get(t.direction === 'Up' ? 'Uptrend' : 'Downtrend').color;
-    const [y0, y1] = t.direction === 'Up' ? [0.965, 1] : [0, 0.035];
-    return [
-      { type: 'rect', xref: 'x', yref: 'paper', x0: t.start.time, x1: t.end?.time ?? last, y0, y1, line: { width: 0 }, fillcolor: withAlpha(color, 0.22), layer: 'below' },
-      { type: 'rect', xref: 'x', yref: 'paper', x0: t.confirmed.time, x1: t.end?.time ?? last, y0, y1, line: { width: 0 }, fillcolor: withAlpha(color, 0.55), layer: 'below' },
-    ];
+  const last = ex.prices.t[ex.prices.t.length - 1], gap = css('--panel');
+  const levels = [...swingLevels(ex)].sort((a, b) => a - b), striped = levels.length > 1;
+  const rect = (x0, x1, a, b, fillcolor, line) => ({ type: 'rect', xref: 'x', yref: 'paper', x0, x1, y0: Math.min(a, b), y1: Math.max(a, b), line, fillcolor, layer: 'below' });
+  return ['Up', 'Down'].filter(direction => on(direction === 'Up' ? 'Uptrend' : 'Downtrend')).flatMap(direction => {
+    const up = direction === 'Up', color = TERMS.get(up ? 'Uptrend' : 'Downtrend').color;
+    const rows = levels.map(level => ({ level, trends: (ex.trendsByLevel?.[level] ?? []).filter(t => t.direction === direction) })).filter(row => row.trends.length);
+    const height = Math.min(TREND_STRIP * rows.length, TREND_ROOM) / Math.max(1, rows.length), stripe = striped ? height * TREND_STRIPE : 0;
+    return rows.flatMap((row, i) => {
+      const outer = up ? 1 - i * height : i * height, inner = up ? outer - height : outer + height, edge = up ? outer - stripe : outer + stripe;
+      return row.trends.flatMap(t => {
+        const parts = t.parts ?? [], end = t.end?.time ?? last;
+        const from = parts.length ? parts[parts.length - 1].breakOfStructure.time : t.start.time;
+        const segment = (x0, x1, alpha) => rect(x0, x1, edge, inner, withAlpha(color, alpha), { width: 1, color: gap });
+        return [...(striped ? [rect(t.start.time, end, outer, edge, levelColor(row.level), { width: 0 })] : []),
+          ...parts.map((p, k) => segment(k ? parts[k - 1].breakOfStructure.time : t.start.time, p.breakOfStructure.time, p.strong ? 0.6 : 0.25)),
+          ...(Date.parse(from) < Date.parse(end) ? [segment(from, end, 0.1)] : [])];
+      });
+    });
   });
+}
+
+// A trend as an arrow in its level's colour, from where its first swing starts to its latest break of structure, with its
+// count of swings and its strength in a box: the share of its swings that are strong. Drawn at every level selected.
+function drawTrendArrows(ex, labels) {
+  if (!on('trendArrows')) return;
+  for (const level of swingLevels(ex)) {
+    for (const t of ex.trendsByLevel?.[level] ?? []) {
+      const tip = t.parts?.[t.parts.length - 1]?.breakOfStructure;
+      if (!tip) continue;
+      const color = levelColor(level);
+      const hover = `${t.direction === 'Up' ? 'Uptrend' : 'Downtrend'} · level ${level}<br>${t.swings} swings, ${t.strong} strong · strength ${t.strength}%<br>${t.marketStructureBreaks} MSB against`;
+      labels.push({ x: tip.time, y: tip.price, ax: t.start.time, ay: t.start.price, axref: 'x', ayref: 'y', text: '',
+        showarrow: true, arrowhead: 2, arrowsize: 1.2, arrowwidth: 2, arrowcolor: color, hovertext: hover, opacity: 0.9 });
+      // The box sits towards the arrow's head, where a long trend is usually being looked at.
+      const along = 0.8, from = Date.parse(t.start.time), at = new Date(from + (Date.parse(tip.time) - from) * along).toISOString();
+      labels.push({ x: at, y: t.start.price + (tip.price - t.start.price) * along, text: `${t.swings} · ${t.strength}%`, showarrow: false, hovertext: hover,
+        bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: color, borderwidth: 1.5, borderpad: 2,
+        font: { size: 11, color: css('--text') } });
+    }
+  }
 }
 
 function owningSwing(ex, a) {
@@ -951,6 +990,15 @@ function drawReplayExtras(ex, traces, level) {
       const [y0, y1] = e.value.direction === 'Up' ? [0.965, 1] : [0, 0.035];
       shapes.push({ type: 'rect', xref: 'x', yref: 'paper', x0: e.value.start.time, x1: full.prices.t[e.until - 1], y0, y1, layer: 'below',
         line: { color: grey, width: 1, dash: 'dot' }, fillcolor: withAlpha(grey, 0.15) });
+    }
+    // With trend arrows on, a ghost trend keeps its arrow too, in grey, at every level selected.
+    for (const e of on('ghostTrends') && on('trendArrows') ? r.trends.filter(e => swingLevels(ex).includes(e.value.level) && removed(e)) : []) {
+      const v = e.value, tip = v.parts?.[v.parts.length - 1]?.breakOfStructure, up = v.direction === 'Up';
+      if (!tip) continue;
+      traces.push({ type: 'scatter', mode: 'lines+markers+text', name: 'Ghost trend', x: [v.start.time, tip.time], y: [v.start.price, tip.price],
+        line: { color: grey, width: 1.5, dash: 'dot' }, marker: { size: [0, 9], symbol: up ? 'triangle-up' : 'triangle-down', color: grey },
+        text: ['', `${v.swings} · ${v.strength}%`], textposition: up ? 'top center' : 'bottom center', textfont: { size: 10, color: grey },
+        hovertemplate: `Ghost: ${up ? 'uptrend' : 'downtrend'} of ${v.swings} swings, strength ${v.strength}%<br>removed ${when(e)}<extra></extra>` });
     }
   }
 
@@ -1515,6 +1563,7 @@ function draw(el, ex, focus) {
   const labels = [], boxes = [];
   const stacks = new Map();
   drawCandleRuns(ex, labels, traces);
+  drawTrendArrows(ex, labels);
   drawSawtooth(ex, traces);
 
   const level = structureLevel(ex);
@@ -1530,7 +1579,7 @@ function draw(el, ex, focus) {
   const markers = markerTypes.map(type => ({ type, term: TERMS.get(type), items: POINT_LAYERS.includes(type) ? pointsOf(type)
       : BOS_DIRECTION[type] ? allSwings.filter(w => w.direction === BOS_DIRECTION[type]).map(w => ({ type, direction: w.direction, time: w.breakOfStructure.time, price: w.breakOfStructure.price, detail: `<br>level ${w.level}` }))
       : TREND_DIRECTION[type] ? trendsFor(ex).filter(t => t.direction === TREND_DIRECTION[type]).map(t => ({ type, time: t.confirmed.time, price: t.confirmed.price,
-          detail: `<br>from ${fmtTime(t.start.time)} · ${t.end ? `ended ${fmtTime(t.end.time)}` : 'ongoing'}<br>${t.swings} swings · ${t.marketStructureBreaks} MSB against` }))
+          detail: `<br>from ${fmtTime(t.start.time)} · ${t.end ? `ended ${fmtTime(t.end.time)}` : 'ongoing'}<br>${t.swings} swings · strength ${t.strength}% · ${t.marketStructureBreaks} MSB against` }))
       : shownMarketStructureBreaks(ex).filter(m => m.type === type).map(m => ({ type, level: m.level, time: m.break.time, price: m.break.price, detail: `<br>level ${m.level}` })) }));
   const isPointType = type => POINT_LAYERS.includes(type), severalLevels = selectedLevels(ex).length > 1;
   const bulkLabels =markers.filter(m => !isPointType(m.type)).reduce((n, m) => n + m.items.length, 0) > ANNOTATION_LIMIT;

@@ -339,7 +339,8 @@ public static class Sawtooth
     /// Returns the trends in a level's swings: runs of at least minSwings consecutive swings in the same direction, taken in
     /// the order they broke structure. A trend is confirmed by the break of structure of its minSwings-th swing and ends when a
     /// swing in the other direction breaks structure; until then it is ongoing. Market structure breaks against the trend are
-    /// counted but do not end it.
+    /// counted but do not end it: one that falls inside a swing, between its start and its break of structure, makes that
+    /// swing a weak one.
     /// </summary>
     public static List<TrendOutline> Trends(IReadOnlyList<SwingOutline> swings, IReadOnlyList<MarketStructureBreakOutline> breaks, int minSwings = 2)
     {
@@ -358,7 +359,10 @@ public static class Sawtooth
                 var end = j + 1 < ordered.Count ? ordered[j + 1].BreakOfStructure : null;
                 var against = first.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
                 var msbs = breaks.Count(b => b.Type == against && b.Break.Time > first.BreakOfStructure!.Time && (end == null || b.Break.Time <= end.Time));
-                trends.Add(new TrendOutline(first.Level, first.Direction, first.Start, ordered[i + Math.Max(1, minSwings) - 1].BreakOfStructure!, end, j - i + 1, msbs));
+                var parts = ordered.GetRange(i, j - i + 1)
+                    .Select(s => new TrendSwing(s.BreakOfStructure!, !breaks.Any(b => b.Type == against && b.Break.Time > s.Start.Time && b.Break.Time < s.BreakOfStructure!.Time)))
+                    .ToList();
+                trends.Add(new TrendOutline(first.Level, first.Direction, first.Start, ordered[i + Math.Max(1, minSwings) - 1].BreakOfStructure!, end, j - i + 1, msbs, parts));
             }
 
             i = j + 1;

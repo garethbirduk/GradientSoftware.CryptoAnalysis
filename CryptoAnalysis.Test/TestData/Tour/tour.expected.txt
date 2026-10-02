@@ -45,16 +45,16 @@
 #90 · section 54 (Successive Candles) runs to it: L1 HH*
 #84 · section 54 (Successive Candles) text 2 "Here six red candles follow each other, each hour closing lower than the last. These are Successive Red Candles." · seen at #90: L1 LL · L1 upswing low
 #90 · section 54 (Successive Candles) text 3 "And six green candles follow them, each hour closing higher: Successive Green Candles." · seen at #90: L1 HH*
-#16 · section 56 text 3 "Uptrend Confirmed" on close · seen at #90: L1 upswing BoS
+#16 · section 56 text 5 "second Upswing" on close · seen at #90: L1 upswing BoS
 #77 · section 58 text 2 "Swing Low" on close · seen at #90: L1 HL · L1 upswing low
 #81 · section 58 text 3 "MSB" on close · seen at #90: L1 MSB↓
 #89 · section 58 text 5 "BoS" on close · seen at #90: L1 upswing BoS
-#61 · section 61 (Trends in real time) gets there by rewind: nothing
-#62 · section 62 runs to it: L1 LL* · L1 downswing BoS
-#62 · section 62 text 1 "A Trend ends at the BoS of the first Swing in the opposite direction. Here a Downswing is Confirmed, and the Uptrend ends." · seen at #62: L1 LL* · L1 downswing BoS
-#64 · section 63 runs to it: L1 LL* · L1 downswing BoS
-#64 · section 63 text 1 "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend is Confirmed." · seen at #64: L1 LL* · L1 downswing BoS
-#75 · section 64 (Ghost Trends) runs to it: L1 HH* · L1 upswing BoS
-#75 · section 64 (Ghost Trends) text 2 "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." · seen at #75: L1 HH* · L1 upswing BoS
-#64 · section 65 (2nd order Trends) text 3 "Downtrend Confirmed" on close · seen at #75: L1 LL · L1 upswing low · L2 LL · L2 downswing BoS · L2 MSB↓
-#68 · section 65 (2nd order Trends) text 4 "Downtrend ends" on close · seen at #75: L2 upswing BoS
+#61 · section 65 (Trends in real time) gets there by rewind: nothing
+#62 · section 66 runs to it: L1 LL* · L1 downswing BoS
+#62 · section 66 text 1 "A Trend ends at the BoS of the first Swing in the opposite direction. Here a Downswing is Confirmed, and the Uptrend ends." · seen at #62: L1 LL* · L1 downswing BoS
+#64 · section 67 runs to it: L1 LL* · L1 downswing BoS
+#64 · section 67 text 1 "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend." · seen at #64: L1 LL* · L1 downswing BoS
+#75 · section 68 (Ghost Trends) runs to it: L1 HH* · L1 upswing BoS
+#75 · section 68 (Ghost Trends) text 2 "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." · seen at #75: L1 HH* · L1 upswing BoS
+#64 · section 69 (2nd order Trends) text 4 "second Downswing" on close · seen at #75: L1 LL · L1 upswing low · L2 LL · L2 downswing BoS · L2 MSB↓
+#68 · section 69 (2nd order Trends) text 5 "Downtrend ends" on close · seen at #75: L2 upswing BoS

@@ -455,54 +455,88 @@
     {
       "add": ["Uptrend"],
       "cues": [
-        { "text": "Two or more Swings in a row in the same direction form a Trend. A Trend of Upswings is an Uptrend." },
-        { "text": "It begins where its first Swing begins, and it is Confirmed by the BoS of its second Swing.", "hold": 0 },
-        { "at": 16, "on": "close", "place": "above", "text": "Uptrend Confirmed", "hold": 5, "voice": false },
-        { "text": "The band along the top of the chart marks the Uptrend. It is paler until the Uptrend is Confirmed." }
+        { "text": "Just as candles of one colour in a row are Successive Candles, two or more Upswings in a row are an Uptrend." },
+        { "text": "Two or more Downswings in a row are a Downtrend. Either is a Trend." },
+        { "text": "This is an Uptrend of twelve Upswings." },
+        { "text": "It begins where its first Upswing begins. From the BoS of its second Upswing there are two in a row.", "hold": 0 },
+        { "at": 16, "on": "close", "place": "above", "text": "second Upswing", "hold": 5, "voice": false },
+        { "text": "The band along the top of the chart marks the Uptrend, with a segment for each Upswing. Some segments are paler, and we will come to why." },
+        { "text": "Like Successive Candles, a Trend is a count of what has happened. It does not say what the price will do next." }
       ]
     },
     {
-      "chapter": "MSBs against a Trend",
+      "chapter": "Strength",
       "add": ["BearishMarketStructureBreak"],
       "cues": [
-        { "text": "Four times so far, the price has closed below the Swing Low of the latest Upswing. Each is an MSB against the Uptrend." },
+        { "text": "Four times in this Uptrend, the price has closed below the Swing Low of the latest Upswing: an MSB." },
         { "text": "Let's look closely at the latest one." }
       ]
     },
     {
-      "add": ["BullishBreakOfStructure", "msbLevelDown"],
+      "add": ["BullishBreakOfStructure", "msbLevelDown", "LowerLow"],
       "view": [74, 92],
       "cues": [
         { "text": "This Upswing is Confirmed by its BoS. Three hours later the price closes below its Swing Low: an MSB.", "hold": 0 },
         { "at": 77, "on": "close", "place": "below", "text": "Swing Low", "hold": 3.5, "voice": false },
         { "at": 81, "on": "close", "place": "above", "text": "MSB", "hold": 3.5, "voice": false },
-        { "text": "The price falls for three more hours. Then it turns, and this BoS Confirms the next Upswing.", "hold": 0 },
+        { "text": "The price falls for three more hours. Then it turns at an LL, and this BoS Confirms the next Upswing.", "hold": 0 },
         { "at": 89, "on": "close", "place": "left", "text": "BoS", "hold": 6.5, "voice": false },
-        { "text": "An Uptrend is a run of Upswings, and only a Confirmed Downswing can break the run." },
-        { "text": "The MSB did not Confirm a Downswing, so the run went on, from eleven Upswings to twelve." },
-        { "text": "After an MSB against a Trend, the next BoS decides. An Upswing's BoS continues the Uptrend. A Downswing's BoS ends it." }
+        { "text": "The MSB is inside the new Upswing. An Upswing with an MSB inside it is a Weak Upswing. An Upswing with none is a Strong Upswing." },
+        { "text": "A Weak Upswing always has an LL as its Swing Low, because the MSB took the price below the Swing Low before it." }
       ]
     },
     {
+      "cues": [
+        { "text": "An Uptrend is a run of Upswings, and only a Confirmed Downswing can break the run." },
+        { "text": "The MSB did not Confirm a Downswing, so the run went on, from eleven Upswings to twelve. The twelfth is a Weak one." },
+        { "text": "After an MSB against a Trend, the next BoS decides. An Upswing's BoS continues the Uptrend with a Weak Upswing. A Downswing's BoS ends it." }
+      ]
+    },
+    {
+      "add": ["HigherLow"],
       "remove": ["BullishBreakOfStructure", "msbLevelDown"],
       "view": [0, 92],
       "cues": [
-        { "text": "Three of the four went this way: the next BoS was an Upswing's, within hours." }
+        { "text": "Four of the twelve Upswings are Weak: the fourth, seventh, tenth and twelfth. Each has an MSB inside it and an LL as its Swing Low." },
+        { "text": "On the band along the top, the Weak Upswings are the paler segments." },
+        { "text": "The Strength of a Trend is the share of its Swings that are Strong." }
+      ]
+    },
+    {
+      "add": ["trendArrows"],
+      "cues": [
+        { "text": "Here that is eight of twelve. This is an Uptrend of twelve Upswings with a Strength of 66%." },
+        { "text": "The arrow runs from where the Uptrend begins to its latest BoS, and its box shows the count and the Strength." },
+        { "text": "An Uptrend with a Strength of 100% has no Weak Upswing: Higher Highs and Higher Lows throughout." }
+      ]
+    },
+    {
+      "cues": [
+        { "text": "Strength does not say where the Weak Upswings fall. So we also count the Upswings since the last Weak one, starting with it." },
+        { "text": "This Uptrend has had stretches of three, three, three and two Upswings. The twelfth is Weak, so the latest stretch is one Upswing so far." },
+        { "text": "The same holds for Downswings: a Weak Downswing has an MSB inside it, and an HH as its Swing High." },
+        { "text": "Strong, Weak and Strength describe what has happened. They are not a forecast." }
+      ]
+    },
+    {
+      "cues": [
+        { "text": "Three of the four Weak Upswings were Confirmed within hours of the MSB inside them." }
       ]
     },
     {
       "add": ["ghostSwings"],
+      "remove": ["HigherLow"],
       "view": [40, 77],
       "cues": [
-        { "text": "This one was different." },
-        { "text": "After it the price fell for eighteen hours, and two Downswings were Confirmed on the way. They are the Ghost Downswings we saw earlier." },
+        { "text": "The tenth was different." },
+        { "text": "After its MSB the price fell for eighteen hours, and two Downswings were Confirmed on the way. They are the Ghost Downswings we saw earlier." },
         { "text": "In real time, that did end the Uptrend. But it was not the MSB that ended it. It was the BoS of the first Downswing, sixteen hours later." }
       ]
     },
     {
       "chapter": "Trends in real time",
       "add": ["BearishBreakOfStructure", "Downtrend"],
-      "remove": ["BearishMarketStructureBreak", "ghostSwings"],
+      "remove": ["BearishMarketStructureBreak", "LowerLow", "ghostSwings"],
       "rewind": { "to": 61, "speed": 100, "erase": true },
       "view": [40, 77],
       "speed": 2,
@@ -519,7 +553,7 @@
     {
       "until": 64,
       "cues": [
-        { "at": 64, "text": "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend is Confirmed." }
+        { "at": 64, "text": "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend." }
       ]
     },
     {
@@ -541,10 +575,11 @@
       "view": [45, 77],
       "cues": [
         { "text": "As with the Ghost Downswings, the Ghost Downtrend is still here when we increase the resolution." },
-        { "text": "This 2nd order Downtrend is Confirmed by the BoS of its second Downswing, and it ends at the BoS of the first Upswing after it.", "hold": 0 },
-        { "at": 64, "on": "close", "place": "below", "text": "Downtrend Confirmed", "hold": 3.5, "voice": false },
+        { "text": "With two resolutions on the chart, each band carries a thin stripe in the colour of its resolution." },
+        { "text": "This 2nd order Downtrend has two Downswings, and it ends at the BoS of the first Upswing after them.", "hold": 0 },
+        { "at": 64, "on": "close", "place": "below", "text": "second Downswing", "hold": 3.5, "voice": false },
         { "at": 68, "on": "close", "place": "above", "text": "Downtrend ends", "hold": 3.5, "voice": false },
-        { "text": "A second Upswing then Confirms a 2nd order Uptrend. Trends, like Swings, exist at every resolution." }
+        { "text": "Two Upswings in a row then make a 2nd order Uptrend. Trends, like Swings, exist at every resolution." }
       ]
     }
   ]

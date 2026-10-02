@@ -218,6 +218,43 @@ public class SawtoothTests
         Assert.AreEqual("Up:14>-:2s:1m", DescribeTrends(Closes(10, 12, 11, 13, 10.5, 14), 1));
     }
 
+    private static string DescribeStrength(List<Price> prices, int level)
+    {
+        var levels = Sawtooth.Levels(prices, EnumPriceBasis.Close);
+        var swings = Sawtooth.Swings(prices, levels, EnumPriceBasis.Close, level);
+        return string.Join(" ", Sawtooth.Trends(swings, Sawtooth.MarketStructureBreaks(prices, swings, EnumPriceBasis.Close))
+            .Select(t => $"{t.Direction}:{string.Concat(t.Parts.Select(p => p.Strong ? "S" : "W"))}:{t.Strong}of{t.Swings}:{t.Strength}%"));
+    }
+
+    [TestMethod]
+    public void Trends_NoMarketStructureBreakInsideASwing_AllStrong()
+    {
+        Assert.AreEqual("Up:SS:2of2:100%", DescribeStrength(Closes(10, 12, 11, 13, 12, 15, 14), 1));
+    }
+
+    [TestMethod]
+    public void Trends_MarketStructureBreakInsideASwing_MakesItWeak()
+    {
+        Assert.AreEqual("Up:SW:1of2:50%", DescribeStrength(Closes(10, 12, 11, 13, 10.5, 14), 1));
+    }
+
+    [TestMethod]
+    public void Trends_StrengthIsRoundedDown()
+    {
+        Assert.AreEqual("Up:SWS:2of3:66%", DescribeStrength(Closes(10, 12, 11, 13, 10.5, 14, 13, 15), 1));
+    }
+
+    [TestMethod]
+    public void Trends_SameSwings_AreEqual()
+    {
+        var prices = Closes(10, 12, 11, 13, 10.5, 14);
+        var levels = Sawtooth.Levels(prices, EnumPriceBasis.Close);
+        var swings = Sawtooth.Swings(prices, levels, EnumPriceBasis.Close, 1);
+        var breaks = Sawtooth.MarketStructureBreaks(prices, swings, EnumPriceBasis.Close);
+
+        Assert.AreEqual(Sawtooth.Trends(swings, breaks).Single(), Sawtooth.Trends(swings, breaks).Single());
+    }
+
     [TestMethod]
     public void SwingTree_PullbackDownswingsAreInterimsOfTheUpswing()
     {

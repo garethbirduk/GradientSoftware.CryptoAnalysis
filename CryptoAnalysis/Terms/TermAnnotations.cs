@@ -40,9 +40,16 @@ public sealed record SwingOutline(
 public sealed record CandidateSwing(int Level, EnumSwingDirection Direction, PricePoint Start, PricePoint Extreme);
 
 /// <summary>
+/// One swing of a trend, by its break of structure. It is weak when a market structure break against the trend falls inside
+/// it, between its start and its break of structure, and strong when none does.
+/// </summary>
+public sealed record TrendSwing(PricePoint BreakOfStructure, bool Strong);
+
+/// <summary>
 /// A trend at a sawtooth level: consecutive swings in one direction. Start is the first swing's start, Confirmed the break of
 /// structure that made it a trend, and End the break of structure of the first swing the other way (null while ongoing).
-/// Swings counts its swings and MarketStructureBreaks the market structure breaks against it.
+/// Swings counts its swings and MarketStructureBreaks the market structure breaks against it. Parts lists its swings in order,
+/// Strong counts the strong ones, and Strength is their share of the swings as a whole percentage, rounded down.
 /// </summary>
 public sealed record TrendOutline(
     int Level,
@@ -51,7 +58,29 @@ public sealed record TrendOutline(
     PricePoint Confirmed,
     PricePoint? End,
     int Swings,
-    int MarketStructureBreaks);
+    int MarketStructureBreaks,
+    IReadOnlyList<TrendSwing> Parts)
+{
+    public int Strong => Parts.Count(x => x.Strong);
+
+    public int Strength => Parts.Count == 0 ? 0 : (int)Math.Floor(100.0 * Strong / Parts.Count);
+
+    /// <summary>
+    /// Compares the trends by value, their swings included, so a replay can tell when a trend has changed.
+    /// </summary>
+    public bool Equals(TrendOutline? other)
+    {
+        return other is not null && Level == other.Level && Direction == other.Direction && Start == other.Start
+            && Confirmed == other.Confirmed && End == other.End && Swings == other.Swings
+            && MarketStructureBreaks == other.MarketStructureBreaks && Parts.SequenceEqual(other.Parts);
+    }
+
+    /// <inheritdoc/>
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Level, Direction, Start, Confirmed, End, Swings, MarketStructureBreaks, Parts.Count);
+    }
+}
 
 /// <summary>
 /// A swing and its interim swings: the swings one level finer that start inside it, each with its own interims.

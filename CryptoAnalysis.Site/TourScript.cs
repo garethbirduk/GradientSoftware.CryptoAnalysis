@@ -43,7 +43,7 @@ public static class Tours
     /// </summary>
     public static readonly IReadOnlySet<string> PageLayers = new HashSet<string>(
     [
-        "close", "price", "sawtooth", "bosLevelUp", "bosLevelDown", "msbLevelUp", "msbLevelDown",
+        "close", "price", "sawtooth", "bosLevelUp", "bosLevelDown", "msbLevelUp", "msbLevelDown", "trendArrows",
         "replay", "candidates", "future", "eventlog", "live",
         "ghostSwings", "ghostCandidates", "ghostPoints", "ghostTrends", "ghostMsbs",
         .. Enumerable.Range(0, 9).Select(x => $"level{x}"),
