@@ -725,26 +725,37 @@ function hindsightKeys(ex, level) {
 // each strip carries a thin stripe in its level's colour on its outer side. Together they keep within the room the chart
 // leaves around the prices, so the strips get thinner as there are more of them.
 const TREND_STRIP = 0.035, TREND_ROOM = 0.054, TREND_STRIPE = 0.22;
+const trendStrip = (x0, x1, a, b, fillcolor, line) => ({ type: 'rect', xref: 'x', yref: 'paper', x0, x1, y0: Math.min(a, b), y1: Math.max(a, b), line, fillcolor, layer: 'below' });
+
+// The strips for one direction: a row for each selected level that has a trend that way, or in a replay with ghost trends
+// on, one that has been taken back. Outer is the row's side at the chart's edge, edge where its stripe ends and its
+// segments begin, inner its other side.
+function trendRows(ex, direction) {
+  const up = direction === 'Up', levels = [...swingLevels(ex)].sort((a, b) => a - b);
+  const live = on(up ? 'Uptrend' : 'Downtrend'), ghosts = ex.timeline && on('ghostTrends');
+  const rows = levels.map(level => ({ level,
+    trends: live ? (ex.trendsByLevel?.[level] ?? []).filter(t => t.direction === direction) : [],
+    ghosts: ghosts ? ex.timeline.trends.filter(e => e.value.level === level && e.value.direction === direction && e.ended === 'Removed' && e.until <= ex.cursor) : [],
+  })).filter(row => row.trends.length || row.ghosts.length);
+  const height = Math.min(TREND_STRIP * rows.length, TREND_ROOM) / Math.max(1, rows.length), stripe = levels.length > 1 ? height * TREND_STRIPE : 0;
+  return rows.map((row, i) => {
+    const outer = up ? 1 - i * height : i * height;
+    return { ...row, outer, edge: up ? outer - stripe : outer + stripe, inner: up ? outer - height : outer + height, striped: stripe > 0 };
+  });
+}
 
 function trendShapes(ex) {
   const last = ex.prices.t[ex.prices.t.length - 1], gap = css('--panel');
-  const levels = [...swingLevels(ex)].sort((a, b) => a - b), striped = levels.length > 1;
-  const rect = (x0, x1, a, b, fillcolor, line) => ({ type: 'rect', xref: 'x', yref: 'paper', x0, x1, y0: Math.min(a, b), y1: Math.max(a, b), line, fillcolor, layer: 'below' });
-  return ['Up', 'Down'].filter(direction => on(direction === 'Up' ? 'Uptrend' : 'Downtrend')).flatMap(direction => {
-    const up = direction === 'Up', color = TERMS.get(up ? 'Uptrend' : 'Downtrend').color;
-    const rows = levels.map(level => ({ level, trends: (ex.trendsByLevel?.[level] ?? []).filter(t => t.direction === direction) })).filter(row => row.trends.length);
-    const height = Math.min(TREND_STRIP * rows.length, TREND_ROOM) / Math.max(1, rows.length), stripe = striped ? height * TREND_STRIPE : 0;
-    return rows.flatMap((row, i) => {
-      const outer = up ? 1 - i * height : i * height, inner = up ? outer - height : outer + height, edge = up ? outer - stripe : outer + stripe;
-      return row.trends.flatMap(t => {
-        const parts = t.parts ?? [], end = t.end?.time ?? last;
-        const from = parts.length ? parts[parts.length - 1].breakOfStructure.time : t.start.time;
-        const segment = (x0, x1, alpha) => rect(x0, x1, edge, inner, withAlpha(color, alpha), { width: 1, color: gap });
-        return [...(striped ? [rect(t.start.time, end, outer, edge, levelColor(row.level), { width: 0 })] : []),
-          ...parts.map((p, k) => segment(k ? parts[k - 1].breakOfStructure.time : t.start.time, p.breakOfStructure.time, p.strong ? 0.6 : 0.25)),
-          ...(Date.parse(from) < Date.parse(end) ? [segment(from, end, 0.1)] : [])];
-      });
-    });
+  return ['Up', 'Down'].flatMap(direction => {
+    const color = TERMS.get(direction === 'Up' ? 'Uptrend' : 'Downtrend').color;
+    return trendRows(ex, direction).flatMap(row => row.trends.flatMap(t => {
+      const parts = t.parts ?? [], end = t.end?.time ?? last;
+      const from = parts.length ? parts[parts.length - 1].breakOfStructure.time : t.start.time;
+      const segment = (x0, x1, alpha) => trendStrip(x0, x1, row.edge, row.inner, withAlpha(color, alpha), { width: 1, color: gap });
+      return [...(row.striped ? [trendStrip(t.start.time, end, row.outer, row.edge, levelColor(row.level), { width: 0 })] : []),
+        ...parts.map((p, k) => segment(k ? parts[k - 1].breakOfStructure.time : t.start.time, p.breakOfStructure.time, p.strong ? 0.6 : 0.25)),
+        ...(Date.parse(from) < Date.parse(end) ? [segment(from, end, 0.1)] : [])];
+    }));
   });
 }
 
@@ -952,8 +963,8 @@ function drawReplayExtras(ex, traces, level) {
   }
 
   // Each kind of ghost is a layer of its own, so a ghost swing can be shown without the ghost of something else. A ghost
-  // is drawn at the levels its kind is: swings, market structure breaks and points at every level selected, candidates
-  // and trends at the finest.
+  // is drawn at the levels its kind is: swings, market structure breaks, points and trends at every level selected,
+  // candidates at the finest.
   {
     const grey = css('--close'), removed = e => e.ended === 'Removed' && e.until <= t, gone = e => e.value.level === level && removed(e);
     const when = e => fmtTime(full.prices.t[e.until]);
@@ -986,10 +997,13 @@ function drawReplayExtras(ex, traces, level) {
     if (was.length) traces.push({ type: 'scatter', mode: 'markers', name: 'Ghost point', x: was.map(e => e.value.time), y: was.map(e => e.value.price),
       marker: { symbol: was.map(e => TERMS.get(e.value.type).symbol), size: 10, color: withAlpha(grey, 0.35), line: { width: 1, color: grey } },
       hovertemplate: was.map(e => `Ghost: ${e.value.label} was here until ${when(e)}, then moved<extra></extra>`) });
-    for (const e of on('ghostTrends') ? r.trends.filter(gone) : []) {
-      const [y0, y1] = e.value.direction === 'Up' ? [0.965, 1] : [0, 0.035];
-      shapes.push({ type: 'rect', xref: 'x', yref: 'paper', x0: e.value.start.time, x1: full.prices.t[e.until - 1], y0, y1, layer: 'below',
-        line: { color: grey, width: 1, dash: 'dot' }, fillcolor: withAlpha(grey, 0.15) });
+    // A ghost trend sits in its level's row, as a trend of that level and direction does, with the level's stripe faded.
+    for (const row of ['Up', 'Down'].flatMap(direction => trendRows(ex, direction))) {
+      for (const e of row.ghosts) {
+        const until = full.prices.t[e.until - 1];
+        if (row.striped) shapes.push(trendStrip(e.value.start.time, until, row.outer, row.edge, withAlpha(levelColor(row.level), 0.45), { width: 0 }));
+        shapes.push(trendStrip(e.value.start.time, until, row.edge, row.inner, withAlpha(grey, 0.15), { color: grey, width: 1, dash: 'dot' }));
+      }
     }
     // With trend arrows on, a ghost trend keeps its arrow too, in grey, at every level selected.
     for (const e of on('ghostTrends') && on('trendArrows') ? r.trends.filter(e => swingLevels(ex).includes(e.value.level) && removed(e)) : []) {
