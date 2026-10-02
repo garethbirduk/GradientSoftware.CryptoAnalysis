@@ -10,6 +10,7 @@ public sealed record TourCue(int Index, string Text, int? At, string? On, string
 
 /// <summary>
 /// A tour section with everything worked out: the layers on, the sawtooth levels looked at, the candles it runs from and to.
+/// Journey names the fast forward or rewind that runs the replay to From, when the section has one.
 /// </summary>
 public sealed record TourSection(
     int Index,
@@ -20,7 +21,8 @@ public sealed record TourSection(
     int Until,
     IReadOnlyList<int> View,
     double Speed,
-    IReadOnlyList<TourCue> Cues);
+    IReadOnlyList<TourCue> Cues,
+    string? Journey = null);
 
 /// <summary>
 /// A tour as compiled from tour.json against a dataset: its sections, the candle its start time lands on, and whatever the
@@ -117,7 +119,34 @@ public static class Tours
             if (node["speed"] != null)
                 speed = Rate(node["speed"], where, speed);
 
-            var from = Candle(node["from"], prices, at, where, "from", errors) ?? at;
+            // A journey takes the tour to where the section starts: a fast forward or a rewind that runs sets its first candle.
+            var forward = node["fastForward"] != null;
+            var tripName = forward ? "fast forward" : "rewind";
+            var trip = node["fastForward"] ?? node["rewind"];
+            int? journeyTo = null;
+            if (node["fastForward"] != null && node["rewind"] != null)
+                errors.Add($"{where}: a section fast forwards or rewinds, not both");
+            if (trip is JsonObject journey)
+            {
+                if (journey["speed"] != null)
+                    Rate(journey["speed"], where, 50);
+                if (journey[forward ? "draw" : "erase"]?.GetValue<bool>() ?? true)
+                {
+                    var to = journey["to"] is JsonValue given && given.TryGetValue<int>(out var number) ? number : (int?)null;
+                    if (to is int there && there >= 0 && there < candles && (forward ? there > at : there < at))
+                        journeyTo = there;
+                    else
+                        errors.Add($"{where}: the {tripName} needs \"to\", a candle {(forward ? "after" : "before")} #{at}, where the section before ends");
+                    if (node["from"] != null)
+                        errors.Add($"{where}: the {tripName} takes the replay to where the section starts, so the section has no \"from\"");
+                }
+            }
+            else if (trip != null)
+            {
+                errors.Add($"{where}: a {tripName} is {{ \"to\", \"speed\", \"{(forward ? "draw" : "erase")}\" }}");
+            }
+
+            var from = journeyTo ?? Candle(node["from"], prices, at, where, "from", errors) ?? at;
             if (from < 0 || from >= candles)
             {
                 errors.Add($"{where}: from #{from} is not a candle of the tour, which has #0 to #{candles - 1}");
@@ -157,7 +186,7 @@ public static class Tours
             }
 
             var levels = layers.Where(x => x.StartsWith("level")).Select(x => int.Parse(x["level".Length..])).OrderBy(x => x).ToList();
-            sections.Add(new TourSection(i, node["chapter"]?.GetValue<string>(), layers, levels.Count > 0 ? levels : [1], from, at, view, speed, cues));
+            sections.Add(new TourSection(i, node["chapter"]?.GetValue<string>(), layers, levels.Count > 0 ? levels : [1], from, at, view, speed, cues, journeyTo != null ? tripName : null));
         }
 
         return new TourScript(def["title"]?.GetValue<string>(), def["dataset"]?.GetValue<string>(), anchor, sections, errors);
@@ -220,6 +249,8 @@ public static class Tours
         foreach (var s in tour.Sections)
         {
             var name = s.Chapter != null ? $"section {s.Index + 1} ({s.Chapter})" : $"section {s.Index + 1}";
+            if (s.Journey != null)
+                lines.Add($"#{s.From} · {name} gets there by {s.Journey}: {At(prices, s.From, s.From, s.Levels)}");
             if (s.Until > s.From)
                 lines.Add($"#{s.Until} · {name} runs to it: {At(prices, s.Until, s.Until, s.Levels)}");
             foreach (var c in s.Cues.Where(x => x.At != null))

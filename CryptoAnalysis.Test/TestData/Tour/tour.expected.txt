@@ -1,6 +1,7 @@
 #100 · section 1 (Closes) runs to it: nothing
 #45 · section 9 text 1 "This may coincide with an HH" on close · seen at #100: L1 HH · L1 upswing BoS · L1 upswing start
 #89 · section 9 text 2 "Or not." on close · seen at #100: L1 upswing BoS
+#15 · section 13 (Upswings in real time) gets there by rewind: L1 LH*
 #45 · section 13 (Upswings in real time) runs to it: L1 HH* · L1 upswing BoS
 #16 · section 13 (Upswings in real time) text 2 "Each Upswing appears only when its BoS Confirms it." · seen at #45: L1 upswing BoS
 #67 · section 14 (Downswings) runs to it: nothing
@@ -13,10 +14,15 @@
 #30 · section 25 text 3 "2nd order Swing" on close · seen at #75: L2 HL · L2 upswing low
 #57 · section 25 text 4 "2nd order Swing" on close · seen at #75: L2 LH · L2 downswing high
 #50 · section 26 text 2 "3rd order Swing" on close · seen at #75: L3 HL · L3 upswing low
+#19 · section 28 (Market Structure Breaks) gets there by rewind: L1 HH*
 #23 · section 28 (Market Structure Breaks) runs to it: L1 HH* · L1 upswing BoS
 #24 · section 30 runs to it: L1 LL* · L1 MSB↓
 #25 · section 34 runs to it: L1 LL*
 #27 · section 35 runs to it: L1 HH* · L1 upswing BoS
-#71 · section 36 runs to it: nothing
+#71 · section 36 gets there by fast forward: nothing
 #74 · section 37 runs to it: L1 HH*
 #75 · section 38 runs to it: L1 HH* · L1 upswing BoS
+#320 · section 40 gets there by fast forward: L1 HH* · L1 upswing BoS
+#321 · section 41 (BoS and MSB compared) runs to it: L1 LL* · L1 MSB↓
+#320 · section 41 (BoS and MSB compared) text 1 "A BoS closes beyond the position its Swing begins at." · seen at #321: L1 HH · L1 upswing BoS
+#321 · section 42 text 1 "An MSB closes beyond the Swing Low or Swing High of a Swing that is already Confirmed." · seen at #321: L1 LL* · L1 MSB↓

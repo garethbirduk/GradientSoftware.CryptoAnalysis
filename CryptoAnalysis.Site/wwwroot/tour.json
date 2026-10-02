@@ -99,7 +99,7 @@
     {
       "chapter": "Upswings in real time",
       "remove": ["BullishBreakOfStructure", "HigherHigh", "HigherLow", "LowerLow"],
-      "from": 15,
+      "rewind": { "to": 15, "speed": 100, "erase": true },
       "until": 45,
       "view": [0, 75],
       "speed": 5,
@@ -220,7 +220,7 @@
     {
       "chapter": "Market Structure Breaks",
       "remove": ["level2", "Downswing", "Upswing", "level3", "level4"],
-      "from": 19,
+      "rewind": { "to": 19, "speed": 100, "erase": true },
       "until": 23,
       "view": [17, 25],
       "cues": [
@@ -276,9 +276,8 @@
     {
       "add": ["BullishMarketStructureBreak", "BearishBreakOfStructure", "Downswing"],
       "remove": ["HigherLow"],
-      "until": 71,
-      "view": [0, 100],
-      "speed": 10,
+      "fastForward": { "to": 71, "speed": 40, "draw": true },
+      "view": [45, 75],
       "cues": [
         { "text": "Let's move on to the Downswings we saw earlier." }
       ]
@@ -303,9 +302,41 @@
     {
       "add": ["level2"],
       "remove": ["ghostMsbs", "ghostSwings"],
-      "view": [45, 75],
       "cues": [
         { "text": "As with the Ghost Downswings, the Ghost MSB is still here when we increase the resolution, and may be useful in its own right." }
+      ]
+    },
+    {
+      "add": ["bosLevelUp", "BullishBreakOfStructure", "msbLevelDown"],
+      "remove": ["level2", "Downswing", "BullishMarketStructureBreak", "msbLevelUp"],
+      "fastForward": { "to": 320, "speed": 100, "draw": true },
+      "view": [315, 324],
+      "cues": [
+        { "text": "A BoS and an MSB are both a close beyond a level." },
+        { "text": "Let's find an Upswing that has both, an hour apart." },
+        { "text": "This will make it easier to see on the chart as we compare and review a BoS and an MSB." }
+      ]
+    },
+    {
+      "chapter": "BoS and MSB compared",
+      "until": 321,
+      "speed": 10,
+      "cues": [
+        { "at": 320, "text": "A BoS closes beyond the position its Swing begins at." }
+      ]
+    },
+    {
+      "until": 321,
+      "cues": [
+        { "at": 321, "text": "An MSB closes beyond the Swing Low or Swing High of a Swing that is already Confirmed." }
+      ]
+    },
+    {
+      "cues": [
+        { "text": "A BoS continues in the direction of its Swing; an MSB goes against it." },
+        { "text": "A BoS Confirms a Swing; an MSB Confirms nothing. It remains an observation." },
+        { "text": "Every Swing has exactly one BoS; a Swing has at most one MSB, and may have none." },
+        { "text": "Both may or may not coincide with a turning point on the Sawtooth, both exist at every resolution, and both can become Ghosts." }
       ]
     }
   ]

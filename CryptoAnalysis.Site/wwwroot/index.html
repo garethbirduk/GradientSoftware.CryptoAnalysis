@@ -268,7 +268,8 @@
   .ed-row { display: none; grid-template-columns: 1.15fr 1fr 1fr; align-items: end; gap: 5px 8px; margin-top: 5px; }
   .ed-cue:focus-within .ed-row { display: grid; }
   .ed-row .ed-ops { grid-column: 1 / -1; justify-content: flex-end; }
-  .ed-row label.ed-check { flex-direction: row; align-items: center; gap: 5px; padding-bottom: 4px; font-size: 13px; color: var(--text); cursor: pointer; }
+  .ed-row label.ed-check, .ed-grid label.ed-check { flex-direction: row; align-items: center; gap: 5px; padding-bottom: 4px; font-size: 13px; color: var(--text); cursor: pointer; }
+  .ed-grid label.ed-check { align-self: end; }
   #tour-editor input[type="checkbox"] { width: auto; margin: 0; accent-color: var(--accent); }
   .ed-split { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
   .ed-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
@@ -1913,12 +1914,17 @@ function findExample(id) {
 //   section  chapter (starts a chapter, which has a link of its own), layers (replaces the layers) or add and remove,
 //            from (the candle the section starts at; without it, where the section before ended: an earlier candle takes
 //            the replay back), until (the candle the replay runs to; without it the replay stays where it is), view
-//            (without it, the view as before), speed, cues.
+//            (without it, the view as before), speed, cues. A section can be come to by a journey in place of from:
+//            fastForward { to, speed, draw } or rewind { to, speed, erase }. The view eases out to hold the whole way,
+//            the replay runs to the candle "to" at that many candles a second, drawing or erasing as it goes, and the view
+//            eases in to the section's own. With draw or erase false the replay stays where it is and only the view moves.
 //   cue      text, shown under the chart as the section begins; with at, when the replay reaches that candle, which waits
 //            there while the text is read; with on as well ('open', 'high', 'low', 'close' or a price), pinned to that
 //            point of the candle (place: 'above', 'below', 'left' or 'right'). hold is the seconds the text stays before
 //            the next, by default the time it takes to read (0 moves straight on, leaving the caption up while pins show); keep is how long a pin stays: 'section', 'chapter' or 'always'.
 const DEFAULT_VIEW = [0, 168];
+// Candles a second of a fast forward or rewind that does not say.
+const JOURNEY_SPEED = 50;
 const LAYER_ALIASES = { candles: 'price', closes: 'close' };
 // How the editor writes a layer whose id is not what it is called on the page.
 const LAYER_NAMES = { price: 'candles' };
@@ -1987,10 +1993,24 @@ function compileTour(def, candles, resolved = new Map(), audio = {}) {
     if (s.layers) layers = ids(s.layers, where);
     const removed = ids(s.remove, where);
     layers = [...new Set([...layers, ...ids(s.add, where)])].filter(id => !removed.includes(id));
+    const viewBefore = view;
     if (s.view != null) view = range(s.view, where) ?? view;
     renamed(s, where);
     if (s.speed != null) speed = rate(s.speed, where);
-    const fromGiven = candle(s.from, at, where, 'from'), from = Number.isInteger(fromGiven.index) && fromGiven.index >= 0 && fromGiven.index < candles ? fromGiven.index : at;
+    // A journey takes the tour to where the section starts (see journeyTick): one that runs sets the section's first candle.
+    const forward = s.fastForward != null, trip = s.fastForward ?? s.rewind ?? null, tripName = forward ? 'fast forward' : 'rewind';
+    let journey = null;
+    if (s.fastForward != null && s.rewind != null) errors.push(`${where}: a section fast forwards or rewinds, not both`);
+    if (trip != null && typeof trip !== 'object') errors.push(`${where}: a ${tripName} is { "to", "speed", "${forward ? 'draw' : 'erase'}" }`);
+    else if (trip) {
+      const runs = trip[forward ? 'draw' : 'erase'] !== false, there = Number.isInteger(trip.to) && trip.to >= 0 && trip.to < candles && (forward ? trip.to > at : trip.to < at);
+      if (runs && !there) errors.push(`${where}: the ${tripName} needs "to", a candle ${forward ? 'after' : 'before'} #${at}, where the section before ends`);
+      if (runs && s.from != null) errors.push(`${where}: the ${tripName} takes the replay to where the section starts, so the section has no "from"`);
+      const run = runs && there, ends = run ? [at, trip.to] : [];
+      journey = { forward, run, start: at, to: run ? trip.to : null, speed: trip.speed != null ? rate(trip.speed, where) : JOURNEY_SPEED,
+        wide: [Math.min(viewBefore[0], view[0], ...ends), Math.max(viewBefore[1], view[1], ...ends)] };
+    }
+    const fromGiven = journey?.run ? { index: journey.to, spec: `${tripName} → #${journey.to}` } : candle(s.from, at, where, 'from'), from =Number.isInteger(fromGiven.index) && fromGiven.index >= 0 && fromGiven.index < candles ? fromGiven.index : at;
     if (fromGiven.index != null && fromGiven.index !== from) errors.push(`${where}: from #${fromGiven.index} is not a candle of the tour, which has #0 to #${candles - 1}`);
     const untilGiven = candle(s.until, from, where, 'until'), until = untilGiven.index ?? from;
     if (until < from) errors.push(`${where}: until #${until} is before the section's start, #${from}`);
@@ -2012,7 +2032,7 @@ function compileTour(def, candles, resolved = new Map(), audio = {}) {
       return { text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + 0.4 : readingSeconds(text) };
     });
-    return { index: i, chapter: chapters.length - 1, layers, view, speed, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
@@ -2219,10 +2239,11 @@ window.tourVideo = {
   }),
 };
 
-// Sets the tour at the start of a section, with nothing of it shown yet.
-function openSection(i) {
+// Sets the tour at the start of a section, with nothing of it shown yet. A section that has a journey is set at the end of
+// it, unless the journey is to be played: then the tour is left where the journey starts, with the view easing out.
+function openSection(i, { journey = false } = {}) {
   const s = tour.sections[i], ex = tour.ex, shown = tourView(cursorOf(ex)), moved = i !== tour.index;
-  Object.assign(tour, { index: i, view: s.view, queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, nextCandle: 0 });
+  Object.assign(tour, { index: i, view: s.view, queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, nextCandle: 0, journey: null });
   tour.kept = tour.sections.slice(0, i).flatMap(earlier => earlier.cues.filter(c => c.on != null
     && (c.keep === 'always' || (c.keep === 'chapter' && earlier.chapter === s.chapter))));
   // While a candle is being picked, the candles still to come are shown, to pick from.
@@ -2230,6 +2251,18 @@ function openSection(i) {
   const chapter = tour.chapters[s.chapter];
   if (chapter?.section === i) tour.recording?.chapters.push({ name: chapter.name, at: Date.now() });
   history.replaceState(null, '', chapter ? `#Tour/${chapter.slug}` : '#Tour');
+  if (journey && s.journey) {
+    const t = s.journey.run ? s.journey.start : s.from;
+    cursors.set(ex.id, t);
+    prefetch(ex, t);
+    // Only the texts with no candle are read on the way: the others wait for the journey's end.
+    for (const c of s.cues) if (c.at == null) { tour.fired.add(c); tour.queue.push(c); }
+    Object.assign(tour, { view: s.journey.wide, journey: { ...s.journey, phase: 'out' } });
+    zooms.delete(ex.id);
+    // A view that already holds the whole way has no easing out to do.
+    if (shown[0] !== tour.view[0] || shown[1] !== tour.view[1]) zoomTour(shown);
+    return;
+  }
   advanceTo(s.from);
   // The section sets the view: the chart eases to it, and a zoom or pan made by hand goes.
   const view = sectionView(s.from), changed = view[0] !== shown[0] || view[1] !== shown[1];
@@ -2237,9 +2270,47 @@ function openSection(i) {
   if (changed) zoomTour(shown);
 }
 
-function enterSection(i) {
-  openSection(i);
+function enterSection(i, how) {
+  openSection(i, how);
   showNextCue();
+  refreshTour();
+}
+
+// One beat of a journey. The view has eased out to hold the whole way. A journey that runs sets off as the last of the
+// section's texts with no candle comes on show, so that text is read over it, and takes as many candles in a beat as its
+// speed asks; a journey of the view alone waits for its texts to be read. Then the view eases in to the section's own and
+// the section carries on from there.
+function journeyTick(s, ex, now, reading) {
+  const j = tour.journey, t = cursorOf(ex);
+  if (tour.zoom) return;
+  if (j.phase === 'in') return endJourney();
+  if (j.phase === 'out') Object.assign(j, { phase: 'wide', since: now });
+  if (tour.queue.length) return;
+  if (j.run && t !== j.to) {
+    const step = j.forward ? 1 : -1;
+    if (!timelineAt(ex, t + step)) { tour.nextCandle = 0; return prefetch(ex, t + step); }
+    if (now < tour.nextCandle) return;
+    const gap = 1000 / j.speed, late = now - tour.nextCandle, inStep = tour.nextCandle > 0 && late < 1000;
+    const due = Math.min(Math.abs(j.to - t), inStep ? 1 + Math.floor(late / gap) : 1);
+    let n = 1;
+    while (n < due && timelineAt(ex, t + (n + 1) * step)) n++;
+    tour.nextCandle = inStep && n === due ? tour.nextCandle + due * gap : now + gap;
+    cursors.set(ex.id, t + n * step);
+    prefetch(ex, t + n * step);
+    return refreshTour();
+  }
+  // With nothing to run, the wider view stays for its texts, or for a moment when there are none.
+  if (!j.run && (reading || now - j.since < 1000)) return;
+  j.phase = 'in';
+  tour.view = s.view;
+  if (j.wide[0] !== s.view[0] || j.wide[1] !== s.view[1]) zoomTour(j.wide);
+}
+
+// The end of a journey, or of one cut short by a step made by hand: the section as it starts.
+function endJourney() {
+  const s = tourSection();
+  Object.assign(tour, { journey: null, view: s.view, nextCandle: 0 });
+  advanceTo(s.from);
   refreshTour();
 }
 
@@ -2329,18 +2400,27 @@ function tourTick() {
   // A text still waiting for the voice has not begun its time on show.
   const reading = tour.active && (now < tour.activeUntil || tour.voice.waiting.includes(tour.active));
   if (!reading && tour.queue.length) { showNextCue(); return refreshTour(); }
+  if (tour.journey) return journeyTick(s, ex, now, reading);
   if (t < s.until) {
     // The replay waits at a cue that has a candle; text with no candle is read while the replay runs.
     const waiting = (reading && tour.active.at != null) || tour.queue.some(c => c.at != null);
+    if (waiting || !timelineAt(ex, t + 1)) tour.nextCandle = 0;
     if (waiting || now < tour.nextCandle) return;
     if (!timelineAt(ex, t + 1)) return prefetch(ex, t + 1);
-    const gap = 1000 / s.speed;
-    tour.nextCandle = (now - tour.nextCandle < gap ? tour.nextCandle : now) + gap;
-    advanceTo(t + 1);
+    // A beat takes every candle that has come due since the last one, so a section faster than the beat, or than the chart
+    // can be redrawn, still keeps its speed: but never past a text's candle, the section's end or what is loaded. After a
+    // wait the count starts again, so the replay does not leap to make up the time.
+    const gap = 1000 / s.speed, late = now - tour.nextCandle, inStep = tour.nextCandle > 0 && late < 1000;
+    const due = inStep ? 1 + Math.floor(late / gap) : 1;
+    const stop = Math.min(s.until, t + due, ...s.cues.filter(c => c.at > t && !tour.fired.has(c)).map(c => c.at));
+    let to = t + 1;
+    while (to < stop && timelineAt(ex, to + 1)) to++;
+    tour.nextCandle = inStep && to - t === due ? tour.nextCandle + due * gap : now + gap;
+    advanceTo(to);
     return refreshTour();
   }
   if (reading) return;
-  if (tour.index + 1 < tour.sections.length) return enterSection(tour.index + 1);
+  if (tour.index + 1 < tour.sections.length) return enterSection(tour.index + 1, { journey: true });
   pauseTour();
   tour.onEnd?.();
   tour.onEnd = null;
@@ -2348,9 +2428,10 @@ function tourTick() {
 
 function playTour() {
   const s = tourSection();
-  if (tour.index === tour.sections.length - 1 && cursorOf(tour.ex) >= s.until && !tour.queue.length) enterSection(0);
+  if (tour.index === tour.sections.length - 1 && cursorOf(tour.ex) >= s.until && !tour.queue.length && !tour.journey) enterSection(0);
   // The text on show gets its reading time again, and is read aloud from its start: it was shown while the tour was not playing.
   if (tour.active) tour.activeUntil = performance.now() + tour.active.hold * 1000;
+  tour.nextCandle = 0;
   tour.timer = setInterval(tourTick, TOUR_TICK);
   if (tour.active) speak(tour.active);
   updateTourPanel();
@@ -2369,6 +2450,7 @@ function tourGo(action) {
   if (!tour?.sections.length) return;
   if (action === 'play') return tour.timer ? pauseTour() : playTour();
   pauseTour();
+  if (tour.journey) endJourney();
   const s = tourSection(), t = cursorOf(tour.ex);
   if (action === 'prev') return enterSection(t > s.from || tour.shown.length > 1 ? tour.index : Math.max(0, tour.index - 1));
   if (action === 'first') return enterSection(0);
@@ -2556,7 +2638,7 @@ let editorSection = -1, editorFolded = false;
 const editorOn = () => state.tourEditor !== false && !videoMode;
 const tourDirty = () => !!tour && JSON.stringify(tour.def) !== tour.saved;
 const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
-  section: ['chapter', 'layers', 'add', 'remove', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'text', 'hold', 'keep', 'voice'] };
+  section: ['chapter', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'text', 'hold', 'keep', 'voice'] };
 
 // tour.json as text: a line for each text and for each of a section's settings, so a change shows as a small diff.
 function formatTour(def) {
@@ -2574,8 +2656,10 @@ function formatTour(def) {
 
 // How long a section takes to play: the replay waits at each text that has a candle, and the rest is read while it runs.
 function sectionSeconds(s) {
-  const sum = cues => cues.reduce((n, c) => n + c.hold, 0);
-  return sum(s.cues.filter(c => c.at != null)) + Math.max((s.until - s.from) / s.speed, sum(s.cues.filter(c => c.at == null)));
+  const sum = cues => cues.reduce((n, c) => n + c.hold, 0), j = s.journey;
+  // A journey is the view easing out and in, and the run between when it has one.
+  const journey = j ? 2 * TOUR_ZOOM_MS / 1000 + (j.run ? Math.abs(j.to - j.start) / j.speed : 0) : 0;
+  return sum(s.cues.filter(c => c.at != null)) + Math.max(journey + (s.until - s.from) / s.speed, sum(s.cues.filter(c => c.at == null)));
 }
 
 // The list is drawn anew each time, so it is put back where it was rather than at its top: the section the tour is at stays
@@ -2628,6 +2712,9 @@ function renderTourEditor(anchor = 'section') {
 
   const openCard = (d, i) => {
     const s = sections[i], before = i ? sections[i - 1] : null, was = before?.layers ?? tour.startLayers;
+    // A journey to the section: which way, and whether the replay runs there or only the view moves.
+    const tripKind = d.fastForward != null ? 'fastForward' : d.rewind != null ? 'rewind' : '', trip = d[tripKind], back = tripKind === 'rewind';
+    const runs = !!trip && trip[back ? 'erase' : 'draw'] !== false;
     const chips = [...s.layers.map(id => `<span class="ed-chip${was.includes(id) ? '' : ' added'}">${was.includes(id) ? '' : '+ '}${esc(layerName(id))}</span>`),
       ...was.filter(id => !s.layers.includes(id)).map(id => `<span class="ed-chip removed">${esc(layerName(id))}</span>`)];
     return `<section class="ed-card open" data-section="${i}">
@@ -2639,6 +2726,10 @@ function renderTourEditor(anchor = 'section') {
         ${viewBoxes('section', d.view, before?.view ?? tour.startView)}
         <label>Candles a second<input type="number" min="0.5" step="0.5" data-scope="section" data-field="speed" data-type="number" placeholder="${before?.speed ?? start.speed ?? 4}" value="${value(d.speed)}"></label>
         <span class="ed-use"><button type="button" data-ed="view-chart" title="Zoom or pan the chart to what this section should show, then press this">Use the chart's view</button></span>
+        <label title="How the tour gets to this section: the view eases out to hold the whole way, then in to the section's view">Gets here by<select data-scope="section" data-field="journey" data-render>${options([['', 'no journey'], ['fastForward', 'a fast forward'], ['rewind', 'a rewind']], tripKind)}</select></label>
+        <label>${back ? 'Rewinds' : 'Fast forwards'} to candle<input type="number" min="0" step="1" data-scope="section" data-field="journeyTo" ${runs ? '' : 'disabled'} value="${numberOr(trip?.to)}"></label>
+        <label>Candles a second on the way<input type="number" min="1" step="5" data-scope="section" data-field="journeySpeed" placeholder="${JOURNEY_SPEED}" ${runs ? '' : 'disabled'} value="${value(trip?.speed)}"></label>
+        <label class="ed-check" title="Ticked, the replay runs there, ${back ? 'erasing' : 'drawing'} the closes and the rest as it goes. Unticked, the replay stays where it is and only the view moves"><input type="checkbox" data-scope="section" data-field="journeyRun" data-render ${tripKind ? '' : 'disabled'} ${runs ? 'checked' : ''}>${back ? 'Erases' : 'Draws'} as it goes</label>
       </div>
       <div class="ed-layers"><span>Layers</span>${chips.join('') || '<span class="ed-chip">none</span>'}<span class="ed-hint">Set with the layer buttons on the left.</span></div>
       ${(d.cues ?? []).map((c, j) => cueCard(c, j, s.cues[j])).join('')}
@@ -2766,8 +2857,19 @@ function editTourField(el) {
   rememberTour(`${scope}|${tour.index}|${j}|${field}`);
   const target = scope === 'tour' ? def : scope === 'start' ? (def.start ??= {}) : scope === 'cue' ? def.sections[tour.index].cues[j] : def.sections[tour.index];
   const raw = el.value, value = raw !== '' && (type === 'number' || (type === 'auto' && /^\d+(\.\d+)?$/.test(raw))) ? Number(raw) : raw;
+  if (field.startsWith('journey')) {
+    // A journey's boxes are one setting, written as fastForward or rewind: where to, how fast, and whether the replay
+    // runs there. One just chosen runs, as that is what it is mostly for.
+    const box = f => el.closest('.ed-grid').querySelector(`[data-field="${f}"]`), kind = box('journey').value, had = target.fastForward ?? target.rewind;
+    delete target.fastForward;
+    delete target.rewind;
+    if (kind) {
+      const to = box('journeyTo').value, rate = box('journeySpeed').value, runs = had ? box('journeyRun').checked : true;
+      target[kind] = { ...(to !== '' ? { to: Number(to) } : {}), ...(rate !== '' ? { speed: Number(rate) } : {}), [kind === 'rewind' ? 'erase' : 'draw']: runs };
+    }
+  }
   // Silent is the one tick box: ticked, the text has "voice": false, and otherwise it has no "voice" at all.
-  if (el.type === 'checkbox') { if (el.checked) target[field] = false; else delete target[field]; }
+  else if (el.type === 'checkbox') { if (el.checked) target[field] = false; else delete target[field]; }
   else if (field === 'view0' || field === 'view1') {
     // The two boxes of a view are one setting: with both empty it is left out, and with one empty that end is as before.
     const read = k => { const v = el.closest('.ed-grid').querySelector(`[data-field="view${k}"]`).value; return v === '' ? null : Number(v); };
@@ -2777,7 +2879,7 @@ function editTourField(el) {
   // An empty box leaves the setting out, so it is as before; a text stays, empty, until it is written.
   else if ((value === '' && field !== 'text') || Number.isNaN(value)) delete target[field]; else target[field] = value;
   if (field === 'text') cueEl.querySelector('[data-field="hold"]').placeholder = readingSeconds(value).toFixed(1);
-  applyTour(scope === 'cue' ? { cue: j, render: el.hasAttribute('data-render') } : { end: field === 'until', start: field === 'from' });
+  applyTour(scope === 'cue' ? { cue: j, render: el.hasAttribute('data-render') } : { end: field === 'until', start: field === 'from', render: el.hasAttribute('data-render') });
   // Where the change redrew the editor, the box that was being used is found again: a text's settings only show once
   // the text has the focus.
   if (!el.isConnected && cueEl) focusCue(j);
@@ -2790,6 +2892,7 @@ function inheritedOf(el) {
   const view = field === 'view0' ? 0 : field === 'view1' ? 1 : null;
   if (scope === 'start') return view != null ? DEFAULT_VIEW[view] : field === 'speed' ? 4 : null;
   if (scope === 'cue') return field === 'at' ? cue?.at ?? s?.from : field === 'hold' ? cue?.hold : null;
+  if (field === 'journeySpeed' || field === 'journeyTo') return field === 'journeySpeed' ? JOURNEY_SPEED : s?.from;
   return scope !== 'section' ? null : view != null ? s?.view[view] : ['from', 'until', 'speed'].includes(field) ? s?.[field] : null;
 }
 
@@ -2883,7 +2986,7 @@ function tourAction(action, el) {
     case 'section-fold':
       editorFolded = true;
       return renderTourEditor();
-    case 'play-here': pauseTour(); enterSection(i); return playTour();
+    case 'play-here': pauseTour(); enterSection(i, { journey: true }); return playTour();
     case 'save': return saveTour();
     case 'revert': return revertTour();
     case 'undo': {
