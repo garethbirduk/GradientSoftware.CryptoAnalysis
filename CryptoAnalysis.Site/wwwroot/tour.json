@@ -338,6 +338,214 @@
         { "text": "Every Swing has exactly one BoS; a Swing has at most one MSB, and may have none." },
         { "text": "Both may or may not coincide with a turning point on the Sawtooth, both exist at every resolution, and both can become Ghosts." }
       ]
+    },
+    {
+      "chapter": "Candles",
+      "layers": ["level1", "close"],
+      "rewind": { "to": 50, "speed": 100, "erase": true },
+      "view": [38, 52],
+      "cues": [
+        { "text": "So far each hour has been a single price: the close." }
+      ]
+    },
+    {
+      "add": ["candles"],
+      "cues": [
+        { "text": "A candle shows the whole hour." },
+        { "text": "The closes we have followed are still here, one on each candle." }
+      ]
+    },
+    {
+      "view": [44, 51],
+      "cues": [
+        { "text": "A candle has four prices. The open is the price at the start of the hour, and the close is the price at its end.", "hold": 0 },
+        { "at": 48, "on": "open", "place": "left", "text": "open", "hold": 4, "voice": false },
+        { "at": 48, "on": "close", "place": "right", "text": "close", "hold": 4, "voice": false },
+        { "text": "The high and the low are the furthest the price went during the hour.", "hold": 0 },
+        { "at": 48, "on": "high", "place": "above", "text": "high", "hold": 2.5, "voice": false },
+        { "at": 48, "on": "low", "place": "below", "text": "low", "hold": 2.5, "voice": false },
+        { "text": "The body of the candle spans the open and the close. The thin lines above and below the body are wicks, and they reach to the high and the low." }
+      ]
+    },
+    {
+      "cues": [
+        { "text": "A candle that closes above its open is green. A candle that closes below its open is red.", "hold": 0 },
+        { "at": 48, "on": "high", "place": "above", "text": "green", "hold": 3.5, "voice": false },
+        { "at": 47, "on": "low", "place": "below", "text": "red", "hold": 3.5, "voice": false }
+      ]
+    },
+    {
+      "chapter": "Wicks and breaks",
+      "add": ["Upswing", "BullishBreakOfStructure"],
+      "until": 75,
+      "view": [43, 77],
+      "speed": 5,
+      "cues": [
+        { "text": "Let's run on to the BoS of the longer-term Upswing we saw earlier." }
+      ]
+    },
+    {
+      "cues": [
+        { "text": "The Upswing begins at this HH, and its BoS is the first close above it.", "hold": 0 },
+        { "at": 45, "on": "close", "place": "above", "text": "HH", "hold": 3, "keep": "chapter", "voice": false },
+        { "at": 75, "on": "close", "place": "left", "text": "BoS", "hold": 3, "voice": false }
+      ]
+    },
+    {
+      "add": ["bosLevelUp"],
+      "remove": ["Upswing"],
+      "view": [45, 64],
+      "cues": [
+        { "text": "But the price went above that level before the BoS, more than once.", "hold": 0 },
+        { "at": 54, "on": "high", "place": "above", "text": "high above the level", "hold": 3, "voice": false },
+        { "at": 62, "on": "high", "place": "above", "text": "and again", "hold": 3, "voice": false },
+        { "text": "Each time, the hour closed back below the level." }
+      ]
+    },
+    {
+      "view": [43, 77],
+      "cues": [
+        { "text": "A wick beyond a level is not a BoS. A BoS needs a close beyond it." }
+      ]
+    },
+    {
+      "add": ["Upswing", "Downswing"],
+      "remove": ["bosLevelUp"],
+      "until": 81,
+      "view": [72, 83],
+      "speed": 2,
+      "cues": [
+        { "text": "The same holds for an MSB. Let's run on to the next Upswing and its MSB." }
+      ]
+    },
+    {
+      "add": ["msbLevelDown", "BearishMarketStructureBreak"],
+      "view": [76, 83],
+      "cues": [
+        { "text": "An MSB is the first close below the Swing Low of the Upswing.", "hold": 0 },
+        { "at": 77, "on": "close", "place": "above", "text": "Swing Low", "hold": 3, "voice": false },
+        { "at": 81, "on": "close", "place": "right", "text": "MSB", "hold": 3, "voice": false },
+        { "text": "But the price went below that level before the MSB.", "hold": 0 },
+        { "at": 80, "on": "low", "place": "below", "text": "low below the level", "hold": 4, "voice": false },
+        { "text": "The hour closed back above the level. A wick beyond a level is not an MSB either." }
+      ]
+    },
+    {
+      "chapter": "Successive Candles",
+      "add": ["SuccessiveRedCandles", "SuccessiveGreenCandles"],
+      "remove": ["BullishBreakOfStructure", "msbLevelDown", "BearishMarketStructureBreak"],
+      "until": 90,
+      "view": [76, 92],
+      "speed": 5,
+      "cues": [
+        { "text": "Candles of one colour often come one after another." },
+        { "at": 84, "text": "Here six red candles follow each other, each hour closing lower than the last. These are Successive Red Candles." },
+        { "at": 90, "text": "And six green candles follow them, each hour closing higher: Successive Green Candles." }
+      ]
+    },
+    {
+      "chapter": "Trends",
+      "remove": ["SuccessiveRedCandles", "SuccessiveGreenCandles"],
+      "view": [0, 92],
+      "cues": [
+        { "text": "Candles of one colour can follow one another. So can Swings of one direction." },
+        { "text": "Every Swing on the chart is an Upswing: twelve of them, one after another." }
+      ]
+    },
+    {
+      "add": ["Uptrend"],
+      "cues": [
+        { "text": "Two or more Swings in a row in the same direction form a Trend. A Trend of Upswings is an Uptrend." },
+        { "text": "It begins where its first Swing begins, and it is Confirmed by the BoS of its second Swing.", "hold": 0 },
+        { "at": 16, "on": "close", "place": "above", "text": "Uptrend Confirmed", "hold": 5, "voice": false },
+        { "text": "The band along the top of the chart marks the Uptrend. It is paler until the Uptrend is Confirmed." }
+      ]
+    },
+    {
+      "chapter": "MSBs against a Trend",
+      "add": ["BearishMarketStructureBreak"],
+      "cues": [
+        { "text": "Four times so far, the price has closed below the Swing Low of the latest Upswing. Each is an MSB against the Uptrend." },
+        { "text": "Let's look closely at the latest one." }
+      ]
+    },
+    {
+      "add": ["BullishBreakOfStructure", "msbLevelDown"],
+      "view": [74, 92],
+      "cues": [
+        { "text": "This Upswing is Confirmed by its BoS. Three hours later the price closes below its Swing Low: an MSB.", "hold": 0 },
+        { "at": 77, "on": "close", "place": "below", "text": "Swing Low", "hold": 3.5, "voice": false },
+        { "at": 81, "on": "close", "place": "above", "text": "MSB", "hold": 3.5, "voice": false },
+        { "text": "The price falls for three more hours. Then it turns, and this BoS Confirms the next Upswing.", "hold": 0 },
+        { "at": 89, "on": "close", "place": "left", "text": "BoS", "hold": 6.5, "voice": false },
+        { "text": "An Uptrend is a run of Upswings, and only a Confirmed Downswing can break the run." },
+        { "text": "The MSB did not Confirm a Downswing, so the run went on, from eleven Upswings to twelve." },
+        { "text": "After an MSB against a Trend, the next BoS decides. An Upswing's BoS continues the Uptrend. A Downswing's BoS ends it." }
+      ]
+    },
+    {
+      "remove": ["BullishBreakOfStructure", "msbLevelDown"],
+      "view": [0, 92],
+      "cues": [
+        { "text": "Three of the four went this way: the next BoS was an Upswing's, within hours." }
+      ]
+    },
+    {
+      "add": ["ghostSwings"],
+      "view": [40, 77],
+      "cues": [
+        { "text": "This one was different." },
+        { "text": "After it the price fell for eighteen hours, and two Downswings were Confirmed on the way. They are the Ghost Downswings we saw earlier." },
+        { "text": "In real time, that did end the Uptrend. But it was not the MSB that ended it. It was the BoS of the first Downswing, sixteen hours later." }
+      ]
+    },
+    {
+      "chapter": "Trends in real time",
+      "add": ["BearishBreakOfStructure", "Downtrend"],
+      "remove": ["BearishMarketStructureBreak", "ghostSwings"],
+      "rewind": { "to": 61, "speed": 100, "erase": true },
+      "view": [40, 77],
+      "speed": 2,
+      "cues": [
+        { "text": "Let's go back and watch it end in real time." }
+      ]
+    },
+    {
+      "until": 62,
+      "cues": [
+        { "at": 62, "text": "A Trend ends at the BoS of the first Swing in the opposite direction. Here a Downswing is Confirmed, and the Uptrend ends." }
+      ]
+    },
+    {
+      "until": 64,
+      "cues": [
+        { "at": 64, "text": "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend is Confirmed." }
+      ]
+    },
+    {
+      "chapter": "Ghost Trends",
+      "add": ["ghostSwings", "ghostTrends"],
+      "until": 75,
+      "speed": 5,
+      "cues": [
+        { "text": "We have seen what happens next." },
+        { "at": 75, "text": "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." },
+        { "text": "With the Downswings gone, the Uptrend carries on as if it had never ended. This BoS Confirms its tenth Upswing." },
+        { "text": "At this resolution every new HH does this. A Downtrend lasts only for as long as the price stays below the last HH." }
+      ]
+    },
+    {
+      "chapter": "2nd order Trends",
+      "add": ["level2"],
+      "remove": ["ghostSwings", "ghostTrends"],
+      "view": [45, 77],
+      "cues": [
+        { "text": "As with the Ghost Downswings, the Ghost Downtrend is still here when we increase the resolution." },
+        { "text": "This 2nd order Downtrend is Confirmed by the BoS of its second Downswing, and it ends at the BoS of the first Upswing after it.", "hold": 0 },
+        { "at": 64, "on": "close", "place": "below", "text": "Downtrend Confirmed", "hold": 3.5, "voice": false },
+        { "at": 68, "on": "close", "place": "above", "text": "Downtrend ends", "hold": 3.5, "voice": false },
+        { "text": "A second Upswing then Confirms a 2nd order Uptrend. Trends, like Swings, exist at every resolution." }
+      ]
     }
   ]
 }
