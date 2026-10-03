@@ -1,20 +1,22 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace Gradient.CryptoAnalysis.Site;
 
 /// <summary>
-/// One text of a tour section. At is the candle it appears at (null: as the section begins), On what it is pinned to.
+/// One text of a tour section. At is the candle it appears at (null: as the section begins), On what it is pinned to. A
+/// line runs from the pinned point to LineTo, the candle and point it ends on, and appears when the replay reaches that.
 /// </summary>
-public sealed record TourCue(int Index, string Text, int? At, string? On, string? Place, string Keep, double Hold);
+public sealed record TourCue(int Index, string Text, int? At, string? On, string? Place, string Keep, double Hold, (int At, string On)? LineTo = null);
 
 /// <summary>
-/// A tour section with everything worked out: the layers on, the sawtooth levels looked at, the candles it runs from and to.
-/// Journey names the fast forward or rewind that runs the replay to From, when the section has one.
+/// A tour section with everything worked out: the scene it is in, the layers on, the sawtooth levels looked at, the candles
+/// it runs from and to. Journey names the fast forward or rewind that runs the replay to From, when the section has one.
 /// </summary>
 public sealed record TourSection(
     int Index,
     string? Chapter,
+    int Scene,
     IReadOnlyList<string> Layers,
     IReadOnlyList<int> Levels,
     int From,
@@ -25,10 +27,16 @@ public sealed record TourSection(
     string? Journey = null);
 
 /// <summary>
-/// A tour as compiled from tour.json against a dataset: its sections, the candle its start time lands on, and whatever the
-/// file gets wrong.
+/// One scene of a tour: a replay of a dataset from the candle its start time lands on, with its candles numbered from #0.
+/// The tour's start state is the first scene; a section with "scene" begins another.
 /// </summary>
-public sealed record TourScript(string? Title, string? Dataset, int Anchor, IReadOnlyList<TourSection> Sections, IReadOnlyList<string> Errors);
+public sealed record TourScene(string Dataset, int Anchor);
+
+/// <summary>
+/// A tour as compiled from tour.json against its datasets: its scenes, its sections, and whatever the file gets wrong.
+/// Anchor is the first scene's, the candle the tour's start time lands on.
+/// </summary>
+public sealed record TourScript(string? Title, string? Dataset, int Anchor, IReadOnlyList<TourScene> Scenes, IReadOnlyList<TourSection> Sections, IReadOnlyList<string> Errors);
 
 /// <summary>
 /// Reads the page's tour.json the way the page does (see the Tour section of index.html), so a test can check the file and the
@@ -43,9 +51,9 @@ public static class Tours
     /// </summary>
     public static readonly IReadOnlySet<string> PageLayers = new HashSet<string>(
     [
-        "close", "price", "sawtooth", "bosLevelUp", "bosLevelDown", "msbLevelUp", "msbLevelDown", "trendArrows",
+        "close", "price", "sawtooth", "bosLevelUp", "bosLevelDown", "msbLevelUp", "msbLevelDown", "trendArrows", "rangeBands", "rangeZones",
         "replay", "candidates", "future", "eventlog", "live",
-        "ghostSwings", "ghostCandidates", "ghostPoints", "ghostTrends", "ghostMsbs",
+        "ghostSwings", "ghostCandidates", "ghostPoints", "ghostTrends", "ghostMsbs", "ghostRanges",
         .. Enumerable.Range(0, 9).Select(x => $"level{x}"),
     ]);
 
@@ -57,16 +65,48 @@ public static class Tours
     private const int EventSearchLimit = 3000;
 
     /// <summary>
-    /// Compiles the tour against a dataset: the candle its start time lands on, then every section worked out from the start
-    /// state and the sections before it. Problems are listed, not thrown.
+    /// The datasets the local server serves, by id: a file under the repository root and, for a coarser dataset built from
+    /// it, the hours its candles span. The first is the tour's own.
+    /// </summary>
+    public static readonly IReadOnlyList<(string Id, string Name, string Path, int Hours)> Datasets =
+    [
+        ("btc-1h", "BTC/USD hourly (Coinbase)", Path.Combine("CryptoAnalysis.Test", "TestData", "PricesExtensionsData", "COINBASE_BTCUSD, 60", "COINBASE_BTCUSD, 60.csv"), 1),
+        ("btc-1h-2020", "BTC/USD hourly (Coinbase, from 2020)", Path.Combine("CryptoAnalysis.Test", "TestData", "COINBASE_BTCUSD, 60.csv"), 1),
+        ("btc-4h-2020", "BTC/USD 4-hour (Coinbase, from 2020)", Path.Combine("CryptoAnalysis.Test", "TestData", "COINBASE_BTCUSD, 60.csv"), 4),
+    ];
+
+    /// <summary>
+    /// Loads a dataset of the catalogue: its file, resampled to its candle length when that is more than an hour.
+    /// </summary>
+    public static List<Price> Load((string Id, string Name, string Path, int Hours) dataset, string repoRoot)
+    {
+        var prices = new Csv.CsvReaderHelper().ReadData<Price, global::CryptoAnalysis.Csv.ClassMaps.PriceClassMap>(Path.Combine(repoRoot, dataset.Path)).ToList();
+        return dataset.Hours > 1 ? Resample.To(prices, TimeSpan.FromHours(dataset.Hours)) : prices;
+    }
+
+    /// <summary>
+    /// Compiles the tour against one dataset, the tour's own: a tour without scenes needs no other.
     /// </summary>
     public static TourScript Compile(JsonNode def, IReadOnlyList<Price> dataset)
+    {
+        return Compile(def, new Dictionary<string, IReadOnlyList<Price>> { [def["dataset"]?.GetValue<string>() ?? ""] = dataset });
+    }
+
+    /// <summary>
+    /// Compiles the tour against its datasets, by id: the candle each scene's start time lands on, then every section worked out
+    /// from the start state and the sections before it. A scene names a dataset the tour does not have, or none, and it plays on
+    /// the tour's own, which is the one named by the tour or else the first given. Problems are listed, not thrown.
+    /// </summary>
+    public static TourScript Compile(JsonNode def, IReadOnlyDictionary<string, IReadOnlyList<Price>> datasets)
     {
         var errors = new List<string>();
         var known = new HashSet<string>(PageLayers.Concat(Terms.All.Select(x => x.Type.ToString())));
         var start = def["start"]?.AsObject();
-        var anchor = AnchorOf(start?["time"]?.GetValue<string>(), dataset);
-        var prices = dataset.Skip(anchor).ToList();
+        var own = def["dataset"]?.GetValue<string>() ?? "";
+        var ownPrices = datasets.TryGetValue(own, out var found) ? found : datasets.Values.First();
+        var anchor = AnchorOf(start?["time"]?.GetValue<string>(), ownPrices);
+        var scenes = new List<TourScene> { new(own, anchor) };
+        var prices = ownPrices.Skip(anchor).ToList();
         var candles = prices.Count;
 
         List<string> Ids(JsonNode? list, string where) => (list?.AsArray() ?? [])
@@ -110,6 +150,33 @@ public static class Tours
 
             if (node["window"] != null)
                 errors.Add($"{where}: \"window\" is now \"view\", the first and last candle shown");
+
+            // A section that begins a scene starts a replay of its own: the candles count from #0 again and the view starts afresh.
+            if (node["scene"] is JsonNode sceneNode)
+            {
+                var scene = sceneNode as JsonObject;
+                var time = scene?["time"]?.GetValue<string>();
+                var id = scene?["dataset"]?.GetValue<string>() ?? own;
+                if (scene == null || time == null)
+                    errors.Add($"{where}: a scene is {{ \"dataset\", \"time\" }}, on the tour's dataset unless one is given");
+                if (!datasets.TryGetValue(id, out var sceneDataset))
+                {
+                    errors.Add($"{where}: the server has no dataset \"{id}\", so the scene plays on the tour's own");
+                    sceneDataset = ownPrices;
+                }
+
+                var sceneAnchor = AnchorOf(time, sceneDataset);
+                prices = sceneDataset.Skip(sceneAnchor).ToList();
+                candles = prices.Count;
+                if (candles < 2)
+                    errors.Add($"{where}: the scene's time is past the end of its dataset");
+                scenes.Add(new TourScene(id, sceneAnchor));
+                at = 0;
+                view = DefaultView;
+                if (node["fastForward"] != null || node["rewind"] != null)
+                    errors.Add($"{where}: a section that begins a scene has no journey: the scene starts a new replay");
+            }
+
             if (node["layers"] != null)
                 layers = Ids(node["layers"], where);
             var removed = Ids(node["remove"], where);
@@ -182,14 +249,34 @@ public static class Tours
                 if (!Keeps.Contains(keep))
                     errors.Add($"{what}: unknown keep \"{keep}\"");
                 var hold = cue?["hold"]?.GetValue<double>();
-                cues.Add(new TourCue(j, text, cueAt, on, place, keep, hold >= 0 ? hold.Value : Math.Max(2.5, text.Length / 14.0)));
+
+                // A line: from the pinned point to another candle's point, reached when the replay reaches the line's end.
+                (int, string)? lineTo = null;
+                if (cue?["to"] is JsonNode toNode)
+                {
+                    var to = toNode as JsonObject;
+                    var toAt = to == null ? null : Candle(to["at"], prices, from, what, "to", errors);
+                    var toOn = to?["on"] is JsonValue toOnValue ? toOnValue.ToString() : on ?? "close";
+                    if (to == null || to["at"] == null || on == null)
+                        errors.Add($"{what}: a line needs a pinned candle and \"to\": {{ \"at\", \"on\" }}, the candle and point it runs to");
+                    else if (toAt is int end && (end < 0 || end > at))
+                        errors.Add($"{what}: the line's end, #{end}, is not reached, as the section ends at #{at}");
+                    if (!Pins.Contains(toOn) && !double.TryParse(toOn, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                        errors.Add($"{what}: unknown \"on\" \"{toOn}\" for the line's end");
+                    if (toAt is int lineEnd)
+                        lineTo = (lineEnd, toOn);
+                }
+
+                if (cue?["heads"] is JsonNode headsNode && (headsNode is not JsonObject heads || heads.Any(x => x.Key != "start" && x.Key != "end")))
+                    errors.Add($"{what}: heads is {{ \"start\", \"end\" }}, true or false each");
+                cues.Add(new TourCue(j, text, cueAt, on, place, keep, hold >= 0 ? hold.Value : Math.Max(2.5, text.Length / 14.0), lineTo));
             }
 
             var levels = layers.Where(x => x.StartsWith("level")).Select(x => int.Parse(x["level".Length..])).OrderBy(x => x).ToList();
-            sections.Add(new TourSection(i, node["chapter"]?.GetValue<string>(), layers, levels.Count > 0 ? levels : [1], from, at, view, speed, cues, journeyTo != null ? tripName : null));
+            sections.Add(new TourSection(i, node["chapter"]?.GetValue<string>(), scenes.Count - 1, layers, levels.Count > 0 ? levels : [1], from, at, view, speed, cues, journeyTo != null ? tripName : null));
         }
 
-        return new TourScript(def["title"]?.GetValue<string>(), def["dataset"]?.GetValue<string>(), anchor, sections, errors);
+        return new TourScript(def["title"]?.GetValue<string>(), def["dataset"]?.GetValue<string>(), anchor, scenes, sections, errors);
     }
 
     /// <summary>
@@ -244,17 +331,31 @@ public static class Tours
     /// </summary>
     public static List<string> Facts(TourScript tour, IReadOnlyList<Price> dataset)
     {
-        var prices = dataset.Skip(tour.Anchor).ToList();
+        return Facts(tour, new Dictionary<string, IReadOnlyList<Price>> { [tour.Dataset ?? ""] = dataset });
+    }
+
+    /// <summary>
+    /// The facts of a tour with scenes, each scene's read from its own dataset; a line in a later scene says which.
+    /// </summary>
+    public static List<string> Facts(TourScript tour, IReadOnlyDictionary<string, IReadOnlyList<Price>> datasets)
+    {
+        var byScene = tour.Scenes.Select(scene =>
+            (datasets.TryGetValue(scene.Dataset, out var found) ? found : datasets.Values.First()).Skip(scene.Anchor).ToList()).ToList();
         var lines = new List<string>();
         foreach (var s in tour.Sections)
         {
-            var name = s.Chapter != null ? $"section {s.Index + 1} ({s.Chapter})" : $"section {s.Index + 1}";
+            var prices = byScene[s.Scene];
+            var name = (s.Chapter != null ? $"section {s.Index + 1} ({s.Chapter})" : $"section {s.Index + 1}") + (s.Scene > 0 ? $" in scene {s.Scene + 1}" : "");
             if (s.Journey != null)
                 lines.Add($"#{s.From} · {name} gets there by {s.Journey}: {At(prices, s.From, s.From, s.Levels)}");
             if (s.Until > s.From)
                 lines.Add($"#{s.Until} · {name} runs to it: {At(prices, s.Until, s.Until, s.Levels)}");
             foreach (var c in s.Cues.Where(x => x.At != null))
+            {
                 lines.Add($"#{c.At} · {name} text {c.Index + 1} \"{c.Text}\"{(c.On != null ? $" on {c.On}" : "")} · seen at #{s.Until}: {At(prices, c.At!.Value, s.Until, s.Levels)}");
+                if (c.LineTo is (int end, string endOn))
+                    lines.Add($"#{end} · {name} text {c.Index + 1} line ends on {endOn} · seen at #{s.Until}: {At(prices, end, s.Until, s.Levels)}");
+            }
         }
 
         return lines;
@@ -288,6 +389,13 @@ public static class Tours
             facts.AddRange(Sawtooth.MarketStructureBreaks(prefix, swings, EnumPriceBasis.Close)
                 .Where(x => x.Break.Time == time)
                 .Select(x => $"L{level} {Terms.Get(x.Type).Label}"));
+            foreach (var range in Ranges.At(prefix, EnumPriceBasis.Close, level))
+            {
+                if (range.Identified.Time == time)
+                    facts.Add($"L{level} range {range.Low.Price:F0}-{range.High.Price:F0} at {range.Retracement}%");
+                if (range.End?.Time == time)
+                    facts.Add($"L{level} range ends {(range.EndedAbove ? "above" : "below")}");
+            }
         }
 
         return facts.Count > 0 ? string.Join(" · ", facts.Distinct()) : "nothing";

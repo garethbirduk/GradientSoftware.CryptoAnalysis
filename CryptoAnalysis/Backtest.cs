@@ -27,13 +27,26 @@ namespace Gradient.CryptoAnalysis
                     trade.Update(dateTime);
                 }
 
-                if (PositionRules.PreConditions.IsMet(Prices, dateTime))
+                var busy = PositionRules.OnePositionAtATime && Trades.Any(x => x.TradeStatus is EnumConditionStatus.AwaitingConfirmation or EnumConditionStatus.Confirmed or EnumConditionStatus.Open);
+                if (!busy && PositionRules.PreConditions.IsMet(Prices, dateTime))
                 {
                     var trade = new Trade(Prices,
                         PositionRules.ConfirmationConditions, PositionRules.TakeProfitConditions,
-                        PositionRules.StopLossConditions, PositionRules.ExpireConditions);
+                        PositionRules.StopLossConditions, PositionRules.ExpireConditions, PositionRules.Targets);
 
-                    Trades.Add(trade);
+                    // A trade that fills on its own candle opens there; one its candle does not fill is not a trade.
+                    if (PositionRules.Entry is EntryRule entry)
+                    {
+                        if (entry(Prices, dateTime) is double fill)
+                        {
+                            trade.Open(dateTime, fill);
+                            Trades.Add(trade);
+                        }
+                    }
+                    else
+                    {
+                        Trades.Add(trade);
+                    }
                 }
 
                 index++;

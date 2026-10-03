@@ -18,12 +18,19 @@ namespace Gradient.CryptoAnalysis
 
         private void TransitionConfirmedToOpen(DateTime dateTime)
         {
+            Open(dateTime, Prices.First(x => x.DateTime == dateTime).Open);
+        }
+
+        /// <summary>
+        /// Opens the trade on a candle at a price, with its targets set from the prices up to that candle.
+        /// </summary>
+        public void Open(DateTime dateTime, double price)
+        {
             TradeStatus = EnumConditionStatus.Open;
             DateTimeOpen = dateTime;
-            PriceOpen = Prices.First(x => x.DateTime == dateTime).Open;
+            PriceOpen = price;
 
-            var tp = 1.1 * PriceOpen;
-            var sl = 0.9 * PriceOpen;
+            var (tp, sl) = TargetRule?.Invoke(Prices, dateTime) ?? (1.1 * PriceOpen, 0.9 * PriceOpen);
 
             ((IsPriceHighGreaterThanOrEqualCondition)TakeProfitCondition.AndConditions.Single()).SetTargetPrice(tp);
             ((IsPriceLowLessThanOrEqualCondition)StopLossCondition.AndConditions.Single()).SetTargetPrice(sl);
@@ -37,7 +44,7 @@ namespace Gradient.CryptoAnalysis
         }
 
         public Trade(List<Price> prices, ConditionSet confirmationCondition,
-            ConditionSet takeProfitCondition, ConditionSet stopLossCondition, ConditionSet expireCondition)
+            ConditionSet takeProfitCondition, ConditionSet stopLossCondition, ConditionSet expireCondition, TargetRule? targetRule = null)
         {
             TradeStatus = EnumConditionStatus.AwaitingConfirmation;
             Prices = prices;
@@ -45,6 +52,7 @@ namespace Gradient.CryptoAnalysis
             TakeProfitCondition = takeProfitCondition;
             StopLossCondition = stopLossCondition;
             ExpireCondition = expireCondition;
+            TargetRule = targetRule;
         }
 
         public ConditionSet ConfirmationCondition { get; }
@@ -69,6 +77,11 @@ namespace Gradient.CryptoAnalysis
         }
 
         public ConditionSet TakeProfitCondition { get; }
+
+        /// <summary>
+        /// Sets the targets as the trade opens; null for 10% either side of the open.
+        /// </summary>
+        public TargetRule? TargetRule { get; }
 
         public double TakeProfitTarget
         {

@@ -619,6 +619,81 @@
         { "text": "Swings within Swings over a couple of hours are hard to act on. A Swing that plays out over weeks is not." },
         { "text": "Which order to work at, and from how much history, is a choice. Choices are strategy, which comes later." }
       ]
+    },
+    {
+      "chapter": "A Range from the training",
+      "scene": { "dataset": "btc-4h-2020", "time": "2021-11-10T16:00" },
+      "layers": ["level1", "close", "Downswing", "BearishBreakOfStructure", "HigherHigh", "BullishMarketStructureBreak"],
+      "until": 40,
+      "view": [20, 110],
+      "speed": 20,
+      "cues": [
+        { "text": "This chapter leaves 2023 for November 2021, where the training drew its own example of a Range. The training's chart had four hours to a candle, so this scene does too, with the Sawtooth starting at the all-time high of the 10th." },
+        { "text": "The price falls for a week, in 1st order Downswings." },
+        { "at": 40, "on": "close", "place": "above", "text": "HH and MSB: 60761", "hold": 3.5, "voice": false },
+        { "text": "The bounce of the 17th makes an HH, and closes above the bounce before it: a Bullish MSB." }
+      ]
+    },
+    {
+      "add": ["LowerLow"],
+      "remove": ["HigherHigh", "BullishMarketStructureBreak"],
+      "until": 50,
+      "cues": [
+        { "at": 47, "on": "close", "place": "below", "text": "BoS", "hold": 3.5, "voice": false },
+        { "text": "The fall resumes. On the 18th the close below the low before the bounce is the BoS that Confirms the Downswing, and the bounce is its Swing High." },
+        { "at": 50, "on": "close", "place": "below", "text": "LL: 55927", "hold": 3.5, "voice": false },
+        { "text": "The fall ends at an LL on the 19th, and a new Downswing starts here. Its bounce is a Retracement of the fall from the Swing High." }
+      ]
+    },
+    {
+      "add": ["Retracement"],
+      "remove": ["LowerLow"],
+      "until": 61,
+      "speed": 5,
+      "cues": [
+        { "at": 61, "on": "close", "place": "above", "text": "79% back", "hold": 4, "voice": false },
+        { "text": "On Saturday the 20th at 20:00 the bounce has come 79% of the way back: past the setting of 75%, and short of the Swing High. The Retracement is marked where it first passed the setting." }
+      ]
+    },
+    {
+      "add": ["level2", "Upswing", "BearishMarketStructureBreak", "Range", "rangeBands"],
+      "remove": ["Retracement"],
+      "until": 68,
+      "speed": 5,
+      "cues": [
+        { "text": "One order finer, the bounce is a climb of Upswings." },
+        { "at": 68, "on": "close", "place": "below", "text": "MSB", "hold": 4, "voice": false },
+        { "text": "On the 22nd the price closes below the last Upswing's Swing Low: a Bearish MSB. A deep Retracement whose own structure has broken is a Range: from the LL to the top of the bounce, 55927 to 59761, with bands 20% of its height either side." }
+      ]
+    },
+    {
+      "add": ["rangeZones", "Retracement", "candles"],
+      "remove": ["level2", "Upswing", "close"],
+      "until": 94,
+      "speed": 10,
+      "view": [60, 100],
+      "cues": [
+        { "text": "The training divides a Range into a buy-low zone, from the lower band to 25% up, and a sell-high zone, from 75% up to the upper band. With candles on, the wicks show where the price reached into them." },
+        { "text": "The Range holds while the price closes inside the bands." },
+        { "at": 94, "on": "close", "place": "below", "text": "Range ends: 53751", "hold": 4, "voice": false },
+        { "text": "On the 26th the close at 53751 is below the lower band, and the Range ends. The same close is the Downswing's BoS." }
+      ]
+    },
+    {
+      "cues": [
+        { "text": "Traded as the training trades a Range, buying in the buy-low zone and selling in the sell-high zone with the stop at the band, this Range gave three trades.", "hold": 0 },
+        { "at": 69, "on": 56885, "to": { "at": 71, "on": 58802 }, "color": "up", "text": "1: +1917", "hold": 3, "keep": "chapter", "voice": false },
+        { "at": 71, "on": 56885, "to": { "at": 89, "on": 58802 }, "color": "up", "text": "2: +1917", "hold": 3, "keep": "chapter", "voice": false },
+        { "at": 93, "on": 56885, "to": { "at": 94, "on": 55160 }, "color": "down", "text": "3: -1725", "hold": 3, "keep": "chapter", "voice": false },
+        { "text": "Two reached the sell-high zone. The third was stopped by the candle that ended the Range." },
+        { "text": "That is a strategy, and strategies come later." }
+      ]
+    },
+    {
+      "cues": [
+        { "text": "On hourly candles the same week reads differently. Between the Swing High and the LL the price made three Lower Lows with bounces between them, so the tools measured the bounce against the last of those, and read it as a Bullish MSB rather than a Retracement. Same rules; the candle size changes what they see." },
+        { "text": "Which candle size to read a Range at is a choice. Choices are strategy." }
+      ]
     }
   ]
 }

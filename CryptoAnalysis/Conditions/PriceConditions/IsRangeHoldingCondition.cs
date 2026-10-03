@@ -5,7 +5,7 @@ namespace Gradient.CryptoAnalysis.Conditions.PriceConditions;
 /// identified by a retracement of at least minRetracement percent whose structure broke one level finer, and not yet ended by a
 /// close beyond its band. With a direction, only a range out of a trend that way counts.
 /// </summary>
-public class IsRangeCondition : PriceCondition, IAdjustableCandles
+public class IsRangeHoldingCondition : PriceCondition, IAdjustableCandles
 {
     protected override bool IsMet()
     {
@@ -13,7 +13,7 @@ public class IsRangeCondition : PriceCondition, IAdjustableCandles
             .Any(x => x.End == null && (Direction == null || x.Direction == Direction));
     }
 
-    public IsRangeCondition(EnumSwingDirection? direction = null, int additionalCandles = DefaultAdditionalCandles, int level = 1,
+    public IsRangeHoldingCondition(EnumSwingDirection? direction = null, int additionalCandles = DefaultAdditionalCandles, int level = 1,
         double minRetracement = Ranges.DefaultMinRetracement, double band = Ranges.DefaultBand, EnumPriceBasis basis = EnumPriceBasis.Close) : base(additionalCandles)
     {
         Direction = direction;

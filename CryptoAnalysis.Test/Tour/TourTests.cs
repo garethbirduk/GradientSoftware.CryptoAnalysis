@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 using CryptoAnalysis.Csv.ClassMaps;
 using Gradient.CryptoAnalysis.Csv;
 using Gradient.CryptoAnalysis.Site;
@@ -18,15 +18,17 @@ public class TourTests
 {
     private static readonly string RepoRoot = FindRepoRoot(AppContext.BaseDirectory);
     private static readonly string TourPath = Path.Combine(RepoRoot, "CryptoAnalysis.Site", "wwwroot", "tour.json");
-    private static readonly string DatasetPath = Path.Combine(RepoRoot, "CryptoAnalysis.Test", "TestData", "PricesExtensionsData", "COINBASE_BTCUSD, 60", "COINBASE_BTCUSD, 60.csv");
     private static readonly string ExpectedPath = Path.Combine(RepoRoot, "CryptoAnalysis.Test", "TestData", "Tour", "tour.expected.txt");
     private static readonly string ActualPath = Path.Combine(RepoRoot, "CryptoAnalysis.Test", "TestData", "Tour", "tour.actual.txt");
+
+    // The datasets the server serves, loaded once, so a tour with scenes on several of them compiles as the page plays it.
+    private static readonly Lazy<IReadOnlyDictionary<string, IReadOnlyList<Price>>> Datasets = new(() =>
+        Tours.Datasets.ToDictionary(x => x.Id, x => (IReadOnlyList<Price>)Tours.Load(x, RepoRoot)));
 
     private static TourScript Compile()
     {
         var def = JsonNode.Parse(File.ReadAllText(TourPath)) ?? throw new InvalidOperationException("tour.json is empty");
-        var dataset = new CsvReaderHelper().ReadData<Price, PriceClassMap>(DatasetPath).ToList();
-        return Tours.Compile(def, dataset);
+        return Tours.Compile(def, Datasets.Value);
     }
 
     [TestMethod]
@@ -42,8 +44,7 @@ public class TourTests
     public void Tour_StructureMatchesExpected()
     {
         var tour = Compile();
-        var dataset = new CsvReaderHelper().ReadData<Price, PriceClassMap>(DatasetPath).ToList();
-        var actual = Tours.Facts(tour, dataset);
+        var actual = Tours.Facts(tour, Datasets.Value);
 
         if (!File.Exists(ExpectedPath))
         {

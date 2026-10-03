@@ -341,7 +341,8 @@ const SECTIONS = [
   { name: 'Trends', layers: [{ id: 'Uptrend', label: 'Uptrend' }, { id: 'Downtrend', label: 'Downtrend' }, { id: 'trendArrows', label: 'Trend arrows' }] },
   { name: 'Indicators', layers: [{ id: 'BullishMarketStructureBreak' }, { id: 'msbLevelUp', label: 'MSB↑ level', term: 'BullishMarketStructureBreak' },
     { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' },
-    { id: 'Retracement', label: 'Retracement' }, { id: 'Range', label: 'Range' }, { id: 'rangeBands', label: 'Range bands', term: 'Range' }] },
+    { id: 'Retracement', label: 'Retracement' }, { id: 'Range', label: 'Range' }, { id: 'rangeBands', label: 'Range bands', term: 'Range' },
+    { id: 'rangeZones', label: 'Range zones', term: 'Range' }] },
 ].map(s => ({ ...s, layers: s.layers.map(l => ({ ...l, label: l.label ?? TERMS.get(l.id)?.label ?? l.id })) }));
 // Layers with a number beside them: how long a run must be to show, how far back a retracement must read to be marked (and
 // for a range to count), and how far beyond a range the price may close before the range ends. The range settings change
@@ -351,6 +352,7 @@ const SETTINGS = {
   SuccessiveRedCandles: { key: 'SuccessiveRedCandles', min: 2, max: 99, fallback: 5, title: 'Minimum run length', unit: '' },
   Retracement: { key: 'retracement', min: 1, max: 99, fallback: 75, title: 'Least retracement to mark, as a percentage of the move it comes back along', unit: '%', remote: true },
   Range: { key: 'band', min: 0, max: 99, fallback: 20, title: 'Band either side of a range, as a percentage of its height: a close beyond it ends the range', unit: '%', remote: true },
+  rangeZones: { key: 'zone', min: 1, max: 49, fallback: 25, title: 'Depth of the buy-low and sell-high zones from the range\'s edges, as a percentage of its height; each zone reaches out to the band', unit: '%' },
 };
 const LAYERS = SECTIONS.flatMap(s => s.layers);
 const LEVEL_IDS = LAYERS.filter(l => l.level !== undefined).map(l => l.id);
@@ -497,6 +499,7 @@ function swatch(layer) {
   if (layer.id === 'eventlog') return svg(`<path d="M3 3 H19 M3 7 H19 M3 11 H13" stroke="${css('--muted')}" stroke-width="1.6"/>`);
   if (layer.id.startsWith('msbLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="1.5 2.5"/>`);
   if (layer.id === 'rangeBands') return svg(`<line x1="1" y1="3" x2="21" y2="3" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/><line x1="1" y1="11" x2="21" y2="11" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/>`);
+  if (layer.id === 'rangeZones') return svg(`<rect x="1" y="1" width="20" height="5" fill="${withAlpha(css('--down'), 0.25)}"/><rect x="1" y="8" width="20" height="5" fill="${withAlpha(css('--up'), 0.25)}"/><line x1="1" y1="6" x2="21" y2="6" stroke="${TERMS.get('Range')?.color}" stroke-width="1" stroke-dasharray="3 2"/><line x1="1" y1="8" x2="21" y2="8" stroke="${TERMS.get('Range')?.color}" stroke-width="1" stroke-dasharray="3 2"/>`);
   if (layer.id === 'ghostRanges') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(css('--close'), 0.1)}" stroke="${css('--close')}" stroke-dasharray="1.5 2"/>`);
   if (layer.id.startsWith('bosLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="4 3"/>`);
   const term = TERMS.get(layer.term ?? layer.id);
@@ -747,18 +750,29 @@ const rangeHover = g => `Range · level ${g.level} · out of ${rangeOrigin(g)}<b
   `<br>${g.end ? `ended ${fmtTime(g.end.time)}, close ${fmtPrice(g.end.price)} ${g.endedAbove ? 'above' : 'below'} the band` : 'holds'}`;
 
 // A range is a box from the candle that identified it to the one that ended it (or the latest candle while it holds),
-// between its low and high, with its bands as dashed lines beyond.
+// between its low and high, with its bands as dashed lines beyond. The zones are the training's discount and premium:
+// the buy-low zone from the lower band up to the zone setting above the low, the sell-high zone from as far below the
+// high up to the upper band.
 function drawRanges(ex, traces) {
-  if (!on('Range') && !on('rangeBands')) return;
-  const term = TERMS.get('Range'), last = ex.prices.t[ex.prices.t.length - 1];
+  if (!on('Range') && !on('rangeBands') && !on('rangeZones')) return;
+  const term = TERMS.get('Range'), last = ex.prices.t[ex.prices.t.length - 1], zone = setting('rangeZones') / 100;
+  const box = (g, until, a, b) => ({ x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [a, a, b, b, a] });
   for (const g of shownRangeBoxes(ex)) {
-    const until = g.end?.time ?? last;
+    const until = g.end?.time ?? last, height = g.high.price - g.low.price;
+    if (on('rangeZones')) {
+      const buyTop = g.low.price + height * zone, sellBottom = g.high.price - height * zone;
+      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Buy-low zone', ...box(g, until, g.bandLow, buyTop),
+        line: { width: 0 }, fillcolor: withAlpha(css('--up'), 0.12), hovertemplate: `Buy-low zone · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(buyTop)}: from the lower band to ${setting('rangeZones')}% up the range<extra></extra>` });
+      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Sell-high zone', ...box(g, until, sellBottom, g.bandHigh),
+        line: { width: 0 }, fillcolor: withAlpha(css('--down'), 0.12), hovertemplate: `Sell-high zone · level ${g.level}<br>${fmtPrice(sellBottom)} to ${fmtPrice(g.bandHigh)}: from ${setting('rangeZones')}% down the range to the upper band<extra></extra>` });
+      traces.push({ type: 'scatter', mode: 'lines', name: 'Range zone', x: [g.identified.time, until, null, g.identified.time, until], y: [sellBottom, sellBottom, null, buyTop, buyTop],
+        line: { color: term.color, width: 1, dash: 'dash' }, hoverinfo: 'skip' });
+    }
     if (on('Range')) {
-      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: term.name,
-        x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [g.high.price, g.high.price, g.low.price, g.low.price, g.high.price],
+      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: term.name, ...box(g, until, g.high.price, g.low.price),
         line: { color: term.color, width: 1.5 }, fillcolor: withAlpha(term.color, 0.08), hovertemplate: `${rangeHover(g)}<extra></extra>` });
     }
-    if (on('rangeBands')) {
+    if (on('rangeBands') || on('rangeZones')) {
       traces.push({ type: 'scatter', mode: 'lines', name: 'Range band', x: [g.identified.time, until, null, g.identified.time, until], y: [g.bandHigh, g.bandHigh, null, g.bandLow, g.bandLow],
         line: { color: term.color, width: 1, dash: 'dash' }, hovertemplate: `Range band · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(g.bandHigh)}: a close beyond ends the range<extra></extra>` });
     }
@@ -816,22 +830,35 @@ function trendShapes(ex) {
 
 // A trend as an arrow in its level's colour, from where its first swing starts to its latest break of structure, with its
 // count of swings and its strength in a box: the share of its swings that are strong. Drawn at every level selected.
+// An arrow from one point to another with a text box along it: how candle runs, trend arrows and the tour's drawn lines
+// are shown. A head at either end is optional, the box sits the given way along, and the hover is on both.
+function arrowLabels(labels, { from, to, color, text = '', hover = '', along = 0.5, heads = { start: false, end: true }, width = 2, opacity = 0.9, size = 10 }) {
+  labels.push({ x: to.time, y: to.price, ax: from.time, ay: from.price, axref: 'x', ayref: 'y', text: '', showarrow: true,
+    arrowhead: heads.end ? 2 : 0, startarrowhead: heads.start ? 2 : 0, arrowsize: 1.2, startarrowsize: 1.2, arrowwidth: width, arrowcolor: color, hovertext: hover, opacity });
+  if (!text) return;
+  const t0 = Date.parse(from.time), at = new Date(t0 + (Date.parse(to.time) - t0) * along).toISOString();
+  labels.push({ x: at, y: from.price + (to.price - from.price) * along, text, showarrow: false, hovertext: hover,
+    bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: color, borderwidth: 1.5, borderpad: 2, font: { size, color: css('--text') } });
+}
+
 function drawTrendArrows(ex, labels) {
   if (!on('trendArrows')) return;
   for (const level of swingLevels(ex)) {
     for (const t of ex.trendsByLevel?.[level] ?? []) {
       const tip = t.parts?.[t.parts.length - 1]?.breakOfStructure;
       if (!tip) continue;
-      const color = levelColor(level);
       const hover = `${t.direction === 'Up' ? 'Uptrend' : 'Downtrend'} · level ${level}<br>${t.swings} swings, ${t.strong} strong · strength ${t.strength}%<br>${t.marketStructureBreaks} MSB against`;
-      labels.push({ x: tip.time, y: tip.price, ax: t.start.time, ay: t.start.price, axref: 'x', ayref: 'y', text: '',
-        showarrow: true, arrowhead: 2, arrowsize: 1.2, arrowwidth: 2, arrowcolor: color, hovertext: hover, opacity: 0.9 });
       // The box sits towards the arrow's head, where a long trend is usually being looked at.
-      const along = 0.8, from = Date.parse(t.start.time), at = new Date(from + (Date.parse(tip.time) - from) * along).toISOString();
-      labels.push({ x: at, y: t.start.price + (tip.price - t.start.price) * along, text: `${t.swings} · ${t.strength}%`, showarrow: false, hovertext: hover,
-        bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: color, borderwidth: 1.5, borderpad: 2,
-        font: { size: 11, color: css('--text') } });
+      arrowLabels(labels, { from: t.start, to: tip, color: levelColor(level), text: `${t.swings} · ${t.strength}%`, hover, along: 0.8, size: 11 });
     }
+  }
+}
+
+// The lines a tour draws by hand: a cue with "to" is an arrow from its candle to another, with the text in a box along it.
+function drawTourLines(ex, labels) {
+  for (const line of ex.lines ?? []) {
+    const color = { up: css('--up'), down: css('--down'), accent: css('--accent') }[line.color] ?? line.color ?? css('--accent');
+    arrowLabels(labels, { from: line.from, to: line.to, color, text: line.text, heads: line.heads, width: 3, opacity: 1, size: 12 });
   }
 }
 
@@ -1594,14 +1621,7 @@ function drawCandleRuns(ex, labels, traces) {
         hovertemplate: runs.map(r => `${hover(r)}<extra></extra>`) });
       continue;
     }
-    for (const r of runs) {
-      labels.push({ x: r.end.time, y: r.end.price, ax: r.start.time, ay: r.start.price, axref: 'x', ayref: 'y', text: '',
-        showarrow: true, arrowhead: 2, arrowsize: 1.2, arrowwidth: 2, arrowcolor: term.color, hovertext: hover(r), opacity: 0.9 });
-      const mid = new Date((Date.parse(r.start.time) + Date.parse(r.end.time)) / 2).toISOString();
-      labels.push({ x: mid, y: (r.start.price + r.end.price) / 2, text: `${r.length}`, showarrow: false, hovertext: hover(r),
-        bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: term.color, borderwidth: 1.5, borderpad: 2,
-        font: { size: 10, color: css('--text') } });
-    }
+    for (const r of runs) arrowLabels(labels, { from: r.start, to: r.end, color: term.color, text: `${r.length}`, hover: hover(r) });
   }
 }
 
@@ -1657,6 +1677,7 @@ function draw(el, ex, focus) {
   const stacks = new Map();
   drawCandleRuns(ex, labels, traces);
   drawTrendArrows(ex, labels);
+  drawTourLines(ex, labels);
   drawRanges(ex, traces);
   drawSawtooth(ex, traces);
 
@@ -2050,7 +2071,7 @@ async function renderReplayPage() {
 
 function findExample(id) {
   return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id) ?? DATA.interims?.examples?.find(e => e.id === id)
-    ?? replayDatasets.find(e => e.id === id) ?? (tour?.ex.id === id ? tour.ex : undefined);
+    ?? replayDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined);
 }
 
 // ---- Tour ------------------------------------------------------------------------------------------------------------
@@ -2110,18 +2131,20 @@ const tourSection = () => tour.sections[tour.index];
 // A candle in the file is a number, or an event to wait for from a candle on: { "event": "BullishBreakOfStructure",
 // "level": 1, "nth": 1 }, the nth time that becomes known at that level. The local server looks those up, one lookup for
 // each event and starting candle (see resolveTour), and until it has, the section is listed as waiting.
-const eventKey = (spec, from) => `${spec.event}|${spec.level ?? 1}|${spec.nth ?? 1}|${from}`;
+const eventKey = (spec, from, scene = 0) => `${scene}|${spec.event}|${spec.level ?? 1}|${spec.nth ?? 1}|${from}`;
 const eventName = (spec, from) => `${{ 1: 'the first', 2: 'the second', 3: 'the third' }[spec.nth ?? 1] ?? `the ${spec.nth}th`} ${TERMS.get(spec.event)?.name ?? spec.event} at level ${spec.level ?? 1} after #${from}`;
 
 // A text stays for its narration clip's length when there is one (plus a breath), else for the time it takes to read.
-function compileTour(def, candles, resolved = new Map(), audio = {}) {
+function compileTour(def, scenes, resolved = new Map(), audio = {}) {
   const errors = [], known = new Set(LAYERS.map(l => l.id)), chapters = [], wanted = [];
+  // The scene the sections are in, and how many candles it has.
+  let scene = 0, candles = scenes[0]?.ex.prices.t.length ?? 0;
   // A candle number as given, or looked up for an event; null when it is not known (yet).
   const candle = (v, from, where, field) => {
     if (v == null || typeof v === 'number') return { index: v ?? null, spec: null };
     if (typeof v !== 'object' || !TERMS.has(v.event)) { errors.push(`${where}: ${field} must be a candle number or a known event`); return { index: null, spec: null }; }
-    const key = eventKey(v, from), spec = eventName(v, from);
-    if (!resolved.has(key)) { wanted.push({ key, spec: v, from }); errors.push(`${where}: ${field} is being looked up: ${spec}`); return { index: null, spec }; }
+    const key = eventKey(v, from, scene), spec = eventName(v, from);
+    if (!resolved.has(key)) { wanted.push({ key, spec: v, from, scene }); errors.push(`${where}: ${field} is being looked up: ${spec}`); return { index: null, spec }; }
     if (resolved.get(key) == null) errors.push(`${where}: ${field} waits for ${spec}, which does not happen`);
     return { index: resolved.get(key), spec: `${spec} → #${resolved.get(key)}` };
   };
@@ -2138,6 +2161,18 @@ function compileTour(def, candles, resolved = new Map(), audio = {}) {
   const sections = (def.sections ?? []).map((s, i) => {
     const where = `section ${i + 1}`;
     if (s.chapter) chapters.push({ name: s.chapter, slug: slugOf(s.chapter), section: i });
+    // A section that begins a scene starts a replay of its own: the candles count from #0 again and the view starts afresh.
+    if (s.scene != null) {
+      scene++;
+      const sc = scenes[scene];
+      if (typeof s.scene !== 'object' || !s.scene.time) errors.push(`${where}: a scene is { "dataset", "time" }, on the tour's dataset unless one is given`);
+      else if (!sc) errors.push(`${where}: the scene could not be set up`);
+      else if (sc.missing) errors.push(`${where}: the server has no dataset "${sc.dataset}", so the scene plays on the tour's own`);
+      else if (sc.ex.prices.t.length < 2) errors.push(`${where}: the scene's time is past the end of its dataset`);
+      candles = sc?.ex.prices.t.length ?? candles;
+      at = 0;
+      view = DEFAULT_VIEW;
+    }
     if (s.layers) layers = ids(s.layers, where);
     const removed = ids(s.remove, where);
     layers = [...new Set([...layers, ...ids(s.add, where)])].filter(id => !removed.includes(id));
@@ -2149,6 +2184,7 @@ function compileTour(def, candles, resolved = new Map(), audio = {}) {
     const forward = s.fastForward != null, trip = s.fastForward ?? s.rewind ?? null, tripName = forward ? 'fast forward' : 'rewind';
     let journey = null;
     if (s.fastForward != null && s.rewind != null) errors.push(`${where}: a section fast forwards or rewinds, not both`);
+    if (trip != null && s.scene != null) errors.push(`${where}: a section that begins a scene has no journey: the scene starts a new replay`);
     if (trip != null && typeof trip !== 'object') errors.push(`${where}: a ${tripName} is { "to", "speed", "${forward ? 'draw' : 'erase'}" }`);
     else if (trip) {
       const runs = trip[forward ? 'draw' : 'erase'] !== false, there = Number.isInteger(trip.to) && trip.to >= 0 && trip.to < candles && (forward ? trip.to > at : trip.to < at);
@@ -2175,12 +2211,23 @@ function compileTour(def, candles, resolved = new Map(), audio = {}) {
       if (c.place != null && !PIN_PLACES[c.place]) errors.push(`${what}: unknown place "${c.place}"`);
       if (!['section', 'chapter', 'always'].includes(c.keep ?? 'section')) errors.push(`${what}: unknown keep "${c.keep}"`);
       if (c.voice != null && typeof c.voice !== 'boolean') errors.push(`${what}: voice is true or false`);
+      // A line: from the pinned point to another candle's point, shown when the replay reaches the line's end.
+      let to = null;
+      if (c.to != null) {
+        const toGiven = typeof c.to === 'object' ? candle(c.to.at, from, what, 'to') : { index: null, spec: null };
+        if (typeof c.to !== 'object' || c.to.at == null || c.on == null) errors.push(`${what}: a line needs a pinned candle and "to": { "at", "on" }, the candle and point it runs to`);
+        else if (toGiven.index != null && (toGiven.index < 0 || toGiven.index > at)) errors.push(`${what}: the line's end, #${toGiven.index}, is not reached, as the section ends at #${at}`);
+        if (c.to?.on != null && typeof c.to.on !== 'number' && !PIN_PRICES[c.to.on]) errors.push(`${what}: unknown "on" "${c.to.on}" for the line's end`);
+        to = { at: toGiven.index, atSpec: toGiven.spec, on: c.to?.on ?? c.on ?? 'close' };
+      }
+      if (c.heads != null && (typeof c.heads !== 'object' || Object.keys(c.heads).some(k => k !== 'start' && k !== 'end'))) errors.push(`${what}: heads is { "start", "end" }, true or false each`);
       // A text with "voice": false is shown but not read aloud, so it stays for the time it takes to read.
       const silent = c.voice === false, clip = silent ? null : audio[textKey(text)];
       return { text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
+        to, heads: { start: c.heads?.start === true, end: c.heads?.end !== false }, color: c.color ?? null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + 0.4 : readingSeconds(text) };
     });
-    return { index: i, chapter: chapters.length - 1, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, scene, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
@@ -2188,19 +2235,20 @@ function compileTour(def, candles, resolved = new Map(), audio = {}) {
 // Looks up the events a compiled tour is waiting for, then compiles again, until nothing is waiting: a lookup can move a
 // section's start, and with it what the next section waits from.
 async function resolveTour(retry = 0) {
-  const ex = tour.ex, pending = tour.wanted;
+  const scenes = tour.scenes, pending = tour.wanted;
   if (!pending.length || retry > 12) return;
   tour.resolving = true;
   updateEditorStatus();
-  for (const { key, spec, from } of pending) {
+  for (const { key, spec, from, scene } of pending) {
     if (tour.resolved.has(key)) continue;
+    const ex = scenes[scene ?? 0]?.ex ?? scenes[0].ex;
     const query = `dataset=${encodeURIComponent(ex.dataset)}&anchor=${ex.anchor}&from=${from}&type=${encodeURIComponent(spec.event)}&level=${spec.level ?? 1}&nth=${spec.nth ?? 1}`;
     const found = await fetch(`api/event?${query}`).then(r => r.ok ? r.json() : null).catch(() => null);
     tour.resolved.set(key, found?.index ?? null);
   }
   tour.resolving = false;
-  if (tour.ex !== ex || currentPage !== 'Tour') return;
-  Object.assign(tour, compileTour(tour.def, ex.prices.t.length, tour.resolved, tour.audio));
+  if (tour.scenes !== scenes || currentPage !== 'Tour') return;
+  Object.assign(tour, compileTour(tour.def, scenes, tour.resolved, tour.audio));
   if (tour.wanted.length) return resolveTour(retry + 1);
   editorSection = -1;
   seekTour(tour.index, { t: cursorOf(ex), shown: tour.shown.length });
@@ -2231,33 +2279,74 @@ async function checkTourFile() {
 window.addEventListener('focus', checkTourFile);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkTourFile(); });
 
+// The tour's scenes: the start state is the first, and each section with "scene": { "dataset", "time" } begins another, a
+// replay of its own on that dataset (the tour's unless given) from that time, with its candles numbered from #0 again.
+function sceneSpecs(def) {
+  const own = def.dataset ?? null;
+  return [{ dataset: own, time: def.start?.time, section: -1 },
+    ...(def.sections ?? []).flatMap((s, i) => s.scene != null ? [{ dataset: (typeof s.scene === 'object' && s.scene.dataset) || own, time: typeof s.scene === 'object' ? s.scene.time : undefined, section: i }] : [])];
+}
+
 async function loadTour() {
   const { def, base } = await readTourFile();
   const list = await loadDatasets();
-  const info = list.find(d => d.id === def.dataset) ?? list[0];
-  if (!info) throw new Error('the server has no datasets');
+  if (!list.length) throw new Error('the server has no datasets');
   const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
-  const loaded = { def, base, audio, whole: await loadDataset(info), ex: null, saved: JSON.stringify(def), history: [], lastEdit: null, picking: null, note: '', resolved: new Map(), resolving: false,
+  const loaded = { def, base, audio, wholes: new Map(), scenes: [], ex: null, saved: JSON.stringify(def), history: [], lastEdit: null, picking: null, note: '', resolved: new Map(), resolving: false,
     index: 0, view: DEFAULT_VIEW, queue: [], shown: [], fired: new Set(), kept: [], active: null, activeUntil: 0, nextCandle: 0, timer: null,
     voice: { now: null, waiting: [] } };
+  await loadTourDatasets(loaded);
   anchorTour(loaded);
-  return Object.assign(loaded, compileTour(def, loaded.ex.prices.t.length, loaded.resolved, loaded.audio));
+  return Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio));
 }
 
-// The tour's candles are the dataset's from its start time on, so a candle's number is its place in them. A new start
-// time makes them anew, and what the server worked out from the old one is dropped.
+// Every dataset the tour's scenes name is loaded once; the tour's own falls back to the server's first dataset.
+async function loadTourDatasets(t = tour) {
+  const list = await loadDatasets();
+  for (const spec of sceneSpecs(t.def)) {
+    const key = spec.dataset ?? '', info = list.find(d => d.id === spec.dataset) ?? (spec.dataset === (t.def.dataset ?? null) ? list[0] : null);
+    if (info && !t.wholes.has(key)) t.wholes.set(key, await loadDataset(info));
+  }
+}
+
+// A scene's candles are its dataset's from its start time on, so a candle's number is its place in them. A new start time
+// makes them anew, and what the server worked out from the old one is dropped. A scene whose dataset the server does not
+// have plays on the tour's own, and the tour says so.
 function anchorTour(t = tour) {
-  const time = axisTime(t.def.start?.time ?? ''), anchor = Number.isNaN(time) ? 0 : indexAtOrAfter(t.whole, time);
-  if (t.ex?.anchor === anchor) return;
-  const id = `Tour/${t.whole.dataset}`, cut = a => a.slice(anchor), p = t.whole.prices;
-  // Events were looked up from the old start, so they are looked up again.
-  t.resolved?.clear();
-  remote.delete(id);
-  eventCache.clear();
-  zooms.delete(id);
-  cursors.set(id, 0);
-  t.ex = { id, dataset: t.whole.dataset, anchor, tour: true, title: 'Tour', level: 1, expected: [], annotations: [],
-    prices: { t: cut(p.t), o: cut(p.o), h: cut(p.h), l: cut(p.l), c: cut(p.c) } };
+  const scenes = [], ids = new Set();
+  let changed = false;
+  for (const spec of sceneSpecs(t.def)) {
+    const whole = t.wholes.get(spec.dataset ?? '') ?? t.wholes.get(t.def.dataset ?? '') ?? [...t.wholes.values()][0], missing = !t.wholes.has(spec.dataset ?? '');
+    const time = axisTime(spec.time ?? ''), anchor = Number.isNaN(time) ? 0 : indexAtOrAfter(whole, time);
+    const was = (t.scenes ?? []).find(sc => sc.ex?.dataset === whole.dataset && sc.ex.anchor === anchor && !ids.has(sc.ex.id));
+    if (was) { ids.add(was.ex.id); scenes.push({ ...spec, missing, ex: was.ex }); continue; }
+    changed = true;
+    let id = scenes.length ? `Tour/${whole.dataset}@${anchor}` : `Tour/${whole.dataset}`;
+    while (ids.has(id)) id += '+';
+    ids.add(id);
+    const cut = a => a.slice(anchor), p = whole.prices;
+    remote.delete(id);
+    zooms.delete(id);
+    cursors.set(id, 0);
+    scenes.push({ ...spec, missing, ex: { id, dataset: whole.dataset, anchor, tour: true, title: 'Tour', level: 1, expected: [], annotations: [],
+      prices: { t: cut(p.t), o: cut(p.o), h: cut(p.h), l: cut(p.l), c: cut(p.c) } } });
+  }
+  // Events were looked up from the old starts, so they are looked up again.
+  if (changed || scenes.length !== (t.scenes ?? []).length) { t.resolved?.clear(); eventCache.clear(); }
+  t.scenes = scenes;
+  if (!scenes.some(sc => sc.ex === t.ex)) t.ex = scenes[0].ex;
+}
+
+// The tour shows one scene's chart at a time: moving to a section of another scene swaps the chart's example for that
+// scene's, where it was left.
+function showScene(ex) {
+  if (tour.ex === ex) return;
+  const was = tour.ex;
+  tour.ex = ex;
+  tour.zoom = null;
+  const el = document.querySelector(`.chart[data-id="${CSS.escape(was.id)}"]`);
+  if (el) { el.dataset.id = ex.id; el.closest('article').id = `ex-${ex.id}`; }
+  if (activeId === was.id) activeId = ex.id;
 }
 
 // The candles a section shows are its view, which is what the chart shows as the section begins, wherever the replay is.
@@ -2296,6 +2385,12 @@ function zoomTour(from) {
   requestAnimationFrame(step);
 }
 
+// A drawn line: from the cue's pinned point to the point its "to" names, with the text in a box along it.
+function lineOf(ex, cue) {
+  const point = (at, on) => ({ time: ex.prices.t[at], price: typeof on === 'number' ? on : ex.prices[PIN_PRICES[on]]?.[at] });
+  return { from: point(cue.at, cue.on), to: point(cue.to.at, cue.to.on), text: cue.text, heads: cue.heads, color: cue.color };
+}
+
 function pinOf(ex, cue) {
   return { time: ex.prices.t[cue.at], price: typeof cue.on === 'number' ? cue.on : ex.prices[PIN_PRICES[cue.on]]?.[cue.at], text: cue.text,
     place: cue.place ?? { high: 'above', low: 'below', open: 'left' }[cue.on] ?? 'right' };
@@ -2321,12 +2416,15 @@ function pinLabel(pin) {
     bgcolor: css('--panel'), bordercolor: accent, borderpad: 5, font: { color: css('--text'), size: 13 } };
 }
 
+// The candle a cue is reached at: a line's end, a pin's candle, or none for a text shown as the section begins.
+const cueAt = c => c.to?.at ?? c.at;
+
 // Moves the replay to a candle and queues the cues it has reached: text with no candle is reached as the section begins.
 function advanceTo(t) {
   const s = tourSection(), ex = tour.ex;
   cursors.set(ex.id, t);
   prefetch(ex, t);
-  for (const c of s.cues) if (!tour.fired.has(c) && (c.at ?? s.from) <= t) { tour.fired.add(c); tour.queue.push(c); }
+  for (const c of s.cues) if (!tour.fired.has(c) && (cueAt(c) ?? s.from) <= t) { tour.fired.add(c); tour.queue.push(c); }
 }
 
 function showNextCue() {
@@ -2390,9 +2488,13 @@ window.tourVideo = {
 // Sets the tour at the start of a section, with nothing of it shown yet. A section that has a journey is set at the end of
 // it, unless the journey is to be played: then the tour is left where the journey starts, with the view easing out.
 function openSection(i, { journey = false } = {}) {
-  const s = tour.sections[i], ex = tour.ex, shown = tourView(cursorOf(ex)), moved = i !== tour.index;
+  const s = tour.sections[i], switched = (tour.scenes[s.scene] ?? tour.scenes[0]).ex !== tour.ex;
+  // Another scene is a cut, not a move: its chart comes up at the section's view with nothing to ease from.
+  if (switched) showScene((tour.scenes[s.scene] ?? tour.scenes[0]).ex);
+  const ex = tour.ex, shown = switched ? s.view : tourView(cursorOf(ex)), moved = i !== tour.index;
   Object.assign(tour, { index: i, view: s.view, queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, nextCandle: 0, journey: null });
-  tour.kept = tour.sections.slice(0, i).flatMap(earlier => earlier.cues.filter(c => c.on != null
+  // Pins kept from earlier sections belong to this scene's chart only.
+  tour.kept = tour.sections.slice(0, i).filter(earlier => earlier.scene === s.scene).flatMap(earlier => earlier.cues.filter(c => c.on != null
     && (c.keep === 'always' || (c.keep === 'chapter' && earlier.chapter === s.chapter))));
   // While a candle is being picked, the candles still to come are shown, to pick from.
   tourLayers = ['replay', ...s.layers, ...(tour.picking ? ['future'] : [])];
@@ -2473,7 +2575,7 @@ function seekTour(i, { t = 0, shown = 1, cue = null } = {}) {
   }
   openSection(Math.max(0, Math.min(i, tour.sections.length - 1)));
   const s = tourSection(), target = cue == null ? null : s.cues[cue];
-  const pending = () => s.cues.filter(c => !tour.fired.has(c)).map(c => c.at);
+  const pending = () => s.cues.filter(c => !tour.fired.has(c)).map(cueAt);
   if (target) {
     while (!tour.shown.includes(target)) {
       if (!tour.queue.length) {
@@ -2491,8 +2593,10 @@ function seekTour(i, { t = 0, shown = 1, cue = null } = {}) {
 
 function refreshTour() {
   const ex = tour.ex;
-  const pins = cues => cues.filter(c => c.on != null && c.at != null).map(c => pinOf(ex, c)).filter(p => p.time && Number.isFinite(p.price));
+  const pins = cues => cues.filter(c => c.on != null && c.at != null && c.to == null).map(c => pinOf(ex, c)).filter(p => p.time && Number.isFinite(p.price));
+  const lines = cues => cues.filter(c => c.to != null && c.at != null && c.to.at != null).map(c => lineOf(ex, c)).filter(l => l.from.time && l.to.time && Number.isFinite(l.from.price) && Number.isFinite(l.to.price));
   ex.pins = pins([...tour.kept, ...tour.shown]);
+  ex.lines = lines([...tour.kept, ...tour.shown]);
   // Room is kept for all of the section's pins from its start, so the prices do not move each time one appears.
   ex.pinRoom = pins([...tour.kept, ...(tourSection()?.cues ?? [])]);
   syncLayerButtons();
@@ -2509,7 +2613,8 @@ function updateTourPanel() {
   const caption = [...tour.shown].reverse().find(c => c.on == null);
   part('title').textContent = tour.def.title || 'Tour';
   part('chapter').textContent = tour.chapters[s?.chapter]?.name ?? tour.def.title ?? 'Tour';
-  part('where').textContent = s ? `section ${s.index + 1} of ${tour.sections.length} · #${s.from}${s.until > s.from ? ` to #${s.until}` : ''}` : 'no sections yet';
+  const scene = tour.scenes.length > 1 && s ? ` · scene ${s.scene + 1}: ${datasetList?.find(d => d.id === ex.dataset)?.name ?? ex.dataset} from ${fmtTime(ex.prices.t[0])}` : '';
+  part('where').textContent = s ? `section ${s.index + 1} of ${tour.sections.length} · #${s.from}${s.until > s.from ? ` to #${s.until}` : ''}${scene}` : 'no sections yet';
   part('caption').textContent = caption?.text ?? '';
   part('readout').textContent = `#${t} · ${fmtTime(ex.prices.t[t])} UTC`;
   const warning = part('warning');
@@ -2560,7 +2665,7 @@ function tourTick() {
     // wait the count starts again, so the replay does not leap to make up the time.
     const gap = 1000 / s.speed, late = now - tour.nextCandle, inStep = tour.nextCandle > 0 && late < 1000;
     const due = inStep ? 1 + Math.floor(late / gap) : 1;
-    const stop = Math.min(s.until, t + due, ...s.cues.filter(c => c.at > t && !tour.fired.has(c)).map(c => c.at));
+    const stop = Math.min(s.until, t + due, ...s.cues.filter(c => cueAt(c) > t && !tour.fired.has(c)).map(cueAt));
     let to = t + 1;
     while (to < stop && timelineAt(ex, to + 1)) to++;
     tour.nextCandle = inStep && to - t === due ? tour.nextCandle + due * gap : now + gap;
@@ -2607,7 +2712,7 @@ function tourGo(action) {
     if (tour.index + 1 < tour.sections.length) enterSection(tour.index + 1);
     return;
   }
-  if (!tour.queue.length) advanceTo(Math.min(s.until, ...s.cues.filter(c => !tour.fired.has(c)).map(c => c.at)));
+  if (!tour.queue.length) advanceTo(Math.min(s.until, ...s.cues.filter(c => !tour.fired.has(c)).map(cueAt)));
   showNextCue();
   refreshTour();
 }
@@ -2786,7 +2891,7 @@ let editorSection = -1, editorFolded = false;
 const editorOn = () => state.tourEditor !== false && !videoMode;
 const tourDirty = () => !!tour && JSON.stringify(tour.def) !== tour.saved;
 const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
-  section: ['chapter', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'text', 'hold', 'keep', 'voice'] };
+  section: ['chapter', 'scene', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'to', 'heads', 'color', 'text', 'hold', 'keep', 'voice'] };
 
 // tour.json as text: a line for each text and for each of a section's settings, so a change shows as a small diff.
 function formatTour(def) {
@@ -2852,6 +2957,12 @@ function renderTourEditor(anchor = 'section') {
         <label>Seconds<input type="number" min="0" step="0.5" data-scope="cue" data-field="hold" data-type="number" placeholder="${readingSeconds(c.text ?? '').toFixed(1)}" value="${value(c.hold)}"></label>
         <label>Pin stays<select data-scope="cue" data-field="keep" ${pinned ? '' : 'disabled'}>${options([['', 'this section'], ['chapter', 'this chapter'], ['always', 'to the end']], c.keep === 'section' ? '' : c.keep)}</select></label>
         <label class="ed-check" title="Shown but not read aloud by the voice, in the page or in the video"><input type="checkbox" data-scope="cue" data-field="voice" ${c.voice === false ? 'checked' : ''}>Silent</label>
+        <label title="Draws a line from the pinned point to a point on another candle, with the text in a box along it; it appears when the replay reaches the line's end">Line to candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="cue" data-field="lineTo" data-type="number" data-render ${pinned ? '' : 'disabled'} placeholder="${esc(compiled?.to?.atSpec ?? 'no line')}" value="${numberOr(c.to?.at)}"${eventBox(compiled?.to?.atSpec)}></span></label>
+        <label>Line ends on<select data-scope="cue" data-field="lineOn" data-type="auto" ${c.to ? '' : 'disabled'}>${options([['', 'same as the pin'], ['open', 'open'], ['high', 'high'], ['low', 'low'], ['close', 'close'],
+          ...(typeof c.to?.on === 'number' ? [[c.to.on, `price ${c.to.on}`]] : [])], c.to?.on)}</select></label>
+        <label class="ed-check" title="An arrow head where the line starts"><input type="checkbox" data-scope="cue" data-field="headStart" ${c.to ? '' : 'disabled'} ${c.heads?.start === true ? 'checked' : ''}>Head at start</label>
+        <label class="ed-check" title="An arrow head where the line ends"><input type="checkbox" data-scope="cue" data-field="headEnd" ${c.to ? '' : 'disabled'} ${c.heads?.end !== false ? 'checked' : ''}>Head at end</label>
+        <label title="The line's colour: up (green), down (red), accent, or any CSS colour">Line colour<input data-scope="cue" data-field="color" ${c.to ? '' : 'disabled'} placeholder="accent" value="${value(c.color)}"></label>
         ${ops('cue', 'text')}
         ${j ? `<span class="ed-split"><button type="button" data-ed="cue-split" title="Start a new section with this text and those after it, so it can have layers of its own">Split the section here</button></span>` : ''}
       </div>
@@ -2878,6 +2989,8 @@ function renderTourEditor(anchor = 'section') {
         <label>${back ? 'Rewinds' : 'Fast forwards'} to candle<input type="number" min="0" step="1" data-scope="section" data-field="journeyTo" ${runs ? '' : 'disabled'} value="${numberOr(trip?.to)}"></label>
         <label>Candles a second on the way<input type="number" min="1" step="5" data-scope="section" data-field="journeySpeed" placeholder="${JOURNEY_SPEED}" ${runs ? '' : 'disabled'} value="${value(trip?.speed)}"></label>
         <label class="ed-check" title="Ticked, the replay runs there, ${back ? 'erasing' : 'drawing'} the closes and the rest as it goes. Unticked, the replay stays where it is and only the view moves"><input type="checkbox" data-scope="section" data-field="journeyRun" data-render ${tripKind ? '' : 'disabled'} ${runs ? 'checked' : ''}>${back ? 'Erases' : 'Draws'} as it goes</label>
+        <label title="Begins a new scene here: a replay of its own on a dataset from a time, with its candles numbered from #0 again. A cut, not a journey">Begins a scene on<select data-scope="section" data-field="sceneDataset" data-render>${options([['', 'no scene: carries on'], ...(datasetList ?? []).map(x => [x.id, x.name])], d.scene ? (d.scene.dataset ?? def.dataset ?? datasetList?.[0]?.id) : '')}</select></label>
+        <label>Scene starts at (candle #0, UTC)<input type="datetime-local" step="3600" data-scope="section" data-field="sceneTime" data-commit data-render ${d.scene ? '' : 'disabled'} value="${value(d.scene?.time)}"></label>
       </div>
       <div class="ed-layers"><span>Layers</span>${chips.join('') || '<span class="ed-chip">none</span>'}<span class="ed-hint">Set with the layer buttons on the left.</span></div>
       ${(d.cues ?? []).map((c, j) => cueCard(c, j, s.cues[j])).join('')}
@@ -2992,7 +3105,7 @@ function applyTour({ render = false, cue = null, end = false, start = false } = 
   const was = { t: cursorOf(tour.ex), shown: tour.shown.length };
   tour.note = '';
   anchorTour();
-  Object.assign(tour, compileTour(tour.def, tour.ex.prices.t.length, tour.resolved, tour.audio));
+  Object.assign(tour, compileTour(tour.def, tour.scenes, tour.resolved, tour.audio));
   if (render) { editorSection = -1; renderTourGlossary(); }
   seekTour(tour.index, start ? {} : end ? { t: Infinity, shown: Infinity } : cue != null ? { cue } : was);
   updateEditorMeta();
@@ -3015,6 +3128,24 @@ function editTourField(el) {
       const to = box('journeyTo').value, rate = box('journeySpeed').value, runs = had ? box('journeyRun').checked : true;
       target[kind] = { ...(to !== '' ? { to: Number(to) } : {}), ...(rate !== '' ? { speed: Number(rate) } : {}), [kind === 'rewind' ? 'erase' : 'draw']: runs };
     }
+  }
+  // A line's boxes are one setting: no end candle means no line; the end's point is the pin's unless given.
+  else if (field === 'lineTo' || field === 'lineOn') {
+    const box = f => el.closest('.ed-cue').querySelector(`[data-field="${f}"]`), to = box('lineTo').value, onRaw = box('lineOn').value;
+    if (to === '') delete target.to;
+    else target.to = { at: Number(to), ...(onRaw !== '' ? { on: /^\d+(\.\d+)?$/.test(onRaw) ? Number(onRaw) : onRaw } : {}) };
+  }
+  else if (field === 'headStart' || field === 'headEnd') {
+    const heads = { ...target.heads, [field === 'headStart' ? 'start' : 'end']: el.checked };
+    // Only what differs from the default, a head at the end alone, is written.
+    const written = { ...(heads.start === true ? { start: true } : {}), ...(heads.end === false ? { end: false } : {}) };
+    if (Object.keys(written).length) target.heads = written; else delete target.heads;
+  }
+  // A scene's two boxes are one setting: no dataset chosen means no scene; the tour's own dataset is not written.
+  else if (field.startsWith('scene')) {
+    const box = f => el.closest('.ed-grid').querySelector(`[data-field="${f}"]`), dataset = box('sceneDataset').value, time = box('sceneTime').value;
+    if (!dataset) delete target.scene;
+    else target.scene = { ...(dataset !== (def.dataset ?? datasetList?.[0]?.id) ? { dataset } : {}), ...(time ? { time } : {}) };
   }
   // Silent is the one tick box: ticked, the text has "voice": false, and otherwise it has no "voice" at all.
   else if (el.type === 'checkbox') { if (el.checked) target[field] = false; else delete target[field]; }
@@ -3039,7 +3170,7 @@ function inheritedOf(el) {
   const { scope, field } = el.dataset, s = tourSection(), cueEl = el.closest('.ed-cue'), cue = cueEl && s?.cues[Number(cueEl.dataset.cue)];
   const view = field === 'view0' ? 0 : field === 'view1' ? 1 : null;
   if (scope === 'start') return view != null ? DEFAULT_VIEW[view] : field === 'speed' ? 4 : null;
-  if (scope === 'cue') return field === 'at' ? cue?.at ?? s?.from : field === 'hold' ? cue?.hold : null;
+  if (scope === 'cue') return field === 'at' ? cue?.at ?? s?.from : field === 'lineTo' ? cue?.at ?? s?.from : field === 'hold' ? cue?.hold : null;
   if (field === 'journeySpeed' || field === 'journeyTo') return field === 'journeySpeed' ? JOURNEY_SPEED : s?.from;
   return scope !== 'section' ? null : view != null ? s?.view[view] : ['from', 'until', 'speed'].includes(field) ? s?.[field] : null;
 }

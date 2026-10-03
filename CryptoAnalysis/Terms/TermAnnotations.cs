@@ -147,6 +147,21 @@ public sealed record RangeOutline(
     public double BandHigh => High.Price + Height * Band / 100;
 
     public bool EndedAbove => End != null && End.Price > High.Price;
+
+    /// <summary>
+    /// The top of the buy-low zone: the given share of the height above the low. The zone runs from the lower band to it.
+    /// </summary>
+    public double BuyLowTop(double zone) => Low.Price + Height * zone / 100;
+
+    /// <summary>
+    /// The bottom of the sell-high zone: the given share of the height below the high. The zone runs from it to the upper band.
+    /// </summary>
+    public double SellHighBottom(double zone) => High.Price - Height * zone / 100;
+
+    /// <summary>
+    /// Whether the range holds at a time: identified by then and not ended before it.
+    /// </summary>
+    public bool HoldsAt(DateTime time) => Identified.Time <= time && (End == null || End.Time > time);
 }
 
 /// <summary>

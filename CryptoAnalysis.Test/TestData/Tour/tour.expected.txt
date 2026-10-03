@@ -59,6 +59,23 @@
 #64 · section 69 (2nd order Trends) text 4 "second Downswing" on close · seen at #75: L1 LL · L1 upswing low · L2 LL · L2 downswing BoS · L2 MSB↓
 #68 · section 69 (2nd order Trends) text 5 "Downtrend ends" on close · seen at #75: L2 upswing BoS
 #1103 · section 70 (Orders and timescale) gets there by fast forward: L1 HH* · L1 upswing BoS
-#768 · section 71 text 2 "2 February" on close · seen at #1103: L1 HH · L1 upswing BoS · L1 upswing start
+#768 · section 71 text 2 "2 February" on close · seen at #1103: L1 HH · L1 upswing BoS · L1 upswing start · L1 range ends above
 #1049 · section 71 text 4 "Swing Low" on close · seen at #1103: L1 LL · L1 upswing low
 #1103 · section 71 text 6 "BoS" on close · seen at #1103: L1 HH* · L1 upswing BoS
+#40 · section 74 (A Range from the training) in scene 2 runs to it: L1 HH* · L1 MSB↑
+#40 · section 74 (A Range from the training) in scene 2 text 3 "HH and MSB: 60761" on close · seen at #40: L1 HH* · L1 MSB↑
+#50 · section 75 in scene 2 runs to it: L1 LL*
+#47 · section 75 in scene 2 text 1 "BoS" on close · seen at #50: L1 downswing BoS
+#50 · section 75 in scene 2 text 3 "LL: 55927" on close · seen at #50: L1 LL*
+#61 · section 76 in scene 2 runs to it: L1 LH*
+#61 · section 76 in scene 2 text 1 "79% back" on close · seen at #61: L1 LH*
+#68 · section 77 in scene 2 runs to it: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
+#68 · section 77 in scene 2 text 2 "MSB" on close · seen at #68: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
+#94 · section 78 in scene 2 runs to it: L1 LL* · L1 downswing BoS · L1 range ends below
+#94 · section 78 in scene 2 text 3 "Range ends: 53751" on close · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
+#69 · section 79 in scene 2 text 2 "1: +1917" on 56885 · seen at #94: nothing
+#71 · section 79 in scene 2 text 2 line ends on 58802 · seen at #94: nothing
+#71 · section 79 in scene 2 text 3 "2: +1917" on 56885 · seen at #94: nothing
+#89 · section 79 in scene 2 text 3 line ends on 58802 · seen at #94: nothing
+#93 · section 79 in scene 2 text 4 "3: -1725" on 56885 · seen at #94: nothing
+#94 · section 79 in scene 2 text 4 line ends on 55160 · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below

@@ -148,11 +148,13 @@ if (serve && full.Count > 0)
     var sourceDir = Path.Combine(repoRoot, "CryptoAnalysis.Site", "wwwroot");
     var video = new TourVideo(Path.Combine(repoRoot, "tools", "tour-video"), Path.Combine(repoRoot, "artifacts", "tour-video", "tour.mp4"),
         Path.Combine(sourceDir, "tour.json"), $"http://localhost:{port}");
-    var datasets = new List<Dataset> { new(FullHistoryDataset, "BTC/USD hourly (Coinbase)", full) };
-    // The longer history, from 2020, for replays of what came before the tour's dataset.
-    var longPath = Path.Combine(repoRoot, "CryptoAnalysis.Test", "TestData", "COINBASE_BTCUSD, 60.csv");
-    if (File.Exists(longPath))
-        datasets.Add(new Dataset("btc-1h-2020", "BTC/USD hourly (Coinbase, from 2020)", new CsvReaderHelper().ReadData<Price, PriceClassMap>(longPath).ToList()));
+    // The tour's own dataset first, then the others the tour's scenes can play on, such as the longer history from 2020.
+    var datasets = new List<Dataset> { new(FullHistoryDataset, Tours.Datasets[0].Name, full) };
+    foreach (var dataset in Tours.Datasets.Skip(1))
+    {
+        if (File.Exists(Path.Combine(repoRoot, dataset.Path)))
+            datasets.Add(new Dataset(dataset.Id, dataset.Name, Tours.Load(dataset, repoRoot)));
+    }
     await ReplayServer.Run(outDir, datasets, port, sourceDir, video);
 }
 return 0;
