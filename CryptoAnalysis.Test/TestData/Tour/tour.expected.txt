@@ -58,3 +58,7 @@
 #75 · section 68 (Ghost Trends) text 2 "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." · seen at #75: L1 HH* · L1 upswing BoS
 #64 · section 69 (2nd order Trends) text 4 "second Downswing" on close · seen at #75: L1 LL · L1 upswing low · L2 LL · L2 downswing BoS · L2 MSB↓
 #68 · section 69 (2nd order Trends) text 5 "Downtrend ends" on close · seen at #75: L2 upswing BoS
+#1103 · section 70 (Orders and timescale) gets there by fast forward: L1 HH* · L1 upswing BoS
+#768 · section 71 text 2 "2 February" on close · seen at #1103: L1 HH · L1 upswing BoS · L1 upswing start
+#1049 · section 71 text 4 "Swing Low" on close · seen at #1103: L1 LL · L1 upswing low
+#1103 · section 71 text 6 "BoS" on close · seen at #1103: L1 HH* · L1 upswing BoS

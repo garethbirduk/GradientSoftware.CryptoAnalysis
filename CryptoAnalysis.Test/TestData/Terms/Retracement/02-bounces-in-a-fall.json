@@ -1,0 +1,28 @@
+{
+  "term": "Retracement",
+  "title": "Bounces in a fall",
+  "description": "Level 1 downswings in a fall from 67,158. The first bounce, from 65,906 (13 Apr 01:00), went 142% of the way back, beyond the bounce high before it: a bullish market structure break, and the retracement reads past 100%. The next, from 61,982 (13 Apr 20:00), came 82% of the way back to 66,669 over a day and a half, without closing above 67,687; that deep bounce then broke its own structure and a range was identified, which this example leaves to the Range term. The bounce from 61,791 read 47%.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Retracement",
+      "direction": "Down",
+      "time": "2024-04-13T15:00:00Z",
+      "price": 67687.91
+    },
+    {
+      "type": "Retracement",
+      "direction": "Down",
+      "time": "2024-04-15T09:00:00Z",
+      "price": 66669.16
+    },
+    {
+      "type": "Retracement",
+      "direction": "Down",
+      "time": "2024-04-17T04:00:00Z",
+      "price": 64121.96
+    }
+  ]
+}

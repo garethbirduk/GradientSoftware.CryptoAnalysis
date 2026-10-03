@@ -55,7 +55,9 @@ public sealed record ReplayTimeline(
     List<ReplayEntry<LevelBreak>> MarketStructureBreaks,
     List<ReplayEntry<TrendOutline>> Trends,
     List<ReplayEntry<StructurePoint>> Points,
-    List<ReplayEntry<CandleRun>> CandleRuns);
+    List<ReplayEntry<CandleRun>> CandleRuns,
+    List<ReplayEntry<RetracementOutline>> Retracements,
+    List<ReplayEntry<RangeOutline>> Ranges);
 
 /// <summary>
 /// Market structure as it can be known at a candle, from that candle's prices and earlier ones only.
@@ -119,12 +121,12 @@ public static class MarketStructure
     /// long series only carries what a chart of its recent candles can show.
     /// </summary>
     public static ReplayTimeline Timeline(List<Price> prices, EnumPriceBasis basis, int maxLevel = 8, int minTrendSwings = 2,
-        int from = 0, int? to = null, int? keepFrom = null)
+        int from = 0, int? to = null, int? keepFrom = null, double minRetracement = Ranges.DefaultMinRetracement, double band = Ranges.DefaultBand)
     {
         var end = Math.Min(to ?? prices.Count, prices.Count);
         from = Math.Max(0, from);
         var snapshots = new Snapshot[Math.Max(0, end - from)];
-        Parallel.For(from, end, t => snapshots[t - from] = TakeSnapshot(prices, basis, t, maxLevel, minTrendSwings, keepFrom));
+        Parallel.For(from, end, t => snapshots[t - from] = TakeSnapshot(prices, basis, t, maxLevel, minTrendSwings, keepFrom, minRetracement, band));
 
         var pivots = new Tracker<LevelPivot>(x => (x.Level, x.Pivot.Kind, x.Pivot.Index));
         var swings = new Tracker<SwingOutline>(x => (x.Level, x.Direction, x.Start.Time));
@@ -134,6 +136,9 @@ public static class MarketStructure
         // A point that moves (a higher close moving an HH forward) stays the same item: its leg starts from the same place.
         var points = new Tracker<StructurePoint>(x => (x.Level, x.Kind, x.LegStart));
         var runs = new Tracker<CandleRun>(x => (x.Green, x.Start.Time));
+        // A retracement is the same item while it measures the same move; a range from the moment it was identified.
+        var retracements = new Tracker<RetracementOutline>(x => (x.Level, x.Direction, x.From.Time, x.To.Time));
+        var ranges = new Tracker<RangeOutline>(x => (x.Level, x.Direction, x.Identified.Time));
 
         for (var t = from; t < end; t++)
         {
@@ -147,10 +152,12 @@ public static class MarketStructure
             candidates.Step(t, s.Candidates, confirmed);
             breaks.Step(t, s.Breaks);
             trends.Step(t, s.Trends);
+            retracements.Step(t, s.Retracements);
+            ranges.Step(t, s.Ranges);
         }
 
         return new ReplayTimeline(pivots.Entries(), swings.Entries(), candidates.Entries(), breaks.Entries(), trends.Entries(),
-            points.Entries(), runs.Entries());
+            points.Entries(), runs.Entries(), retracements.Entries(), ranges.Entries());
     }
 
     private sealed record Snapshot(
@@ -160,12 +167,15 @@ public static class MarketStructure
         List<SwingOutline> Swings,
         List<CandidateSwing> Candidates,
         List<LevelBreak> Breaks,
-        List<TrendOutline> Trends);
+        List<TrendOutline> Trends,
+        List<RetracementOutline> Retracements,
+        List<RangeOutline> Ranges);
 
     /// <summary>
     /// Computes everything the replay tracks at candle t, from the prices up to it.
     /// </summary>
-    private static Snapshot TakeSnapshot(List<Price> prices, EnumPriceBasis basis, int t, int maxLevel, int minTrendSwings, int? keepFrom)
+    private static Snapshot TakeSnapshot(List<Price> prices, EnumPriceBasis basis, int t, int maxLevel, int minTrendSwings, int? keepFrom,
+        double minRetracement, double band)
     {
         var prefix = prices.GetRange(0, t + 1);
         var levels = Sawtooth.Levels(prefix, basis, maxLevel);
@@ -179,25 +189,47 @@ public static class MarketStructure
             pivots.AddRange(kept.Skip(keep == DateTime.MinValue ? 0 : first).Select(p => new LevelPivot(level.Level, p)));
         }
 
+        var top = Math.Min(maxLevel, levels.Count);
+        var swingsByLevel = new List<SwingOutline>[top + 1];
+        var breaksByLevel = new List<MarketStructureBreakOutline>[top + 1];
+        var trendsByLevel = new List<TrendOutline>[top + 1];
+        var candidatesByLevel = new List<CandidateSwing>[top + 1];
+        var retracementsByLevel = new List<RetracementOutline>[top + 1];
+        for (var level = 1; level <= top; level++)
+        {
+            swingsByLevel[level] = Sawtooth.Swings(prefix, levels, basis, level).OrderBy(x => x.Start.Time).ToList();
+            breaksByLevel[level] = Sawtooth.MarketStructureBreaks(prefix, swingsByLevel[level], basis);
+            trendsByLevel[level] = Sawtooth.Trends(swingsByLevel[level], breaksByLevel[level], minTrendSwings);
+            candidatesByLevel[level] = Sawtooth.Candidates(prefix, levels, basis, level);
+            retracementsByLevel[level] = Sawtooth.Retracements(prefix, swingsByLevel[level], candidatesByLevel[level], basis);
+        }
+
         var swings = new List<SwingOutline>();
         var candidates = new List<CandidateSwing>();
         var breaks = new List<LevelBreak>();
         var trends = new List<TrendOutline>();
-        for (var level = 1; level <= Math.Min(maxLevel, levels.Count); level++)
+        var retracements = new List<RetracementOutline>();
+        var ranges = new List<RangeOutline>();
+        for (var level = 1; level <= top; level++)
         {
-            var levelSwings = Sawtooth.Swings(prefix, levels, basis, level).OrderBy(x => x.Start.Time).ToList();
-            var levelBreaks = Sawtooth.MarketStructureBreaks(prefix, levelSwings, basis);
-            swings.AddRange(levelSwings.Where(x => x.End.Time >= keep));
-            breaks.AddRange(levelBreaks.Where(x => x.Break.Time >= keep).Select(x => new LevelBreak(level, x)));
-            trends.AddRange(Sawtooth.Trends(levelSwings, levelBreaks, minTrendSwings).Where(x => x.End == null || x.End.Time >= keep));
-            candidates.AddRange(Sawtooth.Candidates(prefix, levels, basis, level));
+            swings.AddRange(swingsByLevel[level].Where(x => x.End.Time >= keep));
+            breaks.AddRange(breaksByLevel[level].Where(x => x.Break.Time >= keep).Select(x => new LevelBreak(level, x)));
+            trends.AddRange(trendsByLevel[level].Where(x => x.End == null || x.End.Time >= keep));
+            candidates.AddRange(candidatesByLevel[level]);
+            retracements.AddRange(retracementsByLevel[level].Where(x => !x.Confirmed || x.Deepest.Point.Time >= keep));
+            // A range needs the structure one level finer, so the finest level has none.
+            if (level < top)
+            {
+                ranges.AddRange(Ranges.Find(prefix, basis, retracementsByLevel[level], swingsByLevel[level], trendsByLevel[level],
+                    breaksByLevel[level + 1], minRetracement, band).Where(x => x.End == null || x.End.Time >= keep));
+            }
         }
 
         return new Snapshot(
             pivots,
             levels.SelectMany(l => Sawtooth.Points(prefix, l, basis)).Where(x => x.Time >= keep).ToList(),
             CandleRuns.Runs(prefix, minLength: 2).Where(x => x.End.Time >= keep).ToList(),
-            swings, candidates, breaks, trends);
+            swings, candidates, breaks, trends, retracements, ranges);
     }
 
     /// <summary>

@@ -83,6 +83,73 @@ public sealed record TrendOutline(
 }
 
 /// <summary>
+/// One reading of a retracement: the candle on which the counter-move reached a new furthest point, and how far back that is
+/// as a whole percentage of the move it retraces, rounded down.
+/// </summary>
+public sealed record RetracementStep(PricePoint Point, int Percent);
+
+/// <summary>
+/// How far a swing's counter-move has come back along the move before it, at a sawtooth level. From is the extreme of the
+/// previous swing in the same direction (the bounce high a fall started from, the pullback low a rise started from), To the
+/// start of this swing (the low the fall reached, the high the rise reached), and the steps are each new furthest point of the
+/// counter-move since, with its reading: 0% at To, 100% at From. A reading of 100% or more would be a close beyond From, which
+/// is a market structure break; a close beyond To is this swing's break of structure. Confirmed is true when the swing is,
+/// so the steps are final; for a candidate they are the counter-move so far.
+/// </summary>
+public sealed record RetracementOutline(
+    int Level,
+    EnumSwingDirection Direction,
+    PricePoint From,
+    PricePoint To,
+    IReadOnlyList<RetracementStep> Steps,
+    bool Confirmed)
+{
+    public RetracementStep Deepest => Steps[^1];
+
+    /// <summary>
+    /// Compares the retracements by value, their steps included, so a replay can tell when one has changed.
+    /// </summary>
+    public bool Equals(RetracementOutline? other)
+    {
+        return other is not null && Level == other.Level && Direction == other.Direction && From == other.From && To == other.To
+            && Confirmed == other.Confirmed && Steps.SequenceEqual(other.Steps);
+    }
+
+    /// <inheritdoc/>
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Level, Direction, From, To, Confirmed, Steps.Count);
+    }
+}
+
+/// <summary>
+/// A range at a sawtooth level: a deep retracement whose own structure then broke, so neither side has the price. Direction
+/// is the trend it came out of (Down: a downtrend's fall from From to Low bounced to High; Up: an uptrend's rise from From to
+/// High pulled back to Low). Identified is the close of the market structure break one level finer that identified it, with
+/// Retracement the reading at that moment. Low and High are fixed from then on; Band is how far beyond them, as a percentage
+/// of their gap, the price may close before the range ends, and End is the close that ended it (null while it holds).
+/// </summary>
+public sealed record RangeOutline(
+    int Level,
+    EnumSwingDirection Direction,
+    PricePoint From,
+    PricePoint Low,
+    PricePoint High,
+    PricePoint Identified,
+    int Retracement,
+    double Band,
+    PricePoint? End)
+{
+    public double Height => High.Price - Low.Price;
+
+    public double BandLow => Low.Price - Height * Band / 100;
+
+    public double BandHigh => High.Price + Height * Band / 100;
+
+    public bool EndedAbove => End != null && End.Price > High.Price;
+}
+
+/// <summary>
 /// A swing and its interim swings: the swings one level finer that start inside it, each with its own interims.
 /// </summary>
 public sealed record SwingNode(SwingOutline Swing, IReadOnlyList<SwingNode> Interims);
@@ -140,6 +207,15 @@ public static class TermAnnotations
             .Select(x => new TermAnnotation(
                 x.Green ? EnumAnnotationType.SuccessiveGreenCandles : EnumAnnotationType.SuccessiveRedCandles,
                 x.Green ? EnumSwingDirection.Up : EnumSwingDirection.Down, x.End.Time, x.End.Price)));
+
+        var basis = Basis(closeType);
+        var levels = Sawtooth.Levels(prices, basis, level + 1);
+        annotations.AddRange(Sawtooth.Retracements(prices, swings, Sawtooth.Candidates(prices, levels, basis, level), basis)
+            .Where(x => x.Confirmed)
+            .Select(x => new TermAnnotation(EnumAnnotationType.Retracement, x.Direction, x.Deepest.Point.Time, x.Deepest.Point.Price)));
+
+        annotations.AddRange(Ranges.At(prices, basis, level)
+            .Select(x => new TermAnnotation(EnumAnnotationType.Range, x.Direction, x.Identified.Time, x.Identified.Price)));
 
         return annotations
             .Distinct()

@@ -581,6 +581,44 @@
         { "at": 68, "on": "close", "place": "above", "text": "Downtrend ends", "hold": 3.5, "voice": false },
         { "text": "Two Upswings in a row then make a 2nd order Uptrend. Trends, like Swings, exist at every resolution." }
       ]
+    },
+    {
+      "chapter": "Orders and timescale",
+      "layers": ["level1", "close", "Upswing", "Downswing"],
+      "fastForward": { "to": 1103, "speed": 200, "draw": true },
+      "view": [740, 1110],
+      "cues": [
+        { "text": "Every Swing so far has played out over a few hours, and the orders inside it over fewer still." },
+        { "text": "A 1st order Upswing lasts until the price closes above the high it began at. In the first hours of the year that took an hour or two. It can take weeks." },
+        { "text": "Let's run on six weeks." }
+      ]
+    },
+    {
+      "cues": [
+        { "text": "It is now the 15th of February. This 1st order Upswing began on the 2nd, at 24195.", "hold": 0 },
+        { "at": 768, "on": "close", "place": "above", "text": "2 February", "hold": 3.5, "voice": false },
+        { "text": "The price fell for eleven days, to a Swing Low of 21474.", "hold": 0 },
+        { "at": 1049, "on": "close", "place": "below", "text": "Swing Low", "hold": 3.5, "voice": false },
+        { "text": "Two days later it closed above 24195: a BoS, two weeks after the Upswing began.", "hold": 0 },
+        { "at": 1103, "on": "close", "place": "above", "text": "BoS", "hold": 3.5, "voice": false },
+        { "text": "Nothing new has been defined. A high, a Swing Low, a close above the high: the same Upswing as the ones that took an hour or two." }
+      ]
+    },
+    {
+      "add": ["level2", "Uptrend", "Downtrend", "trendArrows"],
+      "cues": [
+        { "text": "Inside it, the 2nd order shows the shapes we saw in the first hundred hours, only larger: a Downtrend of twenty Downswings on the way down, and an Uptrend of ten Upswings on the way back up." },
+        { "text": "In real time those twenty Downswings were 1st order, and their Downtrend with them. The close above 24195 made them Ghosts, and here they are at the 2nd order." },
+        { "text": "The 1st order Uptrend that began on the 1st of January is still running. This two-week Upswing is its forty-third, and a Weak one: on the way down the price closed below the Swing Low before it." }
+      ]
+    },
+    {
+      "cues": [
+        { "text": "The orders are counted from the first close the Sawtooth is given. Start the history somewhere else, and the same weeks divide into different Swings, of different orders." },
+        { "text": "So an order has no timescale of its own. With a few hours of history a 1st order Swing lasts an hour or two; with six weeks, a fortnight. Later in this data, with a year and a half behind it, one 1st order Downswing lasts two months." },
+        { "text": "Swings within Swings over a couple of hours are hard to act on. A Swing that plays out over weeks is not." },
+        { "text": "Which order to work at, and from how much history, is a choice. Choices are strategy, which comes later." }
+      ]
     }
   ]
 }

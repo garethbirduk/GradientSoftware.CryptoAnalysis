@@ -1,0 +1,16 @@
+{
+  "term": "Range",
+  "title": "Deep pullback, then the break",
+  "description": "An uptrend at level 1 from 60,402 (28 Feb 20:00) to 62,995 (29 Feb 06:00). The pullback came 84% of the way back, to 60,796 at 18:00, and the climb out of it took a day: the range was identified on 1 Mar 20:00, at 62,990, when the pullback's structure broke one level finer. The box is 60,796 to 62,995. A close above the top edge at 63,154 was the uptrend's break of structure, but it was inside the band, so the range held; it ended two days after it was identified when 63,496 (4 Mar 00:00) closed above the band.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Range",
+      "direction": "Up",
+      "time": "2024-03-01T20:00:00Z",
+      "price": 62990.39
+    }
+  ]
+}

@@ -54,7 +54,7 @@ public static class ReplayServer
         });
 
         var byId = datasets.ToDictionary(x => x.Id);
-        var batches = new ConcurrentDictionary<(string Dataset, int Anchor, int Start), Lazy<string>>();
+        var batches = new ConcurrentDictionary<(string Dataset, int Anchor, int Start, (double Retracement, double Band) Settings), Lazy<string>>();
 
         // The static page, opened as a file, asks whether the server is running so it can link to it.
         app.MapGet("/api/health", (HttpContext context) =>
@@ -77,15 +77,17 @@ public static class ReplayServer
             }, Json)
             : Results.NotFound());
 
-        // With an anchor, the replay is of the dataset from that candle on: from counts from it, and so does the batch.
-        app.MapGet("/api/replay", (string dataset, int from, int? anchor) =>
+        // With an anchor, the replay is of the dataset from that candle on: from counts from it, and so does the batch. The
+        // range settings (the least retracement and the band, as percentages) are the page's, so each pair has batches of its own.
+        app.MapGet("/api/replay", (string dataset, int from, int? anchor, double? retracement, double? band) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
 
             var first = Math.Clamp(anchor ?? 0, 0, data.Prices.Count - 1);
             var start = Math.Clamp(from / BatchSize * BatchSize, 0, data.Prices.Count - first - 1);
-            var json = batches.GetOrAdd((dataset, first, start), key => new Lazy<string>(() => Batch(data, key.Anchor, key.Start))).Value;
+            var settings = (Retracement: retracement ?? Ranges.DefaultMinRetracement, Band: band ?? Ranges.DefaultBand);
+            var json = batches.GetOrAdd((dataset, first, start, settings), key => new Lazy<string>(() => Batch(data, key.Anchor, key.Start, key.Settings))).Value;
             return Results.Text(json, "application/json");
         });
 
@@ -164,12 +166,12 @@ public static class ReplayServer
     /// One batch: the timeline for candles start to start + BatchSize, plus the candle before so items already holding at the
     /// start are known to be carried over rather than new. The candles are counted from the anchor.
     /// </summary>
-    private static string Batch(Dataset data, int anchor, int start)
+    private static string Batch(Dataset data, int anchor, int start, (double Retracement, double Band) settings)
     {
         var prices = anchor == 0 ? data.Prices : data.Prices.GetRange(anchor, data.Prices.Count - anchor);
         var to = Math.Min(start + BatchSize, prices.Count);
         var timeline = MarketStructure.Timeline(prices, EnumPriceBasis.Close, MaxLevel, from: Math.Max(0, start - 1), to: to,
-            keepFrom: Math.Max(0, start - Window));
+            keepFrom: Math.Max(0, start - Window), minRetracement: settings.Retracement, band: settings.Band);
         return JsonSerializer.Serialize(new { Anchor = anchor, From = start, To = to, Timeline = timeline }, Json);
     }
 }

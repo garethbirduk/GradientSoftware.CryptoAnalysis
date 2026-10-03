@@ -139,6 +139,33 @@ namespace Gradient.CryptoAnalysis
         BearishMarketStructureBreak,
 
         /// <summary>
+        /// How far a swing's counter-move has come back along the move before it: 0% at the swing's start, 100% at the previous
+        /// swing's extreme. It is a measurement, not a signal: a close beyond 100% is a market structure break, a close beyond
+        /// the start is the swing's break of structure, and a retracement says nothing about which will come.
+        /// </summary>
+        /// <remarks>
+        /// Detected on the sawtooth (see <see cref="Sawtooth.Retracements"/>): for a confirmed swing or a candidate at a level,
+        /// against the extreme of the previous swing in the same direction at that level, reading by reading as the counter-move
+        /// reaches each new furthest point. Asserted at the furthest point, the deepest reading.
+        /// </remarks>
+        [Term("R%", "Retracement", TermCategories.Indicators, EnumPosition.Precise, "#d97706", "x")]
+        Retracement,
+
+        /// <summary>
+        /// A deep retracement whose own structure then broke: in a trend, the counter-move came most of the way back along the
+        /// last move without closing beyond it, and then broke structure one level finer, so neither side has the price. The
+        /// range runs between the start of the retracement and its furthest point, and holds until a close beyond a band either
+        /// side of it, so a break of structure inside the band does not end it.
+        /// </summary>
+        /// <remarks>
+        /// Detected on the sawtooth (see <see cref="Ranges"/>): a retracement at a level, in a trend at that level, that reads
+        /// at least the minimum (75% unless set otherwise) and under 100% when a market structure break against the counter-move
+        /// closes one level finer. Asserted at that close. The band is 20% of the range's height unless set otherwise.
+        /// </remarks>
+        [Term("Rg", "Range", TermCategories.Indicators, EnumPosition.Precise, "#65a30d", "square-open")]
+        Range,
+
+        /// <summary>
         /// A run of at least three consecutive green candles (close above open). A red candle, or one that closes where it
         /// opened, ends the run. It is a candle pattern, not structure.
         /// </summary>

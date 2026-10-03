@@ -106,6 +106,7 @@
   .runmin { width: 3.4em; margin: 0 0 0 4px; padding: 1px 2px; font: inherit; font-size: 12px; color: var(--text);
     background: var(--panel); border: 1px solid var(--border); border-radius: 4px; }
   .runmin:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .layerbar .unit { margin-left: 2px; font-size: 11px; color: var(--muted); }
   .example { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-top: 18px; }
   .example header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
   .example h3 { margin: 0; font-size: 17px; }
@@ -328,7 +329,7 @@ const SECTIONS = [
     { id: 'future', label: 'Future candles' }, { id: 'eventlog', label: 'Event log' }, { id: 'live', label: 'Seen live' }] },
   // What a replay once showed and has since taken back, a layer for each kind of thing, so each can be shown on its own.
   { name: 'Ghosts', layers: [{ id: 'ghostSwings', label: 'Ghost swings' }, { id: 'ghostCandidates', label: 'Ghost candidates' }, { id: 'ghostPoints', label: 'Ghost points' },
-    { id: 'ghostTrends', label: 'Ghost trends' }, { id: 'ghostMsbs', label: 'Ghost MSBs' }] },
+    { id: 'ghostTrends', label: 'Ghost trends' }, { id: 'ghostMsbs', label: 'Ghost MSBs' }, { id: 'ghostRanges', label: 'Ghost ranges' }] },
   // A filter, not a layer: which sawtooth levels the sawtooth, swings and points are shown at.
   { name: 'Levels', levels: true, layers: Array.from({ length: LEVELS }, (_, l) => ({ id: `level${l}`, label: `${l}`, level: l })) },
   { name: 'Price', layers: [{ id: 'price', label: 'Candles' }, { id: 'close', label: 'Closes' }] },
@@ -339,8 +340,18 @@ const SECTIONS = [
   { name: 'Downswings', layers: [{ id: 'Downswing', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' }] },
   { name: 'Trends', layers: [{ id: 'Uptrend', label: 'Uptrend' }, { id: 'Downtrend', label: 'Downtrend' }, { id: 'trendArrows', label: 'Trend arrows' }] },
   { name: 'Indicators', layers: [{ id: 'BullishMarketStructureBreak' }, { id: 'msbLevelUp', label: 'MSB↑ level', term: 'BullishMarketStructureBreak' },
-    { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' }] },
+    { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' },
+    { id: 'Retracement', label: 'Retracement' }, { id: 'Range', label: 'Range' }, { id: 'rangeBands', label: 'Range bands', term: 'Range' }] },
 ].map(s => ({ ...s, layers: s.layers.map(l => ({ ...l, label: l.label ?? TERMS.get(l.id)?.label ?? l.id })) }));
+// Layers with a number beside them: how long a run must be to show, how far back a retracement must read to be marked (and
+// for a range to count), and how far beyond a range the price may close before the range ends. The range settings change
+// what the local server computes, so its replays are fetched again when they change.
+const SETTINGS = {
+  SuccessiveGreenCandles: { key: 'SuccessiveGreenCandles', min: 2, max: 99, fallback: 5, title: 'Minimum run length', unit: '' },
+  SuccessiveRedCandles: { key: 'SuccessiveRedCandles', min: 2, max: 99, fallback: 5, title: 'Minimum run length', unit: '' },
+  Retracement: { key: 'retracement', min: 1, max: 99, fallback: 75, title: 'Least retracement to mark, as a percentage of the move it comes back along', unit: '%', remote: true },
+  Range: { key: 'band', min: 0, max: 99, fallback: 20, title: 'Band either side of a range, as a percentage of its height: a close beyond it ends the range', unit: '%', remote: true },
+};
 const LAYERS = SECTIONS.flatMap(s => s.layers);
 const LEVEL_IDS = LAYERS.filter(l => l.level !== undefined).map(l => l.id);
 const POINT_LAYERS = ['HigherHigh', 'HigherLow', 'LowerHigh', 'LowerLow'];
@@ -485,21 +496,25 @@ function swatch(layer) {
     <line x1="15" y1="1" x2="15" y2="13" stroke="${css('--close')}" opacity=".5"/><rect x="12.5" y="3" width="5" height="7" fill="${css('--close')}" opacity=".5"/>`);
   if (layer.id === 'eventlog') return svg(`<path d="M3 3 H19 M3 7 H19 M3 11 H13" stroke="${css('--muted')}" stroke-width="1.6"/>`);
   if (layer.id.startsWith('msbLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="1.5 2.5"/>`);
+  if (layer.id === 'rangeBands') return svg(`<line x1="1" y1="3" x2="21" y2="3" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/><line x1="1" y1="11" x2="21" y2="11" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/>`);
+  if (layer.id === 'ghostRanges') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(css('--close'), 0.1)}" stroke="${css('--close')}" stroke-dasharray="1.5 2"/>`);
   if (layer.id.startsWith('bosLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="4 3"/>`);
   const term = TERMS.get(layer.term ?? layer.id);
   return term ? `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">${markerSvg(term.symbol, term.color)}</svg>` : '';
 }
 
-const RUN_MIN_DEFAULT = 5;
-const runMin = type => state.runMin?.[type] ?? RUN_MIN_DEFAULT;
+const setting = id => state.runMin?.[SETTINGS[id].key] ?? SETTINGS[id].fallback;
+const runMin = setting;
+// The range settings the local server is asked for, as part of every replay request.
+const rangeQuery = () => `&retracement=${setting('Retracement')}&band=${setting('Range')}`;
 
 // One section of the layer bar. Its heading turns the whole section on, or off when it is all on already; the arrow
 // beside it folds the section away, leaving the heading and its count. Folded sections are remembered across pages.
 const isFolded = s => (state.folded ?? []).includes(s.name);
 
 function layerSection(s, i, foldable = true) {
-  const runInput = l => l.id.startsWith('Successive')
-    ? `<input class="runmin" type="number" min="2" max="99" step="1" value="${runMin(l.id)}" data-run="${l.id}" title="Minimum run length" aria-label="Minimum ${esc(l.label.toLowerCase())} length">`
+  const runInput = l => SETTINGS[l.id]
+    ? `<input class="runmin" type="number" min="${SETTINGS[l.id].min}" max="${SETTINGS[l.id].max}" step="1" value="${setting(l.id)}" data-run="${l.id}" title="${esc(SETTINGS[l.id].title)}" aria-label="${esc(SETTINGS[l.id].title)}">${SETTINGS[l.id].unit ? `<span class="unit">${SETTINGS[l.id].unit}</span>` : ''}`
     : '';
   const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>`;
   const items = s => s.levels
@@ -584,10 +599,13 @@ function wireLayerBar(root) {
     b.setAttribute('aria-expanded', !fold);
   }));
   root.querySelectorAll('.runmin').forEach(input => input.addEventListener('input', () => {
-    const value = Math.round(Number(input.value));
-    if (!Number.isFinite(value) || value < 2) return;
-    state.runMin = { ...state.runMin, [input.dataset.run]: value };
-    save(state); drawAll(currentPage);
+    const s = SETTINGS[input.dataset.run], value = Math.round(Number(input.value));
+    if (!Number.isFinite(value) || value < s.min || value > s.max) return;
+    state.runMin = { ...state.runMin, [s.key]: value };
+    save(state);
+    // A setting the server computes with makes every batch fetched so far stale.
+    if (s.remote) { remote.clear(); eventCache.clear(); }
+    drawAll(currentPage);
   }));
   wireReplayControls(root);
 }
@@ -708,6 +726,43 @@ function shownMarketStructureBreaks(ex) {
 
 function trendsFor(ex) {
   return ex.trendsByLevel?.[structureLevel(ex)] ?? [];
+}
+
+// Retracements and ranges are drawn for every level selected, each saying its level, as market structure breaks are. A
+// retracement shows once it reads the Retracement setting, marked where it first did.
+function shownRetracements(ex) {
+  const min = setting('Retracement');
+  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.retracementsByLevel?.[level] ?? [])
+    .map(r => ({ ...r, level, reached: r.steps.find(s => s.percent >= min) })).filter(r => r.reached));
+}
+
+function shownRangeBoxes(ex) {
+  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.rangesByLevel?.[level] ?? []).map(g => ({ ...g, level })));
+}
+
+const rangeOrigin = g => g.direction === 'Down' ? 'a downtrend' : 'an uptrend';
+const rangeHover = g => `Range · level ${g.level} · out of ${rangeOrigin(g)}<br>${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}` +
+  `<br>identified ${fmtTime(g.identified.time)} at a ${g.retracement}% retracement of the move from ${fmtPrice(g.from.price)}` +
+  `<br>band ${g.band}%: ${fmtPrice(g.bandLow)} to ${fmtPrice(g.bandHigh)}` +
+  `<br>${g.end ? `ended ${fmtTime(g.end.time)}, close ${fmtPrice(g.end.price)} ${g.endedAbove ? 'above' : 'below'} the band` : 'holds'}`;
+
+// A range is a box from the candle that identified it to the one that ended it (or the latest candle while it holds),
+// between its low and high, with its bands as dashed lines beyond.
+function drawRanges(ex, traces) {
+  if (!on('Range') && !on('rangeBands')) return;
+  const term = TERMS.get('Range'), last = ex.prices.t[ex.prices.t.length - 1];
+  for (const g of shownRangeBoxes(ex)) {
+    const until = g.end?.time ?? last;
+    if (on('Range')) {
+      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: term.name,
+        x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [g.high.price, g.high.price, g.low.price, g.low.price, g.high.price],
+        line: { color: term.color, width: 1.5 }, fillcolor: withAlpha(term.color, 0.08), hovertemplate: `${rangeHover(g)}<extra></extra>` });
+    }
+    if (on('rangeBands')) {
+      traces.push({ type: 'scatter', mode: 'lines', name: 'Range band', x: [g.identified.time, until, null, g.identified.time, until], y: [g.bandHigh, g.bandHigh, null, g.bandLow, g.bandLow],
+        line: { color: term.color, width: 1, dash: 'dash' }, hovertemplate: `Range band · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(g.bandHigh)}: a close beyond ends the range<extra></extra>` });
+    }
+  }
 }
 
 // Hindsight events at a level, keyed like live events, so each live event can say whether hindsight agrees.
@@ -837,12 +892,15 @@ function fetchBatch(ex, t) {
   const cache = remote.get(ex.id) ?? remote.set(ex.id, new Map()).get(ex.id);
   if (!cache.has(start)) {
     const anchor = ex.anchor ? `&anchor=${ex.anchor}` : '';
-    const request = fetch(`api/replay?dataset=${encodeURIComponent(ex.dataset)}&from=${start}${anchor}`).then(r => r.json()).then(batch => {
+    const request = fetch(`api/replay?dataset=${encodeURIComponent(ex.dataset)}&from=${start}${anchor}${rangeQuery()}`).then(r => r.json()).then(batch => {
       // A server started before anchors existed ignores the anchor: its batch is of other candles, so its structure is dropped.
       if ((batch.anchor ?? 0) !== (ex.anchor ?? 0)) {
         ex.unanchored = true;
         batch.timeline = { pivots: [], swings: [], candidates: [], marketStructureBreaks: [], trends: [], points: [], candleRuns: [] };
       }
+      // A server from before retracements and ranges has neither.
+      batch.timeline.retracements ??= [];
+      batch.timeline.ranges ??= [];
       cache.set(start, batch);
       if (Math.abs(batchStart(cursorOf(ex)) - start) <= REMOTE_BATCH) redrawExample(ex);
       return batch;
@@ -894,7 +952,7 @@ function liveView(ex, t) {
   if (!r) {
     prefetch(ex, t);
     return { ...ex, hindsight: ex, cursor: t, window, loading: true, timeline: null, prices, sawtooth: [], swingsByLevel: [], pointsByLevel: [],
-      marketStructureBreaksByLevel: [], trendsByLevel: [], candidatesByLevel: [], candleRuns: [], liveByLevel: null };
+      marketStructureBreaksByLevel: [], trendsByLevel: [], candidatesByLevel: [], retracementsByLevel: [], rangesByLevel: [], candleRuns: [], liveByLevel: null };
   }
   const byLevel = (entries, value) => {
     const out = [];
@@ -917,6 +975,8 @@ function liveView(ex, t) {
     marketStructureBreaksByLevel: byLevel(r.marketStructureBreaks, v => v.break),
     trendsByLevel: byLevel(r.trends, v => v),
     candidatesByLevel: byLevel(r.candidates, v => v),
+    retracementsByLevel: byLevel(r.retracements ?? [], v => v),
+    rangesByLevel: byLevel(r.ranges ?? [], v => v),
     candleRuns: r.candleRuns.filter(holds).map(e => e.value),
     liveByLevel: ex.liveByLevel?.map(events => events.filter(e => e.time <= time)),
   };
@@ -1005,6 +1065,13 @@ function drawReplayExtras(ex, traces, level) {
         shapes.push(trendStrip(e.value.start.time, until, row.edge, row.inner, withAlpha(grey, 0.15), { color: grey, width: 1, dash: 'dot' }));
       }
     }
+    // A range that a later new high redrew away: its box in grey, at every level selected.
+    for (const e of on('ghostRanges') ? (r.ranges ?? []).filter(e => levels.includes(e.value.level) && removed(e)) : []) {
+      const g = e.value, until = g.end?.time ?? full.prices.t[e.until - 1];
+      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: 'Ghost range', ...box(g.identified.time, until, g.low.price, g.high.price),
+        line: { color: grey, width: 1, dash: 'dot' }, fillcolor: withAlpha(grey, 0.08),
+        hovertemplate: `Ghost: range ${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)} · level ${g.level}<br>removed ${when(e)}, when a later new high redrew the levels<extra></extra>` });
+    }
     // With trend arrows on, a ghost trend keeps its arrow too, in grey, at every level selected.
     for (const e of on('ghostTrends') && on('trendArrows') ? r.trends.filter(e => swingLevels(ex).includes(e.value.level) && removed(e)) : []) {
       const v = e.value, tip = v.parts?.[v.parts.length - 1]?.breakOfStructure, up = v.direction === 'Up';
@@ -1047,7 +1114,7 @@ function continuousBatches(ex) {
 
 const eventCache = new Map();
 function timelineEvents(ex, r, cacheId, level) {
-  const cacheKey = `${cacheId}|${level}|${runMin('SuccessiveGreenCandles')}|${runMin('SuccessiveRedCandles')}`;
+  const cacheKey = `${cacheId}|${level}|${runMin('SuccessiveGreenCandles')}|${runMin('SuccessiveRedCandles')}|${setting('Retracement')}`;
   if (eventCache.has(cacheKey)) return eventCache.get(cacheKey);
   const T = i => ex.prices.t[i], out = [];
   const at = lvl => e => e.value.level === lvl;
@@ -1090,6 +1157,18 @@ function timelineEvents(ex, r, cacheId, level) {
     const run = e.value, type = run.green ? 'SuccessiveGreenCandles' : 'SuccessiveRedCandles';
     if (run.length >= runMin(type))
       add({ at: e.from, ...tag(type), text: `${run.length} ${run.green ? 'greens' : 'reds'} in a row`, times: [run.start.time, run.end.time] });
+  }
+  // A retracement is logged on the candle its reading first reaches the setting.
+  const min = setting('Retracement');
+  for (const e of (r.retracements ?? []).filter(at(level))) {
+    const v = e.value, last = v.steps[v.steps.length - 1];
+    if (last.point.time === T(e.from) && last.percent >= min && !v.steps.slice(0, -1).some(s => s.percent >= min))
+      add({ at: e.from, ...tag('Retracement'), text: `retracement ${last.percent}%: ${fmtPrice(last.point.price)} is ${last.percent}% of the way back from ${fmtPrice(v.to.price)} to ${fmtPrice(v.from.price)}`, times: [v.to.time, last.point.time] }, e);
+  }
+  for (const e of (r.ranges ?? []).filter(at(level))) {
+    const g = e.value;
+    if (!e.continued) add({ at: e.from, ...tag('Range'), text: `range out of ${rangeOrigin(g)}: ${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}, after a ${g.retracement}% retracement broke structure`, times: [g.identified.time] }, e);
+    else if (g.end && g.end.time === T(e.from)) add({ at: e.from, ...tag('Range'), text: `range ended: close ${fmtPrice(g.end.price)} ${g.endedAbove ? 'above' : 'below'} the band`, times: [g.identified.time, g.end.time] }, e);
   }
 
   out.sort((a, b) => a.at - b.at || (b.removal ? 1 : 0) - (a.removal ? 1 : 0));
@@ -1578,11 +1657,12 @@ function draw(el, ex, focus) {
   const stacks = new Map();
   drawCandleRuns(ex, labels, traces);
   drawTrendArrows(ex, labels);
+  drawRanges(ex, traces);
   drawSawtooth(ex, traces);
 
   const level = structureLevel(ex);
   const BOS_DIRECTION = { BullishBreakOfStructure: 'Up', BearishBreakOfStructure: 'Down' };
-  const markerTypes = [...POINT_LAYERS, 'BullishBreakOfStructure', 'BearishBreakOfStructure', 'Uptrend', 'Downtrend', 'BullishMarketStructureBreak', 'BearishMarketStructureBreak'].filter(on);
+  const markerTypes = [...POINT_LAYERS, 'BullishBreakOfStructure', 'BearishBreakOfStructure', 'Uptrend', 'Downtrend', 'BullishMarketStructureBreak', 'BearishMarketStructureBreak', 'Retracement', 'Range'].filter(on);
   // Points are shown for every level selected that exists. A point that is the same at several levels shows once, as the
   // coarsest; where a pivot is a different point at different levels, each level's shows.
   const pointLevels = selectedLevels(ex).filter(l => l < (ex.pointsByLevel?.length ?? 0)).sort((a, b) => a - b);
@@ -1594,6 +1674,11 @@ function draw(el, ex, focus) {
       : BOS_DIRECTION[type] ? allSwings.filter(w => w.direction === BOS_DIRECTION[type]).map(w => ({ type, direction: w.direction, time: w.breakOfStructure.time, price: w.breakOfStructure.price, detail: `<br>level ${w.level}` }))
       : TREND_DIRECTION[type] ? trendsFor(ex).filter(t => t.direction === TREND_DIRECTION[type]).map(t => ({ type, time: t.confirmed.time, price: t.confirmed.price,
           detail: `<br>from ${fmtTime(t.start.time)} · ${t.end ? `ended ${fmtTime(t.end.time)}` : 'ongoing'}<br>${t.swings} swings · strength ${t.strength}% · ${t.marketStructureBreaks} MSB against` }))
+      // A retracement is marked where it first read the setting, labelled with that reading; the hover has the deepest.
+      : type === 'Retracement' ? shownRetracements(ex).map(r => ({ type, level: r.level, time: r.reached.point.time, price: r.reached.point.price, label: `${r.reached.percent}%`,
+          detail: `<br>level ${r.level} · ${r.direction === 'Down' ? 'bounce' : 'pullback'} from ${fmtPrice(r.to.price)} back towards ${fmtPrice(r.from.price)}` +
+            `<br>deepest ${r.deepest.percent}% at ${fmtTime(r.deepest.point.time)}${r.confirmed ? '' : ' so far'}` }))
+      : type === 'Range' ? shownRangeBoxes(ex).map(g => ({ type, level: g.level, time: g.identified.time, price: g.identified.price, detail: `<br>${rangeHover(g).split('<br>').slice(1).join('<br>')}` }))
       : shownMarketStructureBreaks(ex).filter(m => m.type === type).map(m => ({ type, level: m.level, time: m.break.time, price: m.break.price, detail: `<br>level ${m.level}` })) }));
   const isPointType = type => POINT_LAYERS.includes(type), severalLevels = selectedLevels(ex).length > 1;
   const bulkLabels =markers.filter(m => !isPointType(m.type)).reduce((n, m) => n + m.items.length, 0) > ANNOTATION_LIMIT;
@@ -1614,14 +1699,14 @@ function draw(el, ex, focus) {
         : { color: term.color, symbol: term.symbol, size: isFocus ? 13 : 10,
             line: isPoint ? { width: 1.5, color: items.map(a => levelColor(a.level)) } : { width: 1, color: css('--panel') } },
       opacity: isFocus ? 1 : 0.85,
-      ...(asText ? { text: items.map(() => term.label), textposition: below ? 'bottom center' : 'top center', textfont: { size: 10, color: muted } } : {}),
+      ...(asText ? { text: items.map(a => a.label ?? term.label), textposition: below ? 'bottom center' : 'top center', textfont: { size: 10, color: muted } } : {}),
       hovertemplate: items.map(a => `${term.name}${TREND_DIRECTION[type] ? ' confirmed' : ''}<br>${fmtTime(a.time)}<br>${fmtPrice(a.price)}${a.detail ?? ''}<extra></extra>`),
     });
     if (bulkLabels || isPoint) continue;
     for (const a of items) {
       // With several levels shown, a market structure break's label is in a box of its level's colour, as a point's is.
       const boxed = severalLevels && a.level != null;
-      labels.push({ x: a.time, y: a.price, text: term.label, showarrow: false,
+      labels.push({ x: a.time, y: a.price, text: a.label ?? term.label, showarrow: false,
         yshift: stackShift(stacks, a.time, below, boxed ? BOX_HEIGHT : undefined), font: { size: isFocus ? 12 : 11, color: isFocus ? text : muted },
         ...(boxed ? { bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: levelColor(a.level), borderwidth: 1.5, borderpad: 1 } : {}) });
     }

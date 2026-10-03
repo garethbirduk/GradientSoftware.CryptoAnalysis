@@ -148,7 +148,12 @@ if (serve && full.Count > 0)
     var sourceDir = Path.Combine(repoRoot, "CryptoAnalysis.Site", "wwwroot");
     var video = new TourVideo(Path.Combine(repoRoot, "tools", "tour-video"), Path.Combine(repoRoot, "artifacts", "tour-video", "tour.mp4"),
         Path.Combine(sourceDir, "tour.json"), $"http://localhost:{port}");
-    await ReplayServer.Run(outDir, [new Dataset(FullHistoryDataset, "BTC/USD hourly (Coinbase)", full)], port, sourceDir, video);
+    var datasets = new List<Dataset> { new(FullHistoryDataset, "BTC/USD hourly (Coinbase)", full) };
+    // The longer history, from 2020, for replays of what came before the tour's dataset.
+    var longPath = Path.Combine(repoRoot, "CryptoAnalysis.Test", "TestData", "COINBASE_BTCUSD, 60.csv");
+    if (File.Exists(longPath))
+        datasets.Add(new Dataset("btc-1h-2020", "BTC/USD hourly (Coinbase, from 2020)", new CsvReaderHelper().ReadData<Price, PriceClassMap>(longPath).ToList()));
+    await ReplayServer.Run(outDir, datasets, port, sourceDir, video);
 }
 return 0;
 
@@ -188,6 +193,10 @@ static object StructureOf(List<Price> prices)
         PointsByLevel = levels.Select(level => Sawtooth.Points(prices, level, EnumPriceBasis.Close)),
         MarketStructureBreaksByLevel = breaks,
         TrendsByLevel = swings.Select((list, l) => Sawtooth.Trends(list, breaks[l])),
+        RetracementsByLevel = swings.Select((list, l) => Sawtooth.Retracements(prices, list, Sawtooth.Candidates(prices, levels, EnumPriceBasis.Close, l), EnumPriceBasis.Close)),
+        RangesByLevel = swings.Select((list, l) => l + 1 < swings.Count
+            ? Ranges.Find(prices, EnumPriceBasis.Close, Sawtooth.Retracements(prices, list, Sawtooth.Candidates(prices, levels, EnumPriceBasis.Close, l), EnumPriceBasis.Close), list, Sawtooth.Trends(list, breaks[l]), breaks[l + 1])
+            : []),
         LiveByLevel = prices.Count <= liveReplayLimit
             ? Enumerable.Range(0, levels.Count).Select(l => l == 0 ? [] : MarketStructure.Replay(prices, EnumPriceBasis.Close, l))
             : null,

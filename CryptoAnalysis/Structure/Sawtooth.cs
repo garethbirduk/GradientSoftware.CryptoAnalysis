@@ -264,6 +264,58 @@ public static class Sawtooth
     }
 
     /// <summary>
+    /// Returns the retracements at a level: for each confirmed swing, and each candidate, that has a confirmed swing in the same
+    /// direction before it, how far its counter-move came back along the move from that swing's extreme to this one's start,
+    /// reading by reading (see <see cref="RetracementOutline"/>). The first swing in a leg has nothing to measure against.
+    /// </summary>
+    public static List<RetracementOutline> Retracements(List<Price> prices, IReadOnlyList<SwingOutline> swings, IReadOnlyList<CandidateSwing> candidates, EnumPriceBasis basis)
+    {
+        var index = new Dictionary<DateTime, int>();
+        for (var i = 0; i < prices.Count; i++)
+            index.TryAdd(prices[i].DateTime, i);
+
+        var confirmed = swings.Where(x => x.BreakOfStructure != null).OrderBy(x => x.BreakOfStructure!.Time).ToList();
+        var retracements = new List<RetracementOutline>();
+
+        foreach (var swing in confirmed)
+            Add(swing.Level, swing.Direction, swing.Start, index[swing.Extreme.Time], true);
+        foreach (var candidate in candidates)
+            Add(candidate.Level, candidate.Direction, candidate.Start, prices.Count - 1, false);
+
+        return retracements.OrderBy(x => x.To.Time).ToList();
+
+        void Add(int level, EnumSwingDirection direction, PricePoint to, int end, bool final)
+        {
+            // The last swing to break structure before this one starts; one the other way means this is the first swing of its leg.
+            var previous = confirmed.LastOrDefault(x => x.Level == level && x.BreakOfStructure!.Time <= to.Time && x.Start.Time < to.Time);
+            if (previous == null || previous.Direction != direction)
+                return;
+
+            var from = previous.Extreme;
+            var up = direction == EnumSwingDirection.Up;
+            var gap = up ? to.Price - from.Price : from.Price - to.Price;
+            var start = index[to.Time];
+            if (gap <= 0 || start >= end)
+                return;
+
+            var steps = new List<RetracementStep>();
+            double? best = null;
+            for (var i = start + 1; i <= end; i++)
+            {
+                var value = up ? LowOf(prices[i], basis) : HighOf(prices[i], basis);
+                if (best is double b && !(up ? value < b : value > b))
+                    continue;
+                best = value;
+                var back = up ? to.Price - value : value - to.Price;
+                steps.Add(new RetracementStep(new PricePoint(prices[i].DateTime, value), (int)Math.Floor(100 * back / gap)));
+            }
+
+            if (steps.Count > 0)
+                retracements.Add(new RetracementOutline(level, direction, from, to, steps, final));
+        }
+    }
+
+    /// <summary>
     /// Returns the swings one level finer that start inside a swing, before its break of structure: in an upswing, the
     /// downswings of its pullback and the upswings of the climb back to the break; in a downswing the mirror.
     /// </summary>
