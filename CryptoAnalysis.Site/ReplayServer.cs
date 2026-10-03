@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -106,11 +107,58 @@ public static class ReplayServer
             return Results.Json(new { Index = index }, Json);
         });
 
+        // A section that explains something is written out here from the prices of its scene (see Explain): the page sends the
+        // section as the tour has it, with the candle the replay has reached before it, and gets back the section to play.
+        app.MapPost("/api/explain", async (HttpRequest request) =>
+        {
+            JsonObject? body;
+            try
+            {
+                body = await JsonNode.ParseAsync(request.Body) as JsonObject;
+            }
+            catch (JsonException)
+            {
+                return Results.BadRequest("The request is not valid JSON.");
+            }
+
+            if (body?["section"] is not JsonObject section || !byId.TryGetValue(body["dataset"]?.GetValue<string>() ?? "", out var data))
+                return Results.BadRequest("The request is { dataset, anchor, from, where, section }.");
+
+            var first = Math.Clamp(body["anchor"]?.GetValue<int>() ?? 0, 0, data.Prices.Count - 1);
+            var errors = new List<string>();
+            var expanded = Explain.Expand(section, data.Prices.GetRange(first, data.Prices.Count - first), body["from"]?.GetValue<int>() ?? 0,
+                body["where"]?.GetValue<string>() ?? "the section", errors);
+            return Results.Json(new { Section = expanded, Errors = errors }, Json);
+        });
+
+        // A tour of its own around one thing, for the Tour page opened with ?explain=Candle&dataset=btc-1h&at=2023-01-03T00:00.
+        app.MapGet("/api/explain/tour", (string explain, string dataset, string at) =>
+        {
+            if (!byId.TryGetValue(dataset, out var data))
+                return Results.NotFound();
+            var def = Explain.Tour(explain, data.Id, data.Prices, at);
+            return def == null
+                ? Results.BadRequest($"\"{explain}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.")
+                : Results.Text(def.ToJsonString(), "application/json");
+        });
+
         // The tour's editor on the page saves the tour back to its source file. The page says which version of the file it
         // started from, so a file that has changed since, as when it is edited by hand, is not written over.
         if (Directory.Exists(sourceDir))
         {
             var tourPath = Path.Combine(sourceDir, "tour.json");
+
+            // The tour as the page plays it, with every section that explains something written out, for the narration tool.
+            app.MapGet("/api/tour", async () =>
+            {
+                if (!File.Exists(tourPath))
+                    return Results.NotFound();
+                var def = JsonNode.Parse(await File.ReadAllTextAsync(tourPath));
+                if (def == null)
+                    return Results.NotFound();
+                var tour = Tours.Compile(def, datasets.ToDictionary(x => x.Id, x => (IReadOnlyList<Price>)x.Prices));
+                return Results.Text((tour.Expanded ?? def).ToJsonString(), "application/json");
+            });
             app.MapPut("/api/tour", async (HttpRequest request) =>
             {
                 using var reader = new StreamReader(request.Body);

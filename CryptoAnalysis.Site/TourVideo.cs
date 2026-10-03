@@ -69,7 +69,7 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
         {
             if (!Directory.Exists(Path.Combine(toolDir, "node_modules")))
                 failure = "tools/tour-video is not set up: run npm install there, then npx playwright install chromium";
-            else if (await Node("Reading the texts aloud", "narrate.mjs") != 0
+            else if (await Node("Reading the texts aloud", "narrate.mjs", "--url", siteUrl) != 0
                 || (!audioOnly && await Node("Recording the tour", "record.mjs", "--url", siteUrl, "--out", videoPath) != 0))
                 failure = Failure();
         }

@@ -23,7 +23,7 @@ const page = await context.newPage();
 const started = Date.now();
 await page.goto(`${url}/?video#Tour`);
 await page.waitForFunction(() => window.tourVideo?.ready(), null, { timeout: 60000 });
-console.log(`Playing the tour (${readTour().sections?.length ?? 0} sections)…`);
+console.log(`Playing the tour (${(await readTour(url)).sections?.length ?? 0} sections)…`);
 const played = await page.evaluate(() => window.tourVideo.play());
 const video = page.video();
 await context.close();

@@ -34,15 +34,18 @@ public sealed record TourScene(string Dataset, int Anchor);
 
 /// <summary>
 /// A tour as compiled from tour.json against its datasets: its scenes, its sections, and whatever the file gets wrong.
-/// Anchor is the first scene's, the candle the tour's start time lands on.
+/// Anchor is the first scene's, the candle the tour's start time lands on. Expanded is the file with every section that
+/// explains something written out (see <see cref="Explain"/>), so a tool that reads the texts sees those too.
 /// </summary>
-public sealed record TourScript(string? Title, string? Dataset, int Anchor, IReadOnlyList<TourScene> Scenes, IReadOnlyList<TourSection> Sections, IReadOnlyList<string> Errors);
+public sealed record TourScript(string? Title, string? Dataset, int Anchor, IReadOnlyList<TourScene> Scenes, IReadOnlyList<TourSection> Sections, IReadOnlyList<string> Errors,
+    JsonNode? Expanded = null);
 
 /// <summary>
 /// Reads the page's tour.json the way the page does (see the Tour section of index.html), so a test can check the file and the
 /// structure it describes, and the server can resolve the events a tour refers to.
 /// A candle in the file is a number counted from the tour's start, or an event to look for from a candle on:
 /// { "event": "BullishBreakOfStructure", "level": 1, "nth": 1 }, the nth time that becomes known at that level.
+/// A section with "explain" has its texts written from the prices (see <see cref="Explain"/>).
 /// </summary>
 public static class Tours
 {
@@ -138,10 +141,13 @@ public static class Tours
         var speed = Rate(start?["speed"], "start", 4);
         var at = 0;
         var sections = new List<TourSection>();
+        var expanded = def.DeepClone();
+        var expandedSections = expanded["sections"]?.AsArray();
 
-        foreach (var (node, i) in (def["sections"]?.AsArray() ?? []).Select((x, i) => (x?.AsObject(), i)))
+        foreach (var (written, i) in (def["sections"]?.AsArray() ?? []).Select((x, i) => (x?.AsObject(), i)))
         {
             var where = $"section {i + 1}";
+            var node = written;
             if (node == null)
             {
                 errors.Add($"{where}: not a section");
@@ -175,6 +181,14 @@ public static class Tours
                 view = DefaultView;
                 if (node["fastForward"] != null || node["rewind"] != null)
                     errors.Add($"{where}: a section that begins a scene has no journey: the scene starts a new replay");
+            }
+
+            // A section that explains something is written out from the prices before it is read like any other.
+            if (node["explain"] != null)
+            {
+                node = Explain.Expand(node, prices, node["from"] is JsonValue f && f.TryGetValue<int>(out var begins) ? begins : at, where, errors);
+                if (expandedSections != null)
+                    expandedSections[i] = node.DeepClone();
             }
 
             if (node["layers"] != null)
@@ -276,7 +290,7 @@ public static class Tours
             sections.Add(new TourSection(i, node["chapter"]?.GetValue<string>(), scenes.Count - 1, layers, levels.Count > 0 ? levels : [1], from, at, view, speed, cues, journeyTo != null ? tripName : null));
         }
 
-        return new TourScript(def["title"]?.GetValue<string>(), def["dataset"]?.GetValue<string>(), anchor, scenes, sections, errors);
+        return new TourScript(def["title"]?.GetValue<string>(), def["dataset"]?.GetValue<string>(), anchor, scenes, sections, errors, expanded);
     }
 
     /// <summary>
@@ -402,7 +416,7 @@ public static class Tours
     }
 
     // A candle given as a number, or as an event to look for from a candle on.
-    private static int? Candle(JsonNode? node, List<Price> prices, int from, string where, string field, List<string> errors)
+    internal static int? Candle(JsonNode? node, List<Price> prices, int from, string where, string field, List<string> errors)
     {
         switch (node)
         {

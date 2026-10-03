@@ -2,14 +2,14 @@
 // wwwroot/tour-audio, one clip per text, and writes index.json there: the page uses a clip's length as the text's seconds and
 // plays it when its Voice button is on. A text whose clip exists is skipped, so only changed texts are read again: changed
 // on screen, or in what the tour's glossary has the voice say for them. A text marked "voice": false is not read.
-// Usage: node narrate.mjs [--voice af_heart] [--force]
+// Usage: node narrate.mjs [--voice af_heart] [--force] [--url http://localhost:5178]
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { KokoroTTS } from 'kokoro-js';
 import { arg, audioDir, readTour, spokenText, tourTexts } from './shared.mjs';
 
 const voice = arg('voice', 'af_heart'), force = process.argv.includes('--force');
-const tour = readTour(), texts = tourTexts(tour), spoken = spokenText(tour);
+const tour = await readTour(), texts = tourTexts(tour), spoken = spokenText(tour);
 mkdirSync(audioDir, { recursive: true });
 
 const indexPath = join(audioDir, 'index.json');

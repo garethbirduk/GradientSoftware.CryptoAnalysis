@@ -258,6 +258,13 @@
   .ed-use button { flex: 1; }
   #tour-editor .ed-pick button { padding: 1px 6px; }
   .ed-layers { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+  .ed-written { margin: 6px 0 0; padding-left: 22px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  .ed-written li { margin: 2px 0; }
+  .candle-card { position: fixed; z-index: 30; display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .candle-card b { color: var(--text); }
+  .candle-card a { align-self: flex-start; margin-top: 4px; padding: 3px 10px; border: 1px solid var(--accent); border-radius: 5px; color: var(--accent); font-weight: 600; text-decoration: none; }
+  .candle-card a:hover { background: var(--chip); }
   .ed-chip { padding: 0 7px; border-radius: 999px; background: var(--chip); color: var(--text); }
   .ed-chip.added { box-shadow: inset 0 0 0 1px var(--accent); }
   .ed-chip.removed { text-decoration: line-through; opacity: .6; }
@@ -2042,7 +2049,7 @@ async function renderReplayPage() {
     <p>Step through a whole dataset as it was known at each candle. The sawtooth, points, swings, breaks and trends come only from
     the prices up to the cursor, with the levels anchored at the dataset's first candle.</p>
     <p class="remarks">The local server works it out ${REMOTE_BATCH} candles at a time and fetches ahead while you play. The chart
-    follows the cursor, showing the chosen window of history before it.</p></section>`;
+    follows the cursor, showing the chosen window of history before it. Click a candle for its prices and Analyse, which explains it as the tour would.</p></section>`;
   const show = body => { main.innerHTML = head + body; renderLayers(); wireReplayExamples(main); drawAll(currentPage); };
 
   if (!serverOn) {
@@ -2069,6 +2076,39 @@ async function renderReplayPage() {
   main.querySelector('[data-window]').addEventListener('change', e => { state.replayWindow = Number(e.target.value); save(state); redrawExample(ex); });
 }
 
+// A click on a candle of the Replay page opens a card beside it with the candle's prices and Analyse, which opens the Tour
+// page on a tour written around that candle (see writtenTour). A drag still pans; a click elsewhere closes the card.
+{
+  let down = null;
+  const card = document.createElement('div');
+  card.className = 'candle-card';
+  card.hidden = true;
+  document.body.append(card);
+  const close = () => { card.hidden = true; };
+  window.addEventListener('pointerdown', e => {
+    if (!card.hidden && !card.contains(e.target)) close();
+    down = currentPage === 'Replay' && e.target.closest?.('.chart') ? [e.clientX, e.clientY] : null;
+  }, true);
+  window.addEventListener('pointerup', e => {
+    const chart = document.querySelector('#main .chart'), from = down;
+    down = null;
+    if (!from || !chart || currentPage !== 'Replay' || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 4) return;
+    const ex = findExample(chart.dataset.id), i = ex && candleAt(chart, e), p = ex && (ex.hindsight ?? ex).prices;
+    if (i == null || !p?.t[i] || (ex.cursor != null && i > ex.cursor)) return close();
+    const time = p.t[i], up = p.c[i] > p.o[i], colour = p.c[i] === p.o[i] ? 'no body' : up ? 'green' : 'red';
+    const money = v => Math.floor(v).toLocaleString('en-US');
+    const query = new URLSearchParams({ explain: 'Candle', dataset: ex.dataset, at: time.slice(0, 16) });
+    card.innerHTML = `<b>${esc(fmtTime(time))} UTC</b><span>open ${money(p.o[i])} · close ${money(p.c[i])} · ${colour}</span><span>high ${money(p.h[i])} · low ${money(p.l[i])}</span>
+      <a class="button" href="?${query}#Tour" title="Open the Tour page on a tour written around this candle">Analyse</a>`;
+    card.hidden = false;
+    const w = card.offsetWidth, h = card.offsetHeight;
+    card.style.left = `${Math.min(e.clientX + 12, innerWidth - w - 8)}px`;
+    card.style.top = `${Math.min(e.clientY + 12, innerHeight - h - 8)}px`;
+  }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  window.addEventListener('hashchange', close);
+}
+
 function findExample(id) {
   return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id) ?? DATA.interims?.examples?.find(e => e.id === id)
     ?? replayDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined);
@@ -2087,6 +2127,9 @@ function findExample(id) {
 //            fastForward { to, speed, draw } or rewind { to, speed, erase }. The view eases out to hold the whole way,
 //            the replay runs to the candle "to" at that many candles a second, drawing or erasing as it goes, and the view
 //            eases in to the section's own. With draw or erase false the replay stays where it is and only the view moves.
+//            A section with explain ("Candle") and at (the candle) has its view, until and texts written by the local
+//            server from the prices (see Explain in CryptoAnalysis.Site); what it says for itself wins, and texts of its
+//            own follow the written ones.
 //   cue      text, shown under the chart as the section begins; with at, when the replay reaches that candle, which waits
 //            there while the text is read; with on as well ('open', 'high', 'low', 'close' or a price), pinned to that
 //            point of the candle (place: 'above', 'below', 'left' or 'right'). hold is the seconds the text stays before
@@ -2103,6 +2146,9 @@ const TOUR_TICK = 40;
 let tour = null, tourLoading = null;
 // Opened with ?video, the page shows the tour alone, for tools/tour-video to record.
 const videoMode = new URLSearchParams(location.search).has('video');
+// Opened with ?explain=Candle&dataset=btc-1h&at=2023-01-03T00:00, the Tour page plays a tour written by the local server
+// around that one thing instead of tour.json (see Explain in CryptoAnalysis.Site); it can be edited here but not saved.
+const writtenTour = (q => q.has('explain') ? { explain: q.get('explain'), dataset: q.get('dataset') ?? '', at: q.get('at') ?? '' } : null)(new URLSearchParams(location.search));
 
 // The short hash of a text that names its narration clip in tour-audio (FNV-1a, 32 bits; the same as tools/tour-video).
 function textKey(text) {
@@ -2158,8 +2204,9 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}) {
   let layers = startLayers, view = startView, speed = rate(start.speed ?? 4, 'start'), at = 0;
   renamed(start, 'start');
 
-  const sections = (def.sections ?? []).map((s, i) => {
+  const sections = (def.sections ?? []).map((given, i) => {
     const where = `section ${i + 1}`;
+    let s = given;
     if (s.chapter) chapters.push({ name: s.chapter, slug: slugOf(s.chapter), section: i });
     // A section that begins a scene starts a replay of its own: the candles count from #0 again and the view starts afresh.
     if (s.scene != null) {
@@ -2172,6 +2219,14 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}) {
       candles = sc?.ex.prices.t.length ?? candles;
       at = 0;
       view = DEFAULT_VIEW;
+    }
+    // A section that explains something is written out by the local server from the prices of its scene (see resolveTour),
+    // one writing for each section and the candle it starts from; until it has been, the section is listed as waiting.
+    if (s.explain != null) {
+      const from = Number.isInteger(s.from) ? s.from : at, key = `explain|${scene}|${from}|${JSON.stringify(s)}`;
+      if (!resolved.has(key)) { wanted.push({ key, explain: s, from, scene, where }); errors.push(`${where}: the texts explaining ${s.explain} are being written`); }
+      else errors.push(...resolved.get(key).errors);
+      s = resolved.get(key)?.section ?? { ...s, cues: [] };
     }
     if (s.layers) layers = ids(s.layers, where);
     const removed = ids(s.remove, where);
@@ -2239,9 +2294,16 @@ async function resolveTour(retry = 0) {
   if (!pending.length || retry > 12) return;
   tour.resolving = true;
   updateEditorStatus();
-  for (const { key, spec, from, scene } of pending) {
+  for (const { key, spec, explain, from, scene, where } of pending) {
     if (tour.resolved.has(key)) continue;
     const ex = scenes[scene ?? 0]?.ex ?? scenes[0].ex;
+    if (explain) {
+      // The section as the tour has it goes to the server, which sends back the section to play, texts written.
+      const body = JSON.stringify({ dataset: ex.dataset, anchor: ex.anchor, from, where, section: explain });
+      const got = await fetch('api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).then(r => r.ok ? r.json() : null).catch(() => null);
+      tour.resolved.set(key, got ? { section: got.section, errors: got.errors ?? [] } : { section: null, errors: [`${where}: the local server could not write the texts explaining ${explain.explain}`] });
+      continue;
+    }
     const query = `dataset=${encodeURIComponent(ex.dataset)}&anchor=${ex.anchor}&from=${from}&type=${encodeURIComponent(spec.event)}&level=${spec.level ?? 1}&nth=${spec.nth ?? 1}`;
     const found = await fetch(`api/event?${query}`).then(r => r.ok ? r.json() : null).catch(() => null);
     tour.resolved.set(key, found?.index ?? null);
@@ -2251,7 +2313,7 @@ async function resolveTour(retry = 0) {
   Object.assign(tour, compileTour(tour.def, scenes, tour.resolved, tour.audio));
   if (tour.wanted.length) return resolveTour(retry + 1);
   editorSection = -1;
-  seekTour(tour.index, { t: cursorOf(ex), shown: tour.shown.length });
+  seekTour(tour.index, { t: cursorOf(tour.ex), shown: tour.shown.length });
   updateEditorMeta();
   updateEditorStatus();
 }
@@ -2259,11 +2321,18 @@ async function resolveTour(retry = 0) {
 // tour.json as it is on disk, with the short hash that names that version of it: Save sends the hash of the version the
 // page started from, and the local server refuses to write over a file that is no longer that version.
 const readTourFile = () => fetch('tour.json', { cache: 'no-store' }).then(r => r.text()).then(text => ({ def: JSON.parse(text), base: textKey(text) }));
+// A written tour comes from the server instead, which says what is wrong with the request when it cannot write one.
+const readWrittenTour = async () => {
+  const r = await fetch(`api/explain/tour?${new URLSearchParams(writtenTour)}`, { cache: 'no-store' });
+  const text = await r.text();
+  if (!r.ok) throw new Error(r.status === 404 ? `the server has no dataset "${writtenTour.dataset}"` : text || `the server answered ${r.status}`);
+  return { def: JSON.parse(text), base: textKey(text) };
+};
 
 // tour.json can change on disk while the page is open, as when it is edited by hand. Coming back to the page, the newer
 // file is loaded at once when nothing here is unsaved (Undo brings back what was here); otherwise the editor says so.
 async function checkTourFile() {
-  if (currentPage !== 'Tour' || !tour || tour.checking || tour.recording || videoMode) return;
+  if (currentPage !== 'Tour' || !tour || tour.checking || tour.recording || videoMode || writtenTour) return;
   tour.checking = true;
   const file = await readTourFile().catch(() => null);
   tour.checking = false;
@@ -2288,7 +2357,7 @@ function sceneSpecs(def) {
 }
 
 async function loadTour() {
-  const { def, base } = await readTourFile();
+  const { def, base } = await (writtenTour ? readWrittenTour() : readTourFile());
   const list = await loadDatasets();
   if (!list.length) throw new Error('the server has no datasets');
   const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
@@ -2723,8 +2792,10 @@ async function renderTourPage(chapter) {
   currentPage = 'Tour';
   const show = body => {
     main.innerHTML = `<section class="term-head"><h2 data-tour="title">${esc(tour?.def.title || 'Tour')}</h2>
-      <p class="remarks">A scripted replay, read from <code>tour.json</code> and changed with the editor beside the chart. Candles are numbered
-      from the tour's start: the crosshair shows a candle's number.</p></section>${body}`;
+      <p class="remarks">${writtenTour
+        ? `A tour written by the local server around one ${esc(writtenTour.explain)}, from the prices. The editor beside the chart changes it here only. <a href="./#Tour">The tour itself</a>.`
+        : `A scripted replay, read from <code>tour.json</code> and changed with the editor beside the chart. Candles are numbered
+      from the tour's start: the crosshair shows a candle's number.`}</p></section>${body}`;
     renderLayers(); wireReplayExamples(main); drawAll(currentPage);
   };
 
@@ -2758,10 +2829,10 @@ async function renderTourPage(chapter) {
         <span class="keys">Keys: ← → step · Home End first last · Space play</span>
         <button type="button" data-tour-go="voice" title="Read each text aloud from its clip in tour-audio, made by tools/tour-video">Voice</button>
         <button type="button" data-tour-go="glossary" title="Show or hide the glossary: what the voice says in place of what is written, such as Break of Structure for BoS">Glossary</button>
-        <button type="button" data-tour-go="audio" title="Read aloud the texts of the tour as saved in tour.json that are new or changed, or that the glossary now has said differently, for Voice to play">Update audio</button>
+        ${writtenTour ? '' : `<button type="button" data-tour-go="audio" title="Read aloud the texts of the tour as saved in tour.json that are new or changed, or that the glossary now has said differently, for Voice to play">Update audio</button>
         <button type="button" data-tour-go="video" title="Make the video of the tour as saved in tour.json, to download: the audio is updated, then the tour is recorded with it, which takes as long as the tour">Generate video</button>
         <a class="button" data-tour="download" href="api/video/file" download="tour.mp4" hidden>Download video</a>
-        <span data-tour="video" aria-live="polite"></span>
+        <span data-tour="video" aria-live="polite"></span>`}
         <button type="button" class="edit" data-tour-go="edit" title="Show or hide the editor">Editor</button>
       </div>
       <div class="tour-glossary" data-tour="glossary" role="group" aria-label="Glossary" hidden></div>
@@ -2774,7 +2845,7 @@ async function renderTourPage(chapter) {
   glossary.addEventListener('input', e => { const row = e.target.closest('.gl-row'); if (row) readGlossary(`glossary|${[...row.parentElement.children].indexOf(row)}|${e.target.dataset.gl}`); });
   glossary.addEventListener('click', e => { const b = e.target.closest('button[data-gl]'); if (b && !b.disabled) glossaryAction(b.dataset.gl, b); });
   renderTourGlossary();
-  if (!videoMode) refreshTourExport();
+  if (!videoMode && !writtenTour) refreshTourExport();
   editorSection = -1;
   const wanted = tour.chapters.find(c => c.slug === chapter), first = wanted ? wanted.section : tour.index;
   // Opening the page shows its section's view at once, with no zoom to it.
@@ -2971,6 +3042,8 @@ function renderTourEditor(anchor = 'section') {
 
   const openCard = (d, i) => {
     const s = sections[i], before = i ? sections[i - 1] : null, was = before?.layers ?? tour.startLayers;
+    // The texts written for a section that explains something come before any of its own.
+    const written = s.cues.slice(0, s.cues.length - (d.cues ?? []).length);
     // A journey to the section: which way, and whether the replay runs there or only the view moves.
     const tripKind = d.fastForward != null ? 'fastForward' : d.rewind != null ? 'rewind' : '', trip = d[tripKind], back = tripKind === 'rewind';
     const runs = !!trip && trip[back ? 'erase' : 'draw'] !== false;
@@ -2993,7 +3066,9 @@ function renderTourEditor(anchor = 'section') {
         <label>Scene starts at (candle #0, UTC)<input type="datetime-local" step="3600" data-scope="section" data-field="sceneTime" data-commit data-render ${d.scene ? '' : 'disabled'} value="${value(d.scene?.time)}"></label>
       </div>
       <div class="ed-layers"><span>Layers</span>${chips.join('') || '<span class="ed-chip">none</span>'}<span class="ed-hint">Set with the layer buttons on the left.</span></div>
-      ${(d.cues ?? []).map((c, j) => cueCard(c, j, s.cues[j])).join('')}
+      ${d.explain == null ? '' : `<div class="ed-layers"><span>Explains</span><span class="ed-chip">${esc(String(d.explain))} at #${esc(String(d.at ?? '?'))}</span><span class="ed-hint">The texts are written from the prices; texts added here follow them.</span></div>
+        ${written.length ? `<ol class="ed-written">${written.map(c => `<li>${esc(c.text)}${c.on != null ? ` <em>(pinned to the ${esc(String(c.on))} of #${c.at})</em>` : ''}</li>`).join('')}</ol>` : ''}`}
+      ${(d.cues ?? []).map((c, j) => cueCard(c, j, s.cues[written.length + j])).join('')}
       <div class="ed-foot"><button type="button" data-ed="add-cue">+ Text</button><button type="button" data-ed="add-section">+ Section after</button>
         <button type="button" data-ed="section-copy" title="Add a copy of this section after it">Duplicate</button>
         <button type="button" data-ed="play-here" title="Play from the start of this section">▶ From here</button></div>
@@ -3041,13 +3116,14 @@ function updateEditorMeta() {
     const i = Number(card.dataset.section), d = tour.def.sections[i], s = tour.sections[i];
     if (!d || !s) return;
     const name = card.querySelector('[data-ed-name]');
-    name.textContent = d.chapter || `↳ ${d.cues?.find(c => c.on == null && c.text)?.text ?? 'no text yet'}`;
+    name.textContent = d.chapter || `↳ ${d.cues?.find(c => c.on == null && c.text)?.text ?? (d.explain != null ? `${d.explain} at #${d.at ?? '?'}` : 'no text yet')}`;
     name.classList.toggle('chapter', !!d.chapter);
     card.querySelector('[data-ed-meta]').textContent = `#${s.from}${s.until > s.from ? ` → #${s.until}` : ''} · ${Math.round(sectionSeconds(s))}s`;
   });
   // A text's settings are folded away until it is being edited, so each says when it appears and for how long.
-  document.querySelectorAll('#tour-editor [data-ed-cue]').forEach((el, j) => {
-    const c = tourSection()?.cues[j];
+  const cueCards = document.querySelectorAll('#tour-editor [data-ed-cue]'), written = Math.max(0, (tourSection()?.cues.length ?? 0) - cueCards.length);
+  cueCards.forEach((el, j) => {
+    const c = tourSection()?.cues[written + j];
     if (c) el.textContent = `${j + 1} · ${c.at != null ? `at #${c.at}` : 'as the section begins'}${c.on != null ? ` · pinned to ${typeof c.on === 'number' ? c.on : `the ${c.on}`}` : ''} · ${c.hold.toFixed(1)}s${c.silent ? ' · silent' : ''}`;
   });
   const total = document.querySelector('[data-ed-total]'), seconds = Math.round(tour.sections.reduce((n, s) => n + sectionSeconds(s), 0));
@@ -3064,10 +3140,11 @@ function updateEditorStatus() {
   const problems = tour.errors.length, dirty = tourDirty();
   status.textContent = tour.picking ? 'Click a candle on the chart. Esc cancels.'
     : tour.resolving ? 'Looking up the events the tour waits for…'
-    : tour.note || (problems ? `${problems} problem${problems === 1 ? '' : 's'}, listed above the chart` : dirty ? 'Changes not saved' : 'Saved in tour.json');
+    : tour.note || (problems ? `${problems} problem${problems === 1 ? '' : 's'}, listed above the chart`
+    : writtenTour ? `Written from the prices${dirty ? ', changed here only' : ''}` : dirty ? 'Changes not saved' : 'Saved in tour.json');
   status.classList.toggle('warn', !tour.picking && (!!tour.note || problems > 0));
   const save = document.querySelector('[data-ed="save"]');
-  save.disabled = !dirty;
+  save.disabled = !dirty || !!writtenTour;
   save.classList.toggle('dirty', dirty);
   document.querySelector('[data-ed="undo"]').disabled = !tour.history.length;
   document.querySelectorAll('[data-ed="pick"]').forEach(b => b.setAttribute('aria-pressed',
@@ -3230,7 +3307,7 @@ function candleAt(el, e) {
 }
 
 async function saveTour() {
-  if (!tourDirty()) return;
+  if (!tourDirty() || writtenTour) return;
   const def = JSON.stringify(tour.def), body = formatTour(tour.def);
   const response = await fetch('api/tour', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Tour-Base': tour.base }, body }).catch(() => null);
   if (response?.ok) Object.assign(tour, { saved: def, base: textKey(body) });

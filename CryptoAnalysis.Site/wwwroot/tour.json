@@ -358,21 +358,14 @@
     {
       "view": [44, 51],
       "cues": [
-        { "text": "A candle has four prices. The open is the price at the start of the hour, and the close is the price at its end.", "hold": 0 },
-        { "at": 48, "on": "open", "place": "left", "text": "open", "hold": 4, "voice": false },
-        { "at": 48, "on": "close", "place": "right", "text": "close", "hold": 4, "voice": false },
-        { "text": "The high and the low are the furthest the price went during the hour.", "hold": 0 },
-        { "at": 48, "on": "high", "place": "above", "text": "high", "hold": 2.5, "voice": false },
-        { "at": 48, "on": "low", "place": "below", "text": "low", "hold": 2.5, "voice": false },
-        { "text": "The body of the candle spans the open and the close. The thin lines above and below the body are wicks, and they reach to the high and the low." }
+        { "text": "A candle has four prices. The open is the price at the start of the hour, and the close is the price at its end. The high and the low are the furthest the price went during the hour." },
+        { "text": "The body of the candle spans the open and the close. The thin lines above and below the body are wicks, and they reach to the high and the low." },
+        { "text": "A candle that closes above its open is green. A candle that closes below its open is red." }
       ]
     },
     {
-      "cues": [
-        { "text": "A candle that closes above its open is green. A candle that closes below its open is red.", "hold": 0 },
-        { "at": 48, "on": "high", "place": "above", "text": "green", "hold": 3.5, "voice": false },
-        { "at": 47, "on": "low", "place": "below", "text": "red", "hold": 3.5, "voice": false }
-      ]
+      "explain": "Candle",
+      "at": 48
     },
     {
       "chapter": "Wicks and breaks",

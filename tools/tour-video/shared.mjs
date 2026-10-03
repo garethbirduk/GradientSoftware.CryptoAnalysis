@@ -14,7 +14,12 @@ export function textKey(text) {
   return h.toString(16).padStart(8, '0');
 }
 
-export function readTour() {
+// The tour as the page plays it: from the local server when one is running there, which writes out the sections that explain
+// something from the prices (see Explain in CryptoAnalysis.Site), else as it is in the file, where those have no texts yet.
+export async function readTour(url = arg('url', 'http://localhost:5178')) {
+  const served = await fetch(`${url}/api/tour`).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (served) return served;
+  console.log(`No server at ${url}: texts written from the prices are not read.`);
   return JSON.parse(readFileSync(tourPath, 'utf8'));
 }
 

@@ -27,12 +27,16 @@
 #320 · section 41 (BoS and MSB compared) text 1 "A BoS closes beyond the position its Swing begins at." · seen at #321: L1 HH · L1 upswing BoS
 #321 · section 42 text 1 "An MSB closes beyond the Swing Low or Swing High of a Swing that is already Confirmed." · seen at #321: L1 LL* · L1 MSB↓
 #50 · section 44 (Candles) gets there by rewind: nothing
-#48 · section 46 text 2 "open" on open · seen at #50: L1 LH*
-#48 · section 46 text 3 "close" on close · seen at #50: L1 LH*
-#48 · section 46 text 5 "high" on high · seen at #50: L1 LH*
-#48 · section 46 text 6 "low" on low · seen at #50: L1 LH*
-#48 · section 47 text 2 "green" on high · seen at #50: L1 LH*
-#47 · section 47 text 3 "red" on low · seen at #50: L1 LL
+#48 · section 47 text 1 "This candle is the hour from 00:00 to 01:00 on Tuesday 3 January 2023." · seen at #50: L1 LH*
+#48 · section 47 text 2 "It opened at 16666 and closed at 16690." · seen at #50: L1 LH*
+#48 · section 47 text 3 "open: 16666" on open · seen at #50: L1 LH*
+#48 · section 47 text 4 "close: 16690" on close · seen at #50: L1 LH*
+#48 · section 47 text 5 "Its high was 16700 and its low was 16639." · seen at #50: L1 LH*
+#48 · section 47 text 6 "high: 16700" on high · seen at #50: L1 LH*
+#48 · section 47 text 7 "low: 16639" on low · seen at #50: L1 LH*
+#48 · section 47 text 8 "Because the candle closed higher than the open, it is green." · seen at #50: L1 LH*
+#48 · section 47 text 9 "The candle before it closed lower than the open, so it is red." · seen at #50: L1 LH*
+#47 · section 47 text 10 "red" on low · seen at #50: L1 LL
 #75 · section 48 (Wicks and breaks) runs to it: L1 HH* · L1 upswing BoS
 #45 · section 49 text 2 "HH" on close · seen at #75: L1 HH · L1 upswing BoS · L1 upswing start
 #75 · section 49 text 3 "BoS" on close · seen at #75: L1 HH* · L1 upswing BoS
