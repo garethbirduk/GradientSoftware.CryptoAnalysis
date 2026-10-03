@@ -131,14 +131,17 @@ public static class ReplayServer
             return Results.Json(new { Section = expanded, Errors = errors }, Json);
         });
 
-        // A tour of its own around one thing, for the Tour page opened with ?explain=Candle&dataset=btc-1h&at=2023-01-03T00:00.
-        app.MapGet("/api/explain/tour", (string explain, string dataset, string at) =>
+        // A tour of its own around one thing, for the Tour page opened with ?explain=Swing&dataset=btc-1h&at=2023-01-03T00:00&level=1.
+        // seen is the Replay page's cursor, so the Swing or Trend is the one the page showed there.
+        app.MapGet("/api/explain/tour", (string explain, string dataset, string at, int? level, string? seen) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
-            var def = Explain.Tour(explain, data.Id, data.Prices, at);
+            if (!Explain.Terms.Contains(explain))
+                return Results.BadRequest($"\"{explain}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.");
+            var def = Explain.Tour(explain, data.Id, data.Prices, at, level ?? 1, seen);
             return def == null
-                ? Results.BadRequest($"\"{explain}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.")
+                ? Results.BadRequest($"No {explain} at level {level ?? 1} has the candle at {at} in it.")
                 : Results.Text(def.ToJsonString(), "application/json");
         });
 

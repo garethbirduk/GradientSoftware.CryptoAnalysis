@@ -263,7 +263,8 @@
   .candle-card { position: fixed; z-index: 30; display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px solid var(--border);
     border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .candle-card b { color: var(--text); }
-  .candle-card a { align-self: flex-start; margin-top: 4px; padding: 3px 10px; border: 1px solid var(--accent); border-radius: 5px; color: var(--accent); font-weight: 600; text-decoration: none; }
+  .candle-card .analyse { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
+  .candle-card a { padding: 3px 10px; border: 1px solid var(--accent); border-radius: 5px; color: var(--accent); font-weight: 600; text-decoration: none; }
   .candle-card a:hover { background: var(--chip); }
   .ed-chip { padding: 0 7px; border-radius: 999px; background: var(--chip); color: var(--text); }
   .ed-chip.added { box-shadow: inset 0 0 0 1px var(--accent); }
@@ -2094,12 +2095,15 @@ async function renderReplayPage() {
     down = null;
     if (!from || !chart || currentPage !== 'Replay' || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 4) return;
     const ex = findExample(chart.dataset.id), i = ex && candleAt(chart, e), p = ex && (ex.hindsight ?? ex).prices;
-    if (i == null || !p?.t[i] || (ex.cursor != null && i > ex.cursor)) return close();
+    if (i == null || !p?.t[i] || i > cursorOf(ex)) return close();
     const time = p.t[i], up = p.c[i] > p.o[i], colour = p.c[i] === p.o[i] ? 'no body' : up ? 'green' : 'red';
-    const money = v => Math.floor(v).toLocaleString('en-US');
-    const query = new URLSearchParams({ explain: 'Candle', dataset: ex.dataset, at: time.slice(0, 16) });
+    const money = v => Math.floor(v).toLocaleString('en-US'), level = structureLevel(ex);
+    const cursor = cursorOf(ex), seen = p.t[cursor] ? { seen: p.t[cursor].slice(0, 16) } : {};
+    const link = (explain, title) => `<a href="?${new URLSearchParams({ explain, dataset: ex.dataset, at: time.slice(0, 16), level, ...seen })}#Tour" title="${esc(title)}">${explain}</a>`;
     card.innerHTML = `<b>${esc(fmtTime(time))} UTC</b><span>open ${money(p.o[i])} · close ${money(p.c[i])} · ${colour}</span><span>high ${money(p.h[i])} · low ${money(p.l[i])}</span>
-      <a class="button" href="?${query}#Tour" title="Open the Tour page on a tour written around this candle">Analyse</a>`;
+      <span class="analyse">Analyse ${link('Candle', 'Open the Tour page on a tour written around this candle')}
+      ${link('Swing', `Open the Tour page on a tour written around the level ${level} Swing this candle is in`)}
+      ${link('Trend', `Open the Tour page on a tour written around the level ${level} Trend this candle is in`)}</span>`;
     card.hidden = false;
     const w = card.offsetWidth, h = card.offsetHeight;
     card.style.left = `${Math.min(e.clientX + 12, innerWidth - w - 8)}px`;
@@ -2127,9 +2131,9 @@ function findExample(id) {
 //            fastForward { to, speed, draw } or rewind { to, speed, erase }. The view eases out to hold the whole way,
 //            the replay runs to the candle "to" at that many candles a second, drawing or erasing as it goes, and the view
 //            eases in to the section's own. With draw or erase false the replay stays where it is and only the view moves.
-//            A section with explain ("Candle") and at (the candle) has its view, until and texts written by the local
-//            server from the prices (see Explain in CryptoAnalysis.Site); what it says for itself wins, and texts of its
-//            own follow the written ones.
+//            A section with explain ("Candle", "Swing" or "Trend"), at (the candle) and level (the sawtooth level, 1 unless
+//            given) has its view, layers, until and texts written by the local server from the prices (see Explain in
+//            CryptoAnalysis.Site); what it says for itself wins, and texts of its own follow the written ones.
 //   cue      text, shown under the chart as the section begins; with at, when the replay reaches that candle, which waits
 //            there while the text is read; with on as well ('open', 'high', 'low', 'close' or a price), pinned to that
 //            point of the candle (place: 'above', 'below', 'left' or 'right'). hold is the seconds the text stays before
@@ -2146,9 +2150,10 @@ const TOUR_TICK = 40;
 let tour = null, tourLoading = null;
 // Opened with ?video, the page shows the tour alone, for tools/tour-video to record.
 const videoMode = new URLSearchParams(location.search).has('video');
-// Opened with ?explain=Candle&dataset=btc-1h&at=2023-01-03T00:00, the Tour page plays a tour written by the local server
-// around that one thing instead of tour.json (see Explain in CryptoAnalysis.Site); it can be edited here but not saved.
-const writtenTour = (q => q.has('explain') ? { explain: q.get('explain'), dataset: q.get('dataset') ?? '', at: q.get('at') ?? '' } : null)(new URLSearchParams(location.search));
+// Opened with ?explain=Swing&dataset=btc-1h&at=2023-01-03T00:00&level=1, the Tour page plays a tour written by the local
+// server around that one thing (a Candle, or the Swing or Trend at that level the candle is in) instead of tour.json (see
+// Explain in CryptoAnalysis.Site); it can be edited here but not saved.
+const writtenTour = (q => q.has('explain') ? { explain: q.get('explain'), dataset: q.get('dataset') ?? '', at: q.get('at') ?? '', level: q.get('level') ?? '1', ...(q.has('seen') ? { seen: q.get('seen') } : {}) } : null)(new URLSearchParams(location.search));
 
 // The short hash of a text that names its narration clip in tour-audio (FNV-1a, 32 bits; the same as tools/tour-video).
 function textKey(text) {

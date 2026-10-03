@@ -103,6 +103,90 @@ public class ExplainTests
     }
 
     [TestMethod]
+    public void Swing_TheToursTenthUpswing_IsWeakWithItsMsbOnTheWay()
+    {
+        // The Upswing of the tour's "Wicks and breaks" chapter: from the HH at #45 to the BoS at #75, with the MSB at #46 inside it.
+        var section = Explain.Swing(TourPrices.Value, 60, level: 1, reached: 50, out var problem);
+
+        Assert.IsNotNull(section, problem);
+        Assert.AreEqual(75, section["until"]!.GetValue<int>());
+        CollectionAssert.AreEqual(new[] { 39, 81 }, section["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray());
+        var pins = section["cues"]!.AsArray().Where(x => x!["on"] != null).Select(x => $"#{x!["at"]} {x["text"]}").ToList();
+        Assert.IsTrue(Texts(section).Any(x => x.StartsWith("This is a 1st order Upswing. It begins")));
+        Assert.IsTrue(Texts(section).Contains("The MSB inside it makes it a Weak Upswing."));
+        Assert.IsTrue(pins.Contains("#46 MSB"));
+        Assert.IsTrue(pins.Contains("#75 BoS"));
+    }
+
+    [TestMethod]
+    public void Swing_NoneAtTheCandle_SaysSo()
+    {
+        var section = Explain.Swing(TourPrices.Value, 0, level: 1, reached: 0, out var problem);
+
+        Assert.IsNull(section);
+        Assert.AreEqual("no 1st order Swing has #0 in it", problem);
+    }
+
+    [TestMethod]
+    public void Trend_TheToursUptrend_HasTwelveUpswingsFourWeak()
+    {
+        // The tour's Uptrend as seen at #90: twelve Upswings, the fourth, seventh, tenth and twelfth Weak, Strength 66%.
+        var section = Explain.Trend(TourPrices.Value, 90, level: 1, reached: 90, out var problem);
+
+        Assert.IsNotNull(section, problem);
+        var texts = Texts(section);
+        Assert.IsNull(section["until"], "The replay is already at the candle.");
+        Assert.IsTrue(texts.Contains("Here it is an Uptrend of twelve Upswings."), texts[4]);
+        Assert.IsTrue(texts.Contains("Four of the twelve are Weak: the fourth, seventh, tenth and twelfth. Each has an MSB inside it, a close below the Swing Low of the Upswing before."), texts[5]);
+        Assert.IsTrue(texts.Contains("Its Strength is eight of twelve: 66%."), texts[6]);
+        Assert.IsTrue(texts.Contains("No Downswing has been Confirmed since, so it is still running."), texts[7]);
+    }
+
+    [TestMethod]
+    public void Trend_SeenBeforeTheNewHigh_EndedAtTheFirstDownswing()
+    {
+        // At #64 the Uptrend has ended at the BoS of the first Downswing (#62), as the tour's "Trends in real time" chapter shows.
+        var section = Explain.Trend(TourPrices.Value, 40, level: 1, reached: 64, out var problem);
+
+        Assert.IsNotNull(section, problem);
+        var texts = Texts(section);
+        Assert.IsTrue(texts.Any(x => x.StartsWith("By its end it is an Uptrend of")), texts[4]);
+        Assert.IsTrue(texts.Any(x => x.StartsWith("It ended at") && x.EndsWith("at the BoS of the first Downswing since it began.")), texts[^1]);
+        var end = section["cues"]!.AsArray().Last(x => x!["on"] != null)!;
+        Assert.AreEqual("Uptrend ends", end["text"]!.GetValue<string>());
+        Assert.AreEqual(62, end["at"]!.GetValue<int>());
+    }
+
+    [TestMethod]
+    public void Tour_AroundASwing_JumpsToItAndRunsThroughIt()
+    {
+        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+
+        var def = Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T12:00")!;
+        var tour = Tours.Compile(def, prices);
+
+        Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
+        Assert.AreEqual(1, tour.Sections.Count);
+        Assert.AreEqual(39, tour.Sections[0].From, "Six candles before the Upswing begins at #45.");
+        Assert.AreEqual(75, tour.Sections[0].Until, "The BoS.");
+        StringAssert.StartsWith(def["title"]!.GetValue<string>(), "1st order Swing at 12:00 on 3 January 2023");
+        Assert.IsNull(Explain.Tour("Trend", "btc-1h", prices, "2023-01-01T00:00", level: 8), "No level 8 Trend has the first candle.");
+
+        // A Trend runs to the candle, and is the one the Replay page showed at its cursor: at #64 the Uptrend has ended.
+        var trend = Tours.Compile(Explain.Tour("Trend", "btc-1h", prices, "2023-01-02T12:00", seen: "2023-01-03T16:00")!, prices);
+        Assert.AreEqual(0, trend.Errors.Count, string.Join("\n", trend.Errors));
+        Assert.AreEqual(36, trend.Sections[0].Until, "The candle clicked.");
+        Assert.IsTrue(trend.Sections[0].Cues.Any(c => c.Text == "No Downswing has been Confirmed since, so it is still running."), "Seen from #36 the Uptrend still runs.");
+        Assert.IsNull(Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T12:00", seen: "2023-01-03T13:00"), "At #61 the Upswing from #45 has no BoS yet, so the page did not show it.");
+
+        // A 2nd order Swing the page showed at #100 is not on the chart at its own BoS, so the tour runs on to the cursor.
+        var finer = Tours.Compile(Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T12:00", level: 2, seen: "2023-01-05T04:00")!, prices);
+        Assert.AreEqual(0, finer.Errors.Count, string.Join("\n", finer.Errors));
+        Assert.AreEqual(100, finer.Sections[0].Until);
+        Assert.IsTrue(finer.Sections[0].Cues.Any(c => c.Text.StartsWith("This is a 2nd order ")), finer.Sections[0].Cues[0].Text);
+    }
+
+    [TestMethod]
     public void Tour_RunsToTheCandleThenExplainsIt()
     {
         var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
