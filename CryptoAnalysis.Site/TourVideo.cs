@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Gradient.CryptoAnalysis.Site;
 
@@ -11,13 +13,17 @@ public sealed record TourVideoStatus(bool Running, bool AudioOnly, string Stage,
 /// <summary>
 /// Makes the tour's audio and video for the page's Update audio and Generate video buttons by running tools/tour-video: the
 /// texts are read aloud, and for the video the tour is then played in a headless browser against this server and recorded.
-/// One run at a time.
+/// The reading is done by a worker kept running between runs, so the model loads once; a tour written from the prices can
+/// have its texts read ahead the same way. One run at a time.
 /// </summary>
-public sealed class TourVideo(string toolDir, string videoPath, string tourPath, string siteUrl)
+public sealed class TourVideo(string toolDir, string videoPath, string tourPath, string siteUrl) : IDisposable
 {
     private const int LinesKept = 12;
     private readonly object gate = new();
+    private readonly SemaphoreSlim reading = new(1, 1);
     private readonly List<string> lines = [];
+    private Process? worker;
+    private string? pending;
     private bool running;
     private bool audioOnly;
     private string stage = "";
@@ -27,24 +33,55 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
     public string VideoPath => videoPath;
 
     /// <summary>
+    /// The tour as the page plays it, with every section that explains something written out, as JSON: what the texts are
+    /// read from. Set by the server, which has the datasets to write them with.
+    /// </summary>
+    public Func<string?>? TourSource { get; set; }
+
+    /// <summary>
     /// Starts reading the texts aloud and, unless only the audio is wanted, making the video. Does nothing while a run is
     /// under way.
     /// </summary>
     public void Start(bool onlyAudio = false)
     {
+        if (!Begin(onlyAudio))
+            return;
+        _ = Task.Run(Make);
+    }
+
+    /// <summary>
+    /// Reads the texts of a tour aloud in the background, so its clips are there by the time its Voice button is pressed:
+    /// those with no clip yet, or whose clip was read from other words. While a run is under way the tour waits its turn,
+    /// the latest asked for taking the place of any waiting before it.
+    /// </summary>
+    public void Narrate(string tourJson)
+    {
         lock (gate)
         {
             if (running)
+            {
+                pending = tourJson;
                 return;
-            running = true;
-            audioOnly = onlyAudio;
-            error = null;
-            stage = "Starting";
-            started = DateTime.UtcNow;
-            lines.Clear();
+            }
         }
 
-        _ = Task.Run(Make);
+        if (!Begin(onlyAudio: true))
+            return;
+        _ = Task.Run(async () =>
+        {
+            string? failure = null;
+            try
+            {
+                if (await Read(tourJson) is { } problem)
+                    failure = problem;
+            }
+            catch (Exception e)
+            {
+                failure = e.Message;
+            }
+
+            End(failure);
+        });
     }
 
     /// <summary>
@@ -62,6 +99,57 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
         }
     }
 
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        lock (gate)
+        {
+            try
+            {
+                if (worker is { HasExited: false })
+                    worker.Kill(entireProcessTree: true);
+            }
+            catch (Exception)
+            {
+                // The worker is going anyway.
+            }
+
+            worker?.Dispose();
+            worker = null;
+        }
+    }
+
+    private bool Begin(bool onlyAudio)
+    {
+        lock (gate)
+        {
+            if (running)
+                return false;
+            running = true;
+            audioOnly = onlyAudio;
+            error = null;
+            stage = "Starting";
+            started = DateTime.UtcNow;
+            lines.Clear();
+            return true;
+        }
+    }
+
+    private void End(string? failure)
+    {
+        string? next;
+        lock (gate)
+        {
+            running = false;
+            error = failure;
+            next = pending;
+            pending = null;
+        }
+
+        if (next != null)
+            Narrate(next);
+    }
+
     private async Task Make()
     {
         string? failure = null;
@@ -69,8 +157,11 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
         {
             if (!Directory.Exists(Path.Combine(toolDir, "node_modules")))
                 failure = "tools/tour-video is not set up: run npm install there, then npx playwright install chromium";
-            else if (await Node("Reading the texts aloud", "narrate.mjs", "--url", siteUrl) != 0
-                || (!audioOnly && await Node("Recording the tour", "record.mjs", "--url", siteUrl, "--out", videoPath) != 0))
+            else if (TourSource?.Invoke() is not { } tour)
+                failure = "the tour could not be read";
+            else if (await Read(tour) is { } problem)
+                failure = problem;
+            else if (!audioOnly && await Node("Recording the tour", "record.mjs", "--url", siteUrl, "--out", videoPath) != 0)
                 failure = Failure();
         }
         catch (Exception e)
@@ -78,10 +169,76 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
             failure = $"node could not be run: {e.Message}";
         }
 
+        End(failure);
+    }
+
+    // Has the worker read a tour's texts; null when it did, else what went wrong.
+    private async Task<string?> Read(string tourJson)
+    {
+        lock (gate)
+            stage = "Reading the texts aloud";
+
+        await reading.WaitAsync();
+        try
+        {
+            var process = Worker();
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { tour = JsonNode.Parse(tourJson) }));
+            await process.StandardInput.FlushAsync();
+            while (await process.StandardOutput.ReadLineAsync() is { } line)
+            {
+                JsonObject? reply;
+                try
+                {
+                    reply = JsonNode.Parse(line) as JsonObject;
+                }
+                catch (JsonException)
+                {
+                    Said(line);
+                    continue;
+                }
+
+                if (reply?["done"] != null)
+                {
+                    Said($"{reply["clips"]} clips, {reply["read"]} sentences read");
+                    return null;
+                }
+
+                if (reply?["error"]?.GetValue<string>() is { } problem)
+                    return problem;
+                if (reply?["read"] is JsonValue progress && progress.TryGetValue<string>(out var read))
+                    Said(read);
+            }
+
+            return Failure("the narration worker stopped");
+        }
+        finally
+        {
+            reading.Release();
+        }
+    }
+
+    // The narration worker, started on first use and again if it has gone.
+    private Process Worker()
+    {
         lock (gate)
         {
-            running = false;
-            error = failure;
+            if (worker is { HasExited: false })
+                return worker;
+            worker?.Dispose();
+            var info = new ProcessStartInfo("node")
+            {
+                WorkingDirectory = toolDir,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            info.ArgumentList.Add("worker.mjs");
+            worker = Process.Start(info) ?? throw new InvalidOperationException("the narration worker did not start");
+            worker.ErrorDataReceived += (_, e) => Said(e.Data);
+            worker.BeginErrorReadLine();
+            return worker;
         }
     }
 
@@ -127,10 +284,10 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
         }
     }
 
-    private string Failure()
+    private string Failure(string? fallback = null)
     {
         // The line naming an error when there is one, else the last thing the tool said.
         lock (gate)
-            return lines.FirstOrDefault(x => x.Contains("Error", StringComparison.OrdinalIgnoreCase)) ?? lines.LastOrDefault() ?? "the video tool failed";
+            return lines.FirstOrDefault(x => x.Contains("Error", StringComparison.OrdinalIgnoreCase)) ?? lines.LastOrDefault() ?? fallback ?? "the video tool failed";
     }
 }

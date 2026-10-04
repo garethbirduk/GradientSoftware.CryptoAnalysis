@@ -132,7 +132,11 @@ public static class ReplayServer
         });
 
         // A tour of its own around one thing, for the Tour page opened with ?explain=Swing&dataset=btc-1h&at=2023-01-03T00:00&level=1.
-        // seen is the Replay page's cursor, so the Swing or Trend is the one the page showed there.
+        // seen is the Replay page's cursor, so the Swing or Trend is the one the page showed there. The written tour takes
+        // the glossary of the tour in tour.json, so the voice says BoS and MSB as that does, and its texts are read aloud in
+        // the background at once, so the clips are there by the time Voice is pressed.
+        var byDataset = datasets.ToDictionary(x => x.Id, x => (IReadOnlyList<Price>)x.Prices);
+        var tourFile = sourceDir != null ? Path.Combine(sourceDir, "tour.json") : null;
         app.MapGet("/api/explain/tour", (string explain, string dataset, string at, int? level, string? seen) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
@@ -140,9 +144,13 @@ public static class ReplayServer
             if (!Explain.Terms.Contains(explain))
                 return Results.BadRequest($"\"{explain}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.");
             var def = Explain.Tour(explain, data.Id, data.Prices, at, level ?? 1, seen);
-            return def == null
-                ? Results.BadRequest($"No {explain} at level {level ?? 1} has the candle at {at} in it.")
-                : Results.Text(def.ToJsonString(), "application/json");
+            if (def == null)
+                return Results.BadRequest($"No {explain} at level {level ?? 1} has the candle at {at} in it.");
+            if (tourFile != null && File.Exists(tourFile) && JsonNode.Parse(File.ReadAllText(tourFile))?["glossary"] is { } glossary)
+                def["glossary"] = glossary.DeepClone();
+            if (video != null && Tours.Compile(def, byDataset).Expanded is { } expanded)
+                video.Narrate(expanded.ToJsonString());
+            return Results.Text(def.ToJsonString(), "application/json");
         });
 
         // The tour's editor on the page saves the tour back to its source file. The page says which version of the file it
@@ -152,16 +160,16 @@ public static class ReplayServer
             var tourPath = Path.Combine(sourceDir, "tour.json");
 
             // The tour as the page plays it, with every section that explains something written out, for the narration tool.
-            app.MapGet("/api/tour", async () =>
+            string? ExpandedTour()
             {
-                if (!File.Exists(tourPath))
-                    return Results.NotFound();
-                var def = JsonNode.Parse(await File.ReadAllTextAsync(tourPath));
-                if (def == null)
-                    return Results.NotFound();
-                var tour = Tours.Compile(def, datasets.ToDictionary(x => x.Id, x => (IReadOnlyList<Price>)x.Prices));
-                return Results.Text((tour.Expanded ?? def).ToJsonString(), "application/json");
-            });
+                if (!File.Exists(tourPath) || JsonNode.Parse(File.ReadAllText(tourPath)) is not { } def)
+                    return null;
+                return (Tours.Compile(def, byDataset).Expanded ?? def).ToJsonString();
+            }
+
+            app.MapGet("/api/tour", () => ExpandedTour() is { } tour ? Results.Text(tour, "application/json") : Results.NotFound());
+            if (video != null)
+                video.TourSource = ExpandedTour;
             app.MapPut("/api/tour", async (HttpRequest request) =>
             {
                 using var reader = new StreamReader(request.Body);
@@ -179,8 +187,24 @@ public static class ReplayServer
                     return Results.Conflict("tour.json has changed on disk since the page loaded it.");
 
                 await File.WriteAllTextAsync(tourPath, text);
+                // The texts that changed are read aloud at once, so Voice has their clips by the time they are played.
+                ReadAloud();
                 return Results.NoContent();
             });
+
+            // The page asks for the tour's texts to be read when it opens the tour or turns Voice on, so clips missing for
+            // whatever reason are made without a button being pressed.
+            app.MapPost("/api/narrate", () =>
+            {
+                ReadAloud();
+                return video != null ? Results.Json(video.Status(), Json) : Results.NoContent();
+            });
+
+            void ReadAloud()
+            {
+                if (video != null && ExpandedTour() is { } tour)
+                    video.Narrate(tour);
+            }
         }
 
         // The tour's Update audio and Generate video buttons run tools/tour-video, and its Download button fetches the video
@@ -198,6 +222,8 @@ public static class ReplayServer
                 : Results.NotFound());
         }
 
+        if (video != null)
+            app.Lifetime.ApplicationStopping.Register(video.Dispose);
         Console.WriteLine($"Serving {siteDir} with replay for {string.Join(", ", datasets.Select(x => x.Id))} on http://localhost:{port}");
         await app.RunAsync();
     }

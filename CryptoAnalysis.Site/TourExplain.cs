@@ -120,7 +120,7 @@ public static class Explain
                 return null;
             first = swing.Span.First;
             var bos = swing.Span.Last;
-            until = SwingAt(prices.GetRange(0, bos + 1), first, level, swing.Swing.Direction) != null ? bos : cursor;
+            until = SwingAt(prices.GetRange(0, bos + 1), index, level)?.Span.First == first ? bos : cursor;
         }
         else
         {
@@ -128,7 +128,7 @@ public static class Explain
                 return null;
             first = trend.Start;
             var made = Math.Max(index, trend.Index[trend.Trend.Confirmed.Time]);
-            until = TrendAt(prices.GetRange(0, made + 1), first, level, trend.Trend.Direction) != null ? made : cursor;
+            until = TrendAt(prices.GetRange(0, made + 1), index, level)?.Start == first ? made : cursor;
         }
 
         var from = Math.Max(0, first - Margin);

@@ -184,6 +184,11 @@ public class ExplainTests
         Assert.AreEqual(0, finer.Errors.Count, string.Join("\n", finer.Errors));
         Assert.AreEqual(100, finer.Sections[0].Until);
         Assert.IsTrue(finer.Sections[0].Cues.Any(c => c.Text.StartsWith("This is a 2nd order ")), finer.Sections[0].Cues[0].Text);
+
+        // At #290 the Uptrend had ended at a Downswing's BoS; by the cursor those Downswings were Ghosts and it ran on, so the tour runs to the cursor.
+        var ghosted = Tours.Compile(Explain.Tour("Trend", "btc-1h", prices, "2023-01-13T02:00", seen: "2023-01-14T00:00")!, prices);
+        Assert.AreEqual(0, ghosted.Errors.Count, string.Join("\n", ghosted.Errors));
+        Assert.AreEqual(312, ghosted.Sections[0].Until);
     }
 
     [TestMethod]

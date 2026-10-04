@@ -423,15 +423,17 @@ function navGroups() {
 }
 
 function renderNav(active) {
+  // A tour written from the prices is opened with a query (?explain=...), which every link drops, so Tour is the tour itself.
+  const base = new URLSearchParams(location.search).has('explain') ? location.pathname : '';
   const menu = ([name, pages], i) => {
     const current = pages.some(p => p.id === active);
     return `<div class="menu${current ? ' active' : ''}">
       <button type="button" aria-expanded="false" aria-controls="menu-${i}">${esc(name)}</button>
       <div class="dropdown" id="menu-${i}">${pages.map(p =>
-        `<a href="#${p.id}" class="${p.id === active ? 'active' : ''}"${p.id === active ? ' aria-current="page"' : ''}><span>${esc(p.name)}</span><span class="count">${p.count || ''}</span></a>`).join('')}</div>
+        `<a href="${base}#${p.id}" class="${p.id === active ? 'active' : ''}"${p.id === active ? ' aria-current="page"' : ''}><span>${esc(p.name)}</span><span class="count">${p.count || ''}</span></a>`).join('')}</div>
     </div>`;
   };
-  const link = page => `<a class="navlink${active === page ? ' active' : ''}" href="#${page}"${active === page ? ' aria-current="page"' : ''}>${page}</a>`;
+  const link = page => `<a class="navlink${active === page ? ' active' : ''}" href="${base}#${page}"${active === page ? ' aria-current="page"' : ''}>${page}</a>`;
   const nav = document.getElementById('nav');
   nav.innerHTML = `<h1>Market structure terms</h1>${[...navGroups()].map(menu).join('')}
     ${link('Replay')}${link('Tour')}
@@ -2708,8 +2710,7 @@ function updateTourPanel() {
   document.querySelector('[data-tour-go="glossary"]').setAttribute('aria-pressed', glossaryOn());
   const voice = document.querySelector('[data-tour-go="voice"]'), clips = Object.keys(tour.audio ?? {}).length;
   voice.setAttribute('aria-pressed', voiceOn());
-  voice.disabled = !clips;
-  if (!clips) voice.title = 'No clips yet: press Update audio';
+  if (!clips) voice.title = 'No clips yet: the local server reads the texts aloud when Voice is on';
 
   // The editor marks the texts shown so far, and the one on show.
   document.querySelectorAll('#tour-editor .ed-cue').forEach((el, j) => {
@@ -2834,10 +2835,9 @@ async function renderTourPage(chapter) {
         <span class="keys">Keys: ← → step · Home End first last · Space play</span>
         <button type="button" data-tour-go="voice" title="Read each text aloud from its clip in tour-audio, made by tools/tour-video">Voice</button>
         <button type="button" data-tour-go="glossary" title="Show or hide the glossary: what the voice says in place of what is written, such as Break of Structure for BoS">Glossary</button>
-        ${writtenTour ? '' : `<button type="button" data-tour-go="audio" title="Read aloud the texts of the tour as saved in tour.json that are new or changed, or that the glossary now has said differently, for Voice to play">Update audio</button>
-        <button type="button" data-tour-go="video" title="Make the video of the tour as saved in tour.json, to download: the audio is updated, then the tour is recorded with it, which takes as long as the tour">Generate video</button>
-        <a class="button" data-tour="download" href="api/video/file" download="tour.mp4" hidden>Download video</a>
-        <span data-tour="video" aria-live="polite"></span>`}
+        ${writtenTour ? '' : `<button type="button" data-tour-go="video" title="Make the video of the tour as saved in tour.json, to download: the texts are read aloud, then the tour is recorded with the clips, which takes as long as the tour">Generate video</button>
+        <a class="button" data-tour="download" href="api/video/file" download="tour.mp4" hidden>Download video</a>`}
+        <span data-tour="video" aria-live="polite"></span>
         <button type="button" class="edit" data-tour-go="edit" title="Show or hide the editor">Editor</button>
       </div>
       <div class="tour-glossary" data-tour="glossary" role="group" aria-label="Glossary" hidden></div>
@@ -2845,12 +2845,12 @@ async function renderTourPage(chapter) {
     </article>`);
   main.querySelectorAll('[data-tour-go]').forEach(b => b.addEventListener('click', () =>
     b.dataset.tourGo === 'edit' ? toggleTourEditor() : b.dataset.tourGo === 'voice' ? toggleTourVoice() : b.dataset.tourGo === 'glossary' ? toggleTourGlossary()
-      : b.dataset.tourGo === 'video' || b.dataset.tourGo === 'audio' ? generateTour(b.dataset.tourGo === 'audio') : tourGo(b.dataset.tourGo)));
+      : b.dataset.tourGo === 'video' ? generateTour() : tourGo(b.dataset.tourGo)));
   const glossary = main.querySelector('[data-tour="glossary"]');
   glossary.addEventListener('input', e => { const row = e.target.closest('.gl-row'); if (row) readGlossary(`glossary|${[...row.parentElement.children].indexOf(row)}|${e.target.dataset.gl}`); });
   glossary.addEventListener('click', e => { const b = e.target.closest('button[data-gl]'); if (b && !b.disabled) glossaryAction(b.dataset.gl, b); });
   renderTourGlossary();
-  if (!videoMode && !writtenTour) refreshTourExport();
+  if (!videoMode) requestNarration();
   editorSection = -1;
   const wanted = tour.chapters.find(c => c.slug === chapter), first = wanted ? wanted.section : tour.index;
   // Opening the page shows its section's view at once, with no zoom to it.
@@ -2860,33 +2860,44 @@ async function renderTourPage(chapter) {
   if (tour.wanted.length) resolveTour();
 }
 
-// The tour's audio and video are made by the local server, which runs tools/tour-video. Update audio reads the texts aloud,
-// which is all that Voice needs; Generate video does that and then records the tour, for Download video to fetch. Either
-// is started here, and the page asks how it is going until it is done.
-let tourExport = null, tourExportNote = '', tourExportDone = '', tourExportPoll = null;
+// The tour's audio and video are made by the local server, which runs tools/tour-video. The texts are read aloud without
+// being asked: when the tour is saved, when the Tour page opens and when Voice is turned on, the server reads whichever
+// have no clip yet or were changed, which is all that Voice needs. Generate video does that and then records the tour, for
+// Download video to fetch. The page asks how it is going until it is done, then loads the clips again.
+let tourExport = null, tourExportNote = '', tourExportPoll = null;
 
-async function refreshTourExport(start = false, audioOnly = false) {
-  const response = await fetch(`api/video${start && audioOnly ? '?audio=true' : ''}`, { method: start ? 'POST' : 'GET' }).catch(() => null), was = tourExport;
+async function refreshTourExport(start = false) {
+  const response = await fetch('api/video', { method: start ? 'POST' : 'GET' }).catch(() => null), was = tourExport;
   tourExport = response?.ok ? await response.json() : null;
-  if (start && !tourExport) tourExportNote = `The local server was started before it could make the ${audioOnly ? 'audio' : 'video'}. Restart ./build-site.ps1 -Serve.`;
+  if (start && !tourExport) tourExportNote = 'The local server was started before it could make the video. Restart ./build-site.ps1 -Serve.';
   clearTimeout(tourExportPoll);
   if (tourExport?.running && currentPage === 'Tour') tourExportPoll = setTimeout(refreshTourExport, 2000);
-  const finished = was?.running && tourExport && !tourExport.running;
-  if (finished && tourExport.audioOnly && !tourExport.error) tourExportDone = 'Audio updated';
+  // The clips are looked for once a reading is done, whether it was still going at the first asking or already over.
+  const finished = tourExport && !tourExport.running && (was?.running || !was);
   updateTourExport();
-  // The changed texts have been read aloud again, so the clips and their lengths are loaded again.
-  if (finished && tour) {
-    const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
-    if (audio && JSON.stringify(audio) !== JSON.stringify(tour.audio)) { tour.audio = audio; applyTour(); }
-  }
+  if (finished && tour) await reloadTourAudio();
 }
 
-function generateTour(audioOnly) {
+// The texts read aloud again have new clips, with new lengths, so the clips are loaded again.
+async function reloadTourAudio() {
+  const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (audio && JSON.stringify(audio) !== JSON.stringify(tour.audio)) { tour.audio = audio; applyTour(); }
+}
+
+// Has the server read the tour's texts that have no clip yet, then follows the reading. A written tour's texts are read
+// as soon as the tour is asked for, so for one only the following is needed.
+async function requestNarration() {
+  if (videoMode) return;
+  if (!writtenTour) await fetch('api/narrate', { method: 'POST' }).catch(() => null);
+  tourExport = null;
+  refreshTourExport();
+}
+
+function generateTour() {
   if (tourExport?.running) return;
-  tourExportDone = '';
-  tourExportNote = tourDirty() ? `Save the tour first: the ${audioOnly ? 'audio' : 'video'} is made from tour.json.` : '';
+  tourExportNote = tourDirty() ? 'Save the tour first: the video is made from tour.json.' : '';
   if (tourExportNote) return updateTourExport();
-  refreshTourExport(true, audioOnly);
+  refreshTourExport(true);
 }
 
 function updateTourExport() {
@@ -2894,12 +2905,14 @@ function updateTourExport() {
   if (!status) return;
   const v = tourExport ?? {}, clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const made = v.made ? new Date(v.made).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-  document.querySelectorAll('[data-tour-go="video"], [data-tour-go="audio"]').forEach(b => { b.disabled = !!v.running; });
-  document.querySelector('[data-tour="download"]').hidden = !v.made;
+  document.querySelectorAll('[data-tour-go="video"]').forEach(b => { b.disabled = !!v.running; });
+  const download = document.querySelector('[data-tour="download"]');
+  if (download) download.hidden = !v.made;
   status.classList.toggle('warn', !v.running && !!(tourExportNote || v.error));
+  // A written tour's status says only how the reading of its texts is going.
   status.textContent = v.running ? `${v.stage}… ${clock(v.seconds)}`
-    : tourExportNote || (v.error ? `The ${v.audioOnly ? 'audio was not updated' : 'video was not made'}: ${v.error}`
-    : [tourExportDone, made ? `Video made ${made}${v.stale ? ', before the tour was last saved' : ''}` : ''].filter(Boolean).join(' · '));
+    : v.error ? `The ${v.audioOnly ? 'texts were not read aloud' : 'video was not made'}: ${v.error}`
+    : writtenTour ? '' : tourExportNote || (made ? `Video made ${made}${v.stale ? ', before the tour was last saved' : ''}` : '');
 }
 
 // ---- Tour glossary ---------------------------------------------------------------------------------------------------
@@ -3160,6 +3173,7 @@ function toggleTourVoice() {
   state.tourVoice = !voiceOn();
   save(state);
   if (!voiceOn() && tour) hush();
+  if (voiceOn()) requestNarration();
   updateTourPanel();
 }
 
@@ -3316,6 +3330,8 @@ async function saveTour() {
   const def = JSON.stringify(tour.def), body = formatTour(tour.def);
   const response = await fetch('api/tour', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Tour-Base': tour.base }, body }).catch(() => null);
   if (response?.ok) Object.assign(tour, { saved: def, base: textKey(body) });
+  // The server reads the changed texts aloud on saving; the page follows that and loads the clips when it is done.
+  if (response?.ok) { tourExport = null; refreshTourExport(); }
   tour.note = response?.ok ? '' : response?.status === 404 || response?.status === 405
     ? 'Not saved: the local server was started before the editor existed. Restart ./build-site.ps1 -Serve.'
     : response?.status === 409 ? 'Not saved: tour.json has changed on disk since this page loaded it. Revert loads the newer version; Undo then brings back what was here.'
