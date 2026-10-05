@@ -41,6 +41,7 @@ public static class Explain
         result.Remove("explain");
         result.Remove("at");
         result.Remove("level");
+        result.Remove("known");
         var term = node["explain"]?.GetValue<string>() ?? "";
         if (!Terms.Contains(term))
         {
@@ -64,7 +65,8 @@ public static class Explain
 
         var level = node["level"] is JsonValue given && given.TryGetValue<int>(out var l) ? l : 1;
         var until = node["until"] is JsonValue end && end.TryGetValue<int>(out var u) ? u : (int?)null;
-        var written = Write(term, prices, at.Value, level, reached, until, out var problem);
+        var known = node["known"] is JsonValue read && read.TryGetValue<int>(out var k) ? k : (int?)null;
+        var written = Write(term, prices, at.Value, level, reached, until, known, out var problem);
         if (written == null)
         {
             errors.Add($"{where}: {problem}");
@@ -89,7 +91,7 @@ public static class Explain
     /// so it is the one the page showed. Null when the term is not one that can be explained or nothing of the kind is at
     /// that candle.
     /// </summary>
-    public static JsonObject? Tour(string term, string dataset, List<Price> prices, string time, int level = 1, string? seen = null)
+    public static JsonObject? Tour(string term, string dataset, List<Price> prices, string time, int level = 1, string? seen = null, bool inPlace = false)
     {
         if (!Terms.Contains(term) || prices.Count == 0)
             return null;
@@ -113,7 +115,10 @@ public static class Explain
         // there too (a Swing's BoS, a Trend's second BoS or the candle), else on to the cursor, as the finer levels can be
         // anchored afresh by the candles between.
         var known = cursor < prices.Count - 1 ? prices.GetRange(0, cursor + 1) : prices;
+        // The chart's own layers mark what the texts speak of: the sawtooth, and for a Trend the points that make it.
+        var layers = new List<string> { $"level{level}", "close", "sawtooth" };
         int first, until;
+        int? last = null;
         if (term == "Swing")
         {
             if (SwingAt(known, index, level) is not { } swing)
@@ -121,6 +126,8 @@ public static class Explain
             first = swing.Span.First;
             var bos = swing.Span.Last;
             until = SwingAt(prices.GetRange(0, bos + 1), index, level)?.Span.First == first ? bos : cursor;
+            last = bos;
+            layers.AddRange(["HigherHigh", "HigherLow", "LowerLow", "LowerHigh"]);
         }
         else
         {
@@ -129,12 +136,25 @@ public static class Explain
             first = trend.Start;
             var made = Math.Max(index, trend.Index[trend.Trend.Confirmed.Time]);
             until = TrendAt(prices.GetRange(0, made + 1), index, level)?.Start == first ? made : cursor;
+            layers.AddRange(trend.Trend.Direction == EnumSwingDirection.Up ? ["HigherHigh", "HigherLow"] : ["LowerLow", "LowerHigh"]);
         }
 
-        var from = Math.Max(0, first - Margin);
+        // Played in place, the chart draws the thing as it is known where the texts are written from, a part at a time as
+        // the run reaches it, so the run stops on the thing's own last candle whatever the chart had there at the time.
+        var readAt = until;
+        if (inPlace && last is int own)
+            until = own;
+        // The view is the thing and one candle after it: the run begins on its first candle and stops on its last.
+        var from = first;
+        var view = new[] { from, until + 1 };
         title = $"{Order(level)} {title}";
-        return TourOf(title, dataset, prices[0].DateTime, [from, until + Margin], [$"level{level}", "close"],
-            new JsonObject { ["chapter"] = term, ["explain"] = term, ["at"] = index, ["level"] = level, ["from"] = from, ["until"] = until, ["speed"] = Pace(until - from) });
+        var section = new JsonObject { ["chapter"] = term, ["explain"] = term, ["at"] = index, ["level"] = level, ["from"] = from, ["until"] = until, ["view"] = new JsonArray(view[0], view[1]), ["speed"] = Pace(until - from) };
+        if (inPlace)
+            section["known"] = readAt;
+        var tour = TourOf(title, dataset, prices[0].DateTime, view, [.. layers], section);
+        if (inPlace)
+            tour["known"] = readAt;
+        return tour;
     }
 
     /// <summary>
@@ -224,7 +244,7 @@ public static class Explain
     // Candles a second for a section that runs a stretch: about twenty seconds of replay, between a brisk walk and a sprint.
     private static double Pace(int candles) => Math.Clamp(Math.Round(candles / 20.0), 10, 200);
 
-    private static JsonObject? Write(string term, List<Price> prices, int at, int level, int reached, int? until, out string problem)
+    private static JsonObject? Write(string term, List<Price> prices, int at, int level, int reached, int? until, int? known, out string problem)
     {
         problem = "";
         switch (term)
@@ -232,9 +252,9 @@ public static class Explain
             case "Candle":
                 return Candle(prices, at, reached);
             case "Swing":
-                return Swing(prices, at, level, reached, out problem, until);
+                return Swing(prices, at, level, reached, out problem, until, known);
             default:
-                return Trend(prices, at, level, reached, out problem, until);
+                return Trend(prices, at, level, reached, out problem, until, known);
         }
     }
 
@@ -292,14 +312,14 @@ public static class Explain
     /// Confirms it, its two legs, and whether it is Strong or Weak. Null, with the problem, when no Swing at that level has
     /// the candle.
     /// </summary>
-    public static JsonObject? Swing(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null)
+    public static JsonObject? Swing(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null, int? known = null)
     {
         FoundSwing? seen;
         int end;
         if (runsTo is int given)
         {
             end = Math.Max(reached, given);
-            seen = SwingAt(prices.GetRange(0, end + 1), at, level);
+            seen = SwingAt(prices.GetRange(0, Math.Max(end, known ?? end) + 1), at, level);
             if (seen == null)
             {
                 problem = $"no {Order(level)} Swing on the chart at #{end} has #{at} in it";
@@ -374,14 +394,14 @@ public static class Explain
     /// Where it begins, that second BoS, its count, which of its Swings are Weak, its Strength, and whether it has ended at
     /// a Swing the other way or still runs. Null, with the problem, when no Trend at that level has the candle.
     /// </summary>
-    public static JsonObject? Trend(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null)
+    public static JsonObject? Trend(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null, int? known = null)
     {
         FoundTrend? seen;
         int end;
         if (runsTo is int given)
         {
             end = Math.Max(reached, given);
-            seen = TrendAt(prices.GetRange(0, end + 1), at, level);
+            seen = TrendAt(prices.GetRange(0, Math.Max(end, known ?? end) + 1), at, level);
             if (seen == null)
             {
                 problem = $"no {Order(level)} Trend on the chart at #{end} has #{at} in it";

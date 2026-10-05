@@ -144,7 +144,7 @@ public static class ReplayServer
                 return Results.NotFound();
             if (!Explain.Terms.Contains(explain))
                 return Results.BadRequest($"\"{explain}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.");
-            var def = Explain.Tour(explain, data.Id, data.Prices, at, level ?? 1, seen);
+            var def = Explain.Tour(explain, data.Id, data.Prices, at, level ?? 1, seen, expanded == true);
             if (def == null)
                 return Results.BadRequest($"No {explain} at level {level ?? 1} has the candle at {at} in it.");
             if (tourFile != null && File.Exists(tourFile) && JsonNode.Parse(File.ReadAllText(tourFile))?["glossary"] is { } glossary)

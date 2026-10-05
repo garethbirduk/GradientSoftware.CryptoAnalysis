@@ -284,10 +284,12 @@
   .ed-written li { margin: 2px 0; }
   .candle-card { position: fixed; z-index: 30; display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px solid var(--border);
     border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .candle-card[hidden] { display: none; }
   .candle-card b { color: var(--text); }
   .candle-card .analyse { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
   .candle-card a { padding: 3px 10px; border: 1px solid var(--accent); border-radius: 5px; color: var(--accent); font-weight: 600; text-decoration: none; }
   .candle-card a:hover { background: var(--chip); }
+  .candle-card .hint { font-size: 11px; }
   .ed-chip { padding: 0 7px; border-radius: 999px; background: var(--chip); color: var(--text); }
   .ed-chip.added { box-shadow: inset 0 0 0 1px var(--accent); }
   .ed-chip.removed { text-decoration: line-through; opacity: .6; }
@@ -1007,11 +1009,16 @@ function chartRow(ex) {
 }
 
 // The structure as known at candle t: the timeline entries that hold there, shaped like the hindsight data so draw() can use it.
+// While an analysis plays, the structure is the one its texts are written from (as known at analysis.known), drawn a part
+// at a time: each part once the cursor has reached its candle, so the sawtooth, points and Swings come as the run goes.
 function liveView(ex, t) {
-  const r = timelineAt(ex, t), holds = holdsAt(t), time = ex.prices.t[t];
+  const told = analysis?.cues && analysis.ex.id === ex.id && analysis.known != null && t <= analysis.known && timelineAt(ex, analysis.known) ? analysis.known : null;
+  const reveal = told != null, r = timelineAt(ex, told ?? t), holds = holdsAt(told ?? t), time = ex.prices.t[t];
   // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
+  // An analysis keeps the window of history before its own start, however far it runs, so that is there to pan back to.
+  const since = analysis?.cues && analysis.ex.id === ex.id ? Math.min(t, analysis.from) : t;
   const window = ex.tour ? tourWindow(ex, t)
-    : isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
+    : isRemote(ex) ? { from: Math.max(0, since - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
   const cut = a => a.slice(window?.from ?? 0, t + 1);
   const prices = { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) };
   if (!r) {
@@ -1024,7 +1031,11 @@ function liveView(ex, t) {
     for (const e of entries) if (holds(e)) (out[e.value.level] ??= []).push(value(e.value));
     return out;
   };
+  const reached = (list, when) => reveal ? list.filter(v => when(v) <= time) : list;
+  const open = v => reveal && v.end && v.end.time > time ? { ...v, end: null } : v;
   const sawtooth = byLevel(r.pivots, v => v.pivot).map(pivots => {
+    if (reveal) pivots = pivots.filter(p => p.index <= t);
+    if (!pivots.length) return [];
     pivots.sort((a, b) => a.index - b.index);
     const out = pivots.map(p => ({ kind: p.kind, time: p.time, price: p.price, confirmedTime: p.confirmedIndex != null ? ex.prices.t[p.confirmedIndex] : null }));
     // The timeline leaves out the current price: it is this candle's close, unless the level already ends here.
@@ -1032,17 +1043,18 @@ function liveView(ex, t) {
     return out;
   });
   return {
-    ...ex, hindsight: ex, cursor: t, window, timeline: r,
+    ...ex, hindsight: ex, cursor: t, window, timeline: reveal ? timelineAt(ex, t) ?? r : r,
     prices,
     sawtooth,
-    swingsByLevel: byLevel(r.swings, v => v).map(list => list.sort((a, b) => a.start.time.localeCompare(b.start.time))),
-    pointsByLevel: byLevel(r.points, v => v).map(list => list.sort((a, b) => a.time.localeCompare(b.time))),
-    marketStructureBreaksByLevel: byLevel(r.marketStructureBreaks, v => v.break),
-    trendsByLevel: byLevel(r.trends, v => v),
-    candidatesByLevel: byLevel(r.candidates, v => v),
-    retracementsByLevel: byLevel(r.retracements ?? [], v => v),
-    rangesByLevel: byLevel(r.ranges ?? [], v => v),
-    candleRuns: r.candleRuns.filter(holds).map(e => e.value),
+    swingsByLevel: byLevel(r.swings, v => v).map(list => reached(list, w => (w.breakOfStructure ?? w.end ?? w.start).time).sort((a, b) => a.start.time.localeCompare(b.start.time))),
+    pointsByLevel: byLevel(r.points, v => v).map(list => reached(list, p => p.time).sort((a, b) => a.time.localeCompare(b.time))),
+    marketStructureBreaksByLevel: byLevel(r.marketStructureBreaks, v => v.break).map(list => reached(list, m => m.break.time)),
+    trendsByLevel: byLevel(r.trends, v => v).map(list => reached(list, tr => tr.confirmed.time).map(open)),
+    candidatesByLevel: reveal ? [] : byLevel(r.candidates, v => v),
+    retracementsByLevel: byLevel(r.retracements ?? [], v => v).map(list => reveal
+      ? list.map(v => ({ ...v, steps: v.steps.filter(s => s.point.time <= time) })).filter(v => v.to.time <= time && v.steps.length) : list),
+    rangesByLevel: byLevel(r.ranges ?? [], v => v).map(list => reached(list, g => g.identified.time).map(open)),
+    candleRuns: reached(r.candleRuns.filter(holds).map(e => e.value), run => run.end.time),
     liveByLevel: ex.liveByLevel?.map(events => events.filter(e => e.time <= time)),
   };
 }
@@ -2137,16 +2149,17 @@ async function renderReplayPage() {
     const time = p.t[i], up = p.c[i] > p.o[i], colour = p.c[i] === p.o[i] ? 'no body' : up ? 'green' : 'red';
     const money = v => Math.floor(v).toLocaleString('en-US'), level = structureLevel(ex);
     const cursor = cursorOf(ex), seen = p.t[cursor] ? { seen: p.t[cursor].slice(0, 16) } : {};
-    const link = (explain, title) => {
+    const link = explain => {
       const params = { explain, dataset: ex.dataset, at: time.slice(0, 16), level, ...seen };
-      return `<a href="?${new URLSearchParams(params)}#Tour" data-analyse="${esc(JSON.stringify({ ...params, levels }))}" title="${esc(title)}">${explain}</a>`;
+      return `<a href="?${new URLSearchParams(params)}#Tour" data-analyse="${esc(JSON.stringify({ ...params, levels }))}">${explain}</a>`;
     };
     // The levels that are on, finest first: where the finest has no Swing or Trend at the candle, the next is tried.
-    const levels = swingLevels(ex).sort((a, b) => b - a), which = levels.length > 1 ? `the finest level on that has one (${levels.join(', ')})` : `level ${level}`;
+    // The links have no tooltips: the browser leaves a tooltip on the screen when its link goes from under a still pointer,
+    // as it does when the link is clicked, so what they do is said in the card.
+    const levels = swingLevels(ex).sort((a, b) => b - a), which = levels.length > 1 ? `finest level on that has one (${levels.join(', ')})` : `level ${level}`;
     card.innerHTML = `<b>${esc(fmtTime(time))} UTC</b><span>open ${money(p.o[i])} · close ${money(p.c[i])} · ${colour}</span><span>high ${money(p.h[i])} · low ${money(p.l[i])}</span>
-      <span class="analyse">Analyse ${link('Candle', 'Explain this candle here, on this chart')}
-      ${link('Swing', `Explain the Swing this candle is in, at ${which}, here on this chart`)}
-      ${link('Trend', `Explain the Trend this candle is in, at ${which}, here on this chart`)}</span>`;
+      <span class="analyse">Analyse ${link('Candle')}${link('Swing')}${link('Trend')}</span>
+      <span class="hint">Swing and Trend: ${esc(which)}</span>`;
     stopPlaying();
     pauseAnalysis();
     card.hidden = false;
@@ -2165,6 +2178,12 @@ async function renderReplayPage() {
   // The card is beside a candle where that was on the screen, so it goes when the chart moves under it: the cursor moves,
   // the chart is zoomed or the page scrolled, a key is pressed or the window changes.
   closeCandleCard = close;
+  // It also goes when the pointer leaves it: once the pointer is well clear of the card.
+  window.addEventListener('pointermove', e => {
+    if (card.hidden) return;
+    const r = card.getBoundingClientRect(), dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right), dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+    if (Math.hypot(dx, dy) > 80) close();
+  }, { passive: true });
   document.addEventListener('keydown', e => { if (!['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key) && !card.contains(e.target)) close(); });
   window.addEventListener('wheel', e => { if (!card.hidden && !card.contains(e.target)) close(); }, { capture: true, passive: true });
   window.addEventListener('scroll', close, { capture: true, passive: true });
@@ -2241,15 +2260,29 @@ async function startAnalysis(params) {
     for (const s of sections) {
       if (s.from != null) at = s.from;
       const end = s.until ?? at;
-      for (const c of s.cues ?? []) if (c.text) cues.push({ text: c.text, at: anchor + (c.at ?? at), when: anchor + Math.max(c.at ?? at, at), on: c.on ?? null, place: c.place ?? null, silent: c.voice === false, given: c.hold >= 0 ? c.hold : null });
+      // The tour's pins are left out: the layers the analysis turns on mark the same places (a BoS by its triangle).
+      for (const c of s.cues ?? []) if (c.text && c.on == null) cues.push({ text: c.text, at: anchor + (c.at ?? at), when: anchor + Math.max(c.at ?? at, at), on: c.on ?? null, place: c.place ?? null, silent: c.voice === false, given: c.hold >= 0 ? c.hold : null });
       mine.until = Math.max(mine.until, anchor + end);
       at = end;
     }
     if (!cues.length) throw new Error('the server wrote no texts for it');
+    // The candle the texts are written from: the chart draws the structure as known there (see liveView).
+    if (Number.isInteger(def.known)) { mine.known = anchor + def.known; await fetchBatch(ex, mine.known); if (analysis !== mine) return; }
     // A candle is explained whatever levels are on; a Swing or a Trend needs its own.
     const needed = [...(def.start?.layers ?? []), ...sections.flatMap(s => s.add ?? [])].map(id => LAYER_ALIASES[id] ?? id).filter(id => params.explain !== 'Candle' || !/^level\d+$/.test(id));
+    // The chart zooms in on what is explained, as the tour does: the view the tour gives it, with half a candle of room
+    // so its first and last candles are whole. The candles before it are drawn too (see liveView), a pan away.
+    // The zoom is the Replay page's own, so it can be widened by hand; the one the page had comes back on Close.
+    const view = [...sections].reverse().find(s => Array.isArray(s.view))?.view ?? def.start?.view, last = ex.prices.t.length - 1;
+    if (Array.isArray(view)) {
+      const time = i => Date.parse(ex.prices.t[Math.max(0, Math.min(last, anchor + i))]), half = (Date.parse(ex.prices.t[Math.min(1, last)]) - Date.parse(ex.prices.t[0])) / 2;
+      mine.zoomBefore = zooms.get(ex.id) ?? null;
+      zooms.set(ex.id, { x: [new Date(time(view[0]) - half).toISOString(), new Date(time(view[1]) + half).toISOString()] });
+    }
+    // A Swing or a Trend is shown with its own level only: the other levels that are on are off until Close.
+    const page = (state.pages.Replay ?? defaultsFor('Replay')).filter(id => params.explain === 'Candle' || !/^level\d+$/.test(id));
     Object.assign(mine, { cues, title: def.title ?? params.explain, speed: sections.find(s => s.speed > 0)?.speed ?? def.start?.speed ?? 4,
-      layers: [...new Set(['replay', ...(state.pages.Replay ?? defaultsFor('Replay')), ...needed])] });
+      layers: [...new Set(['replay', ...page, ...needed])] });
   } catch (e) {
     if (analysis !== mine) return;
     mine.error = e.message;
@@ -2311,6 +2344,7 @@ function closeAnalysis() {
   pauseAnalysis();
   delete a.ex.pins;
   delete a.ex.pinRoom;
+  if (a.zoomBefore !== undefined) { if (a.zoomBefore) zooms.set(a.ex.id, a.zoomBefore); else zooms.delete(a.ex.id); }
   analysis = null;
   const bar = document.querySelector('[data-analysis]');
   if (bar) bar.hidden = true;
