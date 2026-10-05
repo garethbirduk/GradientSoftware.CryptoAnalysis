@@ -137,7 +137,8 @@ public static class ReplayServer
         // the background at once, so the clips are there by the time Voice is pressed.
         var byDataset = datasets.ToDictionary(x => x.Id, x => (IReadOnlyList<Price>)x.Prices);
         var tourFile = sourceDir != null ? Path.Combine(sourceDir, "tour.json") : null;
-        app.MapGet("/api/explain/tour", (string explain, string dataset, string at, int? level, string? seen) =>
+        // With expanded, the tour comes with its sections written out, as the Replay page plays it in place.
+        app.MapGet("/api/explain/tour", (string explain, string dataset, string at, int? level, string? seen, bool? expanded) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
@@ -148,9 +149,10 @@ public static class ReplayServer
                 return Results.BadRequest($"No {explain} at level {level ?? 1} has the candle at {at} in it.");
             if (tourFile != null && File.Exists(tourFile) && JsonNode.Parse(File.ReadAllText(tourFile))?["glossary"] is { } glossary)
                 def["glossary"] = glossary.DeepClone();
-            if (video != null && Tours.Compile(def, byDataset).Expanded is { } expanded)
-                video.Narrate(expanded.ToJsonString());
-            return Results.Text(def.ToJsonString(), "application/json");
+            var written = video != null || expanded == true ? Tours.Compile(def, byDataset).Expanded : null;
+            if (video != null && written != null)
+                video.Narrate(written.ToJsonString());
+            return Results.Text((expanded == true ? written ?? def : def).ToJsonString(), "application/json");
         });
 
         // The Trends like the one a written tour explains, for its Find similar: the Trend as the tour shows it, and every

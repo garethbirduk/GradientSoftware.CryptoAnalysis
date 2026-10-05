@@ -208,6 +208,9 @@
   .tour-controls button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--bg); }
   .tour-controls .edit { margin-left: auto; }
   .tour-warning { color: var(--warn); font-size: 13px; }
+  .analysis { margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
+  .analysis .tour-caption { min-height: 2.9em; max-width: 80ch; margin-top: 4px; }
+  .analysis .tour-caption.warn { color: var(--warn); font-size: 14px; }
   #similar { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
   #similar::backdrop { background: rgba(0, 0, 0, .35); }
   #similar h4 { margin: 0 0 4px; font-size: 15px; }
@@ -413,10 +416,16 @@ let currentPage = null;
 // The tour sets its own layers section by section, and it is always replaying. Layers set by hand there are not remembered:
 // they go into the section being edited when the tour's editor is open, and last until the next section otherwise.
 let tourLayers = ['replay'];
-const layersOf = page => page === 'Tour' ? tourLayers : state.pages[page] ?? defaultsFor(page);
+// An analysis playing on the Replay page (see startAnalysis) adds the layers it needs to those that are on. Layers set
+// while it is open are its own, and those the page had come back when it is closed.
+let analysis = null;
+// Hides the Replay page's candle card (set where the card is made).
+let closeCandleCard = () => {};
+const layersOf = page => page === 'Tour' ? tourLayers : page === 'Replay' && analysis?.layers ? analysis.layers : state.pages[page] ?? defaultsFor(page);
 const on = id => layersOf(currentPage).includes(id);
 const setLayers = layers => {
   if (currentPage === 'Tour') { tourLayers = [...new Set(['replay', ...layers])]; recordTourLayers(); return; }
+  if (currentPage === 'Replay' && analysis?.layers) { analysis.layers = layers; return; }
   state.pages[currentPage] = layers; save(state);
 };
 
@@ -1272,6 +1281,7 @@ function redrawExample(ex) {
 
 function moveTo(ex, index) {
   if (!ex) return;
+  closeCandleCard();
   cursors.set(ex.id, Math.max(0, Math.min(ex.prices.t.length - 1, index)));
   prefetch(ex, cursorOf(ex));
   setActive(ex.id);
@@ -1307,6 +1317,7 @@ function go(action) {
   const ex = activeExample();
   if (!hasReplay(ex)) return;
   const i = cursorOf(ex), time = Date.parse(ex.prices.t[i]);
+  pauseAnalysis();
   if (action !== 'play') stopPlaying();
   switch (action) {
     case 'start': return moveTo(ex, 0);
@@ -1431,6 +1442,8 @@ document.addEventListener('keydown', e => {
     if (step) { e.preventDefault(); tourGo(step); }
     return;
   }
+  // With an analysis open, Space plays and pauses it.
+  if (e.key === ' ' && analysis?.cues && currentPage === 'Replay' && !inside('button, li')) { e.preventDefault(); return analysis.playing ? pauseAnalysis() : playAnalysis(); }
   const actions = { ArrowLeft: e.shiftKey ? '-day' : '-hour', ArrowRight: e.shiftKey ? '+day' : '+hour', Home: 'start', End: 'end', ',': '-event', '.': '+event' };
   const action = actions[e.key] ?? (e.key === ' ' && !inside('button, li') ? 'play' : null);
   if (!action) return;
@@ -2066,12 +2079,13 @@ async function checkLocalServer() {
 async function renderReplayPage() {
   const main = document.getElementById('main');
   selected.clear();
+  closeAnalysis();
   currentPage = 'Replay';
   const head = `<section class="term-head"><h2>Replay</h2>
     <p>Step through a whole dataset as it was known at each candle. The sawtooth, points, swings, breaks and trends come only from
     the prices up to the cursor, with the levels anchored at the dataset's first candle.</p>
     <p class="remarks">The local server works it out ${REMOTE_BATCH} candles at a time and fetches ahead while you play. The chart
-    follows the cursor, showing the chosen window of history before it. Click a candle for its prices and Analyse, which explains it as the tour would.</p></section>`;
+    follows the cursor, showing the chosen window of history before it. Click a candle for its prices and Analyse, which explains it as the tour would, here on the chart.</p></section>`;
   const show = body => { main.innerHTML = head + body; renderLayers(); wireReplayExamples(main); drawAll(currentPage); };
 
   if (!serverOn) {
@@ -2092,14 +2106,17 @@ async function renderReplayPage() {
     </div>
     <article class="example replay-big" id="ex-${esc(ex.id)}">
       <header><h3>${esc(info.name)}</h3><span class="id">${info.candles.toLocaleString()} candles · ${esc(fmtTime(info.first))} to ${esc(fmtTime(info.last))} UTC · anchored at the first candle</span></header>
+      ${analysisBar()}
       ${chartRow(ex)}
     </article>`);
+  wireAnalysisBar(main);
   main.querySelector('[data-dataset]').addEventListener('change', e => { state.replayDataset = e.target.value; save(state); stopPlaying(); renderReplayPage(); });
   main.querySelector('[data-window]').addEventListener('change', e => { state.replayWindow = Number(e.target.value); save(state); redrawExample(ex); });
 }
 
-// A click on a candle of the Replay page opens a card beside it with the candle's prices and Analyse, which opens the Tour
-// page on a tour written around that candle (see writtenTour). A drag still pans; a click elsewhere closes the card.
+// A click on a candle of the Replay page opens a card beside it with the candle's prices and Analyse, which plays a tour
+// written around that candle on the chart itself (see startAnalysis). A drag still pans; a click elsewhere closes the card.
+// A replay or an analysis that is playing stops for it, as the candle would move away from under the card.
 {
   let down = null;
   const card = document.createElement('div');
@@ -2120,18 +2137,268 @@ async function renderReplayPage() {
     const time = p.t[i], up = p.c[i] > p.o[i], colour = p.c[i] === p.o[i] ? 'no body' : up ? 'green' : 'red';
     const money = v => Math.floor(v).toLocaleString('en-US'), level = structureLevel(ex);
     const cursor = cursorOf(ex), seen = p.t[cursor] ? { seen: p.t[cursor].slice(0, 16) } : {};
-    const link = (explain, title) => `<a href="?${new URLSearchParams({ explain, dataset: ex.dataset, at: time.slice(0, 16), level, ...seen })}#Tour" title="${esc(title)}">${explain}</a>`;
+    const link = (explain, title) => {
+      const params = { explain, dataset: ex.dataset, at: time.slice(0, 16), level, ...seen };
+      return `<a href="?${new URLSearchParams(params)}#Tour" data-analyse="${esc(JSON.stringify({ ...params, levels }))}" title="${esc(title)}">${explain}</a>`;
+    };
+    // The levels that are on, finest first: where the finest has no Swing or Trend at the candle, the next is tried.
+    const levels = swingLevels(ex).sort((a, b) => b - a), which = levels.length > 1 ? `the finest level on that has one (${levels.join(', ')})` : `level ${level}`;
     card.innerHTML = `<b>${esc(fmtTime(time))} UTC</b><span>open ${money(p.o[i])} · close ${money(p.c[i])} · ${colour}</span><span>high ${money(p.h[i])} · low ${money(p.l[i])}</span>
-      <span class="analyse">Analyse ${link('Candle', 'Open the Tour page on a tour written around this candle')}
-      ${link('Swing', `Open the Tour page on a tour written around the level ${level} Swing this candle is in`)}
-      ${link('Trend', `Open the Tour page on a tour written around the level ${level} Trend this candle is in`)}</span>`;
+      <span class="analyse">Analyse ${link('Candle', 'Explain this candle here, on this chart')}
+      ${link('Swing', `Explain the Swing this candle is in, at ${which}, here on this chart`)}
+      ${link('Trend', `Explain the Trend this candle is in, at ${which}, here on this chart`)}</span>`;
+    stopPlaying();
+    pauseAnalysis();
     card.hidden = false;
     const w = card.offsetWidth, h = card.offsetHeight;
     card.style.left = `${Math.min(e.clientX + 12, innerWidth - w - 8)}px`;
     card.style.top = `${Math.min(e.clientY + 12, innerHeight - h - 8)}px`;
   }, true);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  // Analyse plays here; opened in a new tab or window, the same link is the Tour page on a tour of its own.
+  card.addEventListener('click', e => {
+    const a = e.target.closest('a[data-analyse]');
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
+    e.preventDefault();
+    close();
+    startAnalysis(JSON.parse(a.dataset.analyse));
+  });
+  // The card is beside a candle where that was on the screen, so it goes when the chart moves under it: the cursor moves,
+  // the chart is zoomed or the page scrolled, a key is pressed or the window changes.
+  closeCandleCard = close;
+  document.addEventListener('keydown', e => { if (!['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key) && !card.contains(e.target)) close(); });
+  window.addEventListener('wheel', e => { if (!card.hidden && !card.contains(e.target)) close(); }, { capture: true, passive: true });
+  window.addEventListener('scroll', close, { capture: true, passive: true });
+  window.addEventListener('resize', close);
+  window.addEventListener('blur', close);
   window.addEventListener('hashchange', close);
+}
+
+// ---- Analysis in place -----------------------------------------------------------------------------------------------
+// Analyse on the Replay page plays a written tour (see Explain in CryptoAnalysis.Site) on the Replay chart itself: the
+// cursor goes to where the tour begins and runs on as the texts are read under the chart, with their pins on it. It is
+// the Replay page throughout, so the chart can be zoomed and panned, the layers changed and the cursor moved, which
+// pauses the analysis; closed, it leaves the cursor where it is and the layers as they were.
+function analysisBar() {
+  return `<div class="analysis" data-analysis hidden>
+    <div class="tour-caption" data-an="caption" aria-live="polite"></div>
+    <div class="tour-controls" role="group" aria-label="Analysis controls">
+      <button type="button" data-an-go="restart" title="Back to the start of the analysis" aria-label="Back to the start">⏮</button>
+      <button type="button" class="play" data-an-go="play" title="Play or pause the analysis (Space)">▶</button>
+      <span class="readout" data-an="title"></span>
+      <button type="button" data-an-go="voice" title="Read each text aloud">Voice</button>
+      <label class="pace" title="How fast the analysis plays: the candles, the wait after each text, and the voice by a tenth either way">Speed
+        <input type="range" min="0" max="${TOUR_PACES.length - 1}" step="1" data-an="pace"><span data-an="pace-name"></span></label>
+      <button type="button" data-an-go="similar" title="Find the other Trends like this one: the same level, direction, count of Swings and Strength, or any of those">Find similar</button>
+      <button type="button" class="edit" data-an-go="close" title="Close the analysis: the cursor stays where it is">Close</button>
+    </div>
+  </div>`;
+}
+
+function wireAnalysisBar(root) {
+  const bar = root.querySelector('[data-analysis]');
+  bar.addEventListener('click', e => {
+    const action = e.target.closest('[data-an-go]')?.dataset.anGo;
+    if (action === 'play') analysis?.playing ? pauseAnalysis() : playAnalysis();
+    else if (action === 'restart') playAnalysis({ restart: true });
+    else if (action === 'voice') toggleAnalysisVoice();
+    else if (action === 'similar') { pauseAnalysis(); openSimilar(); }
+    else if (action === 'close') closeAnalysis();
+  });
+  bar.querySelector('[data-an="pace"]').addEventListener('input', e => setTourPace(e.target.value));
+}
+
+async function startAnalysis(params) {
+  closeAnalysis();
+  stopPlaying();
+  const chart = document.querySelector('#main .chart'), ex = chart && findExample(chart.dataset.id), bar = document.querySelector('[data-analysis]');
+  if (!ex || !bar) return;
+  const mine = analysis = { params, ex, title: '', error: null, layers: null, cues: null, from: 0, until: 0, speed: 4, t: 0, playing: false, done: false, timer: null,
+    queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, nextCandle: 0, player: null, speaking: false, audio: {}, audioAt: 0 };
+  bar.hidden = false;
+  updateAnalysisBar();
+  // The texts are above the chart, so both are on the screen together.
+  bar.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  try {
+    // A Swing or Trend is looked for at the level asked for, then at the other levels that are on, finest first: the
+    // chart shows the Swings of every level that is on, and the candle may be in one of a coarser level only.
+    const { levels = [], ...query } = params, tries = params.explain === 'Candle' ? [query.level] : [...new Set([query.level, ...levels].map(Number))];
+    let def = null;
+    for (const level of tries) {
+      const r = await fetch(`api/explain/tour?${new URLSearchParams({ ...query, level, expanded: true })}`, { cache: 'no-store' });
+      const text = await r.text();
+      if (r.ok) { def = JSON.parse(text); mine.params = { ...query, level }; break; }
+      if (r.status === 400 && tries.length > 1) continue;
+      throw new Error(r.status === 404 ? `the server has no dataset "${params.dataset}"` : text.replace(/^"|"$/g, '') || `the server answered ${r.status}`);
+    }
+    if (!def) throw new Error(`no ${params.explain} at level ${tries.join(', ').replace(/, (\d+)$/, ' or $1')} has the candle at ${fmtTime(query.at)} in it, as the chart was at the cursor`);
+    await loadAnalysisAudio(mine);
+    if (analysis !== mine) return;
+    // The tour's candles are numbered from its start time; the Replay page's from the dataset's first. A text is shown when the replay
+    const start = axisTime(def.start?.time ?? ''), anchor = Number.isNaN(start) ? 0 : indexAtOrAfter(ex, start), sections = def.sections ?? [];
+    let at = sections[0]?.from ?? 0;
+    const cues = [];
+    mine.from = mine.until = anchor + at;
+    for (const s of sections) {
+      if (s.from != null) at = s.from;
+      const end = s.until ?? at;
+      for (const c of s.cues ?? []) if (c.text) cues.push({ text: c.text, at: anchor + (c.at ?? at), when: anchor + Math.max(c.at ?? at, at), on: c.on ?? null, place: c.place ?? null, silent: c.voice === false, given: c.hold >= 0 ? c.hold : null });
+      mine.until = Math.max(mine.until, anchor + end);
+      at = end;
+    }
+    if (!cues.length) throw new Error('the server wrote no texts for it');
+    // A candle is explained whatever levels are on; a Swing or a Trend needs its own.
+    const needed = [...(def.start?.layers ?? []), ...sections.flatMap(s => s.add ?? [])].map(id => LAYER_ALIASES[id] ?? id).filter(id => params.explain !== 'Candle' || !/^level\d+$/.test(id));
+    Object.assign(mine, { cues, title: def.title ?? params.explain, speed: sections.find(s => s.speed > 0)?.speed ?? def.start?.speed ?? 4,
+      layers: [...new Set(['replay', ...(state.pages.Replay ?? defaultsFor('Replay')), ...needed])] });
+  } catch (e) {
+    if (analysis !== mine) return;
+    mine.error = e.message;
+    return updateAnalysisBar();
+  }
+  // Room is kept for all of the pins from the start, so the prices do not move each time one appears.
+  ex.pinRoom = analysisPins(mine, mine.cues);
+  syncLayerButtons();
+  playAnalysis({ restart: true });
+}
+
+const analysisPins = (a, cues) => cues.filter(c => c.on != null).map(c => pinOf(a.ex, c)).filter(p => p.time && Number.isFinite(p.price));
+
+// The clips the local server has read so far. It reads a written tour's texts as soon as the tour is asked for, so a
+// text with no clip yet is looked for again as it comes up.
+async function loadAnalysisAudio(a) {
+  a.audioAt = performance.now();
+  const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (audio) a.audio = audio;
+}
+
+// Plays from where the cursor is when it is inside the analysis, with the texts before it taken as read; otherwise, or
+// when the analysis has ended, from its start.
+function playAnalysis({ restart = false } = {}) {
+  const a = analysis;
+  if (!a?.cues) return;
+  pauseAnalysis();
+  stopPlaying();
+  let t = cursorOf(a.ex);
+  if (restart || a.done || t < a.from || t > a.until) {
+    t = a.from;
+    Object.assign(a, { queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, done: false });
+  } else if (t !== a.t) {
+    const before = a.cues.filter(c => c.when < t);
+    Object.assign(a, { queue: [], shown: before, fired: new Set(before), active: null, activeUntil: 0 });
+  }
+  Object.assign(a, { t, playing: true, nextCandle: 0 });
+  a.ex.pins = analysisPins(a, a.shown);
+  moveTo(a.ex, t);
+  for (const c of a.cues) if (!a.fired.has(c) && c.when <= t) { a.fired.add(c); a.queue.push(c); }
+  // The text on show gets its reading time again, and is read aloud from its start.
+  if (a.active) { a.activeUntil = performance.now() + holdOf(a.active) * 1000; speakAnalysis(a.active); }
+  a.timer = setInterval(analysisTick, TOUR_TICK);
+  updateAnalysisBar();
+}
+
+function pauseAnalysis() {
+  const a = analysis;
+  if (!a?.playing) return;
+  clearInterval(a.timer);
+  a.player?.pause();
+  Object.assign(a, { playing: false, timer: null, speaking: false });
+  updateAnalysisBar();
+}
+
+function closeAnalysis() {
+  const a = analysis;
+  if (!a) return;
+  pauseAnalysis();
+  delete a.ex.pins;
+  delete a.ex.pinRoom;
+  analysis = null;
+  const bar = document.querySelector('[data-analysis]');
+  if (bar) bar.hidden = true;
+  if (currentPage === 'Replay') { syncLayerButtons(); drawAll('Replay'); }
+}
+
+const analysisSpeaks = (a, cue) => voiceOn() && !cue.silent && !!a.audio[textKey(cue.text)];
+
+function speakAnalysis(cue) {
+  const a = analysis;
+  if (!analysisSpeaks(a, cue)) {
+    if (voiceOn() && !cue.silent && performance.now() - a.audioAt > 2000) loadAnalysisAudio(a);
+    return;
+  }
+  a.player?.pause();
+  const player = a.player = new Audio(`tour-audio/${a.audio[textKey(cue.text)].file}`), done = () => { if (a.player === player) a.speaking = false; };
+  player.playbackRate = tourPace().voice;
+  player.addEventListener('ended', done);
+  player.addEventListener('error', done);
+  a.speaking = true;
+  player.play().catch(done);
+}
+
+function toggleAnalysisVoice() {
+  state.tourVoice = !voiceOn();
+  save(state);
+  if (analysis && !voiceOn()) { analysis.player?.pause(); analysis.speaking = false; }
+  if (analysis && voiceOn()) loadAnalysisAudio(analysis);
+  updateAnalysisBar();
+}
+
+// One beat of a playing analysis: the next text once the one on show has been read, else the next candle, else it ends.
+// A text that is read aloud waits for the voice to finish the one before; the candles wait for both.
+function analysisTick() {
+  const a = analysis;
+  if (!a?.playing) return;
+  if (currentPage !== 'Replay') return closeAnalysis();
+  const ex = a.ex, t = cursorOf(ex), now = performance.now();
+  // The cursor moved by hand: the analysis waits, and Play carries on from there.
+  if (t !== a.t) return pauseAnalysis();
+  const holding = a.active && now < a.activeUntil;
+  if (a.queue.length) {
+    if (holding || (a.speaking && analysisSpeaks(a, a.queue[0]))) return;
+    const cue = a.queue.shift(), clip = cue.silent ? null : a.audio[textKey(cue.text)];
+    // The same seconds as on the Tour page: its own, else the length of its clip, else the time it takes to read.
+    cue.clip = cue.given == null && clip?.seconds > 0 ? clip.seconds : 0;
+    cue.hold = cue.given ?? (clip?.seconds > 0 ? clip.seconds + TOUR_PACES[1].gap : readingSeconds(cue.text));
+    Object.assign(a, { active: cue, activeUntil: now + holdOf(cue) * 1000, nextCandle: 0 });
+    a.shown.push(cue);
+    speakAnalysis(cue);
+    if (cue.on != null) { ex.pins = analysisPins(a, a.shown); redrawExample(ex); }
+    return updateAnalysisBar();
+  }
+  if (holding || a.speaking) return;
+  if (t >= a.until) {
+    a.done = true;
+    return pauseAnalysis();
+  }
+  if (!timelineAt(ex, t + 1)) { a.nextCandle = 0; return prefetch(ex, t + 1); }
+  if (now < a.nextCandle) return;
+  // A beat takes every candle that has come due since the last, but never past a text's candle or the end.
+  const gap = 1000 / (a.speed * tourPace().candles), late = now - a.nextCandle, inStep = a.nextCandle > 0 && late < 1000;
+  const due = inStep ? 1 + Math.floor(late / gap) : 1;
+  const stop = Math.min(a.until, t + due, ...a.cues.filter(c => c.when > t && !a.fired.has(c)).map(c => c.when));
+  let to = t + 1;
+  while (to < stop && timelineAt(ex, to + 1)) to++;
+  a.nextCandle = inStep && to - t === due ? a.nextCandle + due * gap : now + gap;
+  a.t = to;
+  moveTo(ex, to);
+  for (const c of a.cues) if (!a.fired.has(c) && c.when <= to) { a.fired.add(c); a.queue.push(c); }
+}
+
+function updateAnalysisBar() {
+  const bar = document.querySelector('[data-analysis]'), a = analysis;
+  if (!bar || !a) return;
+  const part = name => bar.querySelector(`[data-an="${name}"]`), button = name => bar.querySelector(`[data-an-go="${name}"]`);
+  const caption = [...a.shown].reverse().find(c => c.on == null);
+  part('caption').textContent = a.error ? `The analysis could not be written: ${a.error.replace(/\.$/, '')}.` : !a.cues ? 'Writing the analysis…' : caption?.text ?? '';
+  part('caption').classList.toggle('warn', !!a.error);
+  part('title').textContent = a.cues ? `${a.title}${a.done ? ' · ended' : ''}` : '';
+  button('play').textContent = a.playing ? '❚❚' : '▶';
+  button('play').setAttribute('aria-label', a.playing ? 'Pause (Space)' : 'Play (Space)');
+  button('play').disabled = button('restart').disabled = !a.cues;
+  button('voice').setAttribute('aria-pressed', voiceOn());
+  button('similar').hidden = a.params.explain !== 'Trend' || !a.cues;
+  const pace = TOUR_PACES.indexOf(tourPace());
+  part('pace').value = pace;
+  part('pace-name').textContent = TOUR_PACES[pace].name;
 }
 
 function findExample(id) {
@@ -2589,7 +2856,9 @@ function setTourPace(value) {
   state.tourPace = Number(value);
   save(state);
   if (tour?.player) tour.player.playbackRate = tourPace().voice;
+  if (analysis?.player) analysis.player.playbackRate = tourPace().voice;
   updateTourPanel();
+  updateAnalysisBar();
 }
 
 // What tools/tour-video drives: plays the whole tour once and reports when each text and chapter appeared.
@@ -2985,15 +3254,24 @@ async function openSimilar() {
     dialog.addEventListener('click', e => {
       if (e.target === dialog || e.target.closest('[data-sim="close"]')) dialog.close();
       else if (e.target.closest('[data-sim="search"]')) searchSimilar(dialog);
+      // On the Replay page a Trend found is explained there, in place; on the Tour page its link opens a tour of its own.
+      const found = e.target.closest('a[data-sim-at]');
+      if (found && currentPage === 'Replay' && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) {
+        e.preventDefault();
+        dialog.close();
+        startAnalysis({ explain: 'Trend', dataset: similar.params.dataset, at: found.dataset.simAt, level: found.dataset.simLevel });
+      }
     });
   }
   dialog.innerHTML = '<h4>Find similar Trends</h4><p>Reading the Trends…</p>';
   dialog.showModal();
+  // The Trend is the one being explained: on the Replay page by the analysis open there, else by the written tour.
+  const params = currentPage === 'Replay' && analysis ? analysis.params : writtenTour, wanted = JSON.stringify(params);
   try {
-    if (!similar) {
-      const r = await fetch(`api/explain/similar?${new URLSearchParams({ dataset: writtenTour.dataset, at: writtenTour.at, level: writtenTour.level, ...(writtenTour.seen ? { seen: writtenTour.seen } : {}) })}`, { cache: 'no-store' });
+    if (similar?.wanted !== wanted) {
+      const r = await fetch(`api/explain/similar?${new URLSearchParams({ dataset: params.dataset, at: params.at, level: params.level, ...(params.seen ? { seen: params.seen } : {}) })}`, { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status === 404 ? 'the local server is older than this page: restart ./build-site.ps1 -Serve' : await r.text() || `the server answered ${r.status}`);
-      similar = await r.json();
+      similar = { ...await r.json(), params, wanted };
     }
   } catch (e) {
     dialog.innerHTML = `<h4>Find similar Trends</h4><p class="warn">${esc(e.message)}</p><div class="sim-foot"><button type="button" data-sim="close">Close</button></div>`;
@@ -3010,9 +3288,9 @@ function searchSimilar(dialog) {
   const s = similar.shown, keys = [...dialog.querySelectorAll('[data-sim-check]')].filter(c => c.checked).map(c => c.dataset.simCheck);
   const same = t => t.level === s.level && t.start === s.start && t.direction === s.direction;
   const found = similar.trends.filter(t => keys.every(k => t[k] === s[k]));
-  const link = t => `?${new URLSearchParams({ explain: 'Trend', dataset: writtenTour.dataset, at: t.at, level: t.level })}#Tour/trend`;
+  const link = t => `?${new URLSearchParams({ explain: 'Trend', dataset: similar.params.dataset, at: t.at, level: t.level })}#Tour/trend`;
   // A Trend the chart had otherwise at the time has no tour to open, as a tour shows the chart as it was.
-  const row = t => `<li${same(t) ? ' class="current"' : ''}><${t.tour ? `a href="${esc(link(t))}"` : 'a title="The chart had this otherwise at the time, so there is no tour of it"'}${same(t) ? ' aria-current="true"' : ''}><span>#${t.index}</span><span>${esc(fmtTime(t.start))}</span>
+  const row = t => `<li${same(t) ? ' class="current"' : ''}><${t.tour ? `a href="${esc(link(t))}" data-sim-at="${esc(t.at)}" data-sim-level="${t.level}"` :'a title="The chart had this otherwise at the time, so there is no tour of it"'}${same(t) ? ' aria-current="true"' : ''}><span>#${t.index}</span><span>${esc(fmtTime(t.start))}</span>
     <span>${esc(`${orderOf(t.level)} ${trendName(t)} · ${swingsOf(t)} · ${t.strength}%${same(t) ? ' · this one' : ''}${t.tour ? '' : ' · no tour'}`)}</span></a></li>`;
   // The tour shows its Trend as the chart had it where the tour ends; the list has the Trends as the whole dataset does.
   const whole = similar.trends.find(same), differs = whole && (whole.swings !== s.swings || whole.strength !== s.strength);
