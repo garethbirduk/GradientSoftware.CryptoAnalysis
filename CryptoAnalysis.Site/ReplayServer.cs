@@ -153,6 +153,21 @@ public static class ReplayServer
             return Results.Text(def.ToJsonString(), "application/json");
         });
 
+        // The Trends like the one a written tour explains, for its Find similar: the Trend as the tour shows it, and every
+        // Trend the dataset has as a whole, at every level, which the page matches against what is ticked. The list is
+        // worked out once for a dataset.
+        var allTrends = new ConcurrentDictionary<string, Lazy<string>>();
+        app.MapGet("/api/explain/similar", (string dataset, string at, int? level, string? seen) =>
+        {
+            if (!byId.TryGetValue(dataset, out var data))
+                return Results.NotFound();
+            var shown = Explain.TrendShown(data.Prices, at, level ?? 1, seen);
+            if (shown == null)
+                return Results.BadRequest($"No Trend at level {level ?? 1} has the candle at {at} in it.");
+            var trends = allTrends.GetOrAdd(data.Id, _ => new Lazy<string>(() => Explain.AllTrends(data.Prices, MaxLevel).ToJsonString())).Value;
+            return Results.Text($"{{\"shown\":{shown.ToJsonString()},\"trends\":{trends}}}", "application/json");
+        });
+
         // The tour's editor on the page saves the tour back to its source file. The page says which version of the file it
         // started from, so a file that has changed since, as when it is edited by hand, is not written over.
         if (Directory.Exists(sourceDir))

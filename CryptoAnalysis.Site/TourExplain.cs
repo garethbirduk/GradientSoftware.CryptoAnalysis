@@ -137,6 +137,73 @@ public static class Explain
             new JsonObject { ["chapter"] = term, ["explain"] = term, ["at"] = index, ["level"] = level, ["from"] = from, ["until"] = until, ["speed"] = Pace(until - from) });
     }
 
+    /// <summary>
+    /// What a written tour of a Trend says of it, for finding others like it: its level, direction, count of Swings and
+    /// Strength as the tour shows them, which is as the chart had it where the tour ends. Null when no Trend at that level
+    /// has the candle.
+    /// </summary>
+    public static JsonObject? TrendShown(List<Price> prices, string time, int level = 1, string? seen = null)
+    {
+        var index = Tours.AnchorOf(time, prices);
+        var cursor = seen == null ? prices.Count - 1 : Tours.AnchorOf(seen, prices);
+        if (index > cursor)
+            return null;
+        var known = cursor < prices.Count - 1 ? prices.GetRange(0, cursor + 1) : prices;
+        if (TrendAt(known, index, level) is not { } trend)
+            return null;
+        var made = Math.Max(index, trend.Index[trend.Trend.Confirmed.Time]);
+        var until = TrendAt(prices.GetRange(0, made + 1), index, level)?.Start == trend.Start ? made : cursor;
+        var shown = TrendAt(prices.GetRange(0, until + 1), index, level) ?? trend;
+        return TrendRow(shown.Trend, level, shown.Index);
+    }
+
+    /// <summary>
+    /// Every Trend the prices have as a whole, at each level up to maxLevel, ordered by the candle it begins at: its level,
+    /// direction, count of Swings, Strength, where it begins and ends, the candle a written tour of the whole of it is
+    /// opened at, and whether such a tour would show the same Trend.
+    /// </summary>
+    public static JsonArray AllTrends(List<Price> prices, int maxLevel)
+    {
+        var rows = new List<JsonObject>();
+        for (var level = 1; level <= maxLevel; level++)
+        {
+            if (Read(prices, level) is not { } s)
+                break;
+            rows.AddRange(s.Trends.Select(x => TrendRow(x, level, s.Index)));
+        }
+
+        // The whole dataset has hindsight the chart did not have at the time, so a tour, which shows the chart as it was,
+        // can be written of a Trend only where the chart had the same Trend at its last Swing's BoS.
+        Parallel.ForEach(rows, row =>
+        {
+            var at = Tours.AnchorOf(row["at"]!.GetValue<string>(), prices);
+            var then = TrendAt(prices.GetRange(0, at + 1), at, row["level"]!.GetValue<int>());
+            row["tour"] = then != null && then.Start == row["index"]!.GetValue<int>() && TrendRow(then.Trend, 0, then.Index) is { } seen
+                && seen["direction"]!.GetValue<string>() == row["direction"]!.GetValue<string>()
+                && seen["swings"]!.GetValue<int>() == row["swings"]!.GetValue<int>() && seen["strength"]!.GetValue<int>() == row["strength"]!.GetValue<int>();
+        });
+
+        return new JsonArray(rows.OrderBy(x => x["index"]!.GetValue<int>()).ThenBy(x => x["level"]!.GetValue<int>()).ToArray<JsonNode>());
+    }
+
+    // A Trend as a row to match and list. A tour of the whole of it is opened at its last Swing's BoS, where it has every
+    // Swing it will have.
+    private static JsonObject TrendRow(TrendOutline trend, int level, Dictionary<DateTime, int> index)
+    {
+        static string Stamp(DateTime time) => time.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+        return new JsonObject
+        {
+            ["level"] = level,
+            ["direction"] = trend.Direction == EnumSwingDirection.Up ? "Up" : "Down",
+            ["swings"] = trend.Swings,
+            ["strength"] = trend.Strength,
+            ["start"] = Stamp(trend.Start.Time),
+            ["index"] = index[trend.Start.Time],
+            ["end"] = trend.End != null ? Stamp(trend.End.Time) : null,
+            ["at"] = Stamp(trend.Parts.Count > 0 ? trend.Parts[^1].BreakOfStructure.Time : trend.Confirmed.Time),
+        };
+    }
+
     private static JsonObject TourOf(string title, string dataset, DateTime start, int[] view, string[] layers, params JsonObject[] sections)
     {
         return new JsonObject
@@ -154,8 +221,8 @@ public static class Explain
         };
     }
 
-    // Candles a second for a section that runs a stretch: about twenty seconds of replay, between a walk and a sprint.
-    private static double Pace(int candles) => Math.Clamp(Math.Round(candles / 20.0), 4, 200);
+    // Candles a second for a section that runs a stretch: about twenty seconds of replay, between a brisk walk and a sprint.
+    private static double Pace(int candles) => Math.Clamp(Math.Round(candles / 20.0), 10, 200);
 
     private static JsonObject? Write(string term, List<Price> prices, int at, int level, int reached, int? until, out string problem)
     {

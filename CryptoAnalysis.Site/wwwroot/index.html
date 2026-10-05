@@ -202,9 +202,28 @@
   .tour-controls button.play { min-width: 46px; font-weight: 700; color: var(--accent); }
   .tour-controls .readout { color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .tour-controls .keys { font-size: 11px; white-space: nowrap; }
+  .tour-controls .pace { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .tour-controls .pace input { width: 70px; accent-color: var(--accent); }
+  .tour-controls .pace span { min-width: 3.6em; color: var(--text); }
   .tour-controls button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--bg); }
   .tour-controls .edit { margin-left: auto; }
   .tour-warning { color: var(--warn); font-size: 13px; }
+  #similar { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
+  #similar::backdrop { background: rgba(0, 0, 0, .35); }
+  #similar h4 { margin: 0 0 4px; font-size: 15px; }
+  #similar p { margin: 0 0 10px; color: var(--muted); }
+  #similar .sim-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 12px; }
+  #similar .sim-checks label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  #similar .sim-foot { display: flex; align-items: center; gap: 8px; }
+  #similar button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+  #similar button:hover { background: var(--chip); }
+  #similar button.go { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #similar .sim-count { margin: 12px 0 6px; color: var(--muted); }
+  #similar ol { margin: 0; padding: 0; list-style: none; max-height: 44vh; overflow-y: auto; border-top: 1px solid var(--border); }
+  #similar li a { display: grid; grid-template-columns: 5.5em 10.5em 1fr; gap: 10px; padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--text); text-decoration: none; font-variant-numeric: tabular-nums; }
+  #similar li a[href]:hover { background: var(--chip); }
+  #similar li a:not([href]) { color: var(--muted); }
+  #similar li.current a { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
   .tour-errors ul { margin: 6px 0 0; padding-left: 20px; }
   body.picking .chart .nsewdrag { cursor: cell !important; }
   body.video .topnav, body.video aside, body.video #replaybar, body.video .term-head, body.video .tour-chapters, body.video .tour-controls,
@@ -1406,7 +1425,7 @@ function updateReplayControls() {
 
 document.addEventListener('keydown', e => {
   const inside = selector => e.target instanceof Element && e.target.closest(selector);
-  if (!on('replay') || e.ctrlKey || e.metaKey || e.altKey || inside('input, select, textarea, .menu')) return;
+  if (!on('replay') || e.ctrlKey || e.metaKey || e.altKey || inside('input, select, textarea, .menu, dialog')) return;
   if (currentPage === 'Tour') {
     const step = { ArrowLeft: 'prev', ArrowRight: 'next', Home: 'first', End: 'last' }[e.key] ?? (e.key === ' ' && !inside('button') ? 'play' : null);
     if (step) { e.preventDefault(); tourGo(step); }
@@ -2149,6 +2168,9 @@ const LAYER_NAMES = { price: 'candles' };
 const PIN_PRICES = { open: 'o', high: 'h', low: 'l', close: 'c' };
 const PIN_PLACES = { above: [0, -55], below: [0, 55], left: [-70, 0], right: [70, 0] };
 const TOUR_TICK = 40;
+// The Speed slider's three paces: how fast the voice reads (its clips are played that much faster or slower, at the same
+// pitch), how fast the candles run against the section's speed, and the seconds a text stays after it has been read.
+const TOUR_PACES = [{ name: 'Slower', voice: 0.9, candles: 0.6, gap: 0.4 }, { name: 'Normal', voice: 1, candles: 1, gap: 0.15 }, { name: 'Faster', voice: 1.1, candles: 1.6, gap: 0.05 }];
 let tour = null, tourLoading = null;
 // Opened with ?video, the page shows the tour alone, for tools/tour-video to record.
 const videoMode = new URLSearchParams(location.search).has('video');
@@ -2165,14 +2187,20 @@ function textKey(text) {
 }
 
 // What the voice says in place of what is written, from the tour's glossary (the same as tools/tour-video): an entry stands
-// for a whole word in the case it is written in, and the longest entry that fits is used.
+// for a whole word in the case it is written in, and the longest entry that fits is used. Where an entry starts or ends
+// with punctuation, as ":00" does, that side may touch a word.
 function spokenText(def) {
   const entries = Object.entries(def.glossary ?? {}).map(([from, to]) => [from.trim(), String(to)]).filter(([from]) => from)
     .sort((a, b) => b[0].length - a[0].length);
   if (!entries.length) return text => text;
   const lookup = new Map(entries), escaped = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const words = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${entries.map(([from]) => escaped(from)).join('|')})(?![\\p{L}\\p{N}_])`, 'gu');
-  return text => text.replace(words, match => lookup.get(match)).replace(/\s+([.,;:!?])/g, '$1').replace(/ {2,}/g, ' ').trim();
+  const wordy = /[\p{L}\p{N}_]/u, whole = from => `${wordy.test(from[0]) ? '(?<![\\p{L}\\p{N}_])' : ''}${escaped(from)}${wordy.test(from.at(-1)) ? '(?![\\p{L}\\p{N}_])' : ''}`;
+  const words = new RegExp(entries.map(([from]) => whole(from)).join('|'), 'gu');
+  const said = (match, at, text) => {
+    const to = lookup.get(match);
+    return to && wordy.test(to[0]) && wordy.test(text[at - 1] ?? '') ? ` ${to}` : to;
+  };
+  return text => text.replace(words, said).replace(/\s+([.,;:!?])/g, '$1').replace(/ {2,}/g, ' ').trim();
 }
 
 const slugOf = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -2287,7 +2315,8 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}) {
       const silent = c.voice === false, clip = silent ? null : audio[textKey(text)];
       return { text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
         to, heads: { start: c.heads?.start === true, end: c.heads?.end !== false }, color: c.color ?? null,
-        hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + 0.4 : readingSeconds(text) };
+        clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0,
+        hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + TOUR_PACES[1].gap : readingSeconds(text) };
     });
     return { index: i, chapter: chapters.length - 1, scene, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
@@ -2507,7 +2536,7 @@ function showNextCue() {
   const cue = tour.queue.shift();
   if (!cue) return;
   tour.active = cue;
-  tour.activeUntil = performance.now() + cue.hold * 1000;
+  tour.activeUntil = performance.now() + holdOf(cue) * 1000;
   tour.shown.push(cue);
   speak(cue);
 }
@@ -2536,6 +2565,7 @@ function readAloud(cue) {
     return;
   }
   tour.player = new Audio(`tour-audio/${clip.file}`);
+  tour.player.playbackRate = tourPace().voice;
   tour.player.addEventListener('ended', done);
   tour.player.addEventListener('error', done);
   tour.player.play().catch(done);
@@ -2548,6 +2578,19 @@ function hush() {
 }
 
 const voiceOn = () => state.tourVoice === true;
+
+// The pace the Speed slider is set to. A recording is always made at Normal, as its clips are laid at their own length.
+const tourPace = () => tour?.recording || videoMode ? TOUR_PACES[1] : TOUR_PACES[state.tourPace] ?? TOUR_PACES[1];
+// The seconds a text stays at the slider's pace: the length of its clip as played and the gap after it, else its own
+// seconds, which are a reading time and go with the voice.
+const holdOf = cue => { const pace = tourPace(); return cue.clip ? cue.clip / pace.voice + pace.gap : cue.hold / pace.voice; };
+
+function setTourPace(value) {
+  state.tourPace = Number(value);
+  save(state);
+  if (tour?.player) tour.player.playbackRate = tourPace().voice;
+  updateTourPanel();
+}
 
 // What tools/tour-video drives: plays the whole tour once and reports when each text and chapter appeared.
 window.tourVideo = {
@@ -2616,7 +2659,7 @@ function journeyTick(s, ex, now, reading) {
     const step = j.forward ? 1 : -1;
     if (!timelineAt(ex, t + step)) { tour.nextCandle = 0; return prefetch(ex, t + step); }
     if (now < tour.nextCandle) return;
-    const gap = 1000 / j.speed, late = now - tour.nextCandle, inStep = tour.nextCandle > 0 && late < 1000;
+    const gap = 1000 / (j.speed * tourPace().candles), late = now - tour.nextCandle, inStep = tour.nextCandle > 0 && late < 1000;
     const due = Math.min(Math.abs(j.to - t), inStep ? 1 + Math.floor(late / gap) : 1);
     let n = 1;
     while (n < due && timelineAt(ex, t + (n + 1) * step)) n++;
@@ -2711,6 +2754,9 @@ function updateTourPanel() {
   const voice = document.querySelector('[data-tour-go="voice"]'), clips = Object.keys(tour.audio ?? {}).length;
   voice.setAttribute('aria-pressed', voiceOn());
   if (!clips) voice.title = 'No clips yet: the local server reads the texts aloud when Voice is on';
+  const pace = TOUR_PACES.indexOf(tourPace());
+  document.querySelector('[data-tour="pace"]').value = pace;
+  document.querySelector('[data-tour="pace-name"]').textContent = TOUR_PACES[pace].name;
 
   // The editor marks the texts shown so far, and the one on show.
   document.querySelectorAll('#tour-editor .ed-cue').forEach((el, j) => {
@@ -2738,7 +2784,7 @@ function tourTick() {
     // A beat takes every candle that has come due since the last one, so a section faster than the beat, or than the chart
     // can be redrawn, still keeps its speed: but never past a text's candle, the section's end or what is loaded. After a
     // wait the count starts again, so the replay does not leap to make up the time.
-    const gap = 1000 / s.speed, late = now - tour.nextCandle, inStep = tour.nextCandle > 0 && late < 1000;
+    const gap = 1000 / (s.speed * tourPace().candles), late = now - tour.nextCandle, inStep = tour.nextCandle > 0 && late < 1000;
     const due = inStep ? 1 + Math.floor(late / gap) : 1;
     const stop = Math.min(s.until, t + due, ...s.cues.filter(c => cueAt(c) > t && !tour.fired.has(c)).map(cueAt));
     let to = t + 1;
@@ -2758,7 +2804,7 @@ function playTour() {
   const s = tourSection();
   if (tour.index === tour.sections.length - 1 && cursorOf(tour.ex) >= s.until && !tour.queue.length && !tour.journey) enterSection(0);
   // The text on show gets its reading time again, and is read aloud from its start: it was shown while the tour was not playing.
-  if (tour.active) tour.activeUntil = performance.now() + tour.active.hold * 1000;
+  if (tour.active) tour.activeUntil = performance.now() + holdOf(tour.active) * 1000;
   tour.nextCandle = 0;
   tour.timer = setInterval(tourTick, TOUR_TICK);
   if (tour.active) speak(tour.active);
@@ -2834,6 +2880,9 @@ async function renderTourPage(chapter) {
         <span class="readout" data-tour="readout"></span>
         <span class="keys">Keys: ← → step · Home End first last · Space play</span>
         <button type="button" data-tour-go="voice" title="Read each text aloud from its clip in tour-audio, made by tools/tour-video">Voice</button>
+        <label class="pace" title="How fast the tour plays: the candles, the wait after each text, and the voice by a tenth either way">Speed
+          <input type="range" min="0" max="${TOUR_PACES.length - 1}" step="1" data-tour="pace"><span data-tour="pace-name"></span></label>
+        ${writtenTour?.explain === 'Trend' ? '<button type="button" data-tour-go="similar" title="Find the other Trends like this one: the same level, direction, count of Swings and Strength, or any of those">Find similar</button>' : ''}
         <button type="button" data-tour-go="glossary" title="Show or hide the glossary: what the voice says in place of what is written, such as Break of Structure for BoS">Glossary</button>
         ${writtenTour ? '' : `<button type="button" data-tour-go="video" title="Make the video of the tour as saved in tour.json, to download: the texts are read aloud, then the tour is recorded with the clips, which takes as long as the tour">Generate video</button>
         <a class="button" data-tour="download" href="api/video/file" download="tour.mp4" hidden>Download video</a>`}
@@ -2845,7 +2894,8 @@ async function renderTourPage(chapter) {
     </article>`);
   main.querySelectorAll('[data-tour-go]').forEach(b => b.addEventListener('click', () =>
     b.dataset.tourGo === 'edit' ? toggleTourEditor() : b.dataset.tourGo === 'voice' ? toggleTourVoice() : b.dataset.tourGo === 'glossary' ? toggleTourGlossary()
-      : b.dataset.tourGo === 'video' ? generateTour() : tourGo(b.dataset.tourGo)));
+      : b.dataset.tourGo === 'video' ? generateTour() : b.dataset.tourGo === 'similar' ? openSimilar() : tourGo(b.dataset.tourGo)));
+  main.querySelector('[data-tour="pace"]').addEventListener('input', e => setTourPace(e.target.value));
   const glossary = main.querySelector('[data-tour="glossary"]');
   glossary.addEventListener('input', e => { const row = e.target.closest('.gl-row'); if (row) readGlossary(`glossary|${[...row.parentElement.children].indexOf(row)}|${e.target.dataset.gl}`); });
   glossary.addEventListener('click', e => { const b = e.target.closest('button[data-gl]'); if (b && !b.disabled) glossaryAction(b.dataset.gl, b); });
@@ -2913,6 +2963,63 @@ function updateTourExport() {
   status.textContent = v.running ? `${v.stage}… ${clock(v.seconds)}`
     : v.error ? `The ${v.audioOnly ? 'texts were not read aloud' : 'video was not made'}: ${v.error}`
     : writtenTour ? '' : tourExportNote || (made ? `Video made ${made}${v.stale ? ', before the tour was last saved' : ''}` : '');
+}
+
+// ---- Find similar ----------------------------------------------------------------------------------------------------
+// The other Trends like the one a written tour explains. The dialog lists what the tour says of its Trend, each a tick:
+// its direction, its level, its count of Swings and its Strength. Search lists the Trends of the dataset as a whole that
+// match what is ticked, by the candle they begin at, each a link to a written tour of its own, with this one marked.
+const SIMILAR_SHOWN = 500;
+const orderOf = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'} order`;
+const trendName = t => t.direction === 'Up' ? 'Uptrend' : 'Downtrend';
+const swingsOf = t => `${t.swings} ${t.direction === 'Up' ? 'Upswings' : 'Downswings'}`;
+let similar = null;
+
+async function openSimilar() {
+  let dialog = document.getElementById('similar');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'similar';
+    dialog.setAttribute('aria-label', 'Find similar Trends');
+    document.body.append(dialog);
+    dialog.addEventListener('click', e => {
+      if (e.target === dialog || e.target.closest('[data-sim="close"]')) dialog.close();
+      else if (e.target.closest('[data-sim="search"]')) searchSimilar(dialog);
+    });
+  }
+  dialog.innerHTML = '<h4>Find similar Trends</h4><p>Reading the Trends…</p>';
+  dialog.showModal();
+  try {
+    if (!similar) {
+      const r = await fetch(`api/explain/similar?${new URLSearchParams({ dataset: writtenTour.dataset, at: writtenTour.at, level: writtenTour.level, ...(writtenTour.seen ? { seen: writtenTour.seen } : {}) })}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status === 404 ? 'the local server is older than this page: restart ./build-site.ps1 -Serve' : await r.text() || `the server answered ${r.status}`);
+      similar = await r.json();
+    }
+  } catch (e) {
+    dialog.innerHTML = `<h4>Find similar Trends</h4><p class="warn">${esc(e.message)}</p><div class="sim-foot"><button type="button" data-sim="close">Close</button></div>`;
+    return;
+  }
+  const s = similar.shown, check = (key, label) => `<label><input type="checkbox" data-sim-check="${key}" checked>${esc(label)}</label>`;
+  dialog.innerHTML = `<h4>Find similar Trends</h4><p>Untick what need not be the same, then search.</p>
+    <div class="sim-checks">${check('direction', trendName(s))}${check('level', orderOf(s.level))}${check('swings', swingsOf(s))}${check('strength', `${s.strength}% Strength`)}</div>
+    <div class="sim-foot"><button type="button" class="go" data-sim="search">Search</button><button type="button" data-sim="close">Close</button></div>
+    <div data-sim="results"></div>`;
+}
+
+function searchSimilar(dialog) {
+  const s = similar.shown, keys = [...dialog.querySelectorAll('[data-sim-check]')].filter(c => c.checked).map(c => c.dataset.simCheck);
+  const same = t => t.level === s.level && t.start === s.start && t.direction === s.direction;
+  const found = similar.trends.filter(t => keys.every(k => t[k] === s[k]));
+  const link = t => `?${new URLSearchParams({ explain: 'Trend', dataset: writtenTour.dataset, at: t.at, level: t.level })}#Tour/trend`;
+  // A Trend the chart had otherwise at the time has no tour to open, as a tour shows the chart as it was.
+  const row = t => `<li${same(t) ? ' class="current"' : ''}><${t.tour ? `a href="${esc(link(t))}"` : 'a title="The chart had this otherwise at the time, so there is no tour of it"'}${same(t) ? ' aria-current="true"' : ''}><span>#${t.index}</span><span>${esc(fmtTime(t.start))}</span>
+    <span>${esc(`${orderOf(t.level)} ${trendName(t)} · ${swingsOf(t)} · ${t.strength}%${same(t) ? ' · this one' : ''}${t.tour ? '' : ' · no tour'}`)}</span></a></li>`;
+  // The tour shows its Trend as the chart had it where the tour ends; the list has the Trends as the whole dataset does.
+  const whole = similar.trends.find(same), differs = whole && (whole.swings !== s.swings || whole.strength !== s.strength);
+  const note = !whole ? ' This one is not among them: with the candles since, it is a Ghost.' : differs ? ` With the candles since, this one is ${swingsOf(whole)} at ${whole.strength}%.` : '';
+  dialog.querySelector('[data-sim="results"]').innerHTML = `<div class="sim-count">${found.length} Trend${found.length === 1 ? '' : 's'} in the dataset as a whole, by the candle they begin at${found.length > SIMILAR_SHOWN ? `: the first ${SIMILAR_SHOWN} are listed` : ''}.${esc(note)}</div>
+    <ol>${found.slice(0, SIMILAR_SHOWN).map(row).join('')}</ol>`;
+  dialog.querySelector('li.current')?.scrollIntoView({ block: 'nearest' });
 }
 
 // ---- Tour glossary ---------------------------------------------------------------------------------------------------

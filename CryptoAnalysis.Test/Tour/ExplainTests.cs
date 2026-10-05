@@ -192,6 +192,42 @@ public class ExplainTests
     }
 
     [TestMethod]
+    public void AllTrends_ListsEveryLevelByStart_AndTheToursTrendIsAmongThem()
+    {
+        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+
+        var shown = Explain.TrendShown(prices, "2023-02-28T15:00", level: 3, seen: "2023-03-01T22:00")!;
+        var trends = Explain.AllTrends(prices, 8).Select(x => x!.AsObject()).ToList();
+
+        Assert.AreEqual("Down", shown["direction"]!.GetValue<string>());
+        Assert.AreEqual(3, shown["level"]!.GetValue<int>());
+        Assert.AreEqual(1387, shown["index"]!.GetValue<int>());
+        var starts = trends.Select(x => x["index"]!.GetValue<int>()).ToList();
+        CollectionAssert.AreEqual(starts.OrderBy(x => x).ToList(), starts);
+        Assert.IsTrue(trends.Select(x => x["level"]!.GetValue<int>()).Distinct().Count() > 3, "Trends at several levels.");
+        // The Downtrend the page showed at its cursor is a Ghost by the end of the dataset: the list has the Uptrend from #1343 there.
+        Assert.AreEqual(2, shown["swings"]!.GetValue<int>());
+        Assert.AreEqual(50, shown["strength"]!.GetValue<int>());
+        Assert.IsFalse(trends.Any(x => x["level"]!.GetValue<int>() == 3 && x["index"]!.GetValue<int>() == 1387));
+        Assert.IsTrue(trends.Any(x => x["level"]!.GetValue<int>() == 3 && x["index"]!.GetValue<int>() == 1343 && x["direction"]!.GetValue<string>() == "Up" && x["swings"]!.GetValue<int>() == 5 && x["strength"]!.GetValue<int>() == 80));
+        Assert.IsNull(Explain.TrendShown(prices, "2023-01-01T00:00", level: 8));
+
+        // A row a tour can be written of opens one that shows the same Trend and ends at its last Swing's BoS; the others
+        // the chart had otherwise at the time.
+        var withTour = trends.Where(x => x["tour"]!.GetValue<bool>()).ToList();
+        Assert.IsTrue(withTour.Count > 0 && withTour.Count < trends.Count, $"{withTour.Count} of {trends.Count}");
+        foreach (var row in withTour.Where((_, i) => i % 12 == 0))
+        {
+            var seen = Explain.TrendShown(prices, row["at"]!.GetValue<string>(), row["level"]!.GetValue<int>())!;
+            Assert.AreEqual($"{row["direction"]} {row["swings"]} {row["strength"]} {row["start"]}", $"{seen["direction"]} {seen["swings"]} {seen["strength"]} {seen["start"]}");
+            var tour = Tours.Compile(Explain.Tour("Trend", "btc-1h", prices, row["at"]!.GetValue<string>(), row["level"]!.GetValue<int>())!, prices);
+            Assert.AreEqual(Tours.AnchorOf(row["at"]!.GetValue<string>(), prices), tour.Sections[0].Until);
+        }
+
+        Console.WriteLine($"{withTour.Count} of {trends.Count} Trends can have a tour");
+    }
+
+    [TestMethod]
     public void Tour_RunsToTheCandleThenExplainsIt()
     {
         var prices = Tours.Load(Tours.Datasets[0], RepoRoot);

@@ -1,7 +1,7 @@
 {
   "title": "Market structure basics",
   "dataset": "btc-1h",
-  "glossary": { "BoS": "Break of Structure", "(BoS)": "", "HH": "Higher High", "(HH)": "", "HL": "Higher Low", "(HL)": "", "LL": "Lower Low", "(LL)": "", "LH": "Lower High", "(LH)": "", "MSB": "Market Structure Break", "(MSB)": "", "an HH": "a Higher High", "an HL": "a Higher Low", "an LL": "a Lower Low", "an LH": "a Lower High", "an MSB": "a Market Structure Break", "An MSB": "A Market Structure Break" },
+  "glossary": { "BoS": "Break of Structure", "(BoS)": "", "HH": "Higher High", "(HH)": "", "HL": "Higher Low", "(HL)": "", "LL": "Lower Low", "(LL)": "", "LH": "Lower High", "(LH)": "", "MSB": "Market Structure Break", "(MSB)": "", "an HH": "a Higher High", "an HL": "a Higher Low", "an LL": "a Lower Low", "an LH": "a Lower High", "an MSB": "a Market Structure Break", "An MSB": "A Market Structure Break", ":00": "hundred" },
   "start": { "time": "2023-01-01T00:00", "view": [0, 168], "speed": 5, "layers": ["level1"] },
   "sections": [
     {

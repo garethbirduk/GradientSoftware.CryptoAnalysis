@@ -11,5 +11,5 @@ Turns the site's tour (`CryptoAnalysis.Site/wwwroot/tour.json`) into a narrated 
 
 What is read aloud can differ from what is shown:
 
-- The tour's `glossary` gives what the voice says for a word or phrase, as in `"glossary": { "BoS": "Break of Structure" }`. An entry stands for a whole word in the case it is written in, and the longest entry that fits is used. Texts whose spoken words change are read again on the next run.
+- The tour's `glossary` gives what the voice says for a word or phrase, as in `"glossary": { "BoS": "Break of Structure" }`. An entry stands for a whole word in the case it is written in, and the longest entry that fits is used. An entry that starts or ends with punctuation may touch a word on that side, so `":00": "hundred"` has 17:00 read as "17 hundred". Texts whose spoken words change are read again on the next run.
 - A text with `"voice": false` (Silent in the editor) is shown but not read.
