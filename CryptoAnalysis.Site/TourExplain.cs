@@ -140,10 +140,17 @@ public static class Explain
         }
 
         // Played in place, the chart draws the thing as it is known where the texts are written from, a part at a time as
-        // the run reaches it, so the run stops on the thing's own last candle whatever the chart had there at the time.
+        // the run reaches it. A Swing is then read at the cursor, as the page showed it, and the run stops on its own
+        // last candle whatever the chart had there at the time.
         var readAt = until;
         if (inPlace && last is int own)
+        {
+            readAt = cursor;
             until = own;
+        }
+
+        // The Swing a level coarser that this begins inside: the chart keeps the candles from its start, to look back at.
+        var context = inPlace && level > 1 ? SwingAt(known, first, level - 1)?.Span.First : null;
         // The view is the thing and one candle after it: the run begins on its first candle and stops on its last.
         var from = first;
         var view = new[] { from, until + 1 };
@@ -154,6 +161,8 @@ public static class Explain
         var tour = TourOf(title, dataset, prices[0].DateTime, view, [.. layers], section);
         if (inPlace)
             tour["known"] = readAt;
+        if (context != null)
+            tour["context"] = context;
         return tour;
     }
 

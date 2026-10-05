@@ -353,7 +353,7 @@ const LEVELS = 9;
 const SWINGS = { Up: { name: 'Upswings', layer: 'Upswing', color: '--upswing' }, Down: { name: 'Downswings', layer: 'Downswing', color: '--downswing' } };
 const SWING_DIRECTION = { Upswing: 'Up', Downswing: 'Down' };
 const TREND_DIRECTION = { Uptrend: 'Up', Downtrend: 'Down' };
-const STRUCTURE_PAGES = ['Sawtooth', 'InterimSwings', 'Replay', 'Tour'];
+const STRUCTURE_PAGES = ['Sawtooth', 'InterimSwings', 'Replay', 'Analysis', 'Tour'];
 
 // Every layer a chart can show, grouped into sections that appear in the same order on every page.
 const SECTIONS = [
@@ -403,6 +403,7 @@ const PAGE_DEFAULTS = {
   Sawtooth: ['price', 'sawtooth', 'level0', 'level1'],
   InterimSwings: ['price', 'Upswing', 'Downswing', 'level1', 'level2', 'level3'],
   Replay: ['replay', 'price', 'sawtooth', 'level1', 'Upswing', 'Downswing', 'BullishBreakOfStructure', 'BearishBreakOfStructure'],
+  Analysis: ['replay', 'price'],
 };
 // Replay extras are on by default, so switching Replay on shows them; they only draw while replaying.
 const GHOST_IDS = SECTIONS.find(s => s.name === 'Ghosts').layers.map(l => l.id);
@@ -418,16 +419,16 @@ let currentPage = null;
 // The tour sets its own layers section by section, and it is always replaying. Layers set by hand there are not remembered:
 // they go into the section being edited when the tour's editor is open, and last until the next section otherwise.
 let tourLayers = ['replay'];
-// An analysis playing on the Replay page (see startAnalysis) adds the layers it needs to those that are on. Layers set
-// while it is open are its own, and those the page had come back when it is closed.
+// An analysis playing on the Analysis page (see startAnalysis) adds the layers it needs to the page's own. Layers set
+// while it is open are its own, and the Replay page's are never touched.
 let analysis = null;
 // Hides the Replay page's candle card (set where the card is made).
 let closeCandleCard = () => {};
-const layersOf = page => page === 'Tour' ? tourLayers : page === 'Replay' && analysis?.layers ? analysis.layers : state.pages[page] ?? defaultsFor(page);
+const layersOf = page => page === 'Tour' ? tourLayers : page === 'Analysis' && analysis?.layers ? analysis.layers : state.pages[page] ?? defaultsFor(page);
 const on = id => layersOf(currentPage).includes(id);
 const setLayers = layers => {
   if (currentPage === 'Tour') { tourLayers = [...new Set(['replay', ...layers])]; recordTourLayers(); return; }
-  if (currentPage === 'Replay' && analysis?.layers) { analysis.layers = layers; return; }
+  if (currentPage === 'Analysis' && analysis?.layers) { analysis.layers = layers; return; }
   state.pages[currentPage] = layers; save(state);
 };
 
@@ -466,7 +467,7 @@ function renderNav(active) {
   const link = page => `<a class="navlink${active === page ? ' active' : ''}" href="${base}#${page}"${active === page ? ' aria-current="page"' : ''}>${page}</a>`;
   const nav = document.getElementById('nav');
   nav.innerHTML = `<h1>Market structure terms</h1>${[...navGroups()].map(menu).join('')}
-    ${link('Replay')}${link('Tour')}
+    ${link('Replay')}${link('Analysis')}${link('Tour')}
     <span class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC · ${DATA.examples.length} examples</span>`;
 
   nav.querySelectorAll('.menu > button').forEach(b => b.addEventListener('click', () => {
@@ -1016,9 +1017,10 @@ function liveView(ex, t) {
   const reveal = told != null, r = timelineAt(ex, told ?? t), holds = holdsAt(told ?? t), time = ex.prices.t[t];
   // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
   // An analysis keeps the window of history before its own start, however far it runs, so that is there to pan back to.
-  const since = analysis?.cues && analysis.ex.id === ex.id ? Math.min(t, analysis.from) : t;
+  // It also keeps the candles from the start of the Swing a level coarser that its own begins inside.
+  const mine = analysis?.cues && analysis.ex.id === ex.id ? analysis : null, since = mine ? Math.min(t, mine.from) : t;
   const window = ex.tour ? tourWindow(ex, t)
-    : isRemote(ex) ? { from: Math.max(0, since - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
+    : isRemote(ex) ? { from: Math.max(0, Math.min(since - replayWindow(), mine?.context ?? Infinity)), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
   const cut = a => a.slice(window?.from ?? 0, t + 1);
   const prices = { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) };
   if (!r) {
@@ -1046,7 +1048,8 @@ function liveView(ex, t) {
     ...ex, hindsight: ex, cursor: t, window, timeline: reveal ? timelineAt(ex, t) ?? r : r,
     prices,
     sawtooth,
-    swingsByLevel: byLevel(r.swings, v => v).map(list => reached(list, w => (w.breakOfStructure ?? w.end ?? w.start).time).sort((a, b) => a.start.time.localeCompare(b.start.time))),
+    // A Swing comes at its BoS; one of a coarser level than the analysis's own, which holds it, as soon as it has begun.
+    swingsByLevel: byLevel(r.swings, v => v).map((list, level) => reached(list, w => (level < Number(analysis?.params.level) ? w.start : w.breakOfStructure ?? w.end ?? w.start).time).sort((a, b) => a.start.time.localeCompare(b.start.time))),
     pointsByLevel: byLevel(r.points, v => v).map(list => reached(list, p => p.time).sort((a, b) => a.time.localeCompare(b.time))),
     marketStructureBreaksByLevel: byLevel(r.marketStructureBreaks, v => v.break).map(list => reached(list, m => m.break.time)),
     trendsByLevel: byLevel(r.trends, v => v).map(list => reached(list, tr => tr.confirmed.time).map(open)),
@@ -1455,7 +1458,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   // With an analysis open, Space plays and pauses it.
-  if (e.key === ' ' && analysis?.cues && currentPage === 'Replay' && !inside('button, li')) { e.preventDefault(); return analysis.playing ? pauseAnalysis() : playAnalysis(); }
+  if (e.key === ' ' && analysis?.cues && currentPage === 'Analysis' && !inside('button, li')) { e.preventDefault(); return analysis.playing ? pauseAnalysis() : playAnalysis(); }
   const actions = { ArrowLeft: e.shiftKey ? '-day' : '-hour', ArrowRight: e.shiftKey ? '+day' : '+hour', Home: 'start', End: 'end', ',': '-event', '.': '+event' };
   const action = actions[e.key] ?? (e.key === ' ' && !inside('button, li') ? 'play' : null);
   if (!action) return;
@@ -2167,13 +2170,14 @@ async function renderReplayPage() {
     card.style.left = `${Math.min(e.clientX + 12, innerWidth - w - 8)}px`;
     card.style.top = `${Math.min(e.clientY + 12, innerHeight - h - 8)}px`;
   }, true);
-  // Analyse plays here; opened in a new tab or window, the same link is the Tour page on a tour of its own.
+  // Analyse plays on the Analysis page; opened in a new tab or window, the same link is the Tour page on a tour of its own.
   card.addEventListener('click', e => {
     const a = e.target.closest('a[data-analyse]');
     if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
     e.preventDefault();
     close();
-    startAnalysis(JSON.parse(a.dataset.analyse));
+    wantedAnalysis = JSON.parse(a.dataset.analyse);
+    location.hash = analysisHash(wantedAnalysis);
   });
   // The card is beside a candle where that was on the screen, so it goes when the chart moves under it: the cursor moves,
   // the chart is zoomed or the page scrolled, a key is pressed or the window changes.
@@ -2208,7 +2212,7 @@ function analysisBar() {
       <label class="pace" title="How fast the analysis plays: the candles, the wait after each text, and the voice by a tenth either way">Speed
         <input type="range" min="0" max="${TOUR_PACES.length - 1}" step="1" data-an="pace"><span data-an="pace-name"></span></label>
       <button type="button" data-an-go="similar" title="Find the other Trends like this one: the same level, direction, count of Swings and Strength, or any of those">Find similar</button>
-      <button type="button" class="edit" data-an-go="close" title="Close the analysis: the cursor stays where it is">Close</button>
+      <button type="button" class="edit" data-an-go="close" title="Close the analysis and go back to the Replay page">Close</button>
     </div>
   </div>`;
 }
@@ -2221,9 +2225,54 @@ function wireAnalysisBar(root) {
     else if (action === 'restart') playAnalysis({ restart: true });
     else if (action === 'voice') toggleAnalysisVoice();
     else if (action === 'similar') { pauseAnalysis(); openSimilar(); }
-    else if (action === 'close') closeAnalysis();
+    else if (action === 'close') { closeAnalysis(); location.hash = '#Replay'; }
   });
   bar.querySelector('[data-an="pace"]').addEventListener('input', e => setTourPace(e.target.value));
+}
+
+// The Analysis page: the analysis last asked for, on a chart of the dataset that is the page's own, so its cursor, view
+// and layers are apart from the Replay page's. Coming back to the page plays the same analysis again.
+// The page's address says which analysis it is, so it can be copied and opens the same one: what is explained, the
+// dataset, the candle, the level and the Replay cursor it was seen from. The layers are the analysis's own, so not in it.
+let wantedAnalysis = null;
+const analysisDatasets = [];
+const analysisHash = p => `#Analysis?${new URLSearchParams({ explain: p.explain, dataset: p.dataset, at: p.at, level: p.level, ...(p.seen ? { seen: p.seen } : {}) })}`;
+
+async function renderAnalysisPage(query) {
+  const main = document.getElementById('main');
+  if (query?.get('explain') && query.get('dataset') && query.get('at')) {
+    const asked = { explain: query.get('explain'), dataset: query.get('dataset'), at: query.get('at'), level: Number(query.get('level')) || 1, ...(query.get('seen') ? { seen: query.get('seen') } : {}) };
+    if (!wantedAnalysis || analysisHash(wantedAnalysis) !== analysisHash(asked)) wantedAnalysis = asked;
+  } else if (wantedAnalysis) history.replaceState(null, '', analysisHash(wantedAnalysis));
+  const params = wantedAnalysis;
+  selected.clear();
+  closeAnalysis();
+  currentPage = 'Analysis';
+  const head = `<section class="term-head"><h2>Analysis</h2>
+    <p>A Candle, Swing or Trend picked on the Replay page, explained on a chart of its own. The layers and the view here are this page's; the Replay page keeps its own.</p></section>`;
+  const show = body => { main.innerHTML = head + body; renderLayers(); wireReplayExamples(main); drawAll(currentPage); };
+  if (!serverOn) {
+    show(`<div class="empty" data-server-check>Checking for the local server…</div>`);
+    return checkLocalServer();
+  }
+  if (!params) return show('<div class="empty">Nothing to analyse yet. On the <a href="#Replay">Replay</a> page, click a candle and choose Analyse.</div>');
+  show('<div class="empty">Loading the dataset…</div>');
+  const info = (await loadDatasets()).find(d => d.id === params.dataset), whole = info && await loadDataset(info);
+  if (currentPage !== 'Analysis' || wantedAnalysis !== params) return;
+  if (!whole) return show(`<div class="empty">The server has no dataset "${esc(params.dataset)}".</div>`);
+  let ex = analysisDatasets.find(e => e.dataset === info.id);
+  if (!ex) {
+    ex = { id: `Analysis/${info.id}`, dataset: info.id, title: info.name, level: 1, prices: whole.prices, expected: [], annotations: [] };
+    analysisDatasets.push(ex);
+    cursors.set(ex.id, 0);
+  }
+  show(`<article class="example replay-big" id="ex-${esc(ex.id)}">
+      <header><h3>${esc(info.name)}</h3></header>
+      ${analysisBar()}
+      ${chartRow(ex)}
+    </article>`);
+  wireAnalysisBar(main);
+  startAnalysis(params);
 }
 
 async function startAnalysis(params) {
@@ -2246,12 +2295,15 @@ async function startAnalysis(params) {
       const r = await fetch(`api/explain/tour?${new URLSearchParams({ ...query, level, expanded: true })}`, { cache: 'no-store' });
       const text = await r.text();
       if (r.ok) { def = JSON.parse(text); mine.params = { ...query, level }; break; }
+      if (analysis !== mine) return;
       if (r.status === 400 && tries.length > 1) continue;
       throw new Error(r.status === 404 ? `the server has no dataset "${params.dataset}"` : text.replace(/^"|"$/g, '') || `the server answered ${r.status}`);
     }
     if (!def) throw new Error(`no ${params.explain} at level ${tries.join(', ').replace(/, (\d+)$/, ' or $1')} has the candle at ${fmtTime(query.at)} in it, as the chart was at the cursor`);
     await loadAnalysisAudio(mine);
     if (analysis !== mine) return;
+    // The address names the level the Swing or Trend was found at, so it opens this analysis and no other.
+    if (currentPage === 'Analysis') { wantedAnalysis = mine.params; history.replaceState(null, '', analysisHash(mine.params)); }
     // The tour's candles are numbered from its start time; the Replay page's from the dataset's first. A text is shown when the replay
     const start = axisTime(def.start?.time ?? ''), anchor = Number.isNaN(start) ? 0 : indexAtOrAfter(ex, start), sections = def.sections ?? [];
     let at = sections[0]?.from ?? 0;
@@ -2267,6 +2319,7 @@ async function startAnalysis(params) {
     }
     if (!cues.length) throw new Error('the server wrote no texts for it');
     // The candle the texts are written from: the chart draws the structure as known there (see liveView).
+    if (Number.isInteger(def.context)) mine.context = anchor + def.context;
     if (Number.isInteger(def.known)) { mine.known = anchor + def.known; await fetchBatch(ex, mine.known); if (analysis !== mine) return; }
     // A candle is explained whatever levels are on; a Swing or a Trend needs its own.
     const needed = [...(def.start?.layers ?? []), ...sections.flatMap(s => s.add ?? [])].map(id => LAYER_ALIASES[id] ?? id).filter(id => params.explain !== 'Candle' || !/^level\d+$/.test(id));
@@ -2280,7 +2333,7 @@ async function startAnalysis(params) {
       zooms.set(ex.id, { x: [new Date(time(view[0]) - half).toISOString(), new Date(time(view[1]) + half).toISOString()] });
     }
     // A Swing or a Trend is shown with its own level only: the other levels that are on are off until Close.
-    const page = (state.pages.Replay ?? defaultsFor('Replay')).filter(id => params.explain === 'Candle' || !/^level\d+$/.test(id));
+    const page = (state.pages.Analysis ?? defaultsFor('Analysis')).filter(id => params.explain === 'Candle' || !/^level\d+$/.test(id));
     Object.assign(mine, { cues, title: def.title ?? params.explain, speed: sections.find(s => s.speed > 0)?.speed ?? def.start?.speed ?? 4,
       layers: [...new Set(['replay', ...page, ...needed])] });
   } catch (e) {
@@ -2348,7 +2401,7 @@ function closeAnalysis() {
   analysis = null;
   const bar = document.querySelector('[data-analysis]');
   if (bar) bar.hidden = true;
-  if (currentPage === 'Replay') { syncLayerButtons(); drawAll('Replay'); }
+  if (currentPage === 'Analysis') { syncLayerButtons(); drawAll('Analysis'); }
 }
 
 const analysisSpeaks = (a, cue) => voiceOn() && !cue.silent && !!a.audio[textKey(cue.text)];
@@ -2381,7 +2434,7 @@ function toggleAnalysisVoice() {
 function analysisTick() {
   const a = analysis;
   if (!a?.playing) return;
-  if (currentPage !== 'Replay') return closeAnalysis();
+  if (currentPage !== 'Analysis') return closeAnalysis();
   const ex = a.ex, t = cursorOf(ex), now = performance.now();
   // The cursor moved by hand: the analysis waits, and Play carries on from there.
   if (t !== a.t) return pauseAnalysis();
@@ -2437,7 +2490,7 @@ function updateAnalysisBar() {
 
 function findExample(id) {
   return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id) ?? DATA.interims?.examples?.find(e => e.id === id)
-    ?? replayDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined);
+    ?? replayDatasets.find(e => e.id === id) ?? analysisDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined);
 }
 
 // ---- Tour ------------------------------------------------------------------------------------------------------------
@@ -3290,17 +3343,17 @@ async function openSimilar() {
       else if (e.target.closest('[data-sim="search"]')) searchSimilar(dialog);
       // On the Replay page a Trend found is explained there, in place; on the Tour page its link opens a tour of its own.
       const found = e.target.closest('a[data-sim-at]');
-      if (found && currentPage === 'Replay' && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) {
+      if (found && currentPage === 'Analysis' && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) {
         e.preventDefault();
         dialog.close();
-        startAnalysis({ explain: 'Trend', dataset: similar.params.dataset, at: found.dataset.simAt, level: found.dataset.simLevel });
+        startAnalysis(wantedAnalysis = { explain: 'Trend', dataset: similar.params.dataset, at: found.dataset.simAt, level: found.dataset.simLevel });
       }
     });
   }
   dialog.innerHTML = '<h4>Find similar Trends</h4><p>Reading the Trends…</p>';
   dialog.showModal();
   // The Trend is the one being explained: on the Replay page by the analysis open there, else by the written tour.
-  const params = currentPage === 'Replay' && analysis ? analysis.params : writtenTour, wanted = JSON.stringify(params);
+  const params = currentPage === 'Analysis' && analysis ? analysis.params : writtenTour, wanted = JSON.stringify(params);
   try {
     if (similar?.wanted !== wanted) {
       const r = await fetch(`api/explain/similar?${new URLSearchParams({ dataset: params.dataset, at: params.at, level: params.level, ...(params.seen ? { seen: params.seen } : {}) })}`, { cache: 'no-store' });
@@ -3994,6 +4047,15 @@ function renderInterims() {
 function route() {
   stopPlaying();
   pauseTour();
+  // An analysis has an address of its own: #Analysis?explain=Swing&dataset=...
+  const [first, asked] = location.hash.slice(1).split('?');
+  if (first === 'Analysis') {
+    ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
+    renderNav('Analysis');
+    renderAnalysisPage(new URLSearchParams(asked ?? ''));
+    window.scrollTo(0, 0);
+    return;
+  }
   let type = decodeURIComponent(location.hash.slice(1));
   // The tour's chapters have links of their own: #Tour/<chapter>.
   const [page, chapter] = type.split('/');
@@ -4008,7 +4070,7 @@ function route() {
   }
   if (STRUCTURE_PAGES.includes(type)) {
     renderNav(type);
-    if (type === 'Sawtooth') renderStructure(); else if (type === 'Replay') renderReplayPage(); else renderInterims();
+    if (type === 'Sawtooth') renderStructure(); else if (type === 'Replay') renderReplayPage(); else if (type === 'Analysis') renderAnalysisPage(); else renderInterims();
     window.scrollTo(0, 0);
     return;
   }
