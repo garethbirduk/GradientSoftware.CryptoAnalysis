@@ -82,6 +82,8 @@ export async function narrate(tour, { voice = 'af_heart', force = false, log = (
     }
     writeFileSync(join(audioDir, file), wav(samples, sampleRate));
     index[key] = { text, ...(said !== text ? { spoken: said } : {}), file, voice, seconds: Math.round(samples.length / sampleRate * 100) / 100 };
+    // The index is written as each clip is made, so a page playing the tour has the first clip without waiting for the last.
+    writeFileSync(indexPath, JSON.stringify(index, null, 2) + '\n');
     log(`${key} ${index[key].seconds}s  ${said.slice(0, 60)}`);
   }
 

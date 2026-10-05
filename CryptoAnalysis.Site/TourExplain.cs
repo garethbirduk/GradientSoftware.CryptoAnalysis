@@ -136,11 +136,13 @@ public static class Explain
             first = trend.Start;
             var made = Math.Max(index, trend.Index[trend.Trend.Confirmed.Time]);
             until = TrendAt(prices.GetRange(0, made + 1), index, level)?.Start == first ? made : cursor;
+            // Its own last candle: where it ended, or the cursor while it still runs.
+            last = trend.Span.Last;
             layers.AddRange(trend.Trend.Direction == EnumSwingDirection.Up ? ["HigherHigh", "HigherLow"] : ["LowerLow", "LowerHigh"]);
         }
 
         // Played in place, the chart draws the thing as it is known where the texts are written from, a part at a time as
-        // the run reaches it. A Swing is then read at the cursor, as the page showed it, and the run stops on its own
+        // the run reaches it. The thing is then read at the cursor, as the page showed it, and the run stops on its own
         // last candle whatever the chart had there at the time.
         var readAt = until;
         if (inPlace && last is int own)
@@ -171,7 +173,7 @@ public static class Explain
     /// Strength as the tour shows them, which is as the chart had it where the tour ends. Null when no Trend at that level
     /// has the candle.
     /// </summary>
-    public static JsonObject? TrendShown(List<Price> prices, string time, int level = 1, string? seen = null)
+    public static JsonObject? TrendShown(List<Price> prices, string time, int level = 1, string? seen = null, bool inPlace = false)
     {
         var index = Tours.AnchorOf(time, prices);
         var cursor = seen == null ? prices.Count - 1 : Tours.AnchorOf(seen, prices);
@@ -180,6 +182,9 @@ public static class Explain
         var known = cursor < prices.Count - 1 ? prices.GetRange(0, cursor + 1) : prices;
         if (TrendAt(known, index, level) is not { } trend)
             return null;
+        // Played in place, the tour shows the Trend as it is known at the cursor.
+        if (inPlace)
+            return TrendRow(trend.Trend, level, trend.Index);
         var made = Math.Max(index, trend.Index[trend.Trend.Confirmed.Time]);
         var until = TrendAt(prices.GetRange(0, made + 1), index, level)?.Start == trend.Start ? made : cursor;
         var shown = TrendAt(prices.GetRange(0, until + 1), index, level) ?? trend;

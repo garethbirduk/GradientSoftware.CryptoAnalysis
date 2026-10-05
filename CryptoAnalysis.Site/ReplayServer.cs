@@ -159,11 +159,11 @@ public static class ReplayServer
         // Trend the dataset has as a whole, at every level, which the page matches against what is ticked. The list is
         // worked out once for a dataset.
         var allTrends = new ConcurrentDictionary<string, Lazy<string>>();
-        app.MapGet("/api/explain/similar", (string dataset, string at, int? level, string? seen) =>
+        app.MapGet("/api/explain/similar", (string dataset, string at, int? level, string? seen, bool? inPlace) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
-            var shown = Explain.TrendShown(data.Prices, at, level ?? 1, seen);
+            var shown = Explain.TrendShown(data.Prices, at, level ?? 1, seen, inPlace == true);
             if (shown == null)
                 return Results.BadRequest($"No Trend at level {level ?? 1} has the candle at {at} in it.");
             var trends = allTrends.GetOrAdd(data.Id, _ => new Lazy<string>(() => Explain.AllTrends(data.Prices, MaxLevel).ToJsonString())).Value;
