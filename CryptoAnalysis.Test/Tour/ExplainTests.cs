@@ -167,7 +167,7 @@ public class ExplainTests
 
         Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
         Assert.AreEqual(1, tour.Sections.Count);
-        Assert.AreEqual(39, tour.Sections[0].From, "Six candles before the Upswing begins at #45.");
+        Assert.AreEqual(45, tour.Sections[0].From, "The run begins on the Upswing's first candle.");
         Assert.AreEqual(75, tour.Sections[0].Until, "The BoS.");
         StringAssert.StartsWith(def["title"]!.GetValue<string>(), "1st order Swing at 12:00 on 3 January 2023");
         Assert.IsNull(Explain.Tour("Trend", "btc-1h", prices, "2023-01-01T00:00", level: 8), "No level 8 Trend has the first candle.");
@@ -189,6 +189,35 @@ public class ExplainTests
         var ghosted = Tours.Compile(Explain.Tour("Trend", "btc-1h", prices, "2023-01-13T02:00", seen: "2023-01-14T00:00")!, prices);
         Assert.AreEqual(0, ghosted.Errors.Count, string.Join("\n", ghosted.Errors));
         Assert.AreEqual(312, ghosted.Sections[0].Until);
+    }
+
+    [TestMethod]
+    public void Tour_InPlace_SaysWhatIsInsideAndListsItToStepInto()
+    {
+        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+        static List<string> Steps(JsonObject def) => (def["inside"]?.AsArray() ?? []).Select(x => $"{x!["explain"]} {x["level"]} {x["name"]} {x["at"]}").ToList();
+
+        // The 1st order Downswing from #47 to #62, as the chart had it at #72.
+        var def = Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T10:00", seen: "2023-01-04T00:00", inPlace: true)!;
+        var tour = Tours.Compile(def, prices);
+
+        Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
+        Assert.AreEqual(2, tour.Sections.Count, "Its own section, then what is inside it.");
+        CollectionAssert.AreEqual(
+            new[] { "Inside it are two 2nd order Upswings and one Downswing.", "The two Upswings are part of a 2nd order Uptrend that began before it." },
+            tour.Sections[1].Cues.Select(c => c.Text).ToList());
+        Assert.IsTrue(tour.Sections[1].Cues.All(c => c.At == 62), "Told at its BoS, once its own texts are done.");
+        CollectionAssert.AreEqual(
+            new[] { "Trend 2 Uptrend 2023-01-03T09:00", "Swing 2 Upswing 2023-01-03T00:00", "Swing 2 Upswing 2023-01-03T07:00", "Swing 2 Downswing 2023-01-03T12:00" },
+            Steps(def));
+
+        // That Uptrend lists its own Upswings, at its own level.
+        var trend = Explain.Tour("Trend", "btc-1h", prices, "2023-01-03T09:00", level: 2, seen: "2023-01-04T00:00", inPlace: true)!;
+        CollectionAssert.AreEqual(
+            new[] { "Swing 2 Upswing 2023-01-02T05:00", "Swing 2 Upswing 2023-01-03T00:00", "Swing 2 Upswing 2023-01-03T07:00" },
+            Steps(trend));
+
+        Assert.IsNull(Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T10:00", seen: "2023-01-04T00:00")!["inside"], "Only an analysis played in place steps in.");
     }
 
     [TestMethod]

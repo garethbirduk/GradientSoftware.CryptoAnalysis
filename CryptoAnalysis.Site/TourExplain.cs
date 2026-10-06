@@ -119,6 +119,7 @@ public static class Explain
         var layers = new List<string> { $"level{level}", "close", "sawtooth" };
         int first, until;
         int? last = null;
+        Within? within = null;
         if (term == "Swing")
         {
             if (SwingAt(known, index, level) is not { } swing)
@@ -128,6 +129,8 @@ public static class Explain
             until = SwingAt(prices.GetRange(0, bos + 1), index, level)?.Span.First == first ? bos : cursor;
             last = bos;
             layers.AddRange(["HigherHigh", "HigherLow", "LowerLow", "LowerHigh"]);
+            if (inPlace)
+                within = InsideSwing(known, swing, level);
         }
         else
         {
@@ -139,6 +142,8 @@ public static class Explain
             // Its own last candle: where it ended, or the cursor while it still runs.
             last = trend.Span.Last;
             layers.AddRange(trend.Trend.Direction == EnumSwingDirection.Up ? ["HigherHigh", "HigherLow"] : ["LowerLow", "LowerHigh"]);
+            if (inPlace)
+                within = InsideTrend(known, trend, level);
         }
 
         // Played in place, the chart draws the thing as it is known where the texts are written from, a part at a time as
@@ -165,8 +170,105 @@ public static class Explain
             tour["known"] = readAt;
         if (context != null)
             tour["context"] = context;
+        // What it has within it: the things the page can step into from here, and, once its own texts are done, a
+        // section that sums them up, whose layers come on with its first text.
+        if (within != null)
+        {
+            tour["inside"] = new JsonArray(within.Steps.ToArray<JsonNode>());
+            if (within.Texts.Count > 0)
+            {
+                tour["sections"]!.AsArray().Add(new JsonObject
+                {
+                    ["chapter"] = "Inside",
+                    ["inside"] = true,
+                    ["add"] = new JsonArray(within.Layers.Distinct().Select(x => (JsonNode)x).ToArray()),
+                    ["cues"] = new JsonArray(within.Texts.Select(x => (JsonNode)Text(until, x)).ToArray()),
+                });
+            }
+        }
+
         return tour;
     }
+
+    // What a Swing or a Trend has within it: the things to step into, each one the page can analyse in turn, the texts
+    // that sum them up, and the layers that draw them.
+    private sealed record Within(List<JsonObject> Steps, List<string> Texts, List<string> Layers);
+
+    // The Swings a level finer that are Confirmed inside a Swing, from its start to its BoS, and the Trends they make
+    // there. Null when the level has none.
+    private static Within? InsideSwing(List<Price> prices, FoundSwing found, int level)
+    {
+        if (Read(prices, level + 1) is not { } s)
+            return null;
+        var (from, to) = (found.Swing.Start.Time, found.Swing.BreakOfStructure!.Time);
+        var swings = s.Swings.Where(x => x.BreakOfStructure != null && x.Start.Time >= from && x.BreakOfStructure.Time <= to).ToList();
+        if (swings.Count == 0)
+            return null;
+        // A Trend is told of when any of those Swings is one of its own, whether it began inside or before.
+        int Own(TrendOutline trend) => trend.Parts.Count(part => swings.Any(x => x.Direction == trend.Direction && x.BreakOfStructure == part.BreakOfStructure));
+        var trends = s.Trends.Where(x => Own(x) > 0).OrderBy(x => x.Start.Time).ToList();
+        var order = Order(level + 1);
+        static string Name(EnumSwingDirection direction) => direction == EnumSwingDirection.Up ? "Upswing" : "Downswing";
+        int Count(EnumSwingDirection direction) => swings.Count(x => x.Direction == direction);
+
+        // The direction of the first of them is named first, and the order once.
+        var directions = new[] { swings[0].Direction, swings[0].Direction == EnumSwingDirection.Up ? EnumSwingDirection.Down : EnumSwingDirection.Up }.Where(x => Count(x) > 0).ToList();
+        var counts = directions.Select((x, i) => $"{Words(Count(x))} {(i == 0 ? $"{order} " : "")}{Name(x)}{(Count(x) == 1 ? "" : "s")}").ToList();
+        var texts = new List<string> { $"Inside it {(swings.Count == 1 ? "is" : "are")} {List(counts)}." };
+        var layers = new List<string> { $"level{level + 1}" };
+        foreach (var direction in directions)
+            layers.AddRange([Name(direction), direction == EnumSwingDirection.Up ? "BullishBreakOfStructure" : "BearishBreakOfStructure"]);
+
+        var steps = new List<(DateTime Start, int Kind, JsonObject Step)>();
+        var told = new Dictionary<EnumSwingDirection, int>();
+        foreach (var trend in trends)
+        {
+            var up = trend.Direction == EnumSwingDirection.Up;
+            var name = up ? "Uptrend" : "Downtrend";
+            var (own, all) = (Own(trend), Count(trend.Direction));
+            var before = told.GetValueOrDefault(trend.Direction);
+            told[trend.Direction] = before + 1;
+            var which = own < all ? $"{Capital(Words(own))}{(before > 0 ? " more" : "")} of the {Name(trend.Direction)}s"
+                : all == 1 ? $"The {Name(trend.Direction)}" : $"The {Words(own)} {Name(trend.Direction)}s";
+            var what = before > 0 ? $"another {order} {name}" : An($"{order} {name}");
+            texts.Add(trend.Start.Time >= from && own > 1
+                ? $"{which} are in a row: {what}."
+                : $"{which} {(own == 1 ? "is" : "are")} part of {what} that began {(trend.Start.Time >= from ? "inside it" : "before it")}.");
+            layers.AddRange([name, "trendArrows"]);
+            // A candle that names this Trend and no other, for the page to open it by.
+            var at = new[] { trend.Parts.Count > 0 ? trend.Parts[^1].BreakOfStructure.Time : trend.Confirmed.Time, trend.Confirmed.Time, trend.Start.Time }
+                .Cast<DateTime?>().FirstOrDefault(x => TrendIn(s, x!.Value) == trend);
+            if (at != null)
+                steps.Add((trend.Start.Time, 0, Step("Trend", name, level + 1, at.Value, s.Index[trend.Start.Time])));
+        }
+
+        foreach (var swing in swings.Where(x => SwingIn(s, x.Start.Time) == x))
+            steps.Add((swing.Start.Time, 1, Step("Swing", Name(swing.Direction), level + 1, swing.Start.Time, s.Index[swing.Start.Time])));
+        return new Within(steps.OrderBy(x => x.Start).ThenBy(x => x.Kind).Select(x => x.Step).ToList(), texts, layers);
+    }
+
+    // The Swings of a Trend, each to step into at the Trend's own level. Its texts have counted them already.
+    private static Within? InsideTrend(List<Price> prices, FoundTrend found, int level)
+    {
+        if (Read(prices, level) is not { } s)
+            return null;
+        var name = found.Trend.Direction == EnumSwingDirection.Up ? "Upswing" : "Downswing";
+        var steps = found.Trend.Parts
+            .Select(part => s.Swings.FirstOrDefault(x => x.Direction == found.Trend.Direction && x.BreakOfStructure == part.BreakOfStructure))
+            .Where(x => x != null && SwingIn(s, x!.Start.Time) == x)
+            .Select(x => Step("Swing", name, level, x!.Start.Time, s.Index[x.Start.Time]))
+            .ToList();
+        return steps.Count == 0 ? null : new Within(steps, [], []);
+    }
+
+    private static JsonObject Step(string explain, string name, int level, DateTime at, int index) => new()
+    {
+        ["explain"] = explain,
+        ["name"] = name,
+        ["level"] = level,
+        ["at"] = at.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture),
+        ["index"] = index,
+    };
 
     /// <summary>
     /// What a written tour of a Trend says of it, for finding others like it: its level, direction, count of Swings and
@@ -512,12 +614,17 @@ public static class Explain
     {
         if (Read(prices, level) is not { } s)
             return null;
-        var time = prices[at].DateTime;
-        var swing = direction != null
-            ? s.Swings.FirstOrDefault(x => x.Start.Time == time && x.Direction == direction && x.BreakOfStructure != null)
-            : s.Swings.Where(x => x.BreakOfStructure != null).LastOrDefault(x => x.Start.Time <= time && x.BreakOfStructure!.Time >= time);
+        var swing = SwingIn(s, prices[at].DateTime, direction);
         return swing == null ? null : new FoundSwing(swing, (s.Index[swing.Start.Time], s.Index[swing.BreakOfStructure!.Time]), s.Breaks, s.Points, s.Index);
     }
+
+    private static SwingOutline? SwingIn(Structure s, DateTime time, EnumSwingDirection? direction = null) => direction != null
+        ? s.Swings.FirstOrDefault(x => x.Start.Time == time && x.Direction == direction && x.BreakOfStructure != null)
+        : s.Swings.Where(x => x.BreakOfStructure != null).LastOrDefault(x => x.Start.Time <= time && x.BreakOfStructure!.Time >= time);
+
+    private static TrendOutline? TrendIn(Structure s, DateTime time, EnumSwingDirection? direction = null) => direction != null
+        ? s.Trends.FirstOrDefault(x => x.Start.Time == time && x.Direction == direction)
+        : s.Trends.LastOrDefault(x => x.Start.Time <= time && (x.End == null || x.End.Time >= time));
 
     // The Trend at a level that has the candle: begun at or before it and not ended before it. With a direction, only a
     // Trend beginning at the candle that runs that way.
@@ -525,10 +632,7 @@ public static class Explain
     {
         if (Read(prices, level) is not { } s)
             return null;
-        var time = prices[at].DateTime;
-        var trend = direction != null
-            ? s.Trends.FirstOrDefault(x => x.Start.Time == time && x.Direction == direction)
-            : s.Trends.LastOrDefault(x => x.Start.Time <= time && (x.End == null || x.End.Time >= time));
+        var trend = TrendIn(s, prices[at].DateTime, direction);
         if (trend == null)
             return null;
         var start = s.Index[trend.Start.Time];
@@ -578,7 +682,7 @@ public static class Explain
     // "an HH", or the plain word when the point has no label.
     private static string Named(string? label, string plain) => label != null ? $"an {label}" : $"a {plain}";
 
-    private static string An(string word) => $"{("aeiou".Contains(char.ToLowerInvariant(word[0])) ? "an" : "a")} {word}";
+    private static string An(string word) => $"{("aeiou".Contains(char.ToLowerInvariant(word[0])) || word.StartsWith('8') || word.StartsWith("11") || word.StartsWith("18") ? "an" : "a")} {word}";
 
     // A price as the tour writes them: rounded down, no decimals.
     private static string Money(double price) => Math.Floor(price).ToString("0", CultureInfo.InvariantCulture);

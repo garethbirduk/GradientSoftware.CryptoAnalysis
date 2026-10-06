@@ -211,6 +211,9 @@
   .analysis { margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
   .analysis .tour-caption { min-height: 2.9em; max-width: 80ch; margin-top: 4px; }
   .analysis .tour-caption.warn { color: var(--warn); font-size: 14px; }
+  .analysis-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .analysis-steps a { padding: 1px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); text-decoration: none; white-space: nowrap; }
+  .analysis-steps a:hover { border-color: var(--accent); color: var(--accent); }
   #similar { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
   #similar::backdrop { background: rgba(0, 0, 0, .35); }
   #similar h4 { margin: 0 0 4px; font-size: 15px; }
@@ -2218,6 +2221,7 @@ function analysisBar() {
       <button type="button" data-an-go="similar" title="Find the other Trends like this one: the same level, direction, count of Swings and Strength, or any of those">Find similar</button>
       <button type="button" class="edit" data-an-go="close" title="Close the analysis and its tab">Close</button>
     </div>
+    <div class="analysis-steps" data-an="steps" hidden></div>
   </div>`;
 }
 
@@ -2323,16 +2327,23 @@ async function startAnalysis(params) {
       if (s.from != null) at = s.from;
       const end = s.until ?? at;
       // The tour's pins are left out: the layers the analysis turns on mark the same places (a BoS by its triangle).
-      for (const c of s.cues ?? []) if (c.text && c.on == null) cues.push({ text: c.text, at: anchor + (c.at ?? at), when: anchor + Math.max(c.at ?? at, at), on: c.on ?? null, place: c.place ?? null, silent: c.voice === false, given: c.hold >= 0 ? c.hold : null });
+      // The section that sums up what is inside brings its layers with its first text, not from the start.
+      let add = s.inside ? (s.add ?? []).map(id => LAYER_ALIASES[id] ?? id) : null;
+      for (const c of s.cues ?? []) if (c.text && c.on == null) {
+        cues.push({ text: c.text, at: anchor + (c.at ?? at), when: anchor + Math.max(c.at ?? at, at), on: c.on ?? null, place: c.place ?? null, silent: c.voice === false, given: c.hold >= 0 ? c.hold : null, inside: !!s.inside, add });
+        add = null;
+      }
       mine.until = Math.max(mine.until, anchor + end);
       at = end;
     }
     if (!cues.length) throw new Error('the server wrote no texts for it');
+    // The things inside it that can be analysed in turn (see analysisSteps).
+    mine.inside = Array.isArray(def.inside) ? def.inside : [];
     // The candle the texts are written from: the chart draws the structure as known there (see liveView).
     if (Number.isInteger(def.context)) mine.context = anchor + def.context;
     if (Number.isInteger(def.known)) { mine.known = anchor + def.known; await fetchBatch(ex, mine.known); if (analysis !== mine) return; }
     // A candle is explained whatever levels are on; a Swing or a Trend needs its own.
-    const needed = [...(def.start?.layers ?? []), ...sections.flatMap(s => s.add ?? [])].map(id => LAYER_ALIASES[id] ?? id).filter(id => params.explain !== 'Candle' || !/^level\d+$/.test(id));
+    const needed = [...(def.start?.layers ?? []), ...sections.flatMap(s => s.inside ? [] : s.add ?? [])].map(id => LAYER_ALIASES[id] ?? id).filter(id => params.explain !== 'Candle' || !/^level\d+$/.test(id));
     // The chart zooms in on what is explained, as the tour does: the view the tour gives it, with half a candle of room
     // so its first and last candles are whole. The candles before it are drawn too (see liveView), a pan away.
     // The zoom is the Replay page's own, so it can be widened by hand; the one the page had comes back on Close.
@@ -2371,6 +2382,46 @@ async function startAnalysis(params) {
 
 const analysisPins = (a, cues) => cues.filter(c => c.on != null).map(c => pinOf(a.ex, c)).filter(p => p.time && Number.isFinite(p.price));
 
+// The layers a text brings with it come on when it is shown, and go off again when the analysis starts over.
+function bringLayers(a, cues) {
+  const add = [...new Set(cues.flatMap(c => c.add ?? []))].filter(id => !a.layers.includes(id));
+  if (!add.length) return;
+  a.layers = [...a.layers, ...add];
+  a.brought = [...(a.brought ?? []), ...add];
+  syncLayerButtons();
+  redrawExample(a.ex);
+}
+
+function dropBroughtLayers(a) {
+  if (!a.brought?.length) return;
+  a.layers = a.layers.filter(id => !a.brought.includes(id));
+  a.brought = [];
+  syncLayerButtons();
+}
+
+// Stepping in: what an analysis has inside it is listed under its texts once they have got that far, each a link to an
+// analysis of its own, seen from the same cursor. The one stepped in from is kept by address, to step back out to.
+const analysisParents = new Map();
+const ORDERS = n => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'} order`;
+const STEPS_SHOWN = 40;
+
+function analysisSteps(a) {
+  if (!a.cues || a.error) return '';
+  const own = analysisHash(a.params), parent = analysisParents.get(own);
+  const out = parent ? [`<a href="./${esc(parent.hash)}" title="Back to the analysis this was stepped into from">↑ ${esc(parent.title)}</a>`] : [];
+  const steps = a.inside ?? [];
+  if (steps.length && (a.done || a.shown.some(c => c.inside))) {
+    out.push('<span>Step into</span>');
+    for (const s of steps.slice(0, STEPS_SHOWN)) {
+      const hash = analysisHash({ explain: s.explain, dataset: a.params.dataset, at: s.at, level: s.level, ...(a.params.seen ? { seen: a.params.seen } : {}) });
+      analysisParents.set(hash, { hash: own, title: a.title });
+      out.push(`<a href="./${esc(hash)}" title="Analyse this ${esc(ORDERS(s.level))} ${esc(s.name)}">${esc(s.name)} · ${esc(fmtTime(s.at))}</a>`);
+    }
+    if (steps.length > STEPS_SHOWN) out.push(`<span>and ${steps.length - STEPS_SHOWN} more</span>`);
+  }
+  return out.join('');
+}
+
 // The clips the local server has read so far. It reads a written tour's texts as soon as the tour is asked for, so a
 // text with no clip yet is looked for again as it comes up.
 async function loadAnalysisAudio(a) {
@@ -2390,6 +2441,7 @@ function playAnalysis({ restart = false } = {}) {
   if (restart || a.done || t < a.from || t > a.until) {
     t = a.from;
     Object.assign(a, { queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, done: false });
+    dropBroughtLayers(a);
   } else if (t !== a.t) {
     const before = a.cues.filter(c => c.when < t);
     Object.assign(a, { queue: [], shown: before, fired: new Set(before), active: null, activeUntil: 0 });
@@ -2411,6 +2463,7 @@ function skipAnalysis() {
   pauseAnalysis();
   a.player?.pause();
   Object.assign(a, { t: a.until, queue: [], shown: [...a.cues], fired: new Set(a.cues), active: null, activeUntil: 0, done: true, speaking: false });
+  bringLayers(a, a.cues);
   moveTo(a.ex, a.until);
   updateAnalysisBar();
 }
@@ -2491,6 +2544,7 @@ function analysisTick() {
     cue.hold = cue.given ?? (clip?.seconds > 0 ? clip.seconds + TOUR_PACES[1].gap : readingSeconds(cue.text));
     Object.assign(a, { active: cue, activeUntil: now + holdOf(cue) * 1000, nextCandle: 0 });
     a.shown.push(cue);
+    bringLayers(a, [cue]);
     speakAnalysis(cue);
     if (cue.on != null) { ex.pins = analysisPins(a, a.shown); redrawExample(ex); }
     return updateAnalysisBar();
@@ -2529,6 +2583,10 @@ function updateAnalysisBar() {
   button('skip').disabled = !a.cues || a.done;
   button('voice').setAttribute('aria-pressed', voiceOn());
   button('similar').hidden = a.params.explain !== 'Trend' || !a.cues;
+  // Written again only when it changes, so a link is not replaced under the pointer.
+  const steps = analysisSteps(a);
+  if (part('steps').dataset.html !== steps) { part('steps').dataset.html = steps; part('steps').innerHTML = steps; }
+  part('steps').hidden = !steps;
   const pace = TOUR_PACES.indexOf(tourPace());
   part('pace').value = pace;
   part('pace-name').textContent = TOUR_PACES[pace].name;
