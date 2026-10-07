@@ -6,7 +6,10 @@ public static class TestHelper
 {
 
 
-    public static string HtmlPath(string name) => Path.Combine("c:\\", "temp", "crypto", name);
+    /// <summary>
+    /// Where a test saves a chart to look at: a folder of its own under the machine's temp folder, made if need be.
+    /// </summary>
+    public static string HtmlPath(string name) => Path.Combine(Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "crypto")).FullName, name);
 }
 
 //[TestMethod]
