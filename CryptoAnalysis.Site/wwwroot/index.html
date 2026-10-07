@@ -2778,7 +2778,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       let texts = c.texts ?? {};
       if (c.define != null) {
         if (!(c.define in DEFINITIONS)) errors.push(`${what}: no definition "${c.define}" in definitions.json`);
-        else if (!c.direction && DEFINITIONS[c.define].includes('{')) errors.push(`${what}: the definition "${c.define}" is told in a direction: "direction": "Up" or "Down"`);
+        else if (!c.direction && needsDirection(c.define)) errors.push(`${what}: the definition "${c.define}" is told in a direction: "direction": "Up" or "Down"`);
         else texts = { ...texts, education: defineText(c.define, c.direction) };
       }
       const text = textAt(texts, detail);
@@ -2891,13 +2891,16 @@ async function loadDefinitions() {
 const definitionsDirty = () => JSON.stringify(DEFINITIONS) !== definitionsSaved;
 // definitions.json as text: a line for each definition.
 const formatDefinitions = d => `{\n${Object.entries(d).map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n')}\n}\n`;
-function defineText(key, direction) {
-  const up = direction === 'Up', slots = direction ? {
+// Whether a definition has slots for a direction, and so needs one to be told in; {period} is not one.
+const needsDirection = key => [...(DEFINITIONS[key] ?? '').matchAll(/\{([a-z ]+)\}/g)].some(m => m[1] !== 'period');
+// {period} is what a candle spans, "period" when not given.
+function defineText(key, direction, period) {
+  const up = direction === 'Up', slots = { 'period': period ?? 'period', ...(direction ? {
     'trend': up ? 'Uptrend' : 'Downtrend', 'a trend': up ? 'an Uptrend' : 'a Downtrend', 'swing': up ? 'Upswing' : 'Downswing', 'a swing': up ? 'an Upswing' : 'a Downswing',
     'other swing': up ? 'Downswing' : 'Upswing', 'a other swing': up ? 'a Downswing' : 'an Upswing', 'turn': up ? 'Swing Low' : 'Swing High', 'beyond': up ? 'below' : 'above',
     'weak turn': up ? 'LL' : 'HH', 'turn labels': up ? 'an HL or an LL' : 'an LH or an HH', 'extreme': up ? 'lowest' : 'highest', 'trends': up ? 'upwards' : 'downwards',
     'start': up ? 'high' : 'low', 'a first leg': up ? 'a Downleg' : 'an Upleg', 'a second leg': up ? 'an Upleg' : 'a Downleg',
-  } : {};
+  } : {}) };
   return (DEFINITIONS[key] ?? '').replace(/\{([a-z ]+)\}/g, (m, name) => slots[name] ?? m).replace(/(^|[.!?]\s+)([a-z])/g, (m, before, letter) => before + letter.toUpperCase());
 }
 
@@ -3883,7 +3886,7 @@ function renderTourEditor(anchor = 'section') {
       <div class="ed-meta" data-ed-cue></div>
       <label class="ed-level">Text from<select data-scope="cue" data-field="define" data-render>${options([['', 'written here'], ...Object.keys(DEFINITIONS).map(k => [k, `the definition ${k}`])], c.define ?? '')}</select></label>
       ${c.define != null ? `<div class="ed-define">
-        ${(DEFINITIONS[c.define] ?? '').includes('{') ? `<label class="ed-level">Told for<select data-scope="cue" data-field="direction" data-render>${options([['Up', 'up: Uptrend, Upswing'], ['Down', 'down: Downtrend, Downswing']], c.direction ?? '')}</select></label>` : ''}
+        ${needsDirection(c.define) ? `<label class="ed-level">Told for<select data-scope="cue" data-field="direction" data-render>${options([['Up', 'up: Uptrend, Upswing'], ['Down', 'down: Downtrend, Downswing']], c.direction ?? '')}</select></label>` : ''}
         <label class="ed-level">The wording of ${esc(c.define)}, the same wherever it is cited<textarea data-scope="definition" data-field="definition" data-key="${esc(c.define)}" aria-label="The definition ${esc(c.define)}">${value(DEFINITIONS[c.define])}</textarea></label>
         <span class="ed-hint">Slots for its direction: {trend}, {a trend}, {swing}, {a swing}, {other swing}, {a other swing}, {turn}, {beyond}, {weak turn}, {turn labels}, {extreme}, {trends}, {start}, {a first leg}, {a second leg}. Here it reads: ${esc(compiled?.text ?? '')}</span>
       </div>`
@@ -4109,7 +4112,7 @@ function editTourField(el) {
     } else {
       target.define = value;
       delete target.texts;
-      if ((DEFINITIONS[value] ?? '').includes('{')) target.direction ??= 'Up'; else delete target.direction;
+      if (needsDirection(value)) target.direction ??= 'Up'; else delete target.direction;
     }
   }
   // A text for one level of detail; an empty box leaves that level out.

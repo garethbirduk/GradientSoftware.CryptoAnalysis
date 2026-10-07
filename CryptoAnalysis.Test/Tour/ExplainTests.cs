@@ -132,7 +132,8 @@ public class ExplainTests
 
         Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
         var texts = tour.Sections[0].Cues.Where(c => c.On == null).Select(c => c.Text).ToList();
-        Assert.AreEqual("A Higher High (HH) is a high of the sawtooth at one order that is higher than the high before it at that order. Highs and lows are read from the closes.", texts[0]);
+        Assert.AreEqual("A Higher High (HH) is a high of the Sawtooth at one order that is higher than the high before it at that order.", texts[0]);
+        Assert.AreEqual("Highs and lows are read from the closes.", texts[1]);
         Assert.IsTrue(texts.Any(x => x.EndsWith("HH at 16948, above the high of 16872 at 06:00.")), string.Join("\n", texts));
     }
 
@@ -362,6 +363,14 @@ public class ExplainTests
             Definitions.Of(EnumAnnotationType.Downswing).Take(2).ToArray(), "A term page lists its family's definitions.");
         Assert.AreEqual("After an MSB against a Trend, the next BoS decides. An Upswing's BoS continues the Uptrend with a Weak Upswing. A Downswing's BoS ends it.",
             Definitions.Text("Trend.next", EnumSwingDirection.Up));
+        Assert.AreEqual("A candle shows a whole four hours of trading in one shape, drawn from four prices.", Definitions.Text("Candle.what", period: "four hours"));
+        Assert.IsFalse(Definitions.NeedsDirection("Candle.what"), "What a candle spans is not a direction.");
+        Assert.IsTrue(Definitions.NeedsDirection("MSB.before"));
+        Assert.AreEqual("An MSB refers to the prior Swing High, and so can be observed before a new Swing is Confirmed.",
+            Definitions.Of(EnumAnnotationType.BullishMarketStructureBreak).Single(x => x.StartsWith("An MSB refers")), "A Bullish MSB is told against a Downswing.");
+        Assert.AreEqual("A BoS closes beyond the position its Swing begins at.", Definitions.Of(EnumAnnotationType.BearishBreakOfStructure)[0], "A BoS lists the Swing's rule for it first.");
+        foreach (var term in Gradient.CryptoAnalysis.Terms.All)
+            Assert.AreNotEqual(0, Definitions.Of(term.Type).Count, $"{term.Type} has definitions.");
 
         // A cue that cites a definition has it as its text, written out in the expanded tour for the narration.
         var def = JsonNode.Parse("""{ "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [{ "cues": [{ "define": "Trend.ends" }, { "define": "Trend.next" }, { "define": "Trend.nothing" }] }] }""")!;

@@ -35,7 +35,7 @@
       "add": ["sawtooth"],
       "cues": [
         { "texts": { "education": "When we join the HH and HL positions we get a Sawtooth: a less noisy, lower-resolution version of the closes." } },
-        { "texts": { "education": "Each line of the Sawtooth is a leg: an Upleg when it rises, a Downleg when it falls." } }
+        { "define": "Sawtooth.legs" }
       ]
     },
     {
@@ -165,7 +165,8 @@
     {
       "until": 75,
       "cues": [
-        { "texts": { "education": "Something we observed in real time that later disappears with new data is called a Ghost. These are Ghost Downswings." } }
+        { "define": "Ghost.what" },
+        { "texts": { "education": "These are Ghost Downswings." } }
       ]
     },
     {
@@ -263,7 +264,7 @@
       "cues": [
         { "texts": { "education": "Or not." } },
         { "texts": { "education": "At this point we don't know if the price will continue down, or if a new Upswing will be Confirmed." } },
-        { "texts": { "education": "The MSB refers to the prior Swing Low, and so can be observed before a new Swing is Confirmed." } }
+        { "define": "MSB.before", "direction": "Up" }
       ]
     },
     {
@@ -390,7 +391,7 @@
     {
       "view": [43, 77],
       "cues": [
-        { "texts": { "education": "A wick beyond a level is not a BoS. A BoS needs a close beyond it." } }
+        { "define": "BoS.close" }
       ]
     },
     {
@@ -412,7 +413,8 @@
         { "at": 81, "on": "close", "place": "right", "texts": { "education": "MSB" }, "hold": 3, "voice": false },
         { "texts": { "education": "But the price went below that level before the MSB." }, "hold": 0 },
         { "at": 80, "on": "low", "place": "below", "texts": { "education": "low below the level" }, "hold": 4, "voice": false },
-        { "texts": { "education": "The hour closed back above the level. A wick beyond a level is not an MSB either." } }
+        { "texts": { "education": "The hour closed back above the level." } },
+        { "define": "MSB.close" }
       ]
     },
     {
@@ -663,7 +665,7 @@
       "speed": 10,
       "cues": [
         { "texts": { "education": "The training divides a Range into a buy-low zone, from the lower band to 25% up, and a sell-high zone, from 75% up to the upper band. With candles on, the wicks show where the price reached into them." } },
-        { "texts": { "education": "The Range holds while the price closes inside the bands." } },
+        { "define": "Range.holds" },
         { "at": 94, "on": "close", "place": "below", "texts": { "education": "Range ends: 53751" }, "hold": 4, "voice": false },
         { "texts": { "education": "On the 26th the close at 53751 is below the lower band, and the Range ends. The same close is the Downswing's BoS." } }
       ]

@@ -445,13 +445,13 @@ public static class Explain
         // The Candle: what one is, then this one.
         var cues = new JsonArray
         {
-            Teach(at, $"A candle shows a whole {unit} of trading in one shape, drawn from four prices."),
+            Teach(at, Definitions.Text("Candle.what", period: unit)),
             Say(at, $"{Capital(Span(p.DateTime, length))}."),
-            Teach(at, $"The open is the price at the start of the {unit} and the close is the price at its end. The body of the candle spans the two."),
+            Teach(at, Definitions.Text("Candle.body", period: unit)),
             Say(at, $"Open {Money(p.Open)}, close {Money(p.Close)}.", hold: 0),
             Pin(at, "open", "left", $"open: {Money(p.Open)}", 4),
             Pin(at, "close", "right", $"close: {Money(p.Close)}", 4),
-            Teach(at, $"The high and the low are the furthest the price went during the {unit}. The thin lines above and below the body are wicks, and they reach to them."),
+            Teach(at, Definitions.Text("Candle.wicks", period: unit)),
             Say(at, $"High {Money(p.High)}, low {Money(p.Low)}.", hold: 0),
             Pin(at, "high", "above", $"high: {Money(p.High)}", 2.5),
             Pin(at, "low", "below", $"low: {Money(p.Low)}", 2.5),
@@ -459,7 +459,7 @@ public static class Explain
 
         // Its colour: the rule, then this one; at Education, the nearest drawn candle in view of the other colour, the
         // one before preferred, set against it.
-        cues.Add(Teach(at, "A candle that closes above its open is green. A candle that closes below its open is red. One that closes where it opened has no body, and is neither."));
+        cues.Add(Teach(at, Definitions.Text("Candle.colour")));
         cues.Add(Say(at, flat ? "No body: it closed where it opened." : up ? "Green: it closed above its open." : "Red: it closed below its open."));
         if (!flat)
         {
@@ -501,7 +501,7 @@ public static class Explain
         var term = up ? "Successive Green Candles" : "Successive Red Candles";
         var cues = new JsonArray
         {
-            Teach(run.Last, "Candles of one colour that follow one another are Successive Candles, counted from the first of the colour to the last."),
+            Teach(run.Last, Definitions.Text("SuccessiveCandles.what")),
             Say(run.Last, $"{Capital(Ordinal(run.Position))} of {Words(run.Length)} {term}, {Clock(prices[run.First].DateTime, length)} to {Clock(prices[run.Last].DateTime, length)}."),
         };
         problem = "";
@@ -542,11 +542,11 @@ public static class Explain
         var kind = high ? "high" : "low";
         var label = point.Label;
         var more = label is "HH" or "HL";
-        var name = label switch { "HH" => "Higher High", "HL" => "Higher Low", "LH" => "Lower High", "LL" => "Lower Low", _ => label };
         var place = high ? "above" : "below";
         var cues = new JsonArray
         {
-            Teach(at, $"{Capital(An(name))} ({label}) is a {kind} of the sawtooth at one order that is {(more ? "higher" : "lower")} than the {kind} before it at that order. Highs and lows are read from the closes."),
+            Teach(at, Definitions.Text($"Point.{label}")),
+            Teach(at, Definitions.Text("Point.closes")),
             Say(at, previous == null
                 ? $"{Order(level)} {label} at {Money(point.Price)}."
                 : $"{Order(level)} {label} at {Money(point.Price)}, {(more ? "above" : "below")} the {kind} of {Money(previous.Price)} at {Clock(previous.Time, length)}."),
@@ -556,7 +556,7 @@ public static class Explain
             cues.Add(Pin(previousAt, "close", Edge(previousAt, place), $"{(previous.Label.Length > 0 ? previous.Label : kind)}: {Money(previous.Price)}", 4));
         if (point.Provisional)
         {
-            cues.Add(Teach(at, $"While the price keeps closing {(high ? "higher" : "lower")}, the {kind} moves on with it to each new close."));
+            cues.Add(Teach(at, Definitions.Text("Point.moving")));
             cues.Add(Say(at, "Still moving."));
         }
         problem = "";
