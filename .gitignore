@@ -15,3 +15,6 @@ CryptoAnalysis.Site/wwwroot/tour-audio/
 tools/tour-video/node_modules/
 
 temp/
+
+# Charts the tests write for comparison
+actual_*.html
