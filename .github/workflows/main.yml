@@ -47,14 +47,14 @@ jobs:
         reportgenerator "-reports:CryptoAnalysis.Test/coverage.opencover.xml" "-targetdir:./coverage/" "-reporttypes:Badges;Html;TextSummary"
 
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v1
+      uses: actions/upload-pages-artifact@v3
       with:
           path: './coverage/'
 
     - name: Deploy to GitHub Pages
       id: deployment
       if: github.ref == 'refs/heads/main'
-      uses: actions/deploy-pages@v1
+      uses: actions/deploy-pages@v4
             
     - name: Create Test Coverage Badge
       uses: simon-k/dotnet-code-coverage-badge@v1.0.0
