@@ -264,6 +264,12 @@ public static class Sawtooth
     }
 
     /// <summary>
+    /// The smallest move, as a percentage of its price, that a retracement is read against. A move of a few dollars gives
+    /// absurd readings (700%+), so it gets none.
+    /// </summary>
+    public const double MinimumRetracementMovePercent = 0.1;
+
+    /// <summary>
     /// Returns the retracements at a level: for each confirmed swing, and each candidate, that has a confirmed swing in the same
     /// direction before it, how far its counter-move came back along the move from that swing's extreme to this one's start,
     /// reading by reading (see <see cref="RetracementOutline"/>). The first swing in a leg has nothing to measure against.
@@ -295,7 +301,7 @@ public static class Sawtooth
             var up = direction == EnumSwingDirection.Up;
             var gap = up ? to.Price - from.Price : from.Price - to.Price;
             var start = index[to.Time];
-            if (gap <= 0 || start >= end)
+            if (gap <= 0 || gap < Math.Abs(from.Price) * MinimumRetracementMovePercent / 100 || start >= end)
                 return;
 
             var steps = new List<RetracementStep>();
