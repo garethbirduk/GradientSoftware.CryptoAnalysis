@@ -1,5 +1,4 @@
 ﻿using CryptoAnalysis;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Gradient.CryptoAnalysis
 {
@@ -114,7 +113,7 @@ namespace Gradient.CryptoAnalysis
 
         public static List<Price> LowCloses(this IEnumerable<Price> values)
         {
-            if (values.IsNullOrEmpty())
+            if (values == null || !values.Any())
                 return new List<Price>();
 
             var list = new List<Price>()
