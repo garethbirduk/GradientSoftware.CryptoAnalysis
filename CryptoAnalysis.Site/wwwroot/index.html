@@ -179,6 +179,18 @@
   body.touring .example.replay-active { box-shadow: none; }
   body.touring .replay-big .chart { height: clamp(320px, calc(100vh - 440px), 600px); }
   .tour-chapters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+  .tour-chapters.in-panel { margin-top: 8px; font-size: 13px; }
+  .chapter-pill { display: inline-flex; align-items: center; gap: 2px; padding-left: 7px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); }
+  .chapter-pill input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+  .tour-chapters .chapter-pill a { border: 0; background: none; padding-left: 5px; }
+  /* The chapter on show: a border twice as thick, drawn as a ring outside it so the pills do not shift. */
+  .chapter-pill.active { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent); }
+  .chapter-pill.explains { background: color-mix(in srgb, #8b5cf6 10%, var(--panel)); border-color: color-mix(in srgb, #8b5cf6 45%, var(--border)); }
+  .chapter-pill.explains input { accent-color: #8b5cf6; }
+  .chapter-pill.explains.active { border-color: #8b5cf6; box-shadow: 0 0 0 1.5px #8b5cf6; }
+  .chapter-pill.off a { color: var(--muted); text-decoration: line-through; }
+  .chapter-pill.add { padding: 3px 12px; font: inherit; color: var(--muted); border-style: dashed; cursor: pointer; opacity: .8; }
+  .chapter-pill.add:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
   .tour-chapters a { padding: 3px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text);
     font-size: 13px; text-decoration: none; }
   .tour-chapters a:hover { background: var(--chip); }
@@ -209,7 +221,8 @@
   .tour-controls .edit { margin-left: auto; }
   .tour-warning { color: var(--warn); font-size: 13px; }
   .player { margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
-  .player .tour-caption { min-height: 2.9em; max-width: 80ch; margin-top: 4px; }
+  .player .tour-caption { min-height: 2.9em; max-width: 80ch; margin-top: 4px; cursor: pointer; }
+  .tour-caption .unread { color: var(--muted); opacity: .7; }
   .player-scrub { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 13px; color: var(--muted); }
   .player-scrub input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); }
   .player-scrub input[type=range]:disabled { opacity: .4; }
@@ -2247,7 +2260,7 @@ const thingBox = (t, checked) => `<label class="thing${t.kind !== 'Candle' && t.
 function playerPanel(page) {
   const tourPage = page === 'Tour';
   return `<div class="player" data-player>
-    <div class="tour-caption" data-tour="caption" aria-live="polite"></div>
+    <div class="tour-caption" data-tour="caption" aria-live="polite" title="Click to move on to the next text"></div>
     <div class="tour-controls" role="group" aria-label="${tourPage ? 'Tour' : 'Analysis'} controls">
       <button type="button" data-tour-go="prev" title="Back to the start of this section, or of the one before (←)" aria-label="Back a section">⏮</button>
       <button type="button" class="play" data-tour-go="play" title="Play or pause (Space)">▶</button>
@@ -2265,11 +2278,13 @@ function playerPanel(page) {
         <button type="button" class="edit" data-tour-go="close" title="Close the analysis and its tab">Close</button>`}
     </div>
     <div class="player-scrub" data-tour="scrub-row">
-      <input type="range" min="0" max="0" step="1" data-tour="scrub" aria-label="Where in the section" title="Drag to move through the section; it pauses, and Play carries on from there">
+      <input type="range" min="0" max="0" step="0.1" list="player-marks" data-tour="scrub" aria-label="Where in the chapter" title="Drag to move through the chapter, its texts and its candles; it pauses, and Play carries on from there. The marks are where texts begin">
+      <datalist id="player-marks"></datalist>
       <span class="readout" data-tour="where-in"></span>
       <label title="At the end of a chapter, play the next one; unticked, it pauses there"><input type="checkbox" data-tour="autonext">Play the next chapter</label>
     </div>
-    ${tourPage ? '<div class="tour-glossary" data-tour="glossary" role="group" aria-label="Glossary" hidden></div>' : '<div class="analysis-things" data-tour="things"></div>'}
+    ${tourPage ? '<div class="tour-glossary" data-tour="glossary" role="group" aria-label="Glossary" hidden></div>'
+      : '<nav class="tour-chapters in-panel" aria-label="Chapters" data-tour="chapters"></nav><div class="analysis-things" data-tour="things"></div>'}
   </div>`;
 }
 
@@ -2277,7 +2292,7 @@ function wirePlayerPanel(root) {
   const panel = root.querySelector('[data-player]');
   panel.addEventListener('click', e => {
     const write = e.target.closest('[data-player-write]')?.dataset.playerWrite;
-    if (write) return rebuildAnalysis(write);
+    if (write) return toggleKind(write === 'education');
     const go = e.target.closest('[data-tour-go]')?.dataset.tourGo;
     if (!go) return;
     if (go === 'edit') toggleTourEditor();
@@ -2290,9 +2305,24 @@ function wirePlayerPanel(root) {
     else tourGo(go);
   });
   panel.querySelector('[data-tour="pace"]').addEventListener('input', e => setTourPace(e.target.value));
-  panel.querySelector('[data-tour="scrub"]').addEventListener('input', e => scrubTour(Number(e.target.value)));
+  panel.querySelector('[data-tour="caption"]').addEventListener('click', nextText);
+  const scrub = panel.querySelector('[data-tour="scrub"]');
+  scrub.addEventListener('input', e => scrubTour(Number(e.target.value)));
+  // Let go, or a key pressed on it: the player plays on if it was playing.
+  scrub.addEventListener('change', () => { if (tour?.playAfterScrub) { tour.playAfterScrub = false; playTour(); } });
+  // While it is held, the slider is where the hand puts it, not where the player is.
+  scrub.addEventListener('pointerdown', () => { scrubbing = true; });
   panel.querySelector('[data-tour="autonext"]').addEventListener('change', e => { state.tourAutoNext = e.target.checked; save(state); });
-  panel.querySelector('[data-tour="things"]')?.addEventListener('change', thingsChanged);
+  // The chapters: in the panel on the Analysis page, above the chart on the Tour page.
+  const chapters = root.querySelector('[data-tour="chapters"]');
+  chapters?.addEventListener('change', e => { const box = e.target.closest('[data-chapter-on]'); if (box) toggleChapter(Number(box.dataset.chapterOn), box.checked); });
+  chapters?.addEventListener('click', e => {
+    const add = e.target.closest('[data-add]'), jump = e.target.closest('a[data-chapter]');
+    if (add) return addThing(add.dataset.add);
+    if (!jump || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
+    e.preventDefault();
+    jumpToChapter(Number(jump.dataset.chapter));
+  });
   const glossary = panel.querySelector('[data-tour="glossary"]');
   glossary?.addEventListener('input', e => { const row = e.target.closest('.gl-row'); if (row) readGlossary(`glossary|${[...row.parentElement.children].indexOf(row)}|${e.target.dataset.gl}`); });
   glossary?.addEventListener('click', e => { const b = e.target.closest('button[data-gl]'); if (b && !b.disabled) glossaryAction(b.dataset.gl, b); });
@@ -2363,8 +2393,10 @@ async function renderAnalysisPage(query) {
       ${chartRow(tour.ex)}
     </article>`);
   wirePlayerPanel(main);
-  renderAnalysisThings();
-  const first = sectionAfter(-1, 1) ?? 0;
+  renderAnalysisWrite();
+  // Written again to add a thing, or at the other detail, it opens at that thing's chapter.
+  const jumped = params.jump ? tour.sections.findIndex((s, i) => s.thing === params.jump && sectionOn(i)) : -1;
+  const first = jumped >= 0 ? jumped : sectionAfter(-1, 1) ?? 0;
   tour.view = tour.sections[first]?.view ?? tour.view;
   tour.zoom = null;
   seekTour(first);
@@ -2385,66 +2417,138 @@ async function loadAnalysis(params) {
   ]);
   const text = await r.text();
   if (!r.ok) throw new Error(r.status === 404 ? `the server has no dataset "${params.dataset}"` : text.replace(/^"|"$/g, '') || `the server answered ${r.status}`);
-  const def = JSON.parse(text);
-  const loaded = newPlayer(def, audio, { page: 'Analysis', idPrefix: 'Analysis', detail: params.detail, params, hash: analysisHash(params), list, missing: def.missing ?? [],
+  const def = splitExplanations(JSON.parse(text));
+  // Every text is kept at its own level: an explanation's at Education, an analysis's at Summary.
+  const loaded = newPlayer(def, audio, { page: 'Analysis', idPrefix: 'Analysis', detail: 'education', params, hash: analysisHash(params), list, missing: def.missing ?? [],
     pins: false, waitForClips: true, extraLayers: (state.pages.Analysis ?? defaultsFor('Analysis')).filter(id => id !== 'replay' && !/^level\d+$/.test(id)) });
   await loadTourDatasets(loaded);
   anchorTour(loaded);
   Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio, loaded.detail));
+  // The explanations are on when the analysis was asked for with Explain.
+  loaded.chapters.forEach((c, i) => { if (loaded.sections[c.section].explains && params.detail !== 'education') loaded.chaptersOff.add(i); });
+  // With no pins shown, a pinned text is left out altogether, so it does not hold the run for its seconds either.
+  for (const s of loaded.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
   if (!loaded.sections.some(s => s.cues.some(c => !c.skipped))) throw new Error('the server wrote no texts for it');
   if (Number.isInteger(def.known)) { loaded.known = def.known; await fetchBatch(loaded.ex, loaded.known); }
   return loaded;
 }
 
-// The analysis written again with what is ticked in its checklist, at the detail of the button pressed.
-function rebuildAnalysis(detail) {
+// ---- Chapters --------------------------------------------------------------------------------------------------------
+// The chapters are a row of pills, the same on both pages: the name jumps to the chapter, and the tick box beside it turns
+// the chapter on or off, a chapter that is off being skipped by the player and its steps. An analysis has a chapter for
+// each thing it tells of, and lists the other things at its candle in their places, faded, each to add.
+
+// An analysis's sections, each thing's in two chapters: what a thing of its kind is, from its texts at Education, then
+// what this one is, from its texts at Summary. Both run through the same candles.
+function splitExplanations(def) {
+  const at = (cues, level) => cues.filter(c => c.texts?.[level]).map(c => ({ ...c, texts: { [level]: c.texts[level] } }));
+  const word = s => s.thing?.startsWith('SuccessiveCandles') ? 'Successive Candles' : (s.chapter ?? '').split(' ').pop();
+  const named = s => { const w = word(s); return w === 'Successive Candles' ? 'What are Successive Candles?' : `What is ${/^[AEIOU]|^(HH|HL|LH|LL|MSB)$/.test(w) ? 'an' : 'a'} ${w}?`; };
+  def.sections = (def.sections ?? []).flatMap(s => {
+    const explained = at(s.cues ?? [], 'education');
+    return [...(explained.length ? [{ ...s, chapter: named(s), explains: true, cues: explained }] : []), { ...s, cues: at(s.cues ?? [], 'summary') }];
+  });
+  return def;
+}
+
+// The things an analysis tells of, as those with a chapter on.
+const thingsOn = () => [...new Set(tour.sections.filter((s, i) => s.thing && sectionOn(i)).map(s => s.thing))];
+// Whether any explanation is on: the detail the analysis is at, in its address.
+const explainsOn = () => tour.chapters.some((c, i) => tour.sections[c.section].explains && !tour.chaptersOff.has(i));
+
+// Analyse turns every analysis chapter on or off, and Explain every explanation, on only for the things whose analysis is
+// on. The address then says the detail the explanations make it.
+function toggleKind(explains) {
   if (tour?.page !== 'Analysis') return;
-  const things = tickedThings();
-  if (!things.length) return;
-  wantedAnalysis = { ...tour.params, things, detail };
+  const of = tour.chapters.map((c, i) => ({ i, s: tour.sections[c.section] })).filter(x => x.s.explains === explains);
+  const analysed = new Set(tour.chapters.flatMap((c, i) => !tour.sections[c.section].explains && !tour.chaptersOff.has(i) ? [tour.sections[c.section].thing] : []));
+  const anyOn = of.some(x => !tour.chaptersOff.has(x.i));
+  for (const x of of) {
+    if (anyOn) tour.chaptersOff.add(x.i);
+    else if (!explains || analysed.has(x.s.thing)) tour.chaptersOff.delete(x.i);
+  }
+  const detail = explainsOn() ? 'education' : 'summary';
+  wantedAnalysis = tour.params = { ...tour.params, detail };
+  tour.hash = analysisHash(tour.params);
+  state.detail = { ...state.detail, Analysis: detail };
+  save(state);
+  history.replaceState(null, '', tour.hash);
+  chaptersChanged();
+}
+
+// A thing at the candle the analysis does not tell of yet: it is written again with it, and opens at its chapter.
+function addThing(id) {
+  if (tour?.page !== 'Analysis') return;
+  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), id])], detail: explainsOn() ? 'education' : 'summary', jump: id };
   history.replaceState(null, '', analysisHash(wantedAnalysis));
   renderAnalysisPage();
 }
 
-// The checklist under the controls: everything at the candle, ticked as the analysis has it, with Analyse and Explain to
-// write it again.
-function renderAnalysisThings() {
-  const box = document.querySelector('[data-tour="things"]');
-  if (!box || tour?.page !== 'Analysis') return;
-  const p = tour.params, list = tour.list ?? p.things.map(id => ({ id, kind: id.split(':')[0], level: Number(id.split(':')[1]) || null, name: id.replace(':', ' ') }));
-  box.innerHTML = `<span>Tell of</span>${list.map(t => thingBox(t, p.things.includes(t.id))).join('')}
-    <span class="write">${analyseButtons('data-player-write', p.detail)}</span>
-    <span class="warn" data-tour="rewrite" hidden>Press Analyse or Explain to add what is newly ticked</span>
+// Under an analysis's chapters: Analyse and Explain, pressed while any of their chapters is on, and what was asked for
+// that is not at the candle.
+function analysisWriteHtml() {
+  const on = explains => tour.chapters.some((c, i) => tour.sections[c.section].explains === explains && !tour.chaptersOff.has(i));
+  return `<span class="write">${ANALYSE_BUTTONS.map(([detail, label]) => `<button type="button" data-player-write="${detail}" aria-pressed="${on(detail === 'education')}"
+      title="${detail === 'education' ? 'Turn on or off the explanations: what a thing of each kind is and how it works' : 'Turn on or off the analysis of each thing'}">${label}</button>`).join('')}</span>
     ${tour.missing.length ? `<span class="warn">Not at this candle as the chart had it: ${esc(tour.missing.join(', '))}</span>` : ''}`;
 }
 
-// The things ticked in the checklist; before it is drawn, those the analysis was written with.
-function tickedThings() {
-  const boxes = [...document.querySelectorAll('[data-tour="things"] input[type=checkbox]')];
-  return boxes.length ? boxes.filter(x => x.checked).map(x => x.value) : tour?.params?.things ?? [];
+function renderAnalysisWrite() {
+  const box = document.querySelector('[data-tour="things"]');
+  if (box && tour?.page === 'Analysis') box.innerHTML = analysisWriteHtml();
 }
 
-// A section is played while the thing it tells of is ticked; a tour's sections tell of no one thing, so are always played.
-const sectionOn = i => !!tour?.sections[i] && (!tour.sections[i].thing || tickedThings().includes(tour.sections[i].thing));
-
-// The next section played after i going forward (by 1) or back (by -1), or null when there is none.
-function sectionAfter(i, by) {
-  for (let j = i + by; j >= 0 && j < (tour?.sections.length ?? 0); j += by) if (sectionOn(j)) return j;
-  return null;
+// The pills: a chapter's tick box and name, the one on show marked; for an analysis, the things at the candle in their
+// order, those it does not tell of faded, to add.
+function chapterPills() {
+  const s = tourSection(), pill = (c, i) => {
+    const on = !tour.chaptersOff.has(i), explains = tour.sections[c.section]?.explains;
+    return `<span class="chapter-pill${explains ? ' explains' : ''}${i === s?.chapter ? ' active' : ''}${on ? '' : ' off'}"><input type="checkbox" data-chapter-on="${i}" ${on ? 'checked' : ''} title="Play this chapter, or leave it out" aria-label="Play ${esc(c.name)}">` +
+      `<a href="#Tour/${c.slug}" data-chapter="${i}" title="Go to this chapter">${tour.page === 'Tour' ? `${i + 1}. ` : ''}${esc(c.name)}</a></span>`;
+  };
+  if (tour.page !== 'Analysis' || !tour.list) return tour.chapters.map(pill).join('');
+  return tour.list.map(t => {
+    // A thing's explanation, then its analysis.
+    const own = tour.chapters.flatMap((c, i) => tour.sections[c.section]?.thing === t.id ? [i] : []);
+    return own.length ? own.map(i => pill(tour.chapters[i], i)).join('') : `<button type="button" class="chapter-pill add" data-add="${esc(t.id)}" title="Add this to the analysis, and go to it">+ ${esc(t.name)}</button>`;
+  }).join('');
 }
 
-// A change to the checklist: the section on show, if unticked, gives way to the next played one; something ticked that
-// the analysis does not have yet is added by Analyse or Explain, which the checklist then says.
-function thingsChanged() {
-  if (tour?.page !== 'Analysis') return;
-  const note = document.querySelector('[data-tour="rewrite"]');
-  if (note) note.hidden = !tickedThings().some(id => !tour.sections.some(s => s.thing === id));
+// Turning a chapter on or off. The chapter on show, turned off, gives way to the next that is on, playing on if it was.
+function toggleChapter(i, on) {
+  if (!tour) return;
+  if (on) tour.chaptersOff.delete(i); else tour.chaptersOff.add(i);
+  chaptersChanged();
+}
+
+function chaptersChanged() {
   if (sectionOn(tour.index) || tour.ended) return updateTourPanel();
   const was = !!tour.timer, next = sectionAfter(tour.index, 1);
   pauseTour();
   if (next == null) return tourGo('end');
   enterSection(next);
   if (was) playTour();
+}
+
+// Going to a chapter, which is turned on if it was off, playing on if it was playing.
+function jumpToChapter(i) {
+  const c = tour?.chapters[i];
+  if (!c) return;
+  const was = !!tour.timer;
+  pauseTour();
+  if (tour.journey) endJourney();
+  tour.chaptersOff.delete(i);
+  enterSection(c.section);
+  if (was) playTour();
+}
+
+// A section is played while its chapter is on.
+const sectionOn = i => !!tour?.sections[i] && !tour.chaptersOff?.has(tour.sections[i].chapter);
+
+// The next section played after i going forward (by 1) or back (by -1), or null when there is none.
+function sectionAfter(i, by) {
+  for (let j = i + by; j >= 0 && j < (tour?.sections.length ?? 0); j += by) if (sectionOn(j)) return j;
+  return null;
 }
 
 function findExample(id) {
@@ -2483,10 +2587,12 @@ const LAYER_NAMES = { price: 'candles' };
 const PIN_PRICES = { open: 'o', high: 'h', low: 'l', close: 'c' };
 const PIN_PLACES = { above: [0, -55], below: [0, 55], left: [-70, 0], right: [70, 0] };
 const TOUR_TICK = 40;
-// The Speed slider's three paces: how fast the voice reads (its clips are played that much faster or slower, at the same
-// pitch), how fast the candles run against the section's speed, and the seconds a text stays after it has been read.
-const TOUR_PACES = [{ name: 'Slowest', voice: 0.8, candles: 0.35, gap: 0.8 }, { name: 'Slower', voice: 0.9, candles: 0.6, gap: 0.4 }, { name: 'Normal', voice: 1, candles: 1, gap: 0.15 },
-  { name: 'Faster', voice: 1.1, candles: 1.6, gap: 0.05 }, { name: 'Fastest', voice: 1.2, candles: 2.6, gap: 0 }];
+// The Speed slider's paces: how fast the voice reads (its clips are played that much faster or slower, at the same pitch),
+// how fast a text is read without the voice (against about 240 words a minute), how fast the candles run against the
+// section's speed, and the seconds a text stays after it has been read.
+const TOUR_PACES = [{ name: 'Slowest', voice: 0.8, reading: 0.6, candles: 0.35, gap: 0.8 }, { name: 'Slower', voice: 0.9, reading: 0.8, candles: 0.6, gap: 0.4 },
+  { name: 'Normal', voice: 1, reading: 1, candles: 1, gap: 0.15 }, { name: 'Faster', voice: 1.1, reading: 1.3, candles: 1.6, gap: 0.05 },
+  { name: 'Fastest', voice: 1.2, reading: 1.7, candles: 2.6, gap: 0 }];
 const NORMAL_PACE = TOUR_PACES.find(p => p.name === 'Normal');
 // The player on the page shown, and each page's own, kept while another page is shown.
 let tour = null, tourLoading = null;
@@ -2530,7 +2636,8 @@ function spokenText(def) {
 }
 
 const slugOf = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-const readingSeconds = text => Math.max(2.5, text.length / 14);
+// The seconds a text takes to read to oneself at Normal: about 240 words a minute, two seconds at least.
+const readingSeconds = text => Math.max(2, text.length / 20);
 const tourSection = () => tour.sections[tour.index];
 
 // Every section's full state, worked out from the start state and the sections before it, so any section can be entered
@@ -2644,10 +2751,10 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       const silent = c.voice === false, clip = silent || !text ? null : audio[textKey(text)];
       return { texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
         to, heads: { start: c.heads?.start === true, end: c.heads?.end !== false }, color: c.color ?? null,
-        clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0,
+        clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0, given: c.hold >= 0 ? c.hold : null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
     });
-    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
@@ -2719,7 +2826,7 @@ function sceneSpecs(def) {
 function newPlayer(def, audio, options = {}) {
   return { page: 'Tour', detail: 'education', idPrefix: 'Tour', def, base: '', audio, wholes: new Map(), scenes: [], ex: null, saved: JSON.stringify(def), history: [], lastEdit: null,
     picking: null, note: '', resolved: new Map(), resolving: false, index: 0, view: DEFAULT_VIEW, queue: [], shown: [], fired: new Set(), kept: [], active: null, activeUntil: 0,
-    nextCandle: 0, timer: null, ended: false, voice: { now: null, waiting: [] }, ...options };
+    nextCandle: 0, timer: null, ended: false, chaptersOff: new Set(), voice: { now: null, waiting: [] }, ...options };
 }
 
 async function loadTour() {
@@ -2869,6 +2976,7 @@ function showNextCue() {
   // A clip read since the tour was compiled gives the text its length, as one there from the start does.
   const clip = !cue.silent && cue.clip === 0 && !(cue.given >= 0) ? tour.audio[textKey(cue.text)] : null;
   if (clip?.seconds > 0) Object.assign(cue, { clip: clip.seconds, hold: clip.seconds + NORMAL_PACE.gap });
+  Object.assign(tour, { activeAt: performance.now(), pausedElapsed: 0 });
   tour.active = cue;
   tour.activeUntil = performance.now() + holdOf(cue) * 1000;
   tour.shown.push(cue);
@@ -2892,7 +3000,8 @@ function readAloud(cue) {
     tour.voice.now = null;
     if (tour.voice.waiting.length) readAloud(tour.voice.waiting.shift());
   };
-  if (cue === tour.active) tour.activeUntil = performance.now() + cue.hold * 1000;
+  // Its time on show, at the slider's pace, starts as its reading does.
+  if (cue === tour.active) Object.assign(tour, { activeAt: performance.now(), activeUntil: performance.now() + holdOf(cue) * 1000 });
   if (tour.recording) {
     tour.recording.cues.push({ key: textKey(cue.text), at: Date.now() });
     turn.timer = setTimeout(done, clip.seconds * 1000);
@@ -2915,9 +3024,15 @@ const voiceOn = () => state.tourVoice === true;
 
 // The pace the Speed slider is set to. A recording is always made at Normal, as its clips are laid at their own length.
 const tourPace = () => tour?.recording || videoMode ? NORMAL_PACE : TOUR_PACES.find(p => p.name === state.tourPaceName) ?? NORMAL_PACE;
-// The seconds a text stays at the slider's pace: the length of its clip as played and the gap after it, else its own
-// seconds, which are a reading time and go with the voice.
-const holdOf = cue => { const pace = tourPace(); return cue.clip ? cue.clip / pace.voice + pace.gap : cue.hold / pace.voice; };
+// Whether a text is read aloud: Voice is on, or a recording is being made, and it has a clip.
+const voiced = cue => !!cue.clip && !cue.silent && (voiceOn() || !!tour?.recording);
+// The seconds a text stays at the slider's pace. Read aloud, the length of its clip as played and the gap after it.
+// Otherwise its own seconds when the tour gives it some, else the time it takes to read at the slider's reading rate.
+const holdOf = cue => {
+  const pace = tourPace();
+  if (voiced(cue)) return cue.clip / pace.voice + pace.gap;
+  return cue.given != null ? cue.given / pace.voice : readingSeconds(cue.text ?? '') / pace.reading;
+};
 
 function setTourPace(value) {
   state.tourPaceName = TOUR_PACES[Number(value)]?.name ?? NORMAL_PACE.name;
@@ -3068,8 +3183,6 @@ function updateTourPanel() {
   document.body.classList.toggle('analysing', analysisRuns());
   if (!playerHere(currentPage) || !part('caption')) return;
   const s = tourSection(), ex = tour.ex, t = cursorOf(ex);
-  // Text pinned to a candle is on the chart; the caption keeps the last text that was not.
-  const caption = [...tour.shown].reverse().find(c => c.on == null);
   if (part('title')) part('title').textContent = tour.def.title || 'Tour';
   part('chapter').textContent = tour.chapters[s?.chapter]?.name ?? tour.def.title ?? 'Tour';
   const scene = tour.scenes.length > 1 && s ? ` · scene ${s.scene + 1}: ${datasetList?.find(d => d.id === ex.dataset)?.name ?? ex.dataset} from ${fmtTime(ex.prices.t[0])}` : '';
@@ -3077,7 +3190,7 @@ function updateTourPanel() {
   const where = tour.page === 'Analysis' ? `${tour.def.title} · chapter ${(s?.chapter ?? 0) + 1} of ${tour.chapters.length}`
     : `section ${(s?.index ?? 0) + 1} of ${tour.sections.length} · #${s?.from}${s?.until > s?.from ? ` to #${s.until}` : ''}`;
   part('where').textContent = s ? `${where}${tour.ended ? ' · ended' : ''}${scene}` : 'no sections yet';
-  part('caption').textContent = caption?.text ?? '';
+  showCaption();
   part('readout').textContent = `#${t} · ${fmtTime(ex.prices.t[t])} UTC`;
   const warning = part('warning');
   if (warning) {
@@ -3088,8 +3201,8 @@ function updateTourPanel() {
   // The chapters and the problems change as the tour is edited, so they are redrawn when they differ.
   const fill = (el, html) => { if (el && el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; } };
   fill(part('errors'), tour.errors.length ? `<div class="empty tour-errors"><b>The tour has problems</b><ul>${tour.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>` : '');
-  fill(part('chapters'), tour.chapters.map((c, i) => `<a href="#Tour/${c.slug}" data-chapter="${i}">${i + 1}. ${esc(c.name)}</a>`).join(''));
-  part('chapters')?.querySelectorAll('a').forEach(a => a.classList.toggle('active', Number(a.dataset.chapter) === s?.chapter));
+  fill(part('chapters'), chapterPills());
+  if (tour.page === 'Analysis') fill(part('things'), analysisWriteHtml());
 
   const play = go('play');
   play.textContent = tour.timer ? '❚❚' : '▶';
@@ -3119,6 +3232,9 @@ function updateTourPanel() {
 // One beat of a playing tour: the next text once the one on show has been read, else the next candle, else the next section.
 function tourTick() {
   if (!playerHere(currentPage) || !tour.sections.length) return pauseTour();
+  // The slider and the caption move on while a text is read, as well as while the candles run.
+  showScrub();
+  showCaption();
   const s = tourSection(), ex = tour.ex, now = performance.now(), t = cursorOf(ex);
   // A text still waiting for the voice has not begun its time on show.
   const reading = tour.active && (now < tour.activeUntil || tour.voice.waiting.includes(tour.active));
@@ -3174,37 +3290,182 @@ async function loadPlayerAudio() {
   if (audio) mine.audio = audio;
 }
 
-// The slider spans the section on show, and its readout says where the cursor is in it.
-function showScrub() {
-  const scrub = document.querySelector('[data-tour="scrub"]'), s = tourSection();
-  if (!scrub || !s) return;
-  const t = Math.max(s.from, Math.min(s.until, cursorOf(tour.ex)));
-  scrub.min = s.from;
-  scrub.max = Math.max(s.until, s.from + 1);
-  scrub.disabled = s.until <= s.from;
-  if (document.activeElement !== scrub) scrub.value = t;
-  document.querySelector('[data-tour="where-in"]').textContent = s.until > s.from ? `${t - s.from} of ${s.until - s.from} candles` : 'stays on this candle';
+// ---- The slider: a chapter in seconds ---------------------------------------------------------------------------------
+// The slider spans the chapter on show in the seconds it takes to play at the pace set: the candles run and the texts read.
+// Its time line is worked out by the rules tourTick plays by: a journey into a section takes its easing and its run; the
+// candles run at the section's speed; a text with no candle is read while they run; the run waits at a text that has a
+// candle until it has been read; and a section ends once its candles have run and its texts been read. Where the player
+// is, it is placed by the candle it is at or the text on show, whichever is further on, so the voice and the time line
+// cannot drift far apart.
+
+// One section's time line from its start: when each text comes on show and for how long, and the candles the run is at,
+// as [candle, seconds] points to read between. A journey's texts with no candle are read over it.
+function sectionPlan(s) {
+  const pace = tourPace(), gap = 1 / (s.speed * pace.candles), j = s.journey;
+  const journey = j ? 2 * TOUR_ZOOM_MS / 1000 + (j.run ? Math.abs(j.to - j.start) / (j.speed * pace.candles) : 0) : 0;
+  let reader = 0, clock = journey, at = s.from;
+  const texts = [], runs = [[s.from, 0], [s.from, journey]];
+  const cues = s.cues.map((c, k) => ({ c, k, when: cueAt(c) ?? s.from })).filter(x => !x.c.skipped).sort((a, b) => a.when - b.when || a.k - b.k);
+  for (const { c, when } of cues) {
+    const hold = holdOf(c);
+    if (c.at == null) { texts.push({ cue: c, start: reader, seconds: hold }); reader += hold; continue; }
+    if (when > at) { clock += (when - at) * gap; at = when; runs.push([at, clock]); }
+    const start = Math.max(clock, reader);
+    texts.push({ cue: c, start, seconds: hold });
+    reader = clock = start + hold;
+    runs.push([at, clock]);
+  }
+  if (s.until > at) { clock += (s.until - at) * gap; runs.push([s.until, clock]); }
+  return { texts, runs, seconds: Math.max(clock, reader) };
 }
 
-// Dragging the slider pauses the player and moves the cursor within the section: its texts up to there are taken as
-// read, and the last of them is on show; Play carries on from there.
-function scrubTour(t) {
+// The chapter's time line: its sections that are played, one after another. It is worked out again when the pace, the
+// sections played, the tour or the clips change.
+function chapterPlan() {
+  const chapter = tourSection()?.chapter, ids = tour.sections.flatMap((s, i) => s.chapter === chapter && sectionOn(i) ? [i] : []);
+  const key = `${chapter}|${tourPace().name}|${voiceOn()}|${ids.join(',')}|${Object.keys(tour.audio ?? {}).length}`;
+  if (tour.plan?.key === key && tour.plan.sections === tour.sections) return tour.plan;
+  let offset = 0;
+  const parts = ids.map(i => { const plan = sectionPlan(tour.sections[i]), part = { i, offset, ...plan }; offset += plan.seconds; return part; });
+  return tour.plan = { key, sections: tour.sections, parts, seconds: offset };
+}
+
+// The seconds into a section at which the run is at a candle, and the candle it is at a number of seconds in.
+function secondsAtCandle(part, t) {
+  const runs = part.runs, next = runs.findIndex(([c]) => c >= t);
+  if (next < 0) return runs[runs.length - 1][1];
+  if (next === 0 || runs[next][0] === t) return runs[next][1];
+  const [c0, s0] = runs[next - 1], [c1, s1] = runs[next];
+  return s0 + (s1 - s0) * (t - c0) / (c1 - c0);
+}
+
+function candleAtSeconds(part, seconds) {
+  const runs = part.runs;
+  let k = 0;
+  while (k + 1 < runs.length && runs[k + 1][1] <= seconds) k++;
+  const [c0, s0] = runs[k], [c1, s1] = runs[k + 1] ?? runs[k];
+  return c1 > c0 && s1 > s0 ? c0 + Math.floor((c1 - c0) * (seconds - s0) / (s1 - s0)) : c0;
+}
+
+// Where the player is in the chapter, in seconds: the candle the run is at, or as far into the text on show as it has
+// been read, whichever is further on. Paused, a text is at its start, as Play reads it again from there.
+function planPosition(plan) {
+  const part = plan.parts.find(p => p.i === tour.index);
+  if (!part) return 0;
+  let at = secondsAtCandle(part, cursorOf(tour.ex));
+  const text = part.texts.find(x => x.cue === tour.active);
+  if (text) at = Math.max(at, text.start + Math.min(text.seconds, activeElapsed()));
+  return part.offset + Math.min(at, part.seconds);
+}
+
+// The seconds the text on show has been read for: while playing, since its reading began; paused, as far as it had got.
+const activeElapsed = () => !tour?.active ? 0 : tour.timer ? Math.max(0, (performance.now() - (tour.activeAt ?? performance.now())) / 1000) : tour.pausedElapsed ?? 0;
+
+// How many of a text's characters have been read after a number of seconds. Read aloud, by its clip: sentence by
+// sentence where the narration tool says how long each sentence is, and by characters within one; otherwise by
+// characters over the clip. Read to oneself, by characters over the time it is given.
+function readChars(cue, elapsed) {
+  const text = cue.text ?? '', n = text.length, pace = tourPace();
+  if (voiced(cue)) {
+    const clip = tour.audio[textKey(text)], at = elapsed * pace.voice, parts = clip?.sentences, written = text.split(/(?<=[.!?])\s+/);
+    if (parts?.length && parts.length === written.length) {
+      const pause = parts.length > 1 ? Math.max(0, (clip.seconds - parts.reduce((a, b) => a + b, 0)) / (parts.length - 1)) : 0;
+      let time = 0, chars = 0;
+      for (let i = 0; i < parts.length; i++) {
+        if (at < time + parts[i]) return chars + Math.round(written[i].length * (at - time) / parts[i]);
+        time += parts[i] + pause;
+        chars += written[i].length + 1;
+      }
+      return n;
+    }
+    return Math.round(n * Math.min(1, at / cue.clip));
+  }
+  return Math.round(n * Math.min(1, elapsed / holdOf(cue)));
+}
+
+// The caption: the last text shown that is not pinned, read up to where the reading has got in black and the rest in
+// grey, word by word. A text no longer on show has been read; a recording shows it whole.
+function showCaption() {
+  const box = document.querySelector('[data-tour="caption"]');
+  if (!box) return;
+  const cue = [...tour.shown].reverse().find(c => c.on == null), text = cue?.text ?? '';
+  let read = cue && cue === tour.active && !videoMode && !tour.recording ? readChars(cue, activeElapsed()) : text.length;
+  if (read < text.length) { const space = text.indexOf(' ', read); read = space < 0 ? text.length : space; }
+  const key = `${text}|${read}`;
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.innerHTML = read >= text.length ? esc(text) : `${esc(text.slice(0, read))}<span class="unread">${esc(text.slice(read))}</span>`;
+}
+
+// Clicking the caption moves on to the next text at once, as when it has been read: on to the next candle with a text,
+// or the next section when this one has none left. Playing, the voice moves on with it.
+function nextText() {
   if (!tour?.sections.length) return;
+  if (tour.journey) endJourney();
+  const s = tourSection();
+  if (!tour.queue.length && cursorOf(tour.ex) >= s.until) {
+    const next = sectionAfter(tour.index, 1);
+    if (next != null) enterSection(next);
+    return;
+  }
+  hush();
+  if (!tour.queue.length) advanceTo(Math.min(s.until, ...pendingCues(s).map(cueAt)));
+  showNextCue();
+  refreshTour();
+}
+
+const clockOf = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+let scrubbing = false;
+window.addEventListener('pointerup', () => { scrubbing = false; }, { passive: true });
+
+// The slider and its readout at where the player is, with a mark at each text that is read.
+function showScrub() {
+  const scrub = document.querySelector('[data-tour="scrub"]');
+  if (!scrub || !tourSection()) return;
+  const plan = chapterPlan(), at = planPosition(plan);
+  scrub.min = 0;
+  scrub.max = Math.max(plan.seconds, 0.1);
+  scrub.step = 0.1;
+  scrub.disabled = plan.seconds <= 0;
+  if (!scrubbing) scrub.value = at;
+  const marks = document.getElementById('player-marks');
+  if (marks && marks.dataset.key !== plan.key) {
+    marks.dataset.key = plan.key;
+    marks.innerHTML = plan.parts.flatMap(p => p.texts.filter(x => x.cue.on == null).map(x => `<option value="${(p.offset + x.start).toFixed(1)}"></option>`)).join('');
+  }
+  document.querySelector('[data-tour="where-in"]').textContent = `${clockOf(scrubbing ? Number(scrub.value) : at)} of ${clockOf(plan.seconds)}`;
+}
+
+// Moving the slider puts the player at that many seconds into the chapter. On a text it is the start of that text, on
+// show; between texts it is the candle the run is at then, with the texts before it taken as read. It holds still while
+// the slider moves, and once it is let go it plays on from there if it was playing, and stays paused if it was not.
+function scrubTour(seconds) {
+  if (!tour?.sections.length) return;
+  const plan = chapterPlan(), part = [...plan.parts].reverse().find(p => p.offset <= seconds) ?? plan.parts[0];
+  if (!part) return;
+  tour.playAfterScrub ||= !!tour.timer;
   pauseTour();
   if (tour.journey) endJourney();
-  seekTour(tour.index, { t, shown: Infinity });
+  const local = seconds - part.offset, s = tour.sections[part.i];
+  const text = [...part.texts].reverse().find(x => x.start <= local && local < x.start + x.seconds && x.cue.on == null);
+  if (text) seekTour(part.i, { cue: s.cues.indexOf(text.cue) });
+  else seekTour(part.i, { t: candleAtSeconds(part, local), shown: part.texts.filter(x => x.start <= local).length });
+  showScrub();
 }
 
 function playTour() {
   if (!tour?.sections.length) return;
   stopPlaying();
-  const s = tourSection(), atEnd = cursorOf(tour.ex) >= s.until && !tour.queue.length && !tour.journey, next = sectionAfter(tour.index, 1);
+  // A section is at its end once its candles have run, its texts have come and the one on show has been read through:
+  // one just entered, its first text on show, is not, even when it stays on one candle.
+  const read = !tour.active || (tour.pausedElapsed ?? 0) >= holdOf(tour.active) - 0.05;
+  const s = tourSection(), atEnd = cursorOf(tour.ex) >= s.until && !tour.queue.length && !tour.journey && read, next = sectionAfter(tour.index, 1);
   // At the end it starts again; at the end of a chapter it is paused at, the next chapter plays; in a section since left
   // out, the next played one does.
   if (tour.ended || (atEnd && next == null)) enterSection(sectionAfter(-1, 1) ?? 0);
   else if ((atEnd || !sectionOn(tour.index)) && next != null) enterSection(next, { journey: true });
   // The text on show gets its reading time again, and is read aloud from its start: it was shown while the tour was not playing.
-  if (tour.active) tour.activeUntil = performance.now() + holdOf(tour.active) * 1000;
+  if (tour.active) Object.assign(tour, { activeAt: performance.now(), activeUntil: performance.now() + holdOf(tour.active) * 1000, pausedElapsed: 0 });
   tour.nextCandle = 0;
   tour.timer = setInterval(tourTick, TOUR_TICK);
   if (tour.active) speak(tour.active);
@@ -3213,6 +3474,8 @@ function playTour() {
 
 function pauseTour() {
   if (!tour?.timer) return;
+  // The text on show keeps how far it had been read, to show while paused.
+  tour.pausedElapsed = activeElapsed();
   clearInterval(tour.timer);
   tour.timer = null;
   hush();
@@ -3224,14 +3487,17 @@ function pauseTour() {
 function tourGo(action) {
   if (!tour?.sections.length) return;
   if (action === 'play') return tour.timer ? pauseTour() : playTour();
+  // A step keeps the player as it was: playing on from where it lands, or paused there.
+  const was = !!tour.timer;
   pauseTour();
   if (tour.journey) endJourney();
   const s = tourSection(), t = cursorOf(tour.ex), first = sectionAfter(-1, 1) ?? 0, last = sectionAfter(tour.sections.length, -1) ?? tour.sections.length - 1;
-  if (action === 'prev') return enterSection((t > s.from || tour.shown.length > 1 || tour.ended) && sectionOn(tour.index) ? tour.index : sectionAfter(tour.index, -1) ?? first);
-  if (action === 'first') return enterSection(first);
-  if (action === 'last') return enterSection(last);
+  const land = i => { enterSection(i); if (was) playTour(); };
+  if (action === 'prev') return land((t > s.from || tour.shown.length > 1 || tour.ended) && sectionOn(tour.index) ? tour.index : sectionAfter(tour.index, -1) ?? first);
+  if (action === 'first') return land(first);
+  if (action === 'last') return land(last);
   const next = sectionAfter(tour.index, 1);
-  if (action === 'next' && next != null) return enterSection(next);
+  if (action === 'next' && next != null) return land(next);
   // The end: the last section played, at its last candle, every text read.
   seekTour(last, { t: Infinity, shown: Infinity });
   tour.ended = true;

@@ -1,6 +1,7 @@
 // Reads a tour's texts aloud with Kokoro (open source, runs locally; the model is fetched on first use) into
 // wwwroot/tour-audio, one clip per text, and writes index.json there: the page uses a clip's length as the text's seconds and
-// plays it when its Voice button is on. A text whose clip exists is skipped, so only changed texts are read again: changed
+// plays it when its Voice button is on, and the length of each of its sentences, by which the page shows how far the text has
+// been read. A text whose clip exists is skipped, so only changed texts are read again: changed
 // on screen, or in what the tour's glossary has the voice say for them. A text marked "voice": false is not read.
 // Each text is read a sentence at a time, and every sentence read is kept under tour-audio/sentences by its own hash, so a
 // sentence that comes again, in another text or another tour, is not read twice: a text's clip is its sentences joined with
@@ -65,7 +66,8 @@ export async function narrate(tour, { voice = 'af_heart', force = false, log = (
 
   for (const [key, text] of texts) {
     const file = `${key}.wav`, said = spoken(text), was = index[key];
-    if (was?.voice === voice && (was.spoken ?? was.text) === said && existsSync(join(audioDir, file)) && !force) continue;
+    // A clip made before the index gave its sentences' lengths is made again, from the sentences kept on disk.
+    if (was?.voice === voice && (was.spoken ?? was.text) === said && was.sentences && existsSync(join(audioDir, file)) && !force) continue;
     const parts = [];
     for (const sentence of sentences(said)) {
       const part = await sentenceSamples(sentence, voice);
@@ -81,7 +83,10 @@ export async function narrate(tour, { voice = 'af_heart', force = false, log = (
       at += p.length + (i < parts.length - 1 ? gap : 0);
     }
     writeFileSync(join(audioDir, file), wav(samples, sampleRate));
-    index[key] = { text, ...(said !== text ? { spoken: said } : {}), file, voice, seconds: Math.round(samples.length / sampleRate * 100) / 100 };
+    // The seconds of each sentence, with the pauses between them the rest of the clip: the page shows how far a text has
+    // been read by them.
+    index[key] = { text, ...(said !== text ? { spoken: said } : {}), file, voice, seconds: Math.round(samples.length / sampleRate * 100) / 100,
+      sentences: parts.map(part => Math.round(part.length / sampleRate * 100) / 100) };
     // The index is written as each clip is made, so a page playing the tour has the first clip without waiting for the last.
     writeFileSync(indexPath, JSON.stringify(index, null, 2) + '\n');
     log(`${key} ${index[key].seconds}s  ${said.slice(0, 60)}`);
