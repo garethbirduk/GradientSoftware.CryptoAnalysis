@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   pages: write
+  packages: write
   id-token: write
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
@@ -22,6 +23,9 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    # The coverage badge is written to a gist, so it is skipped until the repo has the gist's secrets.
+    env:
+      GIST_ID: ${{ secrets.GIST_ID }}
 
     steps:
     - uses: actions/checkout@v4
@@ -33,6 +37,9 @@ jobs:
 
     - name: Print .NET SDK version
       run: dotnet --version
+
+    - name: NuGet source for the GradientSoftware packages
+      run: dotnet nuget add source --username ${{ github.actor }} --password ${{ github.token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/garethbirduk/index.json"
 
     - name: Restore dependencies
       run: dotnet restore
@@ -59,7 +66,7 @@ jobs:
     - name: Create Test Coverage Badge
       uses: simon-k/dotnet-code-coverage-badge@v1.0.0
       id: create_coverage_badge
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main' && env.GIST_ID != ''
       with:
         label: Unit Test Coverage
         color: brightgreen
@@ -72,11 +79,7 @@ jobs:
       if: github.ref == 'refs/heads/main'    
       run: echo "Badge data ${{steps.test_step.outputs.badge}}"
 
-    - name: Nuget set access
-      if: github.ref == 'refs/heads/main'    
-      run: dotnet nuget add source --username ${{ github.actor }} --password ${{ github.token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/garethbirduk/index.json"
-
     - name: Nuget deploy Package
       if: github.ref == 'refs/heads/main'
       run:
-        dotnet nuget push ./CryptoAnalysis/bin/Release/**/*.nupkg --source "github" --api-key ${{ secrets.GH_APIKEY }} --skip-duplicate
+        dotnet nuget push ./CryptoAnalysis/bin/Release/**/*.nupkg --source "github" --api-key ${{ github.token }} --skip-duplicate
