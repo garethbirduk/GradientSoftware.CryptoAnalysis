@@ -138,15 +138,32 @@ public static class ReplayServer
         var byDataset = datasets.ToDictionary(x => x.Id, x => (IReadOnlyList<Price>)x.Prices);
         var tourFile = sourceDir != null ? Path.Combine(sourceDir, "tour.json") : null;
         // With expanded, the tour comes with its sections written out, as the Replay page plays it in place.
-        app.MapGet("/api/explain/tour", (string explain, string dataset, string at, int? level, string? seen, bool? expanded) =>
+        // What is at a candle, as the chart had it at the cursor (seen): the checklist the Replay page's candle card shows.
+        // greenRuns and redRuns are the page's Successive Candles settings: how long a run must be to count.
+        app.MapGet("/api/explain/at", (string dataset, string at, string? seen, int? greenRuns, int? redRuns) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
-            if (!Explain.Terms.Contains(explain))
-                return Results.BadRequest($"\"{explain}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.");
-            var def = Explain.Tour(explain, data.Id, data.Prices, at, level ?? 1, seen, expanded == true);
+            var options = new ExplainOptions(greenRuns ?? ExplainOptions.Default.GreenRuns, redRuns ?? ExplainOptions.Default.RedRuns);
+            return Results.Text(new JsonArray(Explain.At(data.Prices, at, seen, options, MaxLevel).Select(x => (JsonNode)x.ToJson()).ToArray()).ToJsonString(), "application/json");
+        });
+
+        // things lists what to explain, by id as /api/explain/at gives them ("Candle,SuccessiveCandles,Swing:1"), a chapter
+        // each; explain and level name one thing the old way. A thing not at the candle is left out and named in missing.
+        app.MapGet("/api/explain/tour", (string dataset, string at, string? things, string? explain, int? level, string? seen, bool? expanded, int? greenRuns, int? redRuns) =>
+        {
+            if (!byId.TryGetValue(dataset, out var data))
+                return Results.NotFound();
+            var ids = things != null ? things.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() : [$"{explain}{(explain is "Candle" or "SuccessiveCandles" ? "" : $":{level ?? 1}")}"];
+            var unknown = ids.Where(x => Explain.Thing.Parse(x) == null).ToList();
+            if (unknown.Count > 0)
+                return Results.BadRequest($"\"{string.Join(", ", unknown)}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.");
+            var options = new ExplainOptions(greenRuns ?? ExplainOptions.Default.GreenRuns, redRuns ?? ExplainOptions.Default.RedRuns);
+            var def = Explain.Tour(ids.Select(x => Explain.Thing.Parse(x)!).ToList(), data.Id, data.Prices, at, seen, out var missing, expanded == true, options);
             if (def == null)
-                return Results.BadRequest($"No {explain} at level {level ?? 1} has the candle at {at} in it.");
+                return Results.BadRequest($"Nothing of that is at the candle at {at}: {string.Join(", ", missing)}.");
+            if (missing.Count > 0)
+                def["missing"] = new JsonArray(missing.Select(x => (JsonNode)x).ToArray());
             if (tourFile != null && File.Exists(tourFile) && JsonNode.Parse(File.ReadAllText(tourFile))?["glossary"] is { } glossary)
                 def["glossary"] = glossary.DeepClone();
             var written = video != null || expanded == true ? Tours.Compile(def, byDataset).Expanded : null;

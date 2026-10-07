@@ -12,63 +12,63 @@
       "view": [0, 100],
       "speed": 10,
       "cues": [
-        { "text": "Each point on this line is the price of Bitcoin at the end of one hour: the close." },
-        { "text": "Joined together, the hourly closes show where price has been." }
+        { "texts": { "education": "Each point on this line is the price of Bitcoin at the end of one hour: the close." } },
+        { "texts": { "education": "Joined together, the hourly closes show where price has been." } }
       ]
     },
     {
       "chapter": "Higher Highs",
       "add": ["HigherHigh"],
       "cues": [
-        { "text": "We can plot the position each time the price peaks at a new high. We label these positions as Higher Highs (HH)." }
+        { "texts": { "education": "We can plot the position each time the price peaks at a new high. We label these positions as Higher Highs (HH)." } }
       ]
     },
     {
       "chapter": "Higher Lows",
       "add": ["HigherLow"],
       "cues": [
-        { "text": "We also plot the lowest position between one HH and the next. We label these positions as Higher Lows (HL)." }
+        { "texts": { "education": "We also plot the lowest position between one HH and the next. We label these positions as Higher Lows (HL)." } }
       ]
     },
     {
       "chapter": "Sawtooth",
       "add": ["sawtooth"],
       "cues": [
-        { "text": "When we join the HH and HL positions we get a Sawtooth: a less noisy, lower-resolution version of the closes." },
-        { "text": "Each line of the Sawtooth is a leg: an Upleg when it rises, a Downleg when it falls." }
+        { "texts": { "education": "When we join the HH and HL positions we get a Sawtooth: a less noisy, lower-resolution version of the closes." } },
+        { "texts": { "education": "Each line of the Sawtooth is a leg: an Upleg when it rises, a Downleg when it falls." } }
       ]
     },
     {
       "chapter": "Lower Lows",
       "add": ["LowerLow"],
       "cues": [
-        { "text": "Sometimes we get a dip where the low is not increasing. This cannot be called a Higher Low. It is called a Lower Low (LL)." }
+        { "texts": { "education": "Sometimes we get a dip where the low is not increasing. This cannot be called a Higher Low. It is called a Lower Low (LL)." } }
       ]
     },
     {
       "chapter": "Breaks of Structure",
       "remove": ["HigherHigh", "HigherLow", "LowerLow"],
       "cues": [
-        { "text": "We can see from the Sawtooth that we are trending upwards." }
+        { "texts": { "education": "We can see from the Sawtooth that we are trending upwards." } }
       ]
     },
     {
       "add": ["bosLevelUp"],
       "cues": [
-        { "text": "Even though the price may dip, it keeps returning to the previous high and beyond. We can note the position where it first closes above that high." }
+        { "texts": { "education": "Even though the price may dip, it keeps returning to the previous high and beyond. We can note the position where it first closes above that high." } }
       ]
     },
     {
       "add": ["BullishBreakOfStructure"],
       "cues": [
-        { "text": "Where this happens we call it a Break of Structure (BoS)." }
+        { "texts": { "education": "Where this happens we call it a Break of Structure (BoS)." } }
       ]
     },
     {
       "add": ["HigherHigh"],
       "cues": [
-        { "at": 45, "on": "close", "place": "above", "text": "This may coincide with an HH" },
-        { "at": 89, "on": "close", "place": "below", "text": "Or not." }
+        { "at": 45, "on": "close", "place": "above", "texts": { "education": "This may coincide with an HH" } },
+        { "at": 89, "on": "close", "place": "below", "texts": { "education": "Or not." } }
       ]
     },
     {
@@ -76,24 +76,24 @@
       "add": ["Upswing"],
       "remove": ["bosLevelUp", "HigherHigh"],
       "cues": [
-        { "text": "A Swing is a range of positions. It begins at the position that the BoS breaks, and ends at the BoS itself." },
-        { "text": "Until the BoS happens it is only a Candidate Swing. The BoS Confirms it." },
-        { "text": "An Upswing is a Swing that trends upwards." }
+        { "texts": { "education": "A Swing is a range of positions. It begins at the position that the BoS breaks, and ends at the BoS itself." } },
+        { "texts": { "education": "Until the BoS happens it is only a Candidate Swing. The BoS Confirms it." } },
+        { "texts": { "education": "An Upswing is a Swing that trends upwards." } }
       ]
     },
     {
       "chapter": "Swing Low",
       "add": ["HigherLow", "LowerLow"],
       "cues": [
-        { "text": "The Swing Low is the lowest position in the Swing. It is either an HL or an LL." }
+        { "texts": { "education": "The Swing Low is the lowest position in the Swing. It is either an HL or an LL." } }
       ]
     },
     {
       "chapter": "Upswing",
       "add": ["HigherHigh"],
       "cues": [
-        { "text": "An Upswing is characterised by a Downleg from the HH to the Swing Low, followed by an Upleg from the Swing Low to the BoS." },
-        { "text": "The Upleg of the Upswing will always finish at its BoS; the Upleg of the underlying Sawtooth may continue if the BoS itself does not form an HH." }
+        { "texts": { "education": "An Upswing is characterised by a Downleg from the HH to the Swing Low, followed by an Upleg from the Swing Low to the BoS." } },
+        { "texts": { "education": "The Upleg of the Upswing will always finish at its BoS; the Upleg of the underlying Sawtooth may continue if the BoS itself does not form an HH." } }
       ]
     },
     {
@@ -104,8 +104,8 @@
       "view": [0, 75],
       "speed": 5,
       "cues": [
-        { "text": "Let's observe the Upswings in real time." },
-        { "at": 16, "text": "Each Upswing appears only when its BoS Confirms it." }
+        { "texts": { "education": "Let's observe the Upswings in real time." } },
+        { "at": 16, "texts": { "education": "Each Upswing appears only when its BoS Confirms it." } }
       ]
     },
     {
@@ -115,42 +115,42 @@
       "until": 67,
       "speed": 5,
       "cues": [
-        { "text": "Similarly we can plot the Sawtooth in a downward trend where the highs are not Higher Highs, but Lower Highs (LH)." }
+        { "texts": { "education": "Similarly we can plot the Sawtooth in a downward trend where the highs are not Higher Highs, but Lower Highs (LH)." } }
       ]
     },
     {
       "add": ["bosLevelDown"],
       "cues": [
-        { "text": "Even though the price may peak, it keeps returning to the previous low and heads lower. We can note the position where it first closes below that low." }
+        { "texts": { "education": "Even though the price may peak, it keeps returning to the previous low and heads lower. We can note the position where it first closes below that low." } }
       ]
     },
     {
       "add": ["BearishBreakOfStructure"],
       "cues": [
-        { "text": "Where this happens we also call it a Break of Structure (BoS)." }
+        { "texts": { "education": "Where this happens we also call it a Break of Structure (BoS)." } }
       ]
     },
     {
       "add": ["Downswing"],
       "remove": ["bosLevelDown"],
       "cues": [
-        { "text": "And we can define a Downswing, characterised by an Upleg from the LL to the Swing High, followed by a Downleg from the Swing High to the BoS." }
+        { "texts": { "education": "And we can define a Downswing, characterised by an Upleg from the LL to the Swing High, followed by a Downleg from the Swing High to the BoS." } }
       ]
     },
     {
       "remove": ["LowerLow", "LowerHigh", "BearishBreakOfStructure"],
       "until": 74,
       "cues": [
-        { "text": "We might notice the price heading back up." }
+        { "texts": { "education": "We might notice the price heading back up." } }
       ]
     },
     {
       "until": 75,
       "cues": [
-        { "text": "If it breaks the previous HH", "hold": 0 },
-        { "at": 45, "on": "close", "place": "above", "text": "HH", "keep": "chapter", "voice": false },
-        { "at": 75, "on": "close", "place": "above", "text": "BoS", "keep": "chapter", "voice": false },
-        { "text": "then it turns out the Downswings were just part of a longer-term Upswing." }
+        { "texts": { "education": "If it breaks the previous HH" }, "hold": 0 },
+        { "at": 45, "on": "close", "place": "above", "texts": { "education": "HH" }, "keep": "chapter", "voice": false },
+        { "at": 75, "on": "close", "place": "above", "texts": { "education": "BoS" }, "keep": "chapter", "voice": false },
+        { "texts": { "education": "then it turns out the Downswings were just part of a longer-term Upswing." } }
       ]
     },
     {
@@ -159,13 +159,13 @@
       "from": 74,
       "until": 74,
       "cues": [
-        { "text": "Our real-time analysis might have considered these to be Downswings, and we may have strategised according to this observation." }
+        { "texts": { "education": "Our real-time analysis might have considered these to be Downswings, and we may have strategised according to this observation." } }
       ]
     },
     {
       "until": 75,
       "cues": [
-        { "text": "Something we observed in real time that later disappears with new data is called a Ghost. These are Ghost Downswings." }
+        { "texts": { "education": "Something we observed in real time that later disappears with new data is called a Ghost. These are Ghost Downswings." } }
       ]
     },
     {
@@ -174,47 +174,47 @@
       "remove": ["Upswing", "Downswing", "ghostSwings"],
       "view": [45, 75],
       "cues": [
-        { "text": "But the data that Ghosts hide can be useful. Zooming in, we can see the Sawtooth pattern at a higher resolution" }
+        { "texts": { "education": "But the data that Ghosts hide can be useful. Zooming in, we can see the Sawtooth pattern at a higher resolution" } }
       ]
     },
     {
       "add": ["BullishBreakOfStructure", "bosLevelUp", "BearishBreakOfStructure", "bosLevelDown"],
       "remove": ["HigherHigh", "LowerLow", "LowerHigh", "HigherLow"],
       "cues": [
-        { "text": "revealing the BoS at this resolution too" }
+        { "texts": { "education": "revealing the BoS at this resolution too" } }
       ]
     },
     {
       "add": ["Downswing", "Upswing"],
       "remove": ["BullishBreakOfStructure", "bosLevelUp", "BearishBreakOfStructure", "bosLevelDown"],
       "cues": [
-        { "text": "and Swings within Swings." },
-        { "text": "The Ghost Downswings are still here, inside the longer-term Upswing." }
+        { "texts": { "education": "and Swings within Swings." } },
+        { "texts": { "education": "The Ghost Downswings are still here, inside the longer-term Upswing." } }
       ]
     },
     {
       "remove": ["sawtooth"],
       "view": [0, 75],
       "cues": [
-        { "text": "These are 2nd order Swings, and they are common." },
-        { "at": 6, "on": "close", "place": "above", "text": "2nd order Swing", "hold": 1, "voice": false },
-        { "at": 30, "on": "close", "place": "above", "text": "2nd order Swing", "hold": 1, "voice": false },
-        { "at": 57, "on": "close", "place": "above", "text": "2nd order Swing", "hold": 1, "voice": false }
+        { "texts": { "education": "These are 2nd order Swings, and they are common." } },
+        { "at": 6, "on": "close", "place": "above", "texts": { "education": "2nd order Swing" }, "hold": 1, "voice": false },
+        { "at": 30, "on": "close", "place": "above", "texts": { "education": "2nd order Swing" }, "hold": 1, "voice": false },
+        { "at": 57, "on": "close", "place": "above", "texts": { "education": "2nd order Swing" }, "hold": 1, "voice": false }
       ]
     },
     {
       "add": ["level3"],
       "view": [45, 63],
       "cues": [
-        { "text": "Or even 3rd order Swings within Swings within Swings." },
-        { "at": 50, "on": "close", "place": "above", "text": "3rd order Swing", "voice": false }
+        { "texts": { "education": "Or even 3rd order Swings within Swings within Swings." } },
+        { "at": 50, "on": "close", "place": "above", "texts": { "education": "3rd order Swing" }, "voice": false }
       ]
     },
     {
       "add": ["level4"],
       "view": [45, 55],
       "cues": [
-        { "text": "Or 4th order Swings. You get the picture." }
+        { "texts": { "education": "Or 4th order Swings. You get the picture." } }
       ]
     },
     {
@@ -224,53 +224,53 @@
       "until": 23,
       "view": [17, 25],
       "cues": [
-        { "text": "Now we will consider another observation that leads to a useful indicator." }
+        { "texts": { "education": "Now we will consider another observation that leads to a useful indicator." } }
       ]
     },
     {
       "add": ["Upswing"],
       "cues": [
-        { "text": "Consider this Upswing." }
+        { "texts": { "education": "Consider this Upswing." } }
       ]
     },
     {
       "add": ["HigherHigh", "HigherLow", "LowerLow"],
       "until": 24,
       "cues": [
-        { "text": "Recall that sometimes the low dips below the previous Swing Low." }
+        { "texts": { "education": "Recall that sometimes the low dips below the previous Swing Low." } }
       ]
     },
     {
       "add": ["msbLevelDown"],
       "cues": [
-        { "text": "We can note the position where the price closes below the prior Swing Low." }
+        { "texts": { "education": "We can note the position where the price closes below the prior Swing Low." } }
       ]
     },
     {
       "add": ["BearishMarketStructureBreak"],
       "cues": [
-        { "text": "Where this happens we call it a Market Structure Break (MSB). Sometimes it is called a Change of Character." }
+        { "texts": { "education": "Where this happens we call it a Market Structure Break (MSB). Sometimes it is called a Change of Character." } }
       ]
     },
     {
       "add": ["sawtooth"],
       "cues": [
-        { "text": "Like the BoS, it may coincide with a turning point on the Sawtooth." }
+        { "texts": { "education": "Like the BoS, it may coincide with a turning point on the Sawtooth." } }
       ]
     },
     {
       "until": 25,
       "cues": [
-        { "text": "Or not." },
-        { "text": "At this point we don't know if the price will continue down, or if a new Upswing will be Confirmed." },
-        { "text": "The MSB refers to the prior Swing Low, and so can be observed before a new Swing is Confirmed." }
+        { "texts": { "education": "Or not." } },
+        { "texts": { "education": "At this point we don't know if the price will continue down, or if a new Upswing will be Confirmed." } },
+        { "texts": { "education": "The MSB refers to the prior Swing Low, and so can be observed before a new Swing is Confirmed." } }
       ]
     },
     {
       "add": ["BullishBreakOfStructure"],
       "until": 27,
       "cues": [
-        { "text": "Here the price turns up from its Swing Low, forms a BoS and the new Upswing is Confirmed." }
+        { "texts": { "education": "Here the price turns up from its Swing Low, forms a BoS and the new Upswing is Confirmed." } }
       ]
     },
     {
@@ -279,7 +279,7 @@
       "fastForward": { "to": 71, "speed": 40, "draw": true },
       "view": [45, 75],
       "cues": [
-        { "text": "Let's move on to the Downswings we saw earlier." }
+        { "texts": { "education": "Let's move on to the Downswings we saw earlier." } }
       ]
     },
     {
@@ -288,22 +288,22 @@
       "until": 74,
       "speed": 5,
       "cues": [
-        { "text": "An MSB can also happen on an Upleg of a Sawtooth, where the price closes higher than the prior Swing High." }
+        { "texts": { "education": "An MSB can also happen on an Upleg of a Sawtooth, where the price closes higher than the prior Swing High." } }
       ]
     },
     {
       "add": ["ghostMsbs", "ghostSwings"],
       "until": 75,
       "cues": [
-        { "text": "As we return to the longer-term Upswing, we now see a Ghost MSB in addition to the Ghost Downswings we saw earlier." },
-        { "text": "The MSB referred to the Swing High of a Downswing that is now a Ghost." }
+        { "texts": { "education": "As we return to the longer-term Upswing, we now see a Ghost MSB in addition to the Ghost Downswings we saw earlier." } },
+        { "texts": { "education": "The MSB referred to the Swing High of a Downswing that is now a Ghost." } }
       ]
     },
     {
       "add": ["level2"],
       "remove": ["ghostMsbs", "ghostSwings"],
       "cues": [
-        { "text": "As with the Ghost Downswings, the Ghost MSB is still here when we increase the resolution, and may be useful in its own right." }
+        { "texts": { "education": "As with the Ghost Downswings, the Ghost MSB is still here when we increase the resolution, and may be useful in its own right." } }
       ]
     },
     {
@@ -312,9 +312,9 @@
       "fastForward": { "to": 320, "speed": 100, "draw": true },
       "view": [315, 324],
       "cues": [
-        { "text": "A BoS and an MSB are both a close beyond a level." },
-        { "text": "Let's find an Upswing that has both, an hour apart." },
-        { "text": "This will make it easier to see on the chart as we compare and review a BoS and an MSB." }
+        { "texts": { "education": "A BoS and an MSB are both a close beyond a level." } },
+        { "texts": { "education": "Let's find an Upswing that has both, an hour apart." } },
+        { "texts": { "education": "This will make it easier to see on the chart as we compare and review a BoS and an MSB." } }
       ]
     },
     {
@@ -322,21 +322,21 @@
       "until": 321,
       "speed": 10,
       "cues": [
-        { "at": 320, "text": "A BoS closes beyond the position its Swing begins at." }
+        { "at": 320, "texts": { "education": "A BoS closes beyond the position its Swing begins at." } }
       ]
     },
     {
       "until": 321,
       "cues": [
-        { "at": 321, "text": "An MSB closes beyond the Swing Low or Swing High of a Swing that is already Confirmed." }
+        { "at": 321, "texts": { "education": "An MSB closes beyond the Swing Low or Swing High of a Swing that is already Confirmed." } }
       ]
     },
     {
       "cues": [
-        { "text": "A BoS continues in the direction of its Swing; an MSB goes against it." },
-        { "text": "A BoS Confirms a Swing; an MSB Confirms nothing. It remains an observation." },
-        { "text": "Every Swing has exactly one BoS; a Swing has at most one MSB, and may have none." },
-        { "text": "Both may or may not coincide with a turning point on the Sawtooth, both exist at every resolution, and both can become Ghosts." }
+        { "texts": { "education": "A BoS continues in the direction of its Swing; an MSB goes against it." } },
+        { "texts": { "education": "A BoS Confirms a Swing; an MSB Confirms nothing. It remains an observation." } },
+        { "texts": { "education": "Every Swing has exactly one BoS; a Swing has at most one MSB, and may have none." } },
+        { "texts": { "education": "Both may or may not coincide with a turning point on the Sawtooth, both exist at every resolution, and both can become Ghosts." } }
       ]
     },
     {
@@ -345,22 +345,14 @@
       "rewind": { "to": 50, "speed": 100, "erase": true },
       "view": [38, 52],
       "cues": [
-        { "text": "So far each hour has been a single price: the close." }
+        { "texts": { "education": "So far each hour has been a single price: the close." } }
       ]
     },
     {
       "add": ["candles"],
       "cues": [
-        { "text": "A candle shows the whole hour." },
-        { "text": "The closes we have followed are still here, one on each candle." }
-      ]
-    },
-    {
-      "view": [44, 51],
-      "cues": [
-        { "text": "A candle has four prices. The open is the price at the start of the hour, and the close is the price at its end. The high and the low are the furthest the price went during the hour." },
-        { "text": "The body of the candle spans the open and the close. The thin lines above and below the body are wicks, and they reach to the high and the low." },
-        { "text": "A candle that closes above its open is green. A candle that closes below its open is red." }
+        { "texts": { "education": "A candle shows the whole hour." } },
+        { "texts": { "education": "The closes we have followed are still here, one on each candle." } }
       ]
     },
     {
@@ -374,14 +366,14 @@
       "view": [43, 77],
       "speed": 5,
       "cues": [
-        { "text": "Let's run on to the BoS of the longer-term Upswing we saw earlier." }
+        { "texts": { "education": "Let's run on to the BoS of the longer-term Upswing we saw earlier." } }
       ]
     },
     {
       "cues": [
-        { "text": "The Upswing begins at this HH, and its BoS is the first close above it.", "hold": 0 },
-        { "at": 45, "on": "close", "place": "above", "text": "HH", "hold": 3, "keep": "chapter", "voice": false },
-        { "at": 75, "on": "close", "place": "left", "text": "BoS", "hold": 3, "voice": false }
+        { "texts": { "education": "The Upswing begins at this HH, and its BoS is the first close above it." }, "hold": 0 },
+        { "at": 45, "on": "close", "place": "above", "texts": { "education": "HH" }, "hold": 3, "keep": "chapter", "voice": false },
+        { "at": 75, "on": "close", "place": "left", "texts": { "education": "BoS" }, "hold": 3, "voice": false }
       ]
     },
     {
@@ -389,16 +381,16 @@
       "remove": ["Upswing"],
       "view": [45, 64],
       "cues": [
-        { "text": "But the price went above that level before the BoS, more than once.", "hold": 0 },
-        { "at": 54, "on": "high", "place": "above", "text": "high above the level", "hold": 3, "voice": false },
-        { "at": 62, "on": "high", "place": "above", "text": "and again", "hold": 3, "voice": false },
-        { "text": "Each time, the hour closed back below the level." }
+        { "texts": { "education": "But the price went above that level before the BoS, more than once." }, "hold": 0 },
+        { "at": 54, "on": "high", "place": "above", "texts": { "education": "high above the level" }, "hold": 3, "voice": false },
+        { "at": 62, "on": "high", "place": "above", "texts": { "education": "and again" }, "hold": 3, "voice": false },
+        { "texts": { "education": "Each time, the hour closed back below the level." } }
       ]
     },
     {
       "view": [43, 77],
       "cues": [
-        { "text": "A wick beyond a level is not a BoS. A BoS needs a close beyond it." }
+        { "texts": { "education": "A wick beyond a level is not a BoS. A BoS needs a close beyond it." } }
       ]
     },
     {
@@ -408,19 +400,19 @@
       "view": [72, 83],
       "speed": 2,
       "cues": [
-        { "text": "The same holds for an MSB. Let's run on to the next Upswing and its MSB." }
+        { "texts": { "education": "The same holds for an MSB. Let's run on to the next Upswing and its MSB." } }
       ]
     },
     {
       "add": ["msbLevelDown", "BearishMarketStructureBreak"],
       "view": [76, 83],
       "cues": [
-        { "text": "An MSB is the first close below the Swing Low of the Upswing.", "hold": 0 },
-        { "at": 77, "on": "close", "place": "above", "text": "Swing Low", "hold": 3, "voice": false },
-        { "at": 81, "on": "close", "place": "right", "text": "MSB", "hold": 3, "voice": false },
-        { "text": "But the price went below that level before the MSB.", "hold": 0 },
-        { "at": 80, "on": "low", "place": "below", "text": "low below the level", "hold": 4, "voice": false },
-        { "text": "The hour closed back above the level. A wick beyond a level is not an MSB either." }
+        { "texts": { "education": "An MSB is the first close below the Swing Low of the Upswing." }, "hold": 0 },
+        { "at": 77, "on": "close", "place": "above", "texts": { "education": "Swing Low" }, "hold": 3, "voice": false },
+        { "at": 81, "on": "close", "place": "right", "texts": { "education": "MSB" }, "hold": 3, "voice": false },
+        { "texts": { "education": "But the price went below that level before the MSB." }, "hold": 0 },
+        { "at": 80, "on": "low", "place": "below", "texts": { "education": "low below the level" }, "hold": 4, "voice": false },
+        { "texts": { "education": "The hour closed back above the level. A wick beyond a level is not an MSB either." } }
       ]
     },
     {
@@ -431,9 +423,9 @@
       "view": [76, 92],
       "speed": 5,
       "cues": [
-        { "text": "Candles of one colour often come one after another." },
-        { "at": 84, "text": "Here six red candles follow each other, each hour closing lower than the last. These are Successive Red Candles." },
-        { "at": 90, "text": "And six green candles follow them, each hour closing higher: Successive Green Candles." }
+        { "texts": { "education": "Candles of one colour often come one after another." } },
+        { "at": 84, "texts": { "education": "Here six red candles follow each other, each hour closing lower than the last. These are Successive Red Candles." } },
+        { "at": 90, "texts": { "education": "And six green candles follow them, each hour closing higher: Successive Green Candles." } }
       ]
     },
     {
@@ -441,48 +433,48 @@
       "remove": ["SuccessiveRedCandles", "SuccessiveGreenCandles"],
       "view": [0, 92],
       "cues": [
-        { "text": "Candles of one colour can follow one another. So can Swings of one direction." },
-        { "text": "Every Swing on the chart is an Upswing: twelve of them, one after another." }
+        { "texts": { "education": "Candles of one colour can follow one another. So can Swings of one direction." } },
+        { "texts": { "education": "Every Swing on the chart is an Upswing: twelve of them, one after another." } }
       ]
     },
     {
       "add": ["Uptrend"],
       "cues": [
-        { "text": "Just as candles of one colour in a row are Successive Candles, two or more Upswings in a row are an Uptrend." },
-        { "text": "Two or more Downswings in a row are a Downtrend. Either is a Trend." },
-        { "text": "This is an Uptrend of twelve Upswings." },
-        { "text": "It begins where its first Upswing begins. From the BoS of its second Upswing there are two in a row.", "hold": 0 },
-        { "at": 16, "on": "close", "place": "above", "text": "second Upswing", "hold": 5, "voice": false },
-        { "text": "The band along the top of the chart marks the Uptrend, with a segment for each Upswing. Some segments are paler, and we will come to why." },
-        { "text": "Like Successive Candles, a Trend is a count of what has happened. It does not say what the price will do next." }
+        { "texts": { "education": "Just as candles of one colour in a row are Successive Candles, two or more Upswings in a row are an Uptrend." } },
+        { "texts": { "education": "Two or more Downswings in a row are a Downtrend. Either is a Trend." } },
+        { "texts": { "education": "This is an Uptrend of twelve Upswings." } },
+        { "texts": { "education": "It begins where its first Upswing begins. From the BoS of its second Upswing there are two in a row." }, "hold": 0 },
+        { "at": 16, "on": "close", "place": "above", "texts": { "education": "second Upswing" }, "hold": 5, "voice": false },
+        { "texts": { "education": "The band along the top of the chart marks the Uptrend, with a segment for each Upswing. Some segments are paler, and we will come to why." } },
+        { "texts": { "education": "Like Successive Candles, a Trend is a count of what has happened. It does not say what the price will do next." } }
       ]
     },
     {
       "chapter": "Strength",
       "add": ["BearishMarketStructureBreak"],
       "cues": [
-        { "text": "Four times in this Uptrend, the price has closed below the Swing Low of the latest Upswing: an MSB." },
-        { "text": "Let's look closely at the latest one." }
+        { "texts": { "education": "Four times in this Uptrend, the price has closed below the Swing Low of the latest Upswing: an MSB." } },
+        { "texts": { "education": "Let's look closely at the latest one." } }
       ]
     },
     {
       "add": ["BullishBreakOfStructure", "msbLevelDown", "LowerLow"],
       "view": [74, 92],
       "cues": [
-        { "text": "This Upswing is Confirmed by its BoS. Three hours later the price closes below its Swing Low: an MSB.", "hold": 0 },
-        { "at": 77, "on": "close", "place": "below", "text": "Swing Low", "hold": 3.5, "voice": false },
-        { "at": 81, "on": "close", "place": "above", "text": "MSB", "hold": 3.5, "voice": false },
-        { "text": "The price falls for three more hours. Then it turns at an LL, and this BoS Confirms the next Upswing.", "hold": 0 },
-        { "at": 89, "on": "close", "place": "left", "text": "BoS", "hold": 6.5, "voice": false },
-        { "text": "The MSB is inside the new Upswing. An Upswing with an MSB inside it is a Weak Upswing. An Upswing with none is a Strong Upswing." },
-        { "text": "A Weak Upswing always has an LL as its Swing Low, because the MSB took the price below the Swing Low before it." }
+        { "texts": { "education": "This Upswing is Confirmed by its BoS. Three hours later the price closes below its Swing Low: an MSB." }, "hold": 0 },
+        { "at": 77, "on": "close", "place": "below", "texts": { "education": "Swing Low" }, "hold": 3.5, "voice": false },
+        { "at": 81, "on": "close", "place": "above", "texts": { "education": "MSB" }, "hold": 3.5, "voice": false },
+        { "texts": { "education": "The price falls for three more hours. Then it turns at an LL, and this BoS Confirms the next Upswing." }, "hold": 0 },
+        { "at": 89, "on": "close", "place": "left", "texts": { "education": "BoS" }, "hold": 6.5, "voice": false },
+        { "texts": { "education": "The MSB is inside the new Upswing. An Upswing with an MSB inside it is a Weak Upswing. An Upswing with none is a Strong Upswing." } },
+        { "texts": { "education": "A Weak Upswing always has an LL as its Swing Low, because the MSB took the price below the Swing Low before it." } }
       ]
     },
     {
       "cues": [
-        { "text": "An Uptrend is a run of Upswings, and only a Confirmed Downswing can break the run." },
-        { "text": "The MSB did not Confirm a Downswing, so the run went on, from eleven Upswings to twelve. The twelfth is a Weak one." },
-        { "text": "After an MSB against a Trend, the next BoS decides. An Upswing's BoS continues the Uptrend with a Weak Upswing. A Downswing's BoS ends it." }
+        { "texts": { "education": "An Uptrend is a run of Upswings, and only a Confirmed Downswing can break the run." } },
+        { "texts": { "education": "The MSB did not Confirm a Downswing, so the run went on, from eleven Upswings to twelve. The twelfth is a Weak one." } },
+        { "texts": { "education": "After an MSB against a Trend, the next BoS decides. An Upswing's BoS continues the Uptrend with a Weak Upswing. A Downswing's BoS ends it." } }
       ]
     },
     {
@@ -490,30 +482,30 @@
       "remove": ["BullishBreakOfStructure", "msbLevelDown"],
       "view": [0, 92],
       "cues": [
-        { "text": "Four of the twelve Upswings are Weak: the fourth, seventh, tenth and twelfth. Each has an MSB inside it and an LL as its Swing Low." },
-        { "text": "On the band along the top, the Weak Upswings are the paler segments." },
-        { "text": "The Strength of a Trend is the share of its Swings that are Strong." }
+        { "texts": { "education": "Four of the twelve Upswings are Weak: the fourth, seventh, tenth and twelfth. Each has an MSB inside it and an LL as its Swing Low." } },
+        { "texts": { "education": "On the band along the top, the Weak Upswings are the paler segments." } },
+        { "texts": { "education": "The Strength of a Trend is the share of its Swings that are Strong." } }
       ]
     },
     {
       "add": ["trendArrows"],
       "cues": [
-        { "text": "Here that is eight of twelve. This is an Uptrend of twelve Upswings with a Strength of 66%." },
-        { "text": "The arrow runs from where the Uptrend begins to its latest BoS, and its box shows the count and the Strength." },
-        { "text": "An Uptrend with a Strength of 100% has no Weak Upswing: Higher Highs and Higher Lows throughout." }
+        { "texts": { "education": "Here that is eight of twelve. This is an Uptrend of twelve Upswings with a Strength of 66%." } },
+        { "texts": { "education": "The arrow runs from where the Uptrend begins to its latest BoS, and its box shows the count and the Strength." } },
+        { "texts": { "education": "An Uptrend with a Strength of 100% has no Weak Upswing: Higher Highs and Higher Lows throughout." } }
       ]
     },
     {
       "cues": [
-        { "text": "Strength does not say where the Weak Upswings fall. So we also count the Upswings since the last Weak one, starting with it." },
-        { "text": "This Uptrend has had stretches of three, three, three and two Upswings. The twelfth is Weak, so the latest stretch is one Upswing so far." },
-        { "text": "The same holds for Downswings: a Weak Downswing has an MSB inside it, and an HH as its Swing High." },
-        { "text": "Strong, Weak and Strength describe what has happened. They are not a forecast." }
+        { "texts": { "education": "Strength does not say where the Weak Upswings fall. So we also count the Upswings since the last Weak one, starting with it." } },
+        { "texts": { "education": "This Uptrend has had stretches of three, three, three and two Upswings. The twelfth is Weak, so the latest stretch is one Upswing so far." } },
+        { "texts": { "education": "The same holds for Downswings: a Weak Downswing has an MSB inside it, and an HH as its Swing High." } },
+        { "texts": { "education": "Strong, Weak and Strength describe what has happened. They are not a forecast." } }
       ]
     },
     {
       "cues": [
-        { "text": "Three of the four Weak Upswings were Confirmed within hours of the MSB inside them." }
+        { "texts": { "education": "Three of the four Weak Upswings were Confirmed within hours of the MSB inside them." } }
       ]
     },
     {
@@ -521,9 +513,9 @@
       "remove": ["HigherLow"],
       "view": [40, 77],
       "cues": [
-        { "text": "The tenth was different." },
-        { "text": "After its MSB the price fell for eighteen hours, and two Downswings were Confirmed on the way. They are the Ghost Downswings we saw earlier." },
-        { "text": "In real time, that did end the Uptrend. But it was not the MSB that ended it. It was the BoS of the first Downswing, sixteen hours later." }
+        { "texts": { "education": "The tenth was different." } },
+        { "texts": { "education": "After its MSB the price fell for eighteen hours, and two Downswings were Confirmed on the way. They are the Ghost Downswings we saw earlier." } },
+        { "texts": { "education": "In real time, that did end the Uptrend. But it was not the MSB that ended it. It was the BoS of the first Downswing, sixteen hours later." } }
       ]
     },
     {
@@ -534,19 +526,19 @@
       "view": [40, 77],
       "speed": 2,
       "cues": [
-        { "text": "Let's go back and watch it end in real time." }
+        { "texts": { "education": "Let's go back and watch it end in real time." } }
       ]
     },
     {
       "until": 62,
       "cues": [
-        { "at": 62, "text": "A Trend ends at the BoS of the first Swing in the opposite direction. Here a Downswing is Confirmed, and the Uptrend ends." }
+        { "at": 62, "texts": { "education": "A Trend ends at the BoS of the first Swing in the opposite direction. Here a Downswing is Confirmed, and the Uptrend ends." } }
       ]
     },
     {
       "until": 64,
       "cues": [
-        { "at": 64, "text": "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend." }
+        { "at": 64, "texts": { "education": "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend." } }
       ]
     },
     {
@@ -555,10 +547,10 @@
       "until": 75,
       "speed": 5,
       "cues": [
-        { "text": "We have seen what happens next." },
-        { "at": 75, "text": "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." },
-        { "text": "With the Downswings gone, the Uptrend carries on as if it had never ended. This BoS Confirms its tenth Upswing." },
-        { "text": "At this resolution every new HH does this. A Downtrend lasts only for as long as the price stays below the last HH." }
+        { "texts": { "education": "We have seen what happens next." } },
+        { "at": 75, "texts": { "education": "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." } },
+        { "texts": { "education": "With the Downswings gone, the Uptrend carries on as if it had never ended. This BoS Confirms its tenth Upswing." } },
+        { "texts": { "education": "At this resolution every new HH does this. A Downtrend lasts only for as long as the price stays below the last HH." } }
       ]
     },
     {
@@ -567,12 +559,12 @@
       "remove": ["ghostSwings", "ghostTrends"],
       "view": [45, 77],
       "cues": [
-        { "text": "As with the Ghost Downswings, the Ghost Downtrend is still here when we increase the resolution." },
-        { "text": "With two resolutions on the chart, each band carries a thin stripe in the colour of its resolution." },
-        { "text": "This 2nd order Downtrend has two Downswings, and it ends at the BoS of the first Upswing after them.", "hold": 0 },
-        { "at": 64, "on": "close", "place": "below", "text": "second Downswing", "hold": 3.5, "voice": false },
-        { "at": 68, "on": "close", "place": "above", "text": "Downtrend ends", "hold": 3.5, "voice": false },
-        { "text": "Two Upswings in a row then make a 2nd order Uptrend. Trends, like Swings, exist at every resolution." }
+        { "texts": { "education": "As with the Ghost Downswings, the Ghost Downtrend is still here when we increase the resolution." } },
+        { "texts": { "education": "With two resolutions on the chart, each band carries a thin stripe in the colour of its resolution." } },
+        { "texts": { "education": "This 2nd order Downtrend has two Downswings, and it ends at the BoS of the first Upswing after them." }, "hold": 0 },
+        { "at": 64, "on": "close", "place": "below", "texts": { "education": "second Downswing" }, "hold": 3.5, "voice": false },
+        { "at": 68, "on": "close", "place": "above", "texts": { "education": "Downtrend ends" }, "hold": 3.5, "voice": false },
+        { "texts": { "education": "Two Upswings in a row then make a 2nd order Uptrend. Trends, like Swings, exist at every resolution." } }
       ]
     },
     {
@@ -581,36 +573,36 @@
       "fastForward": { "to": 1103, "speed": 200, "draw": true },
       "view": [740, 1110],
       "cues": [
-        { "text": "Every Swing so far has played out over a few hours, and the orders inside it over fewer still." },
-        { "text": "A 1st order Upswing lasts until the price closes above the high it began at. In the first hours of the year that took an hour or two. It can take weeks." },
-        { "text": "Let's run on six weeks." }
+        { "texts": { "education": "Every Swing so far has played out over a few hours, and the orders inside it over fewer still." } },
+        { "texts": { "education": "A 1st order Upswing lasts until the price closes above the high it began at. In the first hours of the year that took an hour or two. It can take weeks." } },
+        { "texts": { "education": "Let's run on six weeks." } }
       ]
     },
     {
       "cues": [
-        { "text": "It is now the 15th of February. This 1st order Upswing began on the 2nd, at 24195.", "hold": 0 },
-        { "at": 768, "on": "close", "place": "above", "text": "2 February", "hold": 3.5, "voice": false },
-        { "text": "The price fell for eleven days, to a Swing Low of 21474.", "hold": 0 },
-        { "at": 1049, "on": "close", "place": "below", "text": "Swing Low", "hold": 3.5, "voice": false },
-        { "text": "Two days later it closed above 24195: a BoS, two weeks after the Upswing began.", "hold": 0 },
-        { "at": 1103, "on": "close", "place": "above", "text": "BoS", "hold": 3.5, "voice": false },
-        { "text": "Nothing new has been defined. A high, a Swing Low, a close above the high: the same Upswing as the ones that took an hour or two." }
+        { "texts": { "education": "It is now the 15th of February. This 1st order Upswing began on the 2nd, at 24195." }, "hold": 0 },
+        { "at": 768, "on": "close", "place": "above", "texts": { "education": "2 February" }, "hold": 3.5, "voice": false },
+        { "texts": { "education": "The price fell for eleven days, to a Swing Low of 21474." }, "hold": 0 },
+        { "at": 1049, "on": "close", "place": "below", "texts": { "education": "Swing Low" }, "hold": 3.5, "voice": false },
+        { "texts": { "education": "Two days later it closed above 24195: a BoS, two weeks after the Upswing began." }, "hold": 0 },
+        { "at": 1103, "on": "close", "place": "above", "texts": { "education": "BoS" }, "hold": 3.5, "voice": false },
+        { "texts": { "education": "Nothing new has been defined. A high, a Swing Low, a close above the high: the same Upswing as the ones that took an hour or two." } }
       ]
     },
     {
       "add": ["level2", "Uptrend", "Downtrend", "trendArrows"],
       "cues": [
-        { "text": "Inside it, the 2nd order shows the shapes we saw in the first hundred hours, only larger: a Downtrend of twenty Downswings on the way down, and an Uptrend of ten Upswings on the way back up." },
-        { "text": "In real time those twenty Downswings were 1st order, and their Downtrend with them. The close above 24195 made them Ghosts, and here they are at the 2nd order." },
-        { "text": "The 1st order Uptrend that began on the 1st of January is still running. This two-week Upswing is its forty-third, and a Weak one: on the way down the price closed below the Swing Low before it." }
+        { "texts": { "education": "Inside it, the 2nd order shows the shapes we saw in the first hundred hours, only larger: a Downtrend of twenty Downswings on the way down, and an Uptrend of ten Upswings on the way back up." } },
+        { "texts": { "education": "In real time those twenty Downswings were 1st order, and their Downtrend with them. The close above 24195 made them Ghosts, and here they are at the 2nd order." } },
+        { "texts": { "education": "The 1st order Uptrend that began on the 1st of January is still running. This two-week Upswing is its forty-third, and a Weak one: on the way down the price closed below the Swing Low before it." } }
       ]
     },
     {
       "cues": [
-        { "text": "The orders are counted from the first close the Sawtooth is given. Start the history somewhere else, and the same weeks divide into different Swings, of different orders." },
-        { "text": "So an order has no timescale of its own. With a few hours of history a 1st order Swing lasts an hour or two; with six weeks, a fortnight. Later in this data, with a year and a half behind it, one 1st order Downswing lasts two months." },
-        { "text": "Swings within Swings over a couple of hours are hard to act on. A Swing that plays out over weeks is not." },
-        { "text": "Which order to work at, and from how much history, is a choice. Choices are strategy, which comes later." }
+        { "texts": { "education": "The orders are counted from the first close the Sawtooth is given. Start the history somewhere else, and the same weeks divide into different Swings, of different orders." } },
+        { "texts": { "education": "So an order has no timescale of its own. With a few hours of history a 1st order Swing lasts an hour or two; with six weeks, a fortnight. Later in this data, with a year and a half behind it, one 1st order Downswing lasts two months." } },
+        { "texts": { "education": "Swings within Swings over a couple of hours are hard to act on. A Swing that plays out over weeks is not." } },
+        { "texts": { "education": "Which order to work at, and from how much history, is a choice. Choices are strategy, which comes later." } }
       ]
     },
     {
@@ -621,10 +613,10 @@
       "view": [20, 110],
       "speed": 20,
       "cues": [
-        { "text": "This chapter leaves 2023 for November 2021, where the training drew its own example of a Range. The training's chart had four hours to a candle, so this scene does too, with the Sawtooth starting at the all-time high of the 10th." },
-        { "text": "The price falls for a week, in 1st order Downswings." },
-        { "at": 40, "on": "close", "place": "above", "text": "HH and MSB: 60761", "hold": 3.5, "voice": false },
-        { "text": "The rise of the 17th makes an HH, and closes above the Swing High before it: a Bullish MSB." }
+        { "texts": { "education": "This chapter leaves 2023 for November 2021, where the training drew its own example of a Range. The training's chart had four hours to a candle, so this scene does too, with the Sawtooth starting at the all-time high of the 10th." } },
+        { "texts": { "education": "The price falls for a week, in 1st order Downswings." } },
+        { "at": 40, "on": "close", "place": "above", "texts": { "education": "HH and MSB: 60761" }, "hold": 3.5, "voice": false },
+        { "texts": { "education": "The rise of the 17th makes an HH, and closes above the Swing High before it: a Bullish MSB." } }
       ]
     },
     {
@@ -632,10 +624,10 @@
       "remove": ["HigherHigh", "BullishMarketStructureBreak"],
       "until": 50,
       "cues": [
-        { "at": 47, "on": "close", "place": "below", "text": "BoS", "hold": 3.5, "voice": false },
-        { "text": "The fall resumes. On the 18th the close below the low before that rise is the BoS that Confirms the Downswing, and the HH is its Swing High." },
-        { "at": 50, "on": "close", "place": "below", "text": "LL: 55927", "hold": 3.5, "voice": false },
-        { "text": "The fall ends at an LL on the 19th, and a new Downswing starts here. The rise from it is a Retracement of the fall from the Swing High." }
+        { "at": 47, "on": "close", "place": "below", "texts": { "education": "BoS" }, "hold": 3.5, "voice": false },
+        { "texts": { "education": "The fall resumes. On the 18th the close below the low before that rise is the BoS that Confirms the Downswing, and the HH is its Swing High." } },
+        { "at": 50, "on": "close", "place": "below", "texts": { "education": "LL: 55927" }, "hold": 3.5, "voice": false },
+        { "texts": { "education": "The fall ends at an LL on the 19th, and a new Downswing starts here. The rise from it is a Retracement of the fall from the Swing High." } }
       ]
     },
     {
@@ -645,8 +637,8 @@
       "until": 61,
       "speed": 5,
       "cues": [
-        { "at": 61, "on": "close", "place": "above", "text": "79% back", "hold": 4, "voice": false },
-        { "text": "On Saturday the 20th at 20:00 the Retracement has come 79% of the way back: past the setting of 75%, and short of the Swing High. It is marked where it first passed the setting." }
+        { "at": 61, "on": "close", "place": "above", "texts": { "education": "79% back" }, "hold": 4, "voice": false },
+        { "texts": { "education": "On Saturday the 20th at 20:00 the Retracement has come 79% of the way back: past the setting of 75%, and short of the Swing High. It is marked where it first passed the setting." } }
       ]
     },
     {
@@ -656,9 +648,9 @@
       "view": [45, 100],
       "speed": 5,
       "cues": [
-        { "text": "One order finer, the Retracement is a run of Upswings. The dotted line is the Swing Low of the latest one: the level an MSB would close below." },
-        { "at": 68, "on": "close", "place": "below", "text": "MSB", "hold": 4, "voice": false },
-        { "text": "On the 22nd the price closes below that line: a Bearish MSB. A deep Retracement whose own structure has broken is a Range: the box from the LL to the highest close of the Retracement, with the dashed lines its bands, 20% of its height either side." }
+        { "texts": { "education": "One order finer, the Retracement is a run of Upswings. The dotted line is the Swing Low of the latest one: the level an MSB would close below." } },
+        { "at": 68, "on": "close", "place": "below", "texts": { "education": "MSB" }, "hold": 4, "voice": false },
+        { "texts": { "education": "On the 22nd the price closes below that line: a Bearish MSB. A deep Retracement whose own structure has broken is a Range: the box from the LL to the highest close of the Retracement, with the dashed lines its bands, 20% of its height either side." } }
       ]
     },
     {
@@ -668,26 +660,26 @@
       "view": [45, 100],
       "speed": 10,
       "cues": [
-        { "text": "The training divides a Range into a buy-low zone, from the lower band to 25% up, and a sell-high zone, from 75% up to the upper band. With candles on, the wicks show where the price reached into them." },
-        { "text": "The Range holds while the price closes inside the bands." },
-        { "at": 94, "on": "close", "place": "below", "text": "Range ends: 53751", "hold": 4, "voice": false },
-        { "text": "On the 26th the close at 53751 is below the lower band, and the Range ends. The same close is the Downswing's BoS." }
+        { "texts": { "education": "The training divides a Range into a buy-low zone, from the lower band to 25% up, and a sell-high zone, from 75% up to the upper band. With candles on, the wicks show where the price reached into them." } },
+        { "texts": { "education": "The Range holds while the price closes inside the bands." } },
+        { "at": 94, "on": "close", "place": "below", "texts": { "education": "Range ends: 53751" }, "hold": 4, "voice": false },
+        { "texts": { "education": "On the 26th the close at 53751 is below the lower band, and the Range ends. The same close is the Downswing's BoS." } }
       ]
     },
     {
       "cues": [
-        { "text": "Traded as the training trades a Range, buying in the buy-low zone and selling in the sell-high zone with the stop at the band, this Range gave three trades.", "hold": 0 },
-        { "at": 69, "on": 56885, "to": { "at": 71, "on": 58802 }, "color": "up", "text": "1: +1917", "hold": 3, "keep": "chapter", "voice": false },
-        { "at": 71, "on": 56885, "to": { "at": 89, "on": 58802 }, "color": "up", "text": "2: +1917", "hold": 3, "keep": "chapter", "voice": false },
-        { "at": 93, "on": 56885, "to": { "at": 94, "on": 55160 }, "color": "down", "text": "3: -1725", "hold": 3, "keep": "chapter", "voice": false },
-        { "text": "Two reached the sell-high zone. The third was stopped by the candle that ended the Range." },
-        { "text": "That is a strategy, and strategies come later." }
+        { "texts": { "education": "Traded as the training trades a Range, buying in the buy-low zone and selling in the sell-high zone with the stop at the band, this Range gave three trades." }, "hold": 0 },
+        { "at": 69, "on": 56885, "to": { "at": 71, "on": 58802 }, "color": "up", "texts": { "education": "1: +1917" }, "hold": 3, "keep": "chapter", "voice": false },
+        { "at": 71, "on": 56885, "to": { "at": 89, "on": 58802 }, "color": "up", "texts": { "education": "2: +1917" }, "hold": 3, "keep": "chapter", "voice": false },
+        { "at": 93, "on": 56885, "to": { "at": 94, "on": 55160 }, "color": "down", "texts": { "education": "3: -1725" }, "hold": 3, "keep": "chapter", "voice": false },
+        { "texts": { "education": "Two reached the sell-high zone. The third was stopped by the candle that ended the Range." } },
+        { "texts": { "education": "That is a strategy, and strategies come later." } }
       ]
     },
     {
       "cues": [
-        { "text": "On hourly candles the same week reads differently. Between the Swing High and the LL the price made three Lower Lows, each a Downswing with a Swing High of its own, so the tools measured the Retracement against the last of those Swing Highs, and read it as a Bullish MSB. Same rules; the candle size changes what they see." },
-        { "text": "Which candle size to read a Range at is a choice. Choices are strategy." }
+        { "texts": { "education": "On hourly candles the same week reads differently. Between the Swing High and the LL the price made three Lower Lows, each a Downswing with a Swing High of its own, so the tools measured the Retracement against the last of those Swing Highs, and read it as a Bullish MSB. Same rules; the candle size changes what they see." } },
+        { "texts": { "education": "Which candle size to read a Range at is a choice. Choices are strategy." } }
       ]
     }
   ]

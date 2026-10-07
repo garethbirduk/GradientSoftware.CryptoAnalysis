@@ -23,10 +23,12 @@ export async function readTour(url = arg('url', 'http://localhost:5178')) {
   return JSON.parse(readFileSync(tourPath, 'utf8'));
 }
 
-// The texts that are read aloud: a text marked "voice": false is shown but not read.
+// The texts that are read aloud: every level of detail a cue is written at, so the page has a clip whichever it shows. A
+// text marked "voice": false is shown but not read.
 export function tourTexts(tour) {
   const texts = new Map();
-  for (const section of tour.sections ?? []) for (const cue of section.cues ?? []) if (cue.text && cue.voice !== false) texts.set(textKey(cue.text), cue.text);
+  for (const section of tour.sections ?? []) for (const cue of section.cues ?? []) if (cue.voice !== false)
+    for (const text of Object.values(cue.texts ?? {})) if (text) texts.set(textKey(text), text);
   return texts;
 }
 

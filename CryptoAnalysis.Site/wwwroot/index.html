@@ -208,12 +208,21 @@
   .tour-controls button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--bg); }
   .tour-controls .edit { margin-left: auto; }
   .tour-warning { color: var(--warn); font-size: 13px; }
-  .analysis { margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
-  .analysis .tour-caption { min-height: 2.9em; max-width: 80ch; margin-top: 4px; }
-  .analysis .tour-caption.warn { color: var(--warn); font-size: 14px; }
-  .analysis-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--muted); }
-  .analysis-steps a { padding: 1px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); text-decoration: none; white-space: nowrap; }
-  .analysis-steps a:hover { border-color: var(--accent); color: var(--accent); }
+  .player { margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
+  .player .tour-caption { min-height: 2.9em; max-width: 80ch; margin-top: 4px; }
+  .player-scrub { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .player-scrub input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+  .player-scrub input[type=range]:disabled { opacity: .4; }
+  .player-scrub label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: var(--text); }
+  .analysis-things { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .analysis-things label, .candle-card .things label { display: inline-flex; align-items: center; gap: 4px; color: var(--text); white-space: nowrap; cursor: pointer; }
+  .analysis-things label.off, .candle-card .things label.off { color: var(--muted); }
+  .analysis-things .write { display: inline-flex; gap: 6px; }
+  .analysis-things button, .candle-card .analyse button { padding: 3px 10px; font: inherit; font-weight: 600; color: var(--accent); background: var(--panel); border: 1px solid var(--accent); border-radius: 5px; cursor: pointer; }
+  .analysis-things button:hover, .candle-card .analyse button:hover { background: var(--chip); }
+  .analysis-things button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+  .candle-card .analyse button:disabled { opacity: .45; cursor: default; }
+  .analysis-things .warn { color: var(--warn); }
   #similar { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
   #similar::backdrop { background: rgba(0, 0, 0, .35); }
   #similar h4 { margin: 0 0 4px; font-size: 15px; }
@@ -293,6 +302,7 @@
   .candle-card a { padding: 3px 10px; border: 1px solid var(--accent); border-radius: 5px; color: var(--accent); font-weight: 600; text-decoration: none; }
   .candle-card a:hover { background: var(--chip); }
   .candle-card .hint { font-size: 11px; }
+  .candle-card .things { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; max-height: 280px; overflow-y: auto; font-size: 13px; }
   .ed-chip { padding: 0 7px; border-radius: 999px; background: var(--chip); color: var(--text); }
   .ed-chip.added { box-shadow: inset 0 0 0 1px var(--accent); }
   .ed-chip.removed { text-decoration: line-through; opacity: .6; }
@@ -300,6 +310,7 @@
   .ed-cue { margin-top: 10px; padding-left: 8px; border-left: 3px solid var(--border); }
   .ed-cue.shown { border-left-color: var(--muted); }
   .ed-cue.active { border-left-color: var(--accent); }
+  .ed-level { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
   .ed-cue > .ed-meta { margin-bottom: 2px; white-space: normal; }
   .ed-row { display: none; grid-template-columns: 1.15fr 1fr 1fr; align-items: end; gap: 5px 8px; margin-top: 5px; }
   .ed-cue:focus-within .ed-row { display: grid; }
@@ -419,19 +430,18 @@ const state = Object.assign({ pages: {} }, load());
 // Ghosts was one layer before it was a section: a page remembered with it on has every kind of ghost on.
 for (const [page, layers] of Object.entries(state.pages)) if (layers.includes('ghosts')) state.pages[page] = layers.flatMap(id => id === 'ghosts' ? GHOST_IDS : [id]);
 let currentPage = null;
-// The tour sets its own layers section by section, and it is always replaying. Layers set by hand there are not remembered:
-// they go into the section being edited when the tour's editor is open, and last until the next section otherwise.
+// The player (see Tour) sets its own layers section by section, on the Tour page and the Analysis page alike, and it is
+// always replaying. Layers set by hand there are not remembered: on the Tour page they go into the section being edited
+// when the editor is open, and otherwise they last until the next section.
 let tourLayers = ['replay'];
-// An analysis playing on the Analysis page (see startAnalysis) adds the layers it needs to the page's own. Layers set
-// while it is open are its own, and the Replay page's are never touched.
-let analysis = null;
+// The page the player is on now has it; the other's is kept, to come back to.
+const playerHere = page => (page === 'Tour' || page === 'Analysis') && tour?.page === page;
 // Hides the Replay page's candle card (set where the card is made).
 let closeCandleCard = () => {};
-const layersOf = page => page === 'Tour' ? tourLayers : page === 'Analysis' && analysis?.layers ? analysis.layers : state.pages[page] ?? defaultsFor(page);
+const layersOf = page => playerHere(page) ? tourLayers : state.pages[page] ?? defaultsFor(page);
 const on = id => layersOf(currentPage).includes(id);
 const setLayers = layers => {
-  if (currentPage === 'Tour') { tourLayers = [...new Set(['replay', ...layers])]; recordTourLayers(); return; }
-  if (currentPage === 'Analysis' && analysis?.layers) { analysis.layers = layers; return; }
+  if (playerHere(currentPage)) { tourLayers = [...new Set(['replay', ...layers])]; if (currentPage === 'Tour') recordTourLayers(); return; }
   state.pages[currentPage] = layers; save(state);
 };
 
@@ -1012,18 +1022,28 @@ function chartRow(ex) {
   return `<div class="chart" data-id="${esc(ex.id)}"></div>`;
 }
 
+// The finest level the section on show draws, which its own Swings are at.
+const revealLevel = () => Math.max(-Infinity, ...(tour?.sections[tour.index]?.layers ?? []).filter(id => /^level\d+$/.test(id)).map(id => Number(id.slice(5))));
+
+// A Trend as it stood at a time: only its Swings whose BoS has come, with its count and Strength from those. Strength is
+// the share of them that are Strong, rounded down, as CryptoAnalysis works it out.
+function trendSoFar(tr, time) {
+  const parts = (tr.parts ?? []).filter(p => p.breakOfStructure.time <= time);
+  if (parts.length === (tr.parts ?? []).length) return tr;
+  const strong = parts.filter(p => p.strong).length;
+  return { ...tr, parts, swings: parts.length, strong, strength: parts.length ? Math.floor(strong * 100 / parts.length) : 0 };
+}
+
 // The structure as known at candle t: the timeline entries that hold there, shaped like the hindsight data so draw() can use it.
-// While an analysis plays, the structure is the one its texts are written from (as known at analysis.known), drawn a part
-// at a time: each part once the cursor has reached its candle, so the sawtooth, points and Swings come as the run goes.
+// While a tour that has a known candle plays, as an analysis does, the structure is the one its texts are written from (as
+// known there), drawn a part at a time: each part once the cursor has reached its candle, so the sawtooth, points and Swings
+// come as the run goes.
 function liveView(ex, t) {
-  const told = analysis?.cues && analysis.ex.id === ex.id && analysis.known != null && t <= analysis.known && timelineAt(ex, analysis.known) ? analysis.known : null;
+  const told = tour?.ex === ex && tour.known != null && t <= tour.known && timelineAt(ex, tour.known) ? tour.known : null;
   const reveal = told != null, r = timelineAt(ex, told ?? t), holds = holdsAt(told ?? t), time = ex.prices.t[t];
   // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
-  // An analysis keeps the window of history before its own start, however far it runs, so that is there to pan back to.
-  // It also keeps the candles from the start of the Swing a level coarser that its own begins inside.
-  const mine = analysis?.cues && analysis.ex.id === ex.id ? analysis : null, since = mine ? Math.min(t, mine.from) : t;
   const window = ex.tour ? tourWindow(ex, t)
-    : isRemote(ex) ? { from: Math.max(0, Math.min(since - replayWindow(), mine?.context ?? Infinity)), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
+    : isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
   const cut = a => a.slice(window?.from ?? 0, t + 1);
   const prices = { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) };
   if (!r) {
@@ -1051,11 +1071,13 @@ function liveView(ex, t) {
     ...ex, hindsight: ex, cursor: t, window, timeline: reveal ? timelineAt(ex, t) ?? r : r,
     prices,
     sawtooth,
-    // A Swing comes at its BoS; one of a coarser level than the analysis's own, which holds it, as soon as it has begun.
-    swingsByLevel: byLevel(r.swings, v => v).map((list, level) => reached(list, w => (level < Number(analysis?.params.level) ? w.start : w.breakOfStructure ?? w.end ?? w.start).time).sort((a, b) => a.start.time.localeCompare(b.start.time))),
+    // A Swing comes at its BoS; one of a coarser level than the section's own, which holds it, as soon as it has begun.
+    swingsByLevel: byLevel(r.swings, v => v).map((list, level) => reached(list, w => (level < revealLevel() ? w.start : w.breakOfStructure ?? w.end ?? w.start).time).sort((a, b) => a.start.time.localeCompare(b.start.time))),
     pointsByLevel: byLevel(r.points, v => v).map(list => reached(list, p => p.time).sort((a, b) => a.time.localeCompare(b.time))),
     marketStructureBreaksByLevel: byLevel(r.marketStructureBreaks, v => v.break).map(list => reached(list, m => m.break.time)),
-    trendsByLevel: byLevel(r.trends, v => v).map(list => reached(list, tr => tr.confirmed.time).map(open)),
+    // A Trend grows as its Swings are reached: the count, Strength and arrow are of the Swings whose BoS the cursor has
+    // passed, so it reads two, then three, and so on, rather than what it had by the analysis's cursor.
+    trendsByLevel: byLevel(r.trends, v => v).map(list => reached(list, tr => tr.confirmed.time).map(open).map(tr => reveal ? trendSoFar(tr, time) : tr)),
     candidatesByLevel: reveal ? [] : byLevel(r.candidates, v => v),
     retracementsByLevel: byLevel(r.retracements ?? [], v => v).map(list => reveal
       ? list.map(v => ({ ...v, steps: v.steps.filter(s => s.point.time <= time) })).filter(v => v.to.time <= time && v.steps.length) : list),
@@ -1335,7 +1357,8 @@ function go(action) {
   const ex = activeExample();
   if (!hasReplay(ex)) return;
   const i = cursorOf(ex), time = Date.parse(ex.prices.t[i]);
-  pauseAnalysis();
+  // The replay's controls, back once an analysis has ended, take the cursor from the player.
+  if (playerHere(currentPage)) pauseTour();
   if (action !== 'play') stopPlaying();
   switch (action) {
     case 'start': return moveTo(ex, 0);
@@ -1455,15 +1478,13 @@ function updateReplayControls() {
 document.addEventListener('keydown', e => {
   const inside = selector => e.target instanceof Element && e.target.closest(selector);
   if (!on('replay') || e.ctrlKey || e.metaKey || e.altKey || inside('input, select, textarea, .menu, dialog')) return;
-  if (currentPage === 'Tour') {
+  // The player has the keys on the Tour page, and on the Analysis page until the analysis has ended, when the replay's
+  // come back; Space plays it there either way.
+  if (currentPage === 'Tour' || analysisRuns() || (playerHere(currentPage) && e.key === ' ' && !inside('button, li'))) {
     const step = { ArrowLeft: 'prev', ArrowRight: 'next', Home: 'first', End: 'last' }[e.key] ?? (e.key === ' ' && !inside('button') ? 'play' : null);
     if (step) { e.preventDefault(); tourGo(step); }
     return;
   }
-  // With an analysis open, Space plays and pauses it.
-  if (e.key === ' ' && analysis?.cues && currentPage === 'Analysis' && !inside('button, li')) { e.preventDefault(); return analysis.playing ? pauseAnalysis() : playAnalysis(); }
-  // Until it has ended the analysis has the cursor, as a tour does: the replay's keys wait, as its controls do.
-  if (analysisRuns()) return;
   const actions = { ArrowLeft: e.shiftKey ? '-day' : '-hour', ArrowRight: e.shiftKey ? '+day' : '+hour', Home: 'start', End: 'end', ',': '-event', '.': '+event' };
   const action = actions[e.key] ?? (e.key === ' ' && !inside('button, li') ? 'play' : null);
   if (!action) return;
@@ -1706,9 +1727,10 @@ function draw(el, ex, focus) {
     };
   };
 
-  // Every level shown draws its own swings; finer levels are drawn lighter, over the coarser ones.
-  const levelsShown = swingLevels(ex);
-  for (const [depth, level] of levelsShown.entries())
+  // Every level shown draws its own swings; finer levels are drawn lighter, and under the coarser ones, so a coarser swing's
+  // border shows where a finer one shares its edges.
+  const levelsShown = [...swingLevels(ex)].sort((a, b) => a - b);
+  for (const [depth, level] of [...levelsShown.entries()].reverse())
     for (const w of (ex.swingsByLevel?.[level] ?? []).filter(w => w.confirmed && on(SWINGS[w.direction].layer))) traces.push(swingBox(w, depth || false));
   const allSwings = shownSwings(ex);
 
@@ -2099,7 +2121,6 @@ async function checkLocalServer() {
 async function renderReplayPage() {
   const main = document.getElementById('main');
   selected.clear();
-  closeAnalysis();
   currentPage = 'Replay';
   const head = `<section class="term-head"><h2>Replay</h2>
     <p>Step through a whole dataset as it was known at each candle. The sawtooth, points, swings, breaks and trends come only from
@@ -2126,64 +2147,80 @@ async function renderReplayPage() {
     </div>
     <article class="example replay-big" id="ex-${esc(ex.id)}">
       <header><h3>${esc(info.name)}</h3><span class="id">${info.candles.toLocaleString()} candles · ${esc(fmtTime(info.first))} to ${esc(fmtTime(info.last))} UTC · anchored at the first candle</span></header>
-      ${analysisBar()}
       ${chartRow(ex)}
     </article>`);
-  wireAnalysisBar(main);
   main.querySelector('[data-dataset]').addEventListener('change', e => { state.replayDataset = e.target.value; save(state); stopPlaying(); renderReplayPage(); });
   main.querySelector('[data-window]').addEventListener('change', e => { state.replayWindow = Number(e.target.value); save(state); redrawExample(ex); });
 }
 
-// A click on a candle of the Replay page opens a card beside it with the candle's prices and Analyse, which plays a tour
-// written around that candle on the chart itself (see startAnalysis). A drag still pans; a click elsewhere closes the card.
-// A replay or an analysis that is playing stops for it, as the candle would move away from under the card.
+// A click on a candle of the Replay page opens a card beside it with the candle's prices and a checklist of what is at
+// that candle as the chart had it at the cursor (see Explain.At in CryptoAnalysis.Site): the Candle, the run it is in, and
+// at each level the high or low it is, the Swing and the Trend it is in. What the chart shows is ticked to begin with: a
+// thing whose layers and level are on. Analyse opens an analysis of what is ticked, a chapter each, telling what each one
+// is; Explain opens the same, telling also what a thing of each kind is and how it works. A drag still pans; a click
+// elsewhere closes the card. A replay or an analysis that is playing stops for it, as the candle would move away from under
+// the card.
+const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ? on('SuccessiveGreenCandles') || on('SuccessiveRedCandles')
+  : on(`level${t.level}`) && (t.kind === 'Point' ? POINT_LAYERS.some(on) : t.kind === 'Swing' ? on('Upswing') || on('Downswing') : on('Uptrend') || on('Downtrend')));
+// The buttons that write an analysis: Analyse at Summary, Explain at Education.
+const ANALYSE_BUTTONS = [['summary', 'Analyse', 'Tell what each thing ticked is, a chapter each'],
+  ['education', 'Explain', 'Tell what each thing ticked is, a chapter each, and what a thing of its kind is and how it works']];
+const analyseButtons = (attr, current = null) => ANALYSE_BUTTONS.map(([detail, label, title]) =>
+  `<button type="button" ${attr}="${detail}" title="${esc(title)}"${current ? ` aria-pressed="${detail === current}"` : ''}>${label}</button>`).join('');
+const thingBox = (t, checked) => `<label class="thing${t.kind !== 'Candle' && t.kind !== 'SuccessiveCandles' && !on(`level${t.level}`) ? ' off' : ''}"><input type="checkbox" value="${esc(t.id)}" ${checked ? 'checked' : ''}>${esc(t.name)}</label>`;
 {
-  let down = null;
+  let down = null, asked = 0;
   const card = document.createElement('div');
   card.className = 'candle-card';
   card.hidden = true;
   document.body.append(card);
-  const close = () => { card.hidden = true; };
+  const close = () => { card.hidden = true; asked++; };
   window.addEventListener('pointerdown', e => {
     if (!card.hidden && !card.contains(e.target)) close();
     down = currentPage === 'Replay' && e.target.closest?.('.chart') ? [e.clientX, e.clientY] : null;
   }, true);
-  window.addEventListener('pointerup', e => {
+  window.addEventListener('pointerup', async e => {
     const chart = document.querySelector('#main .chart'), from = down;
     down = null;
     if (!from || !chart || currentPage !== 'Replay' || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 4) return;
     const ex = findExample(chart.dataset.id), i = ex && candleAt(chart, e), p = ex && (ex.hindsight ?? ex).prices;
     if (i == null || !p?.t[i] || i > cursorOf(ex)) return close();
     const time = p.t[i], up = p.c[i] > p.o[i], colour = p.c[i] === p.o[i] ? 'no body' : up ? 'green' : 'red';
-    const money = v => Math.floor(v).toLocaleString('en-US'), level = structureLevel(ex);
-    const cursor = cursorOf(ex), seen = p.t[cursor] ? { seen: p.t[cursor].slice(0, 16) } : {};
-    const link = explain => {
-      const params = { explain, dataset: ex.dataset, at: time.slice(0, 16), level, ...seen };
-      return `<a href="${esc(analysisLink({ ...params, levels }))}" target="_blank" data-analyse>${explain}</a>`;
-    };
-    // The levels that are on, finest first: where the finest has no Swing or Trend at the candle, the next is tried.
-    // The links have no tooltips: the browser leaves a tooltip on the screen when its link goes from under a still pointer,
-    // as it does when the link is clicked, so what they do is said in the card.
-    const levels = swingLevels(ex).sort((a, b) => b - a), which = levels.length > 1 ? `finest level on that has one (${levels.join(', ')})` : `level ${level}`;
+    const money = v => Math.floor(v).toLocaleString('en-US');
+    const cursor = cursorOf(ex), seen = p.t[cursor]?.slice(0, 16);
+    const base = { dataset: ex.dataset, at: time.slice(0, 16), ...(seen ? { seen } : {}) };
     card.innerHTML = `<b>${esc(fmtTime(time))} UTC</b><span>open ${money(p.o[i])} · close ${money(p.c[i])} · ${colour}</span><span>high ${money(p.h[i])} · low ${money(p.l[i])}</span>
-      <span class="analyse">Analyse ${link('Candle')}${link('Swing')}${link('Trend')}</span>
-      <span class="hint">Swing and Trend: ${esc(which)}</span>`;
+      <div class="things" data-things><span class="hint">Reading what is at this candle…</span></div>
+      <div class="analyse">${analyseButtons('data-analyse-go')}</div>`;
+    card.querySelectorAll('[data-analyse-go]').forEach(b => { b.disabled = true; });
     stopPlaying();
-    pauseAnalysis();
     card.hidden = false;
-    const w = card.offsetWidth, h = card.offsetHeight;
-    card.style.left = `${Math.min(e.clientX + 12, innerWidth - w - 8)}px`;
-    card.style.top = `${Math.min(e.clientY + 12, innerHeight - h - 8)}px`;
+    const place = () => {
+      const w = card.offsetWidth, h = card.offsetHeight;
+      card.style.left = `${Math.min(e.clientX + 12, innerWidth - w - 8)}px`;
+      card.style.top = `${Math.max(8, Math.min(e.clientY + 12, innerHeight - h - 8))}px`;
+    };
+    place();
+    const mine = ++asked;
+    const list = await fetch(`api/explain/at?${new URLSearchParams({ ...base, greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') })}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null).catch(() => null);
+    if (mine !== asked || card.hidden) return;
+    card.base = base;
+    card.querySelector('[data-things]').innerHTML = list?.length
+      ? list.map(t => thingBox(t, thingShown(t))).join('') + '<span class="hint">Ticked: what the chart shows. Greyed: at a level that is off.</span>'
+      : '<span class="hint">The local server could not say what is at this candle.</span>';
+    card.querySelectorAll('[data-analyse-go]').forEach(b => { b.disabled = !list?.length; });
+    place();
   }, true);
-  // Analyse opens the Analysis page in a browser tab of its own, which its Close closes: the page opens it itself, as a
-  // tab can only be closed from within when a page opened it.
+  // Analyse and Explain open the Analysis page in a browser tab of its own, which its Close closes: the page opens it
+  // itself, as a tab can only be closed from within when a page opened it.
   card.addEventListener('click', e => {
-    const a = e.target.closest('a[data-analyse]');
-    if (!a) return;
+    const b = e.target.closest('[data-analyse-go]');
+    if (!b || b.disabled) return;
+    const things = [...card.querySelectorAll('[data-things] input:checked')].map(x => x.value);
+    if (!things.length) return;
     close();
-    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
-    e.preventDefault();
-    window.open(a.href, '_blank');
+    window.open(`./${analysisHash({ ...card.base, things, detail: b.dataset.analyseGo })}`, '_blank');
   });
   // The card is beside a candle where that was on the screen, so it goes when the chart moves under it: the cursor moves,
   // the chart is zoomed or the page scrolled, a key is pressed or the window changes.
@@ -2196,405 +2233,223 @@ async function renderReplayPage() {
   }, { passive: true });
   document.addEventListener('keydown', e => { if (!['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key) && !card.contains(e.target)) close(); });
   window.addEventListener('wheel', e => { if (!card.hidden && !card.contains(e.target)) close(); }, { capture: true, passive: true });
-  window.addEventListener('scroll', close, { capture: true, passive: true });
+  window.addEventListener('scroll', e => { if (!card.contains(e.target)) close(); }, { capture: true, passive: true });
   window.addEventListener('resize', close);
   window.addEventListener('blur', close);
   window.addEventListener('hashchange', close);
 }
 
-// ---- Analysis in place -----------------------------------------------------------------------------------------------
-// Analyse on the Replay page plays a written tour (see Explain in CryptoAnalysis.Site) on the Replay chart itself: the
-// cursor goes to where the tour begins and runs on as the texts are read under the chart, with their pins on it. It is
-// the Replay page throughout, so the chart can be zoomed and panned, the layers changed and the cursor moved, which
-// pauses the analysis; closed, it leaves the cursor where it is and the layers as they were.
-function analysisBar() {
-  return `<div class="analysis" data-analysis hidden>
-    <div class="tour-caption" data-an="caption" aria-live="polite"></div>
-    <div class="tour-controls" role="group" aria-label="Analysis controls">
-      <button type="button" data-an-go="restart" title="Back to the start of the analysis" aria-label="Back to the start">⏮</button>
-      <button type="button" class="play" data-an-go="play" title="Play or pause the analysis (Space)">▶</button>
-      <button type="button" data-an-go="skip" title="Skip to the end of the analysis: every text taken as read, and the replay controls come back" aria-label="Skip to the end">⏭</button>
-      <span class="readout" data-an="title"></span>
-      <button type="button" data-an-go="voice" title="Read each text aloud">Voice</button>
-      <label class="pace" title="How fast the analysis plays: the candles, the wait after each text, and the voice by a tenth either way">Speed
-        <input type="range" min="0" max="${TOUR_PACES.length - 1}" step="1" data-an="pace"><span data-an="pace-name"></span></label>
-      <button type="button" data-an-go="similar" title="Find the other Trends like this one: the same level, direction, count of Swings and Strength, or any of those">Find similar</button>
-      <button type="button" class="edit" data-an-go="close" title="Close the analysis and its tab">Close</button>
+// ---- Player controls ------------------------------------------------------------------------------------------------
+// The Tour and Analysis pages play through the one player (see Tour below), with the same controls above the chart: the
+// text on show, Back and On a section at a time, Play, where the cursor is, Voice and Speed; then a slider through the
+// section on show and whether the next chapter plays on its own. The Tour page adds its glossary, video and editor; the
+// Analysis page Find similar, Close and its checklist.
+function playerPanel(page) {
+  const tourPage = page === 'Tour';
+  return `<div class="player" data-player>
+    <div class="tour-caption" data-tour="caption" aria-live="polite"></div>
+    <div class="tour-controls" role="group" aria-label="${tourPage ? 'Tour' : 'Analysis'} controls">
+      <button type="button" data-tour-go="prev" title="Back to the start of this section, or of the one before (←)" aria-label="Back a section">⏮</button>
+      <button type="button" class="play" data-tour-go="play" title="Play or pause (Space)">▶</button>
+      <button type="button" data-tour-go="next" title="On to the next section; from the last, to the end (→)" aria-label="On a section">⏭</button>
+      <span class="readout" data-tour="readout"></span>
+      <button type="button" data-tour-go="voice" title="Read each text aloud from its clip in tour-audio">Voice</button>
+      <label class="pace" title="How fast it plays: the candles, the wait after each text, and the voice">Speed
+        <input type="range" min="0" max="${TOUR_PACES.length - 1}" step="1" data-tour="pace"><span data-tour="pace-name"></span></label>
+      ${tourPage ? `<button type="button" data-tour-go="glossary" title="Show or hide the glossary: what the voice says in place of what is written, such as Break of Structure for BoS">Glossary</button>
+        <button type="button" data-tour-go="video" title="Make the video of the tour as saved in tour.json, to download: the texts are read aloud, then the tour is recorded with the clips, which takes as long as the tour">Generate video</button>
+        <a class="button" data-tour="download" href="api/video/file" download="tour.mp4" hidden>Download video</a>
+        <span data-tour="video" aria-live="polite"></span>
+        <button type="button" class="edit" data-tour-go="edit" title="Show or hide the editor">Editor</button>`
+      : `<button type="button" data-tour-go="similar" title="Find the other Trends like this one: the same level, direction, count of Swings and Strength, or any of those" hidden>Find similar</button>
+        <button type="button" class="edit" data-tour-go="close" title="Close the analysis and its tab">Close</button>`}
     </div>
-    <div class="analysis-steps" data-an="steps" hidden></div>
+    <div class="player-scrub" data-tour="scrub-row">
+      <input type="range" min="0" max="0" step="1" data-tour="scrub" aria-label="Where in the section" title="Drag to move through the section; it pauses, and Play carries on from there">
+      <span class="readout" data-tour="where-in"></span>
+      <label title="At the end of a chapter, play the next one; unticked, it pauses there"><input type="checkbox" data-tour="autonext">Play the next chapter</label>
+    </div>
+    ${tourPage ? '<div class="tour-glossary" data-tour="glossary" role="group" aria-label="Glossary" hidden></div>' : '<div class="analysis-things" data-tour="things"></div>'}
   </div>`;
 }
 
-function wireAnalysisBar(root) {
-  const bar = root.querySelector('[data-analysis]');
-  bar.addEventListener('click', e => {
-    const action = e.target.closest('[data-an-go]')?.dataset.anGo;
-    if (action === 'play') analysis?.playing ? pauseAnalysis() : playAnalysis();
-    else if (action === 'restart') playAnalysis({ restart: true });
-    else if (action === 'skip') skipAnalysis();
-    else if (action === 'voice') toggleAnalysisVoice();
-    else if (action === 'similar') { pauseAnalysis(); openSimilar(); }
+function wirePlayerPanel(root) {
+  const panel = root.querySelector('[data-player]');
+  panel.addEventListener('click', e => {
+    const write = e.target.closest('[data-player-write]')?.dataset.playerWrite;
+    if (write) return rebuildAnalysis(write);
+    const go = e.target.closest('[data-tour-go]')?.dataset.tourGo;
+    if (!go) return;
+    if (go === 'edit') toggleTourEditor();
+    else if (go === 'voice') toggleTourVoice();
+    else if (go === 'glossary') toggleTourGlossary();
+    else if (go === 'video') generateTour();
+    else if (go === 'similar') { pauseTour(); openSimilar(); }
     // Close closes the tab the Replay page opened; a tab opened by hand cannot be closed from within, and goes to Replay.
-    else if (action === 'close') { closeAnalysis(); window.close(); setTimeout(() => { location.hash = '#Replay'; }, 300); }
+    else if (go === 'close') { pauseTour(); window.close(); setTimeout(() => { location.hash = '#Replay'; }, 300); }
+    else tourGo(go);
   });
-  bar.querySelector('[data-an="pace"]').addEventListener('input', e => setTourPace(e.target.value));
+  panel.querySelector('[data-tour="pace"]').addEventListener('input', e => setTourPace(e.target.value));
+  panel.querySelector('[data-tour="scrub"]').addEventListener('input', e => scrubTour(Number(e.target.value)));
+  panel.querySelector('[data-tour="autonext"]').addEventListener('change', e => { state.tourAutoNext = e.target.checked; save(state); });
+  panel.querySelector('[data-tour="things"]')?.addEventListener('change', thingsChanged);
+  const glossary = panel.querySelector('[data-tour="glossary"]');
+  glossary?.addEventListener('input', e => { const row = e.target.closest('.gl-row'); if (row) readGlossary(`glossary|${[...row.parentElement.children].indexOf(row)}|${e.target.dataset.gl}`); });
+  glossary?.addEventListener('click', e => { const b = e.target.closest('button[data-gl]'); if (b && !b.disabled) glossaryAction(b.dataset.gl, b); });
 }
 
-// The Analysis page: the analysis last asked for, on a chart of the dataset that is the page's own, so its cursor, view
-// and layers are apart from the Replay page's. Coming back to the page plays the same analysis again.
-// The page's address says which analysis it is, so it can be copied and opens the same one: what is explained, the
-// dataset, the candle, the level and the Replay cursor it was seen from. The layers are the analysis's own, so not in it.
+// Whether a chapter that has ended plays the next one, or the player pauses there.
+const autoNext = () => state.tourAutoNext !== false;
+
+// ---- Analysis -------------------------------------------------------------------------------------------------------
+// An analysis is a tour the local server writes (see Explain in CryptoAnalysis.Site) of the things ticked at a candle, a
+// chapter each from the candle outwards, played by the tour's own player on a chart of the Analysis page's own. A few of
+// the tour's options are off: no editor, glossary or video, and no pins, as the layers mark the same places. The chart
+// draws the structure as known at the Replay cursor it was seen from, a part at a time as the run reaches it (see
+// liveView). Analyse tells what each thing is (Summary); Explain also what a thing of its kind is and how it works
+// (Education). Unticking a thing in the checklist leaves its chapter out at once; Analyse or Explain there writes it again.
+// The page's address says which analysis it is, so it can be copied and opens the same one: the dataset, the candle, the
+// Replay cursor it was seen from, the things told of and the detail. An older address naming one thing by explain and
+// level opens that thing.
 let wantedAnalysis = null;
-const analysisDatasets = [];
-const analysisHash = p => `#Analysis?${new URLSearchParams({ explain: p.explain, dataset: p.dataset, at: p.at, level: p.level, ...(p.seen ? { seen: p.seen } : {}) })}`;
-// The link the Replay page opens: it also lists the levels that are on, for the page to find the level the Swing or Trend
-// is at, after which the address is the analysis's own.
-const analysisLink = p => `./${analysisHash(p)}${p.levels?.length ? `&levels=${p.levels.join('.')}` : ''}`;
+const analysisHash = p => `#Analysis?${new URLSearchParams({ dataset: p.dataset, at: p.at, ...(p.seen ? { seen: p.seen } : {}), things: p.things.join(','), detail: p.detail })}`;
+// The level of the Trend an analysis tells of, for Find similar.
+const trendLevel = t => Number(t?.params?.things.find(id => id.startsWith('Trend:'))?.split(':')[1]) || null;
+// Whether an analysis has the cursor: from when it starts until it has ended. The replay controls are hidden for that long,
+// and come back at its end to step on or back from there.
+const analysisRuns = () => currentPage === 'Analysis' && tour?.page === 'Analysis' && !tour.ended;
 
 async function renderAnalysisPage(query) {
   const main = document.getElementById('main');
-  if (query?.get('explain') && query.get('dataset') && query.get('at')) {
-    const asked = { explain: query.get('explain'), dataset: query.get('dataset'), at: query.get('at'), level: Number(query.get('level')) || 1, ...(query.get('seen') ? { seen: query.get('seen') } : {}),
-      ...(query.get('levels') ? { levels: query.get('levels').split('.').map(Number).filter(Number.isInteger) } : {}) };
+  const explain = query?.get('explain'), things = query?.get('things')?.split(',').filter(Boolean)
+    ?? (explain ? [explain === 'Candle' ? 'Candle' : `${explain}:${Number(query.get('level')) || 1}`] : null);
+  if (things?.length && query.get('dataset') && query.get('at')) {
+    const detail = DETAILS.includes(query.get('detail')) ? query.get('detail') : detailOf('Analysis');
+    const asked = { dataset: query.get('dataset'), at: query.get('at'), ...(query.get('seen') ? { seen: query.get('seen') } : {}), things, detail };
     if (!wantedAnalysis || analysisHash(wantedAnalysis) !== analysisHash(asked)) wantedAnalysis = asked;
+    if (`#Analysis?${query}` !== analysisHash(asked)) history.replaceState(null, '', analysisHash(asked));
   } else if (wantedAnalysis) history.replaceState(null, '', analysisHash(wantedAnalysis));
   const params = wantedAnalysis;
   selected.clear();
-  closeAnalysis();
+  pauseTour();
   currentPage = 'Analysis';
   const head = `<section class="term-head"><h2>Analysis</h2>
-    <p>A Candle, Swing or Trend picked on the Replay page, explained on a chart of its own. The layers and the view here are this page's; the Replay page keeps its own.</p></section>`;
+    <p>The things at a candle picked on the Replay page, a chapter each, on a chart of its own. The layers and the view here are this page's; the Replay page keeps its own.</p></section>`;
   const show = body => { main.innerHTML = head + body; renderLayers(); wireReplayExamples(main); drawAll(currentPage); };
   if (!serverOn) {
     show(`<div class="empty" data-server-check>Checking for the local server…</div>`);
     return checkLocalServer();
   }
-  if (!params) return show('<div class="empty">Nothing to analyse yet. On the <a href="#Replay">Replay</a> page, click a candle and choose Analyse.</div>');
-  show('<div class="empty">Loading the dataset…</div>');
-  const info = (await loadDatasets()).find(d => d.id === params.dataset), whole = info && await loadDataset(info);
-  if (currentPage !== 'Analysis' || wantedAnalysis !== params) return;
-  if (!whole) return show(`<div class="empty">The server has no dataset "${esc(params.dataset)}".</div>`);
-  let ex = analysisDatasets.find(e => e.dataset === info.id);
-  if (!ex) {
-    ex = { id: `Analysis/${info.id}`, dataset: info.id, title: info.name, level: 1, prices: whole.prices, expected: [], annotations: [] };
-    analysisDatasets.push(ex);
-    cursors.set(ex.id, 0);
-  }
-  show(`<article class="example replay-big" id="ex-${esc(ex.id)}">
-      <header><h3>${esc(info.name)}</h3></header>
-      ${analysisBar()}
-      ${chartRow(ex)}
-    </article>`);
-  wireAnalysisBar(main);
-  startAnalysis(params);
-}
-
-async function startAnalysis(params) {
-  closeAnalysis();
-  stopPlaying();
-  const chart = document.querySelector('#main .chart'), ex = chart && findExample(chart.dataset.id), bar = document.querySelector('[data-analysis]');
-  if (!ex || !bar) return;
-  const mine = analysis = { params, ex, title: '', error: null, layers: null, cues: null, from: 0, until: 0, speed: 4, t: 0, playing: false, done: false, timer: null,
-    queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, nextCandle: 0, player: null, speaking: false, audio: {}, audioAt: 0 };
-  bar.hidden = false;
-  updateAnalysisBar();
-  // The texts are above the chart, so both are on the screen together.
-  bar.scrollIntoView({ block: 'start', behavior: 'smooth' });
-  try {
-    // A Swing or Trend is looked for at the level asked for, then at the other levels that are on, finest first: the
-    // chart shows the Swings of every level that is on, and the candle may be in one of a coarser level only.
-    const { levels = [], ...query } = params, tries = params.explain === 'Candle' ? [query.level] : [...new Set([query.level, ...levels].map(Number))];
-    let def = null;
-    for (const level of tries) {
-      const r = await fetch(`api/explain/tour?${new URLSearchParams({ ...query, level, expanded: true })}`, { cache: 'no-store' });
-      const text = await r.text();
-      if (r.ok) { def = JSON.parse(text); mine.params = { ...query, level }; break; }
-      if (analysis !== mine) return;
-      if (r.status === 400 && tries.length > 1) continue;
-      throw new Error(r.status === 404 ? `the server has no dataset "${params.dataset}"` : text.replace(/^"|"$/g, '') || `the server answered ${r.status}`);
-    }
-    if (!def) throw new Error(`no ${params.explain} at level ${tries.join(', ').replace(/, (\d+)$/, ' or $1')} has the candle at ${fmtTime(query.at)} in it, as the chart was at the cursor`);
-    await loadAnalysisAudio(mine);
-    if (analysis !== mine) return;
-    // The address names the level the Swing or Trend was found at, so it opens this analysis and no other.
-    if (currentPage === 'Analysis') { wantedAnalysis = mine.params; history.replaceState(null, '', analysisHash(mine.params)); }
-    // The tour's candles are numbered from its start time; the Replay page's from the dataset's first. A text is shown when the replay
-    const start = axisTime(def.start?.time ?? ''), anchor = Number.isNaN(start) ? 0 : indexAtOrAfter(ex, start), sections = def.sections ?? [];
-    let at = sections[0]?.from ?? 0;
-    const cues = [];
-    mine.from = mine.until = anchor + at;
-    for (const s of sections) {
-      if (s.from != null) at = s.from;
-      const end = s.until ?? at;
-      // The tour's pins are left out: the layers the analysis turns on mark the same places (a BoS by its triangle).
-      // The section that sums up what is inside brings its layers with its first text, not from the start.
-      let add = s.inside ? (s.add ?? []).map(id => LAYER_ALIASES[id] ?? id) : null;
-      for (const c of s.cues ?? []) if (c.text && c.on == null) {
-        cues.push({ text: c.text, at: anchor + (c.at ?? at), when: anchor + Math.max(c.at ?? at, at), on: c.on ?? null, place: c.place ?? null, silent: c.voice === false, given: c.hold >= 0 ? c.hold : null, inside: !!s.inside, add });
-        add = null;
-      }
-      mine.until = Math.max(mine.until, anchor + end);
-      at = end;
-    }
-    if (!cues.length) throw new Error('the server wrote no texts for it');
-    // The things inside it that can be analysed in turn (see analysisSteps).
-    mine.inside = Array.isArray(def.inside) ? def.inside : [];
-    // The candle the texts are written from: the chart draws the structure as known there (see liveView).
-    if (Number.isInteger(def.context)) mine.context = anchor + def.context;
-    if (Number.isInteger(def.known)) { mine.known = anchor + def.known; await fetchBatch(ex, mine.known); if (analysis !== mine) return; }
-    // A candle is explained whatever levels are on; a Swing or a Trend needs its own.
-    const needed = [...(def.start?.layers ?? []), ...sections.flatMap(s => s.inside ? [] : s.add ?? [])].map(id => LAYER_ALIASES[id] ?? id).filter(id => params.explain !== 'Candle' || !/^level\d+$/.test(id));
-    // The chart zooms in on what is explained, as the tour does: the view the tour gives it, with half a candle of room
-    // so its first and last candles are whole. The candles before it are drawn too (see liveView), a pan away.
-    // The zoom is the Replay page's own, so it can be widened by hand; the one the page had comes back on Close.
-    const view = [...sections].reverse().find(s => Array.isArray(s.view))?.view ?? def.start?.view, last = ex.prices.t.length - 1;
-    if (Array.isArray(view)) {
-      const time = i => Date.parse(ex.prices.t[Math.max(0, Math.min(last, anchor + i))]), half = (Date.parse(ex.prices.t[Math.min(1, last)]) - Date.parse(ex.prices.t[0])) / 2;
-      mine.zoomBefore = zooms.get(ex.id) ?? null;
-      zooms.set(ex.id, { x: [new Date(time(view[0]) - half).toISOString(), new Date(time(view[1]) + half).toISOString()] });
-    }
-    // With Voice on, the run waits for the clip of its first text, which the server reads once the analysis is asked for:
-    // the rest are read while it plays, and each text waits for its own (see analysisTick). Twenty seconds at most.
-    const spoken = cues.find(c => !c.silent);
-    for (let tries = 0; voiceOn() && spoken && !mine.audio[textKey(spoken.text)] && tries < 40; tries++) {
-      mine.reading = true;
-      updateAnalysisBar();
-      await new Promise(r => setTimeout(r, 500));
-      if (analysis !== mine) return;
-      await loadAnalysisAudio(mine);
-      if (analysis !== mine) return;
-    }
-    mine.reading = false;
-    // A Swing or a Trend is shown with its own level only: the other levels that are on are off until Close.
-    const page = (state.pages.Analysis ?? defaultsFor('Analysis')).filter(id => params.explain === 'Candle' || !/^level\d+$/.test(id));
-    Object.assign(mine, { cues, title: def.title ?? params.explain, speed: sections.find(s => s.speed > 0)?.speed ?? def.start?.speed ?? 4,
-      layers: [...new Set(['replay', ...page, ...needed])] });
-  } catch (e) {
-    if (analysis !== mine) return;
-    mine.error = e.message;
-    return updateAnalysisBar();
-  }
-  // Room is kept for all of the pins from the start, so the prices do not move each time one appears.
-  ex.pinRoom = analysisPins(mine, mine.cues);
-  syncLayerButtons();
-  playAnalysis({ restart: true });
-}
-
-const analysisPins = (a, cues) => cues.filter(c => c.on != null).map(c => pinOf(a.ex, c)).filter(p => p.time && Number.isFinite(p.price));
-
-// The layers a text brings with it come on when it is shown, and go off again when the analysis starts over.
-function bringLayers(a, cues) {
-  const add = [...new Set(cues.flatMap(c => c.add ?? []))].filter(id => !a.layers.includes(id));
-  if (!add.length) return;
-  a.layers = [...a.layers, ...add];
-  a.brought = [...(a.brought ?? []), ...add];
-  syncLayerButtons();
-  redrawExample(a.ex);
-}
-
-function dropBroughtLayers(a) {
-  if (!a.brought?.length) return;
-  a.layers = a.layers.filter(id => !a.brought.includes(id));
-  a.brought = [];
-  syncLayerButtons();
-}
-
-// Stepping in: what an analysis has inside it is listed under its texts once they have got that far, each a link to an
-// analysis of its own, seen from the same cursor. The one stepped in from is kept by address, to step back out to.
-const analysisParents = new Map();
-const ORDERS = n => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'} order`;
-const STEPS_SHOWN = 40;
-
-function analysisSteps(a) {
-  if (!a.cues || a.error) return '';
-  const own = analysisHash(a.params), parent = analysisParents.get(own);
-  const out = parent ? [`<a href="./${esc(parent.hash)}" title="Back to the analysis this was stepped into from">↑ ${esc(parent.title)}</a>`] : [];
-  const steps = a.inside ?? [];
-  if (steps.length && (a.done || a.shown.some(c => c.inside))) {
-    out.push('<span>Step into</span>');
-    for (const s of steps.slice(0, STEPS_SHOWN)) {
-      const hash = analysisHash({ explain: s.explain, dataset: a.params.dataset, at: s.at, level: s.level, ...(a.params.seen ? { seen: a.params.seen } : {}) });
-      analysisParents.set(hash, { hash: own, title: a.title });
-      out.push(`<a href="./${esc(hash)}" title="Analyse this ${esc(ORDERS(s.level))} ${esc(s.name)}">${esc(s.name)} · ${esc(fmtTime(s.at))}</a>`);
-    }
-    if (steps.length > STEPS_SHOWN) out.push(`<span>and ${steps.length - STEPS_SHOWN} more</span>`);
-  }
-  return out.join('');
-}
-
-// The clips the local server has read so far. It reads a written tour's texts as soon as the tour is asked for, so a
-// text with no clip yet is looked for again as it comes up.
-async function loadAnalysisAudio(a) {
-  a.audioAt = performance.now();
-  const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
-  if (audio) a.audio = audio;
-}
-
-// Plays from where the cursor is when it is inside the analysis, with the texts before it taken as read; otherwise, or
-// when the analysis has ended, from its start.
-function playAnalysis({ restart = false } = {}) {
-  const a = analysis;
-  if (!a?.cues) return;
-  pauseAnalysis();
-  stopPlaying();
-  let t = cursorOf(a.ex);
-  if (restart || a.done || t < a.from || t > a.until) {
-    t = a.from;
-    Object.assign(a, { queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, done: false });
-    dropBroughtLayers(a);
-  } else if (t !== a.t) {
-    const before = a.cues.filter(c => c.when < t);
-    Object.assign(a, { queue: [], shown: before, fired: new Set(before), active: null, activeUntil: 0 });
-  }
-  Object.assign(a, { t, playing: true, nextCandle: 0 });
-  a.ex.pins = analysisPins(a, a.shown);
-  moveTo(a.ex, t);
-  for (const c of a.cues) if (!a.fired.has(c) && c.when <= t) { a.fired.add(c); a.queue.push(c); }
-  // The text on show gets its reading time again, and is read aloud from its start.
-  if (a.active) { a.activeUntil = performance.now() + holdOf(a.active) * 1000; speakAnalysis(a.active); }
-  a.timer = setInterval(analysisTick, TOUR_TICK);
-  updateAnalysisBar();
-}
-
-// Straight to the end: the cursor on the last candle and every text taken as read, so the replay controls are there.
-function skipAnalysis() {
-  const a = analysis;
-  if (!a?.cues) return;
-  pauseAnalysis();
-  a.player?.pause();
-  Object.assign(a, { t: a.until, queue: [], shown: [...a.cues], fired: new Set(a.cues), active: null, activeUntil: 0, done: true, speaking: false });
-  bringLayers(a, a.cues);
-  moveTo(a.ex, a.until);
-  updateAnalysisBar();
-}
-
-// Whether an analysis has the cursor: from when it is asked for until it has ended. The replay controls are hidden for
-// that long, as on a tour, and come back at its end to step on or back from there.
-const analysisRuns = () => currentPage === 'Analysis' && !!analysis && !analysis.done && !analysis.error;
-
-function pauseAnalysis() {
-  const a = analysis;
-  if (!a?.playing) return;
-  clearInterval(a.timer);
-  a.player?.pause();
-  Object.assign(a, { playing: false, timer: null, speaking: false });
-  updateAnalysisBar();
-}
-
-function closeAnalysis() {
-  const a = analysis;
-  if (!a) return;
-  pauseAnalysis();
-  delete a.ex.pins;
-  delete a.ex.pinRoom;
-  if (a.zoomBefore !== undefined) { if (a.zoomBefore) zooms.set(a.ex.id, a.zoomBefore); else zooms.delete(a.ex.id); }
-  analysis = null;
-  document.body.classList.remove('analysing');
-  const bar = document.querySelector('[data-analysis]');
-  if (bar) bar.hidden = true;
-  if (currentPage === 'Analysis') { syncLayerButtons(); drawAll('Analysis'); }
-}
-
-const analysisSpeaks = (a, cue) => voiceOn() && !cue.silent && !!a.audio[textKey(cue.text)];
-
-function speakAnalysis(cue) {
-  const a = analysis;
-  if (!analysisSpeaks(a, cue)) {
-    if (voiceOn() && !cue.silent && performance.now() - a.audioAt > 2000) loadAnalysisAudio(a);
-    return;
-  }
-  a.player?.pause();
-  const player = a.player = new Audio(`tour-audio/${a.audio[textKey(cue.text)].file}`), done = () => { if (a.player === player) a.speaking = false; };
-  player.playbackRate = tourPace().voice;
-  player.addEventListener('ended', done);
-  player.addEventListener('error', done);
-  a.speaking = true;
-  player.play().catch(done);
-}
-
-function toggleAnalysisVoice() {
-  state.tourVoice = !voiceOn();
-  save(state);
-  if (analysis && !voiceOn()) { analysis.player?.pause(); analysis.speaking = false; }
-  if (analysis && voiceOn()) loadAnalysisAudio(analysis);
-  updateAnalysisBar();
-}
-
-// One beat of a playing analysis: the next text once the one on show has been read, else the next candle, else it ends.
-// A text that is read aloud waits for the voice to finish the one before; the candles wait for both.
-function analysisTick() {
-  const a = analysis;
-  if (!a?.playing) return;
-  if (currentPage !== 'Analysis') return closeAnalysis();
-  const ex = a.ex, t = cursorOf(ex), now = performance.now();
-  // The cursor moved by hand: the analysis waits, and Play carries on from there.
-  if (t !== a.t) return pauseAnalysis();
-  const holding = a.active && now < a.activeUntil;
-  if (a.queue.length) {
-    if (holding || (a.speaking && analysisSpeaks(a, a.queue[0]))) return;
-    // With Voice on, a text waits for its clip, which the server may still be reading: twenty seconds at most.
-    if (voiceOn() && !a.queue[0].silent && !a.audio[textKey(a.queue[0].text)] && now - (a.waitingSince ??= now) < 20000) {
-      if (now - a.audioAt > 500) loadAnalysisAudio(a);
+  if (!params) return show('<div class="empty">Nothing to analyse yet. On the <a href="#Replay">Replay</a> page, click a candle, tick what to tell of, and choose Analyse or Explain.</div>');
+  // The same analysis comes back as it was left; another is written afresh.
+  if (tours.Analysis?.hash !== analysisHash(params)) {
+    show('<div class="empty">Writing the analysis…</div>');
+    let loaded;
+    try { loaded = await loadAnalysis(params); }
+    catch (e) {
+      if (currentPage === 'Analysis' && wantedAnalysis === params) show(`<div class="empty warn">The analysis could not be written: ${esc(e.message.replace(/\.$/, ''))}.</div>`);
       return;
     }
-    a.waitingSince = null;
-    const cue = a.queue.shift(), clip = cue.silent ? null : a.audio[textKey(cue.text)];
-    // The same seconds as on the Tour page: its own, else the length of its clip, else the time it takes to read.
-    cue.clip = cue.given == null && clip?.seconds > 0 ? clip.seconds : 0;
-    cue.hold = cue.given ?? (clip?.seconds > 0 ? clip.seconds + TOUR_PACES[1].gap : readingSeconds(cue.text));
-    Object.assign(a, { active: cue, activeUntil: now + holdOf(cue) * 1000, nextCandle: 0 });
-    a.shown.push(cue);
-    bringLayers(a, [cue]);
-    speakAnalysis(cue);
-    if (cue.on != null) { ex.pins = analysisPins(a, a.shown); redrawExample(ex); }
-    return updateAnalysisBar();
+    if (currentPage !== 'Analysis' || wantedAnalysis !== params) return;
+    tours.Analysis = loaded;
   }
-  if (holding || a.speaking) return;
-  if (t >= a.until) {
-    a.done = true;
-    return pauseAnalysis();
-  }
-  if (!timelineAt(ex, t + 1)) { a.nextCandle = 0; return prefetch(ex, t + 1); }
-  if (now < a.nextCandle) return;
-  // A beat takes every candle that has come due since the last, but never past a text's candle or the end.
-  const gap = 1000 / (a.speed * tourPace().candles), late = now - a.nextCandle, inStep = a.nextCandle > 0 && late < 1000;
-  const due = inStep ? 1 + Math.floor(late / gap) : 1;
-  const stop = Math.min(a.until, t + due, ...a.cues.filter(c => c.when > t && !a.fired.has(c)).map(c => c.when));
-  let to = t + 1;
-  while (to < stop && timelineAt(ex, to + 1)) to++;
-  a.nextCandle = inStep && to - t === due ? a.nextCandle + due * gap : now + gap;
-  a.t = to;
-  moveTo(ex, to);
-  for (const c of a.cues) if (!a.fired.has(c) && c.when <= to) { a.fired.add(c); a.queue.push(c); }
+  tour = tours.Analysis;
+  // The mode asked for is the one the next analysis opens in.
+  state.detail = { ...state.detail, Analysis: params.detail };
+  save(state);
+  show(`<article class="example replay-big" id="ex-${esc(tour.ex.id)}">
+      <header><h3 data-tour="chapter"></h3><span class="id" data-tour="where"></span></header>
+      ${playerPanel('Analysis')}
+      ${chartRow(tour.ex)}
+    </article>`);
+  wirePlayerPanel(main);
+  renderAnalysisThings();
+  const first = sectionAfter(-1, 1) ?? 0;
+  tour.view = tour.sections[first]?.view ?? tour.view;
+  tour.zoom = null;
+  seekTour(first);
+  main.querySelector('[data-player]').scrollIntoView({ block: 'start' });
+  playTour();
 }
 
-function updateAnalysisBar() {
-  const bar = document.querySelector('[data-analysis]'), a = analysis;
-  document.body.classList.toggle('analysing', analysisRuns());
-  if (!bar || !a) return;
-  const part = name => bar.querySelector(`[data-an="${name}"]`), button = name => bar.querySelector(`[data-an-go="${name}"]`);
-  const caption = [...a.shown].reverse().find(c => c.on == null);
-  part('caption').textContent = a.error ? `The analysis could not be written: ${a.error.replace(/\.$/, '')}.` : !a.cues ? (a.reading ? 'Reading the first text aloud…' : 'Writing the analysis…') : caption?.text ?? '';
-  part('caption').classList.toggle('warn', !!a.error);
-  part('title').textContent = a.cues ? `${a.title}${a.done ? ' · ended' : ''}` : '';
-  button('play').textContent = a.playing ? '❚❚' : '▶';
-  button('play').setAttribute('aria-label', a.playing ? 'Pause (Space)' : 'Play (Space)');
-  button('play').disabled = button('restart').disabled = !a.cues;
-  button('skip').disabled = !a.cues || a.done;
-  button('voice').setAttribute('aria-pressed', voiceOn());
-  button('similar').hidden = a.params.explain !== 'Trend' || !a.cues;
-  // Written again only when it changes, so a link is not replaced under the pointer.
-  const steps = analysisSteps(a);
-  if (part('steps').dataset.html !== steps) { part('steps').dataset.html = steps; part('steps').innerHTML = steps; }
-  part('steps').hidden = !steps;
-  const pace = TOUR_PACES.indexOf(tourPace());
-  part('pace').value = pace;
-  part('pace-name').textContent = TOUR_PACES[pace].name;
+// The written tour of an analysis, ready to play: the things at the candle for its checklist, the clips read so far, its
+// scene on the dataset from its first candle, and the structure as known at the cursor it was seen from, fetched.
+async function loadAnalysis(params) {
+  // The page's Successive Candles settings say how long a run must be to count.
+  const runs = { greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') };
+  const where = { dataset: params.dataset, at: params.at, ...(params.seen ? { seen: params.seen } : {}) };
+  const [r, list, audio] = await Promise.all([
+    fetch(`api/explain/tour?${new URLSearchParams({ ...where, things: params.things.join(','), expanded: true, ...runs })}`, { cache: 'no-store' }),
+    fetch(`api/explain/at?${new URLSearchParams({ ...where, ...runs })}`, { cache: 'no-store' }).then(x => x.ok ? x.json() : null).catch(() => null),
+    fetch('tour-audio/index.json', { cache: 'no-store' }).then(x => x.ok ? x.json() : {}).catch(() => ({})),
+  ]);
+  const text = await r.text();
+  if (!r.ok) throw new Error(r.status === 404 ? `the server has no dataset "${params.dataset}"` : text.replace(/^"|"$/g, '') || `the server answered ${r.status}`);
+  const def = JSON.parse(text);
+  const loaded = newPlayer(def, audio, { page: 'Analysis', idPrefix: 'Analysis', detail: params.detail, params, hash: analysisHash(params), list, missing: def.missing ?? [],
+    pins: false, waitForClips: true, extraLayers: (state.pages.Analysis ?? defaultsFor('Analysis')).filter(id => id !== 'replay' && !/^level\d+$/.test(id)) });
+  await loadTourDatasets(loaded);
+  anchorTour(loaded);
+  Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio, loaded.detail));
+  if (!loaded.sections.some(s => s.cues.some(c => !c.skipped))) throw new Error('the server wrote no texts for it');
+  if (Number.isInteger(def.known)) { loaded.known = def.known; await fetchBatch(loaded.ex, loaded.known); }
+  return loaded;
+}
+
+// The analysis written again with what is ticked in its checklist, at the detail of the button pressed.
+function rebuildAnalysis(detail) {
+  if (tour?.page !== 'Analysis') return;
+  const things = tickedThings();
+  if (!things.length) return;
+  wantedAnalysis = { ...tour.params, things, detail };
+  history.replaceState(null, '', analysisHash(wantedAnalysis));
+  renderAnalysisPage();
+}
+
+// The checklist under the controls: everything at the candle, ticked as the analysis has it, with Analyse and Explain to
+// write it again.
+function renderAnalysisThings() {
+  const box = document.querySelector('[data-tour="things"]');
+  if (!box || tour?.page !== 'Analysis') return;
+  const p = tour.params, list = tour.list ?? p.things.map(id => ({ id, kind: id.split(':')[0], level: Number(id.split(':')[1]) || null, name: id.replace(':', ' ') }));
+  box.innerHTML = `<span>Tell of</span>${list.map(t => thingBox(t, p.things.includes(t.id))).join('')}
+    <span class="write">${analyseButtons('data-player-write', p.detail)}</span>
+    <span class="warn" data-tour="rewrite" hidden>Press Analyse or Explain to add what is newly ticked</span>
+    ${tour.missing.length ? `<span class="warn">Not at this candle as the chart had it: ${esc(tour.missing.join(', '))}</span>` : ''}`;
+}
+
+// The things ticked in the checklist; before it is drawn, those the analysis was written with.
+function tickedThings() {
+  const boxes = [...document.querySelectorAll('[data-tour="things"] input[type=checkbox]')];
+  return boxes.length ? boxes.filter(x => x.checked).map(x => x.value) : tour?.params?.things ?? [];
+}
+
+// A section is played while the thing it tells of is ticked; a tour's sections tell of no one thing, so are always played.
+const sectionOn = i => !!tour?.sections[i] && (!tour.sections[i].thing || tickedThings().includes(tour.sections[i].thing));
+
+// The next section played after i going forward (by 1) or back (by -1), or null when there is none.
+function sectionAfter(i, by) {
+  for (let j = i + by; j >= 0 && j < (tour?.sections.length ?? 0); j += by) if (sectionOn(j)) return j;
+  return null;
+}
+
+// A change to the checklist: the section on show, if unticked, gives way to the next played one; something ticked that
+// the analysis does not have yet is added by Analyse or Explain, which the checklist then says.
+function thingsChanged() {
+  if (tour?.page !== 'Analysis') return;
+  const note = document.querySelector('[data-tour="rewrite"]');
+  if (note) note.hidden = !tickedThings().some(id => !tour.sections.some(s => s.thing === id));
+  if (sectionOn(tour.index) || tour.ended) return updateTourPanel();
+  const was = !!tour.timer, next = sectionAfter(tour.index, 1);
+  pauseTour();
+  if (next == null) return tourGo('end');
+  enterSection(next);
+  if (was) playTour();
 }
 
 function findExample(id) {
   return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id) ?? DATA.interims?.examples?.find(e => e.id === id)
-    ?? replayDatasets.find(e => e.id === id) ?? analysisDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined);
+    ?? replayDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined);
 }
 
 // ---- Tour ------------------------------------------------------------------------------------------------------------
@@ -2613,7 +2468,9 @@ function findExample(id) {
 //            A section with explain ("Candle", "Swing" or "Trend"), at (the candle) and level (the sawtooth level, 1 unless
 //            given) has its view, layers, until and texts written by the local server from the prices (see Explain in
 //            CryptoAnalysis.Site); what it says for itself wins, and texts of its own follow the written ones.
-//   cue      text, shown under the chart as the section begins; with at, when the replay reaches that candle, which waits
+//   cue      texts, a text for each level of detail it is written at ({ "summary", "education" }); the one shown is for
+//            the highest level at or below the page's Detail setting, and a cue with none that low is left out. Shown
+//            under the chart as the section begins; with at, when the replay reaches that candle, which waits
 //            there while the text is read; with on as well ('open', 'high', 'low', 'close' or a price), pinned to that
 //            point of the candle (place: 'above', 'below', 'left' or 'right'). hold is the seconds the text stays before
 //            the next, by default the time it takes to read (0 moves straight on, leaving the caption up while pins show); keep is how long a pin stays: 'section', 'chapter' or 'always'.
@@ -2628,14 +2485,25 @@ const PIN_PLACES = { above: [0, -55], below: [0, 55], left: [-70, 0], right: [70
 const TOUR_TICK = 40;
 // The Speed slider's three paces: how fast the voice reads (its clips are played that much faster or slower, at the same
 // pitch), how fast the candles run against the section's speed, and the seconds a text stays after it has been read.
-const TOUR_PACES = [{ name: 'Slower', voice: 0.9, candles: 0.6, gap: 0.4 }, { name: 'Normal', voice: 1, candles: 1, gap: 0.15 }, { name: 'Faster', voice: 1.1, candles: 1.6, gap: 0.05 }];
+const TOUR_PACES = [{ name: 'Slowest', voice: 0.8, candles: 0.35, gap: 0.8 }, { name: 'Slower', voice: 0.9, candles: 0.6, gap: 0.4 }, { name: 'Normal', voice: 1, candles: 1, gap: 0.15 },
+  { name: 'Faster', voice: 1.1, candles: 1.6, gap: 0.05 }, { name: 'Fastest', voice: 1.2, candles: 2.6, gap: 0 }];
+const NORMAL_PACE = TOUR_PACES.find(p => p.name === 'Normal');
+// The player on the page shown, and each page's own, kept while another page is shown.
 let tour = null, tourLoading = null;
+const tours = { Tour: null, Analysis: null };
 // Opened with ?video, the page shows the tour alone, for tools/tour-video to record.
 const videoMode = new URLSearchParams(location.search).has('video');
-// Opened with ?explain=Swing&dataset=btc-1h&at=2023-01-03T00:00&level=1, the Tour page plays a tour written by the local
-// server around that one thing (a Candle, or the Swing or Trend at that level the candle is in) instead of tour.json (see
-// Explain in CryptoAnalysis.Site); it can be edited here but not saved.
-const writtenTour = (q => q.has('explain') ? { explain: q.get('explain'), dataset: q.get('dataset') ?? '', at: q.get('at') ?? '', level: q.get('level') ?? '1', ...(q.has('seen') ? { seen: q.get('seen') } : {}) } : null)(new URLSearchParams(location.search));
+
+// How much a text tells, from least to most, the same names as EnumDetail in CryptoAnalysis.Site. A cue has a text for
+// each level it is written at and shows the one for the highest level at or below the page's Detail setting; a cue with
+// none that low is left out. The tour always tells at Education; an analysis at the detail it was written with, Analyse
+// at Summary and Explain at Education, the last of which the next analysis opens in.
+const DETAILS = ['summary', 'education'];
+const DETAIL_NAMES = { summary: 'Summary', education: 'Education' };
+const detailOf = page => page === 'Analysis' ? state.detail?.Analysis ?? 'summary' : 'education';
+const textAt = (texts, detail) => { for (let i = DETAILS.indexOf(detail); i >= 0; i--) if (texts?.[DETAILS[i]]) return texts[DETAILS[i]]; return null; };
+// A cue's text at the most detail it has: how the editor names the cue.
+const cueText = c => textAt(c?.texts, DETAILS[DETAILS.length - 1]);
 
 // The short hash of a text that names its narration clip in tour-audio (FNV-1a, 32 bits; the same as tools/tour-video).
 function textKey(text) {
@@ -2674,7 +2542,7 @@ const eventKey = (spec, from, scene = 0) => `${scene}|${spec.event}|${spec.level
 const eventName = (spec, from) => `${{ 1: 'the first', 2: 'the second', 3: 'the third' }[spec.nth ?? 1] ?? `the ${spec.nth}th`} ${TERMS.get(spec.event)?.name ?? spec.event} at level ${spec.level ?? 1} after #${from}`;
 
 // A text stays for its narration clip's length when there is one (plus a breath), else for the time it takes to read.
-function compileTour(def, scenes, resolved = new Map(), audio = {}) {
+function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'education') {
   const errors = [], known = new Set(LAYERS.map(l => l.id)), chapters = [], wanted = [];
   // The scene the sections are in, and how many candles it has.
   let scene = 0, candles = scenes[0]?.ex.prices.t.length ?? 0;
@@ -2750,8 +2618,10 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}) {
     at = Math.max(from, Math.min(until, candles - 1));
 
     const cues = (s.cues ?? []).map((c, j) => {
-      const what = `${where}, text ${j + 1}`, text = c.text ?? '';
-      if (!text) errors.push(`${what}: no text`);
+      const what = `${where}, text ${j + 1}`, texts = c.texts ?? {}, text = textAt(texts, detail);
+      if (c.text != null) errors.push(`${what}: "text" is now "texts", a text for each level of detail: { "summary", "education" }`);
+      else if (!Object.values(texts).some(Boolean)) errors.push(`${what}: no text`);
+      for (const level of Object.keys(texts)) if (!DETAILS.includes(level)) errors.push(`${what}: unknown detail "${level}": ${DETAILS.join(', ')}`);
       const atGiven = candle(c.at, from, what, 'at');
       if (atGiven.index != null && (atGiven.index < 0 || atGiven.index > at)) errors.push(`${what}: at #${atGiven.index} is not reached, as the section ends at #${at}`);
       if (c.on != null && c.at == null) errors.push(`${what}: a pin needs a candle`);
@@ -2769,14 +2639,15 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}) {
         to = { at: toGiven.index, atSpec: toGiven.spec, on: c.to?.on ?? c.on ?? 'close' };
       }
       if (c.heads != null && (typeof c.heads !== 'object' || Object.keys(c.heads).some(k => k !== 'start' && k !== 'end'))) errors.push(`${what}: heads is { "start", "end" }, true or false each`);
-      // A text with "voice": false is shown but not read aloud, so it stays for the time it takes to read.
-      const silent = c.voice === false, clip = silent ? null : audio[textKey(text)];
-      return { text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
+      // A text with "voice": false is shown but not read aloud, so it stays for the time it takes to read. A cue with no
+      // text at the page's detail is skipped: kept in its place for the editor, never queued.
+      const silent = c.voice === false, clip = silent || !text ? null : audio[textKey(text)];
+      return { texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
         to, heads: { start: c.heads?.start === true, end: c.heads?.end !== false }, color: c.color ?? null,
         clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0,
-        hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + TOUR_PACES[1].gap : readingSeconds(text) };
+        hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
     });
-    return { index: i, chapter: chapters.length - 1, scene, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
@@ -2804,7 +2675,7 @@ async function resolveTour(retry = 0) {
   }
   tour.resolving = false;
   if (tour.scenes !== scenes || currentPage !== 'Tour') return;
-  Object.assign(tour, compileTour(tour.def, scenes, tour.resolved, tour.audio));
+  Object.assign(tour, compileTour(tour.def, scenes, tour.resolved, tour.audio, tour.detail));
   if (tour.wanted.length) return resolveTour(retry + 1);
   editorSection = -1;
   seekTour(tour.index, { t: cursorOf(tour.ex), shown: tour.shown.length });
@@ -2815,18 +2686,11 @@ async function resolveTour(retry = 0) {
 // tour.json as it is on disk, with the short hash that names that version of it: Save sends the hash of the version the
 // page started from, and the local server refuses to write over a file that is no longer that version.
 const readTourFile = () => fetch('tour.json', { cache: 'no-store' }).then(r => r.text()).then(text => ({ def: JSON.parse(text), base: textKey(text) }));
-// A written tour comes from the server instead, which says what is wrong with the request when it cannot write one.
-const readWrittenTour = async () => {
-  const r = await fetch(`api/explain/tour?${new URLSearchParams(writtenTour)}`, { cache: 'no-store' });
-  const text = await r.text();
-  if (!r.ok) throw new Error(r.status === 404 ? `the server has no dataset "${writtenTour.dataset}"` : text || `the server answered ${r.status}`);
-  return { def: JSON.parse(text), base: textKey(text) };
-};
 
 // tour.json can change on disk while the page is open, as when it is edited by hand. Coming back to the page, the newer
 // file is loaded at once when nothing here is unsaved (Undo brings back what was here); otherwise the editor says so.
 async function checkTourFile() {
-  if (currentPage !== 'Tour' || !tour || tour.checking || tour.recording || videoMode || writtenTour) return;
+  if (currentPage !== 'Tour' || tour?.page !== 'Tour' || tour.checking || tour.recording || videoMode) return;
   tour.checking = true;
   const file = await readTourFile().catch(() => null);
   tour.checking = false;
@@ -2850,17 +2714,23 @@ function sceneSpecs(def) {
     ...(def.sections ?? []).flatMap((s, i) => s.scene != null ? [{ dataset: (typeof s.scene === 'object' && s.scene.dataset) || own, time: typeof s.scene === 'object' ? s.scene.time : undefined, section: i }] : [])];
 }
 
+// The player's state for a tour, on the page it plays on. A tour from tour.json plays on the Tour page at Education; an
+// analysis on the Analysis page (see loadAnalysis), with the options that page sets.
+function newPlayer(def, audio, options = {}) {
+  return { page: 'Tour', detail: 'education', idPrefix: 'Tour', def, base: '', audio, wholes: new Map(), scenes: [], ex: null, saved: JSON.stringify(def), history: [], lastEdit: null,
+    picking: null, note: '', resolved: new Map(), resolving: false, index: 0, view: DEFAULT_VIEW, queue: [], shown: [], fired: new Set(), kept: [], active: null, activeUntil: 0,
+    nextCandle: 0, timer: null, ended: false, voice: { now: null, waiting: [] }, ...options };
+}
+
 async function loadTour() {
-  const { def, base } = await (writtenTour ? readWrittenTour() : readTourFile());
+  const { def, base } = await readTourFile();
   const list = await loadDatasets();
   if (!list.length) throw new Error('the server has no datasets');
   const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
-  const loaded = { def, base, audio, wholes: new Map(), scenes: [], ex: null, saved: JSON.stringify(def), history: [], lastEdit: null, picking: null, note: '', resolved: new Map(), resolving: false,
-    index: 0, view: DEFAULT_VIEW, queue: [], shown: [], fired: new Set(), kept: [], active: null, activeUntil: 0, nextCandle: 0, timer: null,
-    voice: { now: null, waiting: [] } };
+  const loaded = newPlayer(def, audio, { base });
   await loadTourDatasets(loaded);
   anchorTour(loaded);
-  return Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio));
+  return Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio, loaded.detail));
 }
 
 // Every dataset the tour's scenes name is loaded once; the tour's own falls back to the server's first dataset.
@@ -2884,14 +2754,14 @@ function anchorTour(t = tour) {
     const was = (t.scenes ?? []).find(sc => sc.ex?.dataset === whole.dataset && sc.ex.anchor === anchor && !ids.has(sc.ex.id));
     if (was) { ids.add(was.ex.id); scenes.push({ ...spec, missing, ex: was.ex }); continue; }
     changed = true;
-    let id = scenes.length ? `Tour/${whole.dataset}@${anchor}` : `Tour/${whole.dataset}`;
+    let id = scenes.length ? `${t.idPrefix}/${whole.dataset}@${anchor}` : `${t.idPrefix}/${whole.dataset}`;
     while (ids.has(id)) id += '+';
     ids.add(id);
     const cut = a => a.slice(anchor), p = whole.prices;
     remote.delete(id);
     zooms.delete(id);
     cursors.set(id, 0);
-    scenes.push({ ...spec, missing, ex: { id, dataset: whole.dataset, anchor, tour: true, title: 'Tour', level: 1, expected: [], annotations: [],
+    scenes.push({ ...spec, missing, ex: { id, dataset: whole.dataset, anchor, tour: true, title: t.page === 'Tour' ? 'Tour' : t.def.title ?? t.page, level: 1, expected: [], annotations: [],
       prices: { t: cut(p.t), o: cut(p.o), h: cut(p.h), l: cut(p.l), c: cut(p.c) } } });
   }
   // Events were looked up from the old starts, so they are looked up again.
@@ -2987,12 +2857,18 @@ function advanceTo(t) {
   const s = tourSection(), ex = tour.ex;
   cursors.set(ex.id, t);
   prefetch(ex, t);
-  for (const c of s.cues) if (!tour.fired.has(c) && (cueAt(c) ?? s.from) <= t) { tour.fired.add(c); tour.queue.push(c); }
+  for (const c of s.cues) if (!tour.fired.has(c) && (cueAt(c) ?? s.from) <= t) { tour.fired.add(c); if (!c.skipped) tour.queue.push(c); }
 }
+
+// The cues of a section still to come at the page's detail: the ones that stop the replay at their candle.
+const pendingCues = s => s.cues.filter(c => !tour.fired.has(c) && !c.skipped);
 
 function showNextCue() {
   const cue = tour.queue.shift();
   if (!cue) return;
+  // A clip read since the tour was compiled gives the text its length, as one there from the start does.
+  const clip = !cue.silent && cue.clip === 0 && !(cue.given >= 0) ? tour.audio[textKey(cue.text)] : null;
+  if (clip?.seconds > 0) Object.assign(cue, { clip: clip.seconds, hold: clip.seconds + NORMAL_PACE.gap });
   tour.active = cue;
   tour.activeUntil = performance.now() + holdOf(cue) * 1000;
   tour.shown.push(cue);
@@ -3038,23 +2914,21 @@ function hush() {
 const voiceOn = () => state.tourVoice === true;
 
 // The pace the Speed slider is set to. A recording is always made at Normal, as its clips are laid at their own length.
-const tourPace = () => tour?.recording || videoMode ? TOUR_PACES[1] : TOUR_PACES[state.tourPace] ?? TOUR_PACES[1];
+const tourPace = () => tour?.recording || videoMode ? NORMAL_PACE : TOUR_PACES.find(p => p.name === state.tourPaceName) ?? NORMAL_PACE;
 // The seconds a text stays at the slider's pace: the length of its clip as played and the gap after it, else its own
 // seconds, which are a reading time and go with the voice.
 const holdOf = cue => { const pace = tourPace(); return cue.clip ? cue.clip / pace.voice + pace.gap : cue.hold / pace.voice; };
 
 function setTourPace(value) {
-  state.tourPace = Number(value);
+  state.tourPaceName = TOUR_PACES[Number(value)]?.name ?? NORMAL_PACE.name;
   save(state);
   if (tour?.player) tour.player.playbackRate = tourPace().voice;
-  if (analysis?.player) analysis.player.playbackRate = tourPace().voice;
   updateTourPanel();
-  updateAnalysisBar();
 }
 
 // What tools/tour-video drives: plays the whole tour once and reports when each text and chapter appeared.
 window.tourVideo = {
-  ready: () => currentPage === 'Tour' && !!tour?.sections.length && !tour.wanted.length && !viewFor(tour.ex).loading,
+  ready: () => currentPage === 'Tour' && tour?.page === 'Tour' && !!tour.sections.length && !tour.wanted.length && !viewFor(tour.ex).loading,
   play: () => new Promise(resolve => {
     pauseTour();
     tour.recording = { started: Date.now(), cues: [], chapters: [] };
@@ -3071,21 +2945,23 @@ function openSection(i, { journey = false } = {}) {
   // Another scene is a cut, not a move: its chart comes up at the section's view with nothing to ease from.
   if (switched) showScene((tour.scenes[s.scene] ?? tour.scenes[0]).ex);
   const ex = tour.ex, shown = switched ? s.view : tourView(cursorOf(ex)), moved = i !== tour.index;
-  Object.assign(tour, { index: i, view: s.view, queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, nextCandle: 0, journey: null });
+  Object.assign(tour, { index: i, view: s.view, queue: [], shown: [], fired: new Set(), active: null, activeUntil: 0, nextCandle: 0, journey: null, ended: false });
   // Pins kept from earlier sections belong to this scene's chart only.
-  tour.kept = tour.sections.slice(0, i).filter(earlier => earlier.scene === s.scene).flatMap(earlier => earlier.cues.filter(c => c.on != null
+  tour.kept = tour.sections.slice(0, i).filter(earlier => earlier.scene === s.scene).flatMap(earlier => earlier.cues.filter(c => c.on != null && !c.skipped
     && (c.keep === 'always' || (c.keep === 'chapter' && earlier.chapter === s.chapter))));
   // While a candle is being picked, the candles still to come are shown, to pick from.
-  tourLayers = ['replay', ...s.layers, ...(tour.picking ? ['future'] : [])];
+  // An analysis keeps the page's own layers on beside the section's, all but its levels.
+  tourLayers = [...new Set(['replay', ...(tour.extraLayers ?? []), ...s.layers, ...(tour.picking ? ['future'] : [])])];
   const chapter = tour.chapters[s.chapter];
   if (chapter?.section === i) tour.recording?.chapters.push({ name: chapter.name, at: Date.now() });
-  history.replaceState(null, '', chapter ? `#Tour/${chapter.slug}` : '#Tour');
+  // The Tour page's address names the chapter; an analysis keeps its own.
+  if (tour.page === 'Tour') history.replaceState(null, '', chapter ? `#Tour/${chapter.slug}` : '#Tour');
   if (journey && s.journey) {
     const t = s.journey.run ? s.journey.start : s.from;
     cursors.set(ex.id, t);
     prefetch(ex, t);
     // Only the texts with no candle are read on the way: the others wait for the journey's end.
-    for (const c of s.cues) if (c.at == null) { tour.fired.add(c); tour.queue.push(c); }
+    for (const c of s.cues) if (c.at == null) { tour.fired.add(c); if (!c.skipped) tour.queue.push(c); }
     Object.assign(tour, { view: s.journey.wide, journey: { ...s.journey, phase: 'out' } });
     zooms.delete(ex.id);
     // A view that already holds the whole way has no easing out to do.
@@ -3154,7 +3030,7 @@ function seekTour(i, { t = 0, shown = 1, cue = null } = {}) {
   }
   openSection(Math.max(0, Math.min(i, tour.sections.length - 1)));
   const s = tourSection(), target = cue == null ? null : s.cues[cue];
-  const pending = () => s.cues.filter(c => !tour.fired.has(c)).map(cueAt);
+  const pending = () => pendingCues(s).map(cueAt);
   if (target) {
     while (!tour.shown.includes(target)) {
       if (!tour.queue.length) {
@@ -3172,51 +3048,64 @@ function seekTour(i, { t = 0, shown = 1, cue = null } = {}) {
 
 function refreshTour() {
   const ex = tour.ex;
-  const pins = cues => cues.filter(c => c.on != null && c.at != null && c.to == null).map(c => pinOf(ex, c)).filter(p => p.time && Number.isFinite(p.price));
-  const lines = cues => cues.filter(c => c.to != null && c.at != null && c.to.at != null).map(c => lineOf(ex, c)).filter(l => l.from.time && l.to.time && Number.isFinite(l.from.price) && Number.isFinite(l.to.price));
-  ex.pins = pins([...tour.kept, ...tour.shown]);
-  ex.lines = lines([...tour.kept, ...tour.shown]);
+  // A cue skipped at the page's detail has no text to pin.
+  const pins = cues => cues.filter(c => !c.skipped && c.on != null && c.at != null && c.to == null).map(c => pinOf(ex, c)).filter(p => p.time && Number.isFinite(p.price));
+  const lines = cues => cues.filter(c => !c.skipped && c.to != null && c.at != null && c.to.at != null).map(c => lineOf(ex, c)).filter(l => l.from.time && l.to.time && Number.isFinite(l.from.price) && Number.isFinite(l.to.price));
+  // An analysis shows no pins: the layers it turns on mark the same places.
+  const marks = tour.pins === false ? [] : [...tour.kept, ...tour.shown];
+  ex.pins = pins(marks);
+  ex.lines = lines(marks);
   // Room is kept for all of the section's pins from its start, so the prices do not move each time one appears.
-  ex.pinRoom = pins([...tour.kept, ...(tourSection()?.cues ?? [])]);
+  ex.pinRoom = tour.pins === false ? [] : pins([...tour.kept, ...(tourSection()?.cues ?? [])]);
   syncLayerButtons();
-  if (editorSection !== tour.index) renderTourEditor();
-  drawAll('Tour');
+  if (tour.page === 'Tour' && editorSection !== tour.index) renderTourEditor();
+  drawAll(tour.page);
   updateTourPanel();
 }
 
 function updateTourPanel() {
-  const part = name => document.querySelector(`[data-tour="${name}"]`);
-  if (currentPage !== 'Tour' || !part('caption')) return;
+  const part = name => document.querySelector(`[data-tour="${name}"]`), go = name => document.querySelector(`[data-tour-go="${name}"]`);
+  document.body.classList.toggle('analysing', analysisRuns());
+  if (!playerHere(currentPage) || !part('caption')) return;
   const s = tourSection(), ex = tour.ex, t = cursorOf(ex);
   // Text pinned to a candle is on the chart; the caption keeps the last text that was not.
   const caption = [...tour.shown].reverse().find(c => c.on == null);
-  part('title').textContent = tour.def.title || 'Tour';
+  if (part('title')) part('title').textContent = tour.def.title || 'Tour';
   part('chapter').textContent = tour.chapters[s?.chapter]?.name ?? tour.def.title ?? 'Tour';
   const scene = tour.scenes.length > 1 && s ? ` · scene ${s.scene + 1}: ${datasetList?.find(d => d.id === ex.dataset)?.name ?? ex.dataset} from ${fmtTime(ex.prices.t[0])}` : '';
-  part('where').textContent = s ? `section ${s.index + 1} of ${tour.sections.length} · #${s.from}${s.until > s.from ? ` to #${s.until}` : ''}${scene}` : 'no sections yet';
+  // An analysis counts its chapters, a section each; a tour its sections, several to a chapter.
+  const where = tour.page === 'Analysis' ? `${tour.def.title} · chapter ${(s?.chapter ?? 0) + 1} of ${tour.chapters.length}`
+    : `section ${(s?.index ?? 0) + 1} of ${tour.sections.length} · #${s?.from}${s?.until > s?.from ? ` to #${s.until}` : ''}`;
+  part('where').textContent = s ? `${where}${tour.ended ? ' · ended' : ''}${scene}` : 'no sections yet';
   part('caption').textContent = caption?.text ?? '';
   part('readout').textContent = `#${t} · ${fmtTime(ex.prices.t[t])} UTC`;
   const warning = part('warning');
-  warning.hidden = !ex.unanchored;
-  warning.textContent = ex.unanchored ? 'The local server was started before the tour existed, so it cannot work out the structure from the tour\'s start: only candles and closes are shown. Restart ./build-site.ps1 -Serve.' : '';
+  if (warning) {
+    warning.hidden = !ex.unanchored;
+    warning.textContent = ex.unanchored ? 'The local server was started before the tour existed, so it cannot work out the structure from the tour\'s start: only candles and closes are shown. Restart ./build-site.ps1 -Serve.' : '';
+  }
 
   // The chapters and the problems change as the tour is edited, so they are redrawn when they differ.
-  const fill = (el, html) => { if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; } };
+  const fill = (el, html) => { if (el && el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; } };
   fill(part('errors'), tour.errors.length ? `<div class="empty tour-errors"><b>The tour has problems</b><ul>${tour.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>` : '');
   fill(part('chapters'), tour.chapters.map((c, i) => `<a href="#Tour/${c.slug}" data-chapter="${i}">${i + 1}. ${esc(c.name)}</a>`).join(''));
-  part('chapters').querySelectorAll('a').forEach(a => a.classList.toggle('active', Number(a.dataset.chapter) === s?.chapter));
+  part('chapters')?.querySelectorAll('a').forEach(a => a.classList.toggle('active', Number(a.dataset.chapter) === s?.chapter));
 
-  const play = document.querySelector('[data-tour-go="play"]');
+  const play = go('play');
   play.textContent = tour.timer ? '❚❚' : '▶';
   play.setAttribute('aria-label', tour.timer ? 'Pause (Space)' : 'Play (Space)');
-  document.querySelector('[data-tour-go="edit"]').setAttribute('aria-pressed', editorOn());
-  document.querySelector('[data-tour-go="glossary"]').setAttribute('aria-pressed', glossaryOn());
-  const voice = document.querySelector('[data-tour-go="voice"]'), clips = Object.keys(tour.audio ?? {}).length;
+  go('next').disabled = tour.ended;
+  go('edit')?.setAttribute('aria-pressed', editorOn());
+  go('glossary')?.setAttribute('aria-pressed', glossaryOn());
+  if (go('similar')) go('similar').hidden = !trendLevel(tour);
+  const voice = go('voice'), clips = Object.keys(tour.audio ?? {}).length;
   voice.setAttribute('aria-pressed', voiceOn());
   if (!clips) voice.title = 'No clips yet: the local server reads the texts aloud when Voice is on';
   const pace = TOUR_PACES.indexOf(tourPace());
-  document.querySelector('[data-tour="pace"]').value = pace;
-  document.querySelector('[data-tour="pace-name"]').textContent = TOUR_PACES[pace].name;
+  part('pace').value = pace;
+  part('pace-name').textContent = TOUR_PACES[pace].name;
+  part('autonext').checked = autoNext();
+  showScrub();
 
   // The editor marks the texts shown so far, and the one on show.
   document.querySelectorAll('#tour-editor .ed-cue').forEach((el, j) => {
@@ -3229,11 +3118,22 @@ function updateTourPanel() {
 
 // One beat of a playing tour: the next text once the one on show has been read, else the next candle, else the next section.
 function tourTick() {
-  if (currentPage !== 'Tour' || !tour.sections.length) return pauseTour();
+  if (!playerHere(currentPage) || !tour.sections.length) return pauseTour();
   const s = tourSection(), ex = tour.ex, now = performance.now(), t = cursorOf(ex);
   // A text still waiting for the voice has not begun its time on show.
   const reading = tour.active && (now < tour.activeUntil || tour.voice.waiting.includes(tour.active));
-  if (!reading && tour.queue.length) { showNextCue(); return refreshTour(); }
+  if (!reading && tour.queue.length) {
+    // An analysis's texts are read aloud by the server as it is written: with Voice on, a text waits for its clip,
+    // twenty seconds at most, looking for it again every second.
+    const next = tour.queue[0];
+    if (tour.waitForClips && voiceOn() && !next.silent && !tour.audio[textKey(next.text)] && now - (tour.waitingSince ??= now) < 20000) {
+      if (now - (tour.audioAt ?? 0) > 1000) loadPlayerAudio();
+      return;
+    }
+    tour.waitingSince = null;
+    showNextCue();
+    return refreshTour();
+  }
   if (tour.journey) return journeyTick(s, ex, now, reading);
   if (t < s.until) {
     // The replay waits at a cue that has a candle; text with no candle is read while the replay runs.
@@ -3246,7 +3146,7 @@ function tourTick() {
     // wait the count starts again, so the replay does not leap to make up the time.
     const gap = 1000 / (s.speed * tourPace().candles), late = now - tour.nextCandle, inStep = tour.nextCandle > 0 && late < 1000;
     const due = inStep ? 1 + Math.floor(late / gap) : 1;
-    const stop = Math.min(s.until, t + due, ...s.cues.filter(c => cueAt(c) > t && !tour.fired.has(c)).map(cueAt));
+    const stop = Math.min(s.until, t + due, ...pendingCues(s).filter(c => cueAt(c) > t).map(cueAt));
     let to = t + 1;
     while (to < stop && timelineAt(ex, to + 1)) to++;
     tour.nextCandle = inStep && to - t === due ? tour.nextCandle + due * gap : now + gap;
@@ -3254,15 +3154,55 @@ function tourTick() {
     return refreshTour();
   }
   if (reading) return;
-  if (tour.index + 1 < tour.sections.length) return enterSection(tour.index + 1, { journey: true });
+  // On to the next section played; at the start of a new chapter, only with Play the next chapter ticked.
+  const next = sectionAfter(tour.index, 1);
+  if (next != null) {
+    if (!autoNext() && tour.chapters[tour.sections[next].chapter]?.section === next) return pauseTour();
+    return enterSection(next, { journey: true });
+  }
+  tour.ended = true;
   pauseTour();
   tour.onEnd?.();
   tour.onEnd = null;
 }
 
+// The clips the local server has read so far, looked for again while an analysis's texts are still being read.
+async function loadPlayerAudio() {
+  const mine = tour;
+  mine.audioAt = performance.now();
+  const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (audio) mine.audio = audio;
+}
+
+// The slider spans the section on show, and its readout says where the cursor is in it.
+function showScrub() {
+  const scrub = document.querySelector('[data-tour="scrub"]'), s = tourSection();
+  if (!scrub || !s) return;
+  const t = Math.max(s.from, Math.min(s.until, cursorOf(tour.ex)));
+  scrub.min = s.from;
+  scrub.max = Math.max(s.until, s.from + 1);
+  scrub.disabled = s.until <= s.from;
+  if (document.activeElement !== scrub) scrub.value = t;
+  document.querySelector('[data-tour="where-in"]').textContent = s.until > s.from ? `${t - s.from} of ${s.until - s.from} candles` : 'stays on this candle';
+}
+
+// Dragging the slider pauses the player and moves the cursor within the section: its texts up to there are taken as
+// read, and the last of them is on show; Play carries on from there.
+function scrubTour(t) {
+  if (!tour?.sections.length) return;
+  pauseTour();
+  if (tour.journey) endJourney();
+  seekTour(tour.index, { t, shown: Infinity });
+}
+
 function playTour() {
-  const s = tourSection();
-  if (tour.index === tour.sections.length - 1 && cursorOf(tour.ex) >= s.until && !tour.queue.length && !tour.journey) enterSection(0);
+  if (!tour?.sections.length) return;
+  stopPlaying();
+  const s = tourSection(), atEnd = cursorOf(tour.ex) >= s.until && !tour.queue.length && !tour.journey, next = sectionAfter(tour.index, 1);
+  // At the end it starts again; at the end of a chapter it is paused at, the next chapter plays; in a section since left
+  // out, the next played one does.
+  if (tour.ended || (atEnd && next == null)) enterSection(sectionAfter(-1, 1) ?? 0);
+  else if ((atEnd || !sectionOn(tour.index)) && next != null) enterSection(next, { journey: true });
   // The text on show gets its reading time again, and is read aloud from its start: it was shown while the tour was not playing.
   if (tour.active) tour.activeUntil = performance.now() + holdOf(tour.active) * 1000;
   tour.nextCandle = 0;
@@ -3279,35 +3219,35 @@ function pauseTour() {
   updateTourPanel();
 }
 
-// Stepping by hand: back to the start of the section (or of the one before), or on to the next text, candle with a cue, or section.
+// Stepping by hand, a section at a time, over the sections left out: back to the start of the section, or of the one before
+// when it has not got past its first text; on to the start of the next, or from the last to its end, every text read.
 function tourGo(action) {
   if (!tour?.sections.length) return;
   if (action === 'play') return tour.timer ? pauseTour() : playTour();
   pauseTour();
   if (tour.journey) endJourney();
-  const s = tourSection(), t = cursorOf(tour.ex);
-  if (action === 'prev') return enterSection(t > s.from || tour.shown.length > 1 ? tour.index : Math.max(0, tour.index - 1));
-  if (action === 'first') return enterSection(0);
-  if (action === 'last') return enterSection(tour.sections.length - 1);
-  if (!tour.queue.length && t >= s.until) {
-    if (tour.index + 1 < tour.sections.length) enterSection(tour.index + 1);
-    return;
-  }
-  if (!tour.queue.length) advanceTo(Math.min(s.until, ...s.cues.filter(c => !tour.fired.has(c)).map(cueAt)));
-  showNextCue();
-  refreshTour();
+  const s = tourSection(), t = cursorOf(tour.ex), first = sectionAfter(-1, 1) ?? 0, last = sectionAfter(tour.sections.length, -1) ?? tour.sections.length - 1;
+  if (action === 'prev') return enterSection((t > s.from || tour.shown.length > 1 || tour.ended) && sectionOn(tour.index) ? tour.index : sectionAfter(tour.index, -1) ?? first);
+  if (action === 'first') return enterSection(first);
+  if (action === 'last') return enterSection(last);
+  const next = sectionAfter(tour.index, 1);
+  if (action === 'next' && next != null) return enterSection(next);
+  // The end: the last section played, at its last candle, every text read.
+  seekTour(last, { t: Infinity, shown: Infinity });
+  tour.ended = true;
+  updateTourPanel();
 }
 
 async function renderTourPage(chapter) {
   const main = document.getElementById('main');
   selected.clear();
+  pauseTour();
   currentPage = 'Tour';
+  if (tours.Tour) tour = tours.Tour;
   const show = body => {
-    main.innerHTML = `<section class="term-head"><h2 data-tour="title">${esc(tour?.def.title || 'Tour')}</h2>
-      <p class="remarks">${writtenTour
-        ? `A tour written by the local server around one ${esc(writtenTour.explain)}, from the prices. The editor beside the chart changes it here only. <a href="./#Tour">The tour itself</a>.`
-        : `A scripted replay, read from <code>tour.json</code> and changed with the editor beside the chart. Candles are numbered
-      from the tour's start: the crosshair shows a candle's number.`}</p></section>${body}`;
+    main.innerHTML = `<section class="term-head"><h2 data-tour="title">${esc(tours.Tour?.def.title || 'Tour')}</h2>
+      <p class="remarks">A scripted replay, read from <code>tour.json</code> and changed with the editor beside the chart. Candles are numbered
+      from the tour's start: the crosshair shows a candle's number.</p></section>${body}`;
     renderLayers(); wireReplayExamples(main); drawAll(currentPage);
   };
 
@@ -3315,9 +3255,9 @@ async function renderTourPage(chapter) {
     show(`<div class="empty" data-server-check>Checking for the local server…</div>`);
     return checkLocalServer();
   }
-  if (!tour) {
+  if (!tours.Tour) {
     show('<div class="empty">Loading the tour…</div>');
-    try { tour = await (tourLoading ??= loadTour()); }
+    try { tour = tours.Tour = await (tourLoading ??= loadTour()); }
     catch (e) {
       tourLoading = null;
       if (currentPage === 'Tour') show(`<div class="empty">The tour could not be loaded: ${esc(e.message)}.</div>`);
@@ -3331,34 +3271,11 @@ async function renderTourPage(chapter) {
     <nav class="tour-chapters" aria-label="Chapters" data-tour="chapters"></nav>
     <article class="example replay-big" id="ex-${esc(ex.id)}">
       <header><h3 data-tour="chapter"></h3><span class="id" data-tour="where"></span></header>
+      ${playerPanel('Tour')}
       ${chartRow(ex)}
-      <div class="tour-caption" data-tour="caption" aria-live="polite"></div>
-      <div class="tour-controls" role="group" aria-label="Tour controls">
-        <button type="button" data-tour-go="prev" title="Back to the start of this section, or of the one before (←)" aria-label="Back">⏮</button>
-        <button type="button" class="play" data-tour-go="play" title="Play or pause (Space)">▶</button>
-        <button type="button" data-tour-go="next" title="On to the next text, candle with a cue, or section (→)" aria-label="Next">⏭</button>
-        <span class="readout" data-tour="readout"></span>
-        <span class="keys">Keys: ← → step · Home End first last · Space play</span>
-        <button type="button" data-tour-go="voice" title="Read each text aloud from its clip in tour-audio, made by tools/tour-video">Voice</button>
-        <label class="pace" title="How fast the tour plays: the candles, the wait after each text, and the voice by a tenth either way">Speed
-          <input type="range" min="0" max="${TOUR_PACES.length - 1}" step="1" data-tour="pace"><span data-tour="pace-name"></span></label>
-        ${writtenTour?.explain === 'Trend' ? '<button type="button" data-tour-go="similar" title="Find the other Trends like this one: the same level, direction, count of Swings and Strength, or any of those">Find similar</button>' : ''}
-        <button type="button" data-tour-go="glossary" title="Show or hide the glossary: what the voice says in place of what is written, such as Break of Structure for BoS">Glossary</button>
-        ${writtenTour ? '' : `<button type="button" data-tour-go="video" title="Make the video of the tour as saved in tour.json, to download: the texts are read aloud, then the tour is recorded with the clips, which takes as long as the tour">Generate video</button>
-        <a class="button" data-tour="download" href="api/video/file" download="tour.mp4" hidden>Download video</a>`}
-        <span data-tour="video" aria-live="polite"></span>
-        <button type="button" class="edit" data-tour-go="edit" title="Show or hide the editor">Editor</button>
-      </div>
-      <div class="tour-glossary" data-tour="glossary" role="group" aria-label="Glossary" hidden></div>
       <div class="tour-warning" data-tour="warning" hidden></div>
     </article>`);
-  main.querySelectorAll('[data-tour-go]').forEach(b => b.addEventListener('click', () =>
-    b.dataset.tourGo === 'edit' ? toggleTourEditor() : b.dataset.tourGo === 'voice' ? toggleTourVoice() : b.dataset.tourGo === 'glossary' ? toggleTourGlossary()
-      : b.dataset.tourGo === 'video' ? generateTour() : b.dataset.tourGo === 'similar' ? openSimilar() : tourGo(b.dataset.tourGo)));
-  main.querySelector('[data-tour="pace"]').addEventListener('input', e => setTourPace(e.target.value));
-  const glossary = main.querySelector('[data-tour="glossary"]');
-  glossary.addEventListener('input', e => { const row = e.target.closest('.gl-row'); if (row) readGlossary(`glossary|${[...row.parentElement.children].indexOf(row)}|${e.target.dataset.gl}`); });
-  glossary.addEventListener('click', e => { const b = e.target.closest('button[data-gl]'); if (b && !b.disabled) glossaryAction(b.dataset.gl, b); });
+  wirePlayerPanel(main);
   renderTourGlossary();
   if (!videoMode) requestNarration();
   editorSection = -1;
@@ -3398,7 +3315,7 @@ async function reloadTourAudio() {
 // as soon as the tour is asked for, so for one only the following is needed.
 async function requestNarration() {
   if (videoMode) return;
-  if (!writtenTour) await fetch('api/narrate', { method: 'POST' }).catch(() => null);
+  await fetch('api/narrate', { method: 'POST' }).catch(() => null);
   tourExport = null;
   refreshTourExport();
 }
@@ -3422,7 +3339,7 @@ function updateTourExport() {
   // A written tour's status says only how the reading of its texts is going.
   status.textContent = v.running ? `${v.stage}… ${clock(v.seconds)}`
     : v.error ? `The ${v.audioOnly ? 'texts were not read aloud' : 'video was not made'}: ${v.error}`
-    : writtenTour ? '' : tourExportNote || (made ? `Video made ${made}${v.stale ? ', before the tour was last saved' : ''}` : '');
+    : tourExportNote || (made ? `Video made ${made}${v.stale ? ', before the tour was last saved' : ''}` : '');
 }
 
 // ---- Find similar ----------------------------------------------------------------------------------------------------
@@ -3450,14 +3367,18 @@ async function openSimilar() {
       if (found && currentPage === 'Analysis' && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) {
         e.preventDefault();
         dialog.close();
-        startAnalysis(wantedAnalysis = { explain: 'Trend', dataset: similar.params.dataset, at: found.dataset.simAt, level: found.dataset.simLevel });
+        wantedAnalysis = { dataset: similar.params.dataset, at: found.dataset.simAt, things: [`Trend:${found.dataset.simLevel}`], detail: detailOf('Analysis') };
+        history.replaceState(null, '', analysisHash(wantedAnalysis));
+        renderAnalysisPage();
       }
     });
   }
   dialog.innerHTML = '<h4>Find similar Trends</h4><p>Reading the Trends…</p>';
   dialog.showModal();
-  // The Trend is the one being explained: on the Replay page by the analysis open there, else by the written tour.
-  const params = currentPage === 'Analysis' && analysis ? analysis.params : writtenTour, wanted = JSON.stringify(params);
+  // The Trend is the one the analysis on show tells of.
+  if (tour?.page !== 'Analysis') return dialog.close();
+  const p = tour.params, params = { dataset: p.dataset, at: p.at, level: trendLevel(tour), ...(p.seen ? { seen: p.seen } : {}) };
+  const wanted = JSON.stringify(params);
   try {
     if (similar?.wanted !== wanted) {
       const r = await fetch(`api/explain/similar?${new URLSearchParams({ dataset: params.dataset, at: params.at, level: params.level, ...(params.seen ? { seen: params.seen } : {}), ...(currentPage === 'Analysis' ? { inPlace: true } : {}) })}`, { cache: 'no-store' });
@@ -3479,7 +3400,7 @@ function searchSimilar(dialog) {
   const s = similar.shown, keys = [...dialog.querySelectorAll('[data-sim-check]')].filter(c => c.checked).map(c => c.dataset.simCheck);
   const same = t => t.level === s.level && t.start === s.start && t.direction === s.direction;
   const found = similar.trends.filter(t => keys.every(k => t[k] === s[k]));
-  const link = t => `?${new URLSearchParams({ explain: 'Trend', dataset: similar.params.dataset, at: t.at, level: t.level })}#Tour/trend`;
+  const link = t => `./${analysisHash({ dataset: similar.params.dataset, at: t.at, things: [`Trend:${t.level}`], detail: detailOf('Analysis') })}`;
   // A Trend the chart had otherwise at the time has no tour to open, as a tour shows the chart as it was.
   const row = t => `<li${same(t) ? ' class="current"' : ''}><${t.tour ? `a href="${esc(link(t))}" data-sim-at="${esc(t.at)}" data-sim-level="${t.level}"` :'a title="The chart had this otherwise at the time, so there is no tour of it"'}${same(t) ? ' aria-current="true"' : ''}><span>#${t.index}</span><span>${esc(fmtTime(t.start))}</span>
     <span>${esc(`${orderOf(t.level)} ${trendName(t)} · ${swingsOf(t)} · ${t.strength}%${same(t) ? ' · this one' : ''}${t.tour ? '' : ' · no tour'}`)}</span></a></li>`;
@@ -3556,7 +3477,7 @@ let editorSection = -1, editorFolded = false;
 const editorOn = () => state.tourEditor !== false && !videoMode;
 const tourDirty = () => !!tour && JSON.stringify(tour.def) !== tour.saved;
 const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
-  section: ['chapter', 'scene', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'to', 'heads', 'color', 'text', 'hold', 'keep', 'voice'] };
+  section: ['chapter', 'scene', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'to', 'heads', 'color', 'texts', 'hold', 'keep', 'voice'] };
 
 // tour.json as text: a line for each text and for each of a section's settings, so a change shows as a small diff.
 function formatTour(def) {
@@ -3574,7 +3495,7 @@ function formatTour(def) {
 
 // How long a section takes to play: the replay waits at each text that has a candle, and the rest is read while it runs.
 function sectionSeconds(s) {
-  const sum = cues => cues.reduce((n, c) => n + c.hold, 0), j = s.journey;
+  const sum = cues => cues.filter(c => !c.skipped).reduce((n, c) => n + c.hold, 0), j = s.journey;
   // A journey is the view easing out and in, and the run between when it has one.
   const journey = j ? 2 * TOUR_ZOOM_MS / 1000 + (j.run ? Math.abs(j.to - j.start) / j.speed : 0) : 0;
   return sum(s.cues.filter(c => c.at != null)) + Math.max(journey + (s.until - s.from) / s.speed, sum(s.cues.filter(c => c.at == null)));
@@ -3613,13 +3534,13 @@ function renderTourEditor(anchor = 'section') {
     const pinned = c.on != null;
     return `<div class="ed-cue" data-cue="${j}">
       <div class="ed-meta" data-ed-cue></div>
-      <textarea data-scope="cue" data-field="text" placeholder="Text" aria-label="Text ${j + 1}">${value(c.text)}</textarea>
+      ${DETAILS.map(level => `<label class="ed-level">${DETAIL_NAMES[level]}<textarea data-scope="cue" data-field="texts.${level}" placeholder="${level === DETAILS[0] ? 'Shown at every detail' : `Shown at ${DETAIL_NAMES[level]}, in place of the ${DETAIL_NAMES[DETAILS[0]].toLowerCase()}`}" aria-label="${DETAIL_NAMES[level]} ${j + 1}">${value(c.texts?.[level])}</textarea></label>`).join('')}
       <div class="ed-row">
         <label>At candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="cue" data-field="at" data-type="number" placeholder="${esc(compiled?.atSpec ?? 'start')}" value="${numberOr(c.at)}"${eventBox(compiled?.atSpec)}>${pick('at', 'the candle')}</span></label>
         <label>Pinned to<select data-scope="cue" data-field="on" data-type="auto" data-render>${options([['', 'not pinned'], ['open', 'open'], ['high', 'high'], ['low', 'low'], ['close', 'close'],
           ...(typeof c.on === 'number' ? [[c.on, `price ${c.on}`]] : [])], c.on)}</select></label>
         <label>Side<select data-scope="cue" data-field="place" ${pinned ? '' : 'disabled'}>${options([['', 'auto'], ['above', 'above'], ['below', 'below'], ['left', 'left'], ['right', 'right']], c.place)}</select></label>
-        <label>Seconds<input type="number" min="0" step="0.5" data-scope="cue" data-field="hold" data-type="number" placeholder="${readingSeconds(c.text ?? '').toFixed(1)}" value="${value(c.hold)}"></label>
+        <label>Seconds<input type="number" min="0" step="0.5" data-scope="cue" data-field="hold" data-type="number" placeholder="${readingSeconds(textAt(c.texts, detailOf('Tour')) ?? '').toFixed(1)}" value="${value(c.hold)}"></label>
         <label>Pin stays<select data-scope="cue" data-field="keep" ${pinned ? '' : 'disabled'}>${options([['', 'this section'], ['chapter', 'this chapter'], ['always', 'to the end']], c.keep === 'section' ? '' : c.keep)}</select></label>
         <label class="ed-check" title="Shown but not read aloud by the voice, in the page or in the video"><input type="checkbox" data-scope="cue" data-field="voice" ${c.voice === false ? 'checked' : ''}>Silent</label>
         <label title="Draws a line from the pinned point to a point on another candle, with the text in a box along it; it appears when the replay reaches the line's end">Line to candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="cue" data-field="lineTo" data-type="number" data-render ${pinned ? '' : 'disabled'} placeholder="${esc(compiled?.to?.atSpec ?? 'no line')}" value="${numberOr(c.to?.at)}"${eventBox(compiled?.to?.atSpec)}></span></label>
@@ -3661,7 +3582,7 @@ function renderTourEditor(anchor = 'section') {
       </div>
       <div class="ed-layers"><span>Layers</span>${chips.join('') || '<span class="ed-chip">none</span>'}<span class="ed-hint">Set with the layer buttons on the left.</span></div>
       ${d.explain == null ? '' : `<div class="ed-layers"><span>Explains</span><span class="ed-chip">${esc(String(d.explain))} at #${esc(String(d.at ?? '?'))}</span><span class="ed-hint">The texts are written from the prices; texts added here follow them.</span></div>
-        ${written.length ? `<ol class="ed-written">${written.map(c => `<li>${esc(c.text)}${c.on != null ? ` <em>(pinned to the ${esc(String(c.on))} of #${c.at})</em>` : ''}</li>`).join('')}</ol>` : ''}`}
+        ${written.length ? `<ol class="ed-written">${written.map(c => `<li>${esc(c.text ?? cueText(c))}${c.on != null ? ` <em>(pinned to the ${esc(String(c.on))} of #${c.at})</em>` : ''}</li>`).join('')}</ol>` : ''}`}
       ${(d.cues ?? []).map((c, j) => cueCard(c, j, s.cues[written.length + j])).join('')}
       <div class="ed-foot"><button type="button" data-ed="add-cue">+ Text</button><button type="button" data-ed="add-section">+ Section after</button>
         <button type="button" data-ed="section-copy" title="Add a copy of this section after it">Duplicate</button>
@@ -3710,7 +3631,7 @@ function updateEditorMeta() {
     const i = Number(card.dataset.section), d = tour.def.sections[i], s = tour.sections[i];
     if (!d || !s) return;
     const name = card.querySelector('[data-ed-name]');
-    name.textContent = d.chapter || `↳ ${d.cues?.find(c => c.on == null && c.text)?.text ?? (d.explain != null ? `${d.explain} at #${d.at ?? '?'}` : 'no text yet')}`;
+    name.textContent = d.chapter || `↳ ${cueText(d.cues?.find(c => c.on == null && cueText(c))) ?? (d.explain != null ? `${d.explain} at #${d.at ?? '?'}` : 'no text yet')}`;
     name.classList.toggle('chapter', !!d.chapter);
     card.querySelector('[data-ed-meta]').textContent = `#${s.from}${s.until > s.from ? ` → #${s.until}` : ''} · ${Math.round(sectionSeconds(s))}s`;
   });
@@ -3735,10 +3656,10 @@ function updateEditorStatus() {
   status.textContent = tour.picking ? 'Click a candle on the chart. Esc cancels.'
     : tour.resolving ? 'Looking up the events the tour waits for…'
     : tour.note || (problems ? `${problems} problem${problems === 1 ? '' : 's'}, listed above the chart`
-    : writtenTour ? `Written from the prices${dirty ? ', changed here only' : ''}` : dirty ? 'Changes not saved' : 'Saved in tour.json');
+    : dirty ? 'Changes not saved' : 'Saved in tour.json');
   status.classList.toggle('warn', !tour.picking && (!!tour.note || problems > 0));
   const save = document.querySelector('[data-ed="save"]');
-  save.disabled = !dirty || !!writtenTour;
+  save.disabled = !dirty;
   save.classList.toggle('dirty', dirty);
   document.querySelector('[data-ed="undo"]').disabled = !tour.history.length;
   document.querySelectorAll('[data-ed="pick"]').forEach(b => b.setAttribute('aria-pressed',
@@ -3777,7 +3698,7 @@ function applyTour({ render = false, cue = null, end = false, start = false } = 
   const was = { t: cursorOf(tour.ex), shown: tour.shown.length };
   tour.note = '';
   anchorTour();
-  Object.assign(tour, compileTour(tour.def, tour.scenes, tour.resolved, tour.audio));
+  Object.assign(tour, compileTour(tour.def, tour.scenes, tour.resolved, tour.audio, tour.detail));
   if (render) { editorSection = -1; renderTourGlossary(); }
   seekTour(tour.index, start ? {} : end ? { t: Infinity, shown: Infinity } : cue != null ? { cue } : was);
   updateEditorMeta();
@@ -3819,6 +3740,12 @@ function editTourField(el) {
     if (!dataset) delete target.scene;
     else target.scene = { ...(dataset !== (def.dataset ?? datasetList?.[0]?.id) ? { dataset } : {}), ...(time ? { time } : {}) };
   }
+  // A text for one level of detail; an empty box leaves that level out.
+  else if (field.startsWith('texts.')) {
+    const level = field.slice('texts.'.length);
+    target.texts ??= {};
+    if (value === '') delete target.texts[level]; else target.texts[level] = value;
+  }
   // Silent is the one tick box: ticked, the text has "voice": false, and otherwise it has no "voice" at all.
   else if (el.type === 'checkbox') { if (el.checked) target[field] = false; else delete target[field]; }
   else if (field === 'view0' || field === 'view1') {
@@ -3827,9 +3754,9 @@ function editTourField(el) {
     const first = read(0), last = read(1), before = scope === 'start' ? DEFAULT_VIEW : tour.index ? tour.sections[tour.index - 1].view : tour.startView;
     if (first == null && last == null) delete target.view; else target.view = [first ?? before[0], last ?? before[1]];
   }
-  // An empty box leaves the setting out, so it is as before; a text stays, empty, until it is written.
-  else if ((value === '' && field !== 'text') || Number.isNaN(value)) delete target[field]; else target[field] = value;
-  if (field === 'text') cueEl.querySelector('[data-field="hold"]').placeholder = readingSeconds(value).toFixed(1);
+  // An empty box leaves the setting out, so it is as before.
+  else if (value === '' || Number.isNaN(value)) delete target[field]; else target[field] = value;
+  if (field.startsWith('texts.')) cueEl.querySelector('[data-field="hold"]').placeholder = readingSeconds(textAt(target.texts, detailOf('Tour')) ?? '').toFixed(1);
   applyTour(scope === 'cue' ? { cue: j, render: el.hasAttribute('data-render') } : { end: field === 'until', start: field === 'from', render: el.hasAttribute('data-render') });
   // Where the change redrew the editor, the box that was being used is found again: a text's settings only show once
   // the text has the focus.
@@ -3891,7 +3818,7 @@ function pickCandle(i) {
   if (cue != null) focusCue(cue);
 }
 
-const focusCue = j => document.querySelectorAll('#tour-editor .ed-cue textarea')[j]?.focus();
+const focusCue = j => document.querySelectorAll('#tour-editor .ed-cue')[j]?.querySelector('textarea')?.focus();
 
 // The candle under the pointer, by its number in the tour.
 function candleAt(el, e) {
@@ -3902,7 +3829,7 @@ function candleAt(el, e) {
 }
 
 async function saveTour() {
-  if (!tourDirty() || writtenTour) return;
+  if (!tourDirty() || tour?.page !== 'Tour') return;
   const def = JSON.stringify(tour.def), body = formatTour(tour.def);
   const response = await fetch('api/tour', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Tour-Base': tour.base }, body }).catch(() => null);
   if (response?.ok) Object.assign(tour, { saved: def, base: textKey(body) });
@@ -3967,7 +3894,7 @@ function tourAction(action, el) {
     }
     case 'add-section':
       rememberTour();
-      sections.splice(sections.length ? i + 1 : 0, 0, { cues: [{ text: '' }] });
+      sections.splice(sections.length ? i + 1 : 0, 0, { cues: [{ texts: {} }] });
       tour.index = sections.length === 1 ? 0 : i + 1;
       applyTour({ render: true, start: true });
       return document.querySelector('#tour-editor .ed-cue textarea')?.focus();
@@ -3986,7 +3913,7 @@ function tourAction(action, el) {
     }
     case 'add-cue':
       rememberTour();
-      (d.cues ??= []).push({ text: '' });
+      (d.cues ??= []).push({ texts: {} });
       applyTour({ render: true, cue: d.cues.length - 1 });
       return focusCue(d.cues.length - 1);
     case 'section-copy': {

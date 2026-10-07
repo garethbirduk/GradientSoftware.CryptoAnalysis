@@ -19,7 +19,11 @@ public class ExplainTests
         return prices.Skip(Tours.AnchorOf("2023-01-01T00:00", prices)).ToList();
     });
 
-    private static List<string> Texts(JsonObject section) => (section["cues"]?.AsArray() ?? []).Select(x => x!["text"]!.GetValue<string>()).ToList();
+    // A section's texts as the page shows them at a level of detail: each cue's text for the highest level at or below it,
+    // leaving out the cues with none that low.
+    private static List<string> Texts(JsonObject section, EnumDetail detail = EnumDetail.Summary) => (section["cues"]?.AsArray() ?? [])
+        .Select(x => Enum.GetValues<EnumDetail>().Where(level => level <= detail).Select(level => x!["texts"]?[Details.Name(level)]?.GetValue<string>()).LastOrDefault(t => t != null))
+        .Where(x => x != null).Select(x => x!).ToList();
 
     [TestMethod]
     public void Candle_TheToursExample_SaysItsPricesAndWhyItIsGreen()
@@ -30,21 +34,106 @@ public class ExplainTests
         Assert.IsNull(section["until"], "The replay has passed the candle, so the section does not run on.");
         CollectionAssert.AreEqual(new[]
         {
-            "This candle is the hour from 00:00 to 01:00 on Tuesday 3 January 2023.",
-            "It opened at 16666 and closed at 16690.",
+            "The hour from 00:00 to 01:00 on Tuesday 3 January 2023.",
+            "Open 16666, close 16690.",
             "open: 16666",
             "close: 16690",
-            "Its high was 16700 and its low was 16639.",
+            "High 16700, low 16639.",
             "high: 16700",
             "low: 16639",
-            "Because the candle closed higher than the open, it is green.",
-            "The candle before it closed lower than the open, so it is red.",
-            "red",
+            "Green: it closed above its open.",
         }, Texts(section));
 
+        // Every pin, at Education, where the candle set against it is pinned too.
         var pins = section["cues"]!.AsArray().Where(x => x!["on"] != null).Select(x => $"#{x!["at"]} {x["on"]} {x["place"]}").ToList();
         CollectionAssert.AreEqual(new[] { "#48 open left", "#48 close right", "#48 high above", "#48 low below", "#47 low below" }, pins);
         Assert.IsTrue(section["cues"]!.AsArray().Where(x => x!["on"] != null).All(x => x!["voice"]?.GetValue<bool>() == false), "Pins are shown, not read.");
+        CollectionAssert.AreEqual(new[] { "candles" }, section["add"]!.AsArray().Select(x => x!.GetValue<string>()).ToArray(), "Not in a run of five, so no Successive Candles.");
+    }
+
+    [TestMethod]
+    public void Candle_AtEducation_TeachesWhatACandleIsBetweenItsPrices()
+    {
+        var section = Explain.Candle(TourPrices.Value, 48, reached: 50);
+
+        CollectionAssert.AreEqual(new[]
+        {
+            "A candle shows a whole hour of trading in one shape, drawn from four prices.",
+            "The hour from 00:00 to 01:00 on Tuesday 3 January 2023.",
+            "The open is the price at the start of the hour and the close is the price at its end. The body of the candle spans the two.",
+            "Open 16666, close 16690.",
+            "open: 16666",
+            "close: 16690",
+            "The high and the low are the furthest the price went during the hour. The thin lines above and below the body are wicks, and they reach to them.",
+            "High 16700, low 16639.",
+            "high: 16700",
+            "low: 16639",
+            "A candle that closes above its open is green. A candle that closes below its open is red. One that closes where it opened has no body, and is neither.",
+            "Green: it closed above its open.",
+            "The candle before it closed lower than the open, so it is red.",
+            "red",
+        }, Texts(section, EnumDetail.Education));
+    }
+
+    [TestMethod]
+    public void Run_TellsOfTheSuccessiveCandlesByThePagesSetting()
+    {
+        // The tour's six green candles, #85 to #90: #87 is the third of them, told of on the run's last candle.
+        var section = Explain.Run(TourPrices.Value, 87, reached: 90, null, null, out var problem)!;
+
+        Assert.IsNotNull(section, problem);
+        CollectionAssert.AreEqual(new[] { "Third of six Successive Green Candles, 13:00 to 18:00." }, Texts(section));
+        Assert.AreEqual("Candles of one colour that follow one another are Successive Candles, counted from the first of the colour to the last.", Texts(section, EnumDetail.Education)[0]);
+        CollectionAssert.AreEqual(new[] { "candles", "SuccessiveGreenCandles" }, section["add"]!.AsArray().Select(x => x!.GetValue<string>()).ToArray());
+        CollectionAssert.AreEqual(new[] { 83, 92 }, section["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray(), "The view takes in the whole run.");
+        Assert.IsFalse(Texts(Explain.Candle(TourPrices.Value, 87, reached: 90)).Any(x => x.Contains("Successive")), "The Candle itself does not tell of its run.");
+
+        // Drawn only to #87, the run is three so far; with a setting of seven there is none; seen from #90 it is whole.
+        Assert.AreEqual("Third of three Successive Green Candles, 13:00 to 15:00.", Texts(Explain.Run(TourPrices.Value, 87, reached: 80, new ExplainOptions(3, 3), null, out _)!)[0]);
+        Assert.IsNull(Explain.Run(TourPrices.Value, 87, reached: 90, new ExplainOptions(7, 7), null, out _));
+        var seen = Explain.Run(TourPrices.Value, 87, reached: 87, null, known: 90, out _)!;
+        Assert.AreEqual(90, seen["until"]!.GetValue<int>());
+    }
+
+    [TestMethod]
+    public void At_ListsWhatIsAtTheCandle_AndATourHasAChapterForEachThingTicked()
+    {
+        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+
+        // The third of the tour's six green candles, as the Replay page had it at the run's last candle.
+        var things = Explain.At(prices, "2023-01-04T15:00", "2023-01-04T18:00");
+
+        Assert.AreEqual("Candle", things[0].Id);
+        Assert.AreEqual("SuccessiveCandles", things[1].Id);
+        Assert.AreEqual("Six Successive Green Candles", things[1].Name);
+        Assert.IsTrue(things.Any(x => x.Id == "Swing:1"), string.Join(", ", things.Select(x => x.Id)));
+        var levels = things.Where(x => x.Level != null).Select(x => x.Level!.Value).ToList();
+        CollectionAssert.AreEqual(levels.OrderByDescending(x => x).ToList(), levels, "From the finest level outwards.");
+
+        var def = Explain.Tour([new Explain.Thing("Swing", 1, "Swing"), new Explain.Thing("Candle", null, "Candle"), new Explain.Thing("SuccessiveCandles", null, "Run"), new Explain.Thing("Trend", 8, "Trend")],
+            "btc-1h", prices, "2023-01-04T15:00", "2023-01-04T18:00", out var missing)!;
+        var tour = Tours.Compile(def, prices);
+
+        Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
+        CollectionAssert.AreEqual(new[] { "Candle", "Successive Candles", "1st order Upswing" }, tour.Sections.Select(x => x.Chapter).ToArray(), "From the candle outwards.");
+        CollectionAssert.AreEqual(new[] { "Trend" }, missing, "No 8th order Trend there.");
+        Assert.AreEqual(87, tour.Sections[0].Until, "The Candle chapter runs to the candle.");
+        Assert.AreEqual(90, tour.Sections[1].Until, "The run's chapter runs to its last candle.");
+        Assert.IsTrue(tour.Sections[2].Cues.Any(c => c.Text.StartsWith("1st order Upswing, from ")), tour.Sections[2].Cues[1].Text);
+    }
+
+    [TestMethod]
+    public void Point_TellsOfTheHighAgainstTheOneBefore()
+    {
+        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+        var point = Explain.At(prices, "2023-01-04T18:00", "2023-01-04T18:00").First(x => x.Kind == "Point");
+
+        var tour = Tours.Compile(Explain.Tour([point], "btc-1h", prices, "2023-01-04T18:00", "2023-01-04T18:00", out _)!, prices);
+
+        Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
+        var texts = tour.Sections[0].Cues.Where(c => c.On == null).Select(c => c.Text).ToList();
+        Assert.AreEqual("A Higher High (HH) is a high of the sawtooth at one order that is higher than the high before it at that order. Highs and lows are read from the closes.", texts[0]);
+        Assert.IsTrue(texts.Any(x => x.EndsWith("HH at 16948, above the high of 16872 at 06:00.")), string.Join("\n", texts));
     }
 
     [TestMethod]
@@ -53,8 +142,8 @@ public class ExplainTests
         var section = Explain.Candle(TourPrices.Value, 47, reached: 50);
         var texts = Texts(section);
 
-        Assert.AreEqual("Because the candle closed lower than the open, it is red.", texts[7]);
-        Assert.AreEqual("The candle after it closed higher than the open, so it is green.", texts[8]);
+        Assert.AreEqual("Red: it closed below its open.", texts[7]);
+        Assert.AreEqual("The candle after it closed higher than the open, so it is green.", Texts(section, EnumDetail.Education)[^2], "The candle set against it is for Education.");
         var contrast = section["cues"]!.AsArray()[^1]!;
         Assert.AreEqual(48, contrast["at"]!.GetValue<int>());
         Assert.AreEqual("high", contrast["on"]!.GetValue<string>());
@@ -79,15 +168,15 @@ public class ExplainTests
 
         var texts = Texts(Explain.Candle(prices, 2, reached: 7));
 
-        Assert.AreEqual("This candle is the four hours from 00:00 to 04:00 on Thursday 11 November 2021.", texts[0]);
-        Assert.AreEqual("Because the candle closed higher than the open, it is green.", texts[7]);
-        Assert.AreEqual(8, texts.Count, "Every candle is green, so there is none to set against it.");
+        Assert.AreEqual("The four hours from 00:00 to 04:00 on Thursday 11 November 2021.", texts[0]);
+        Assert.AreEqual("Green: it closed above its open.", texts[7]);
+        Assert.AreEqual(12, Texts(Explain.Candle(prices, 2, reached: 7), EnumDetail.Education).Count, "Every candle is green, so there is none to set against it.");
     }
 
     [TestMethod]
     public void Expand_KeepsWhatTheSectionSaysForItself()
     {
-        var node = JsonNode.Parse("""{ "chapter": "Candles", "explain": "Candle", "at": 48, "view": [40, 60], "speed": 2, "cues": [{ "text": "That is one candle." }] }""")!.AsObject();
+        var node = JsonNode.Parse("""{ "chapter": "Candles", "explain": "Candle", "at": 48, "view": [40, 60], "speed": 2, "cues": [{ "texts": { "summary": "That is one candle." } }] }""")!.AsObject();
         var errors = new List<string>();
 
         var section = Explain.Expand(node, TourPrices.Value, 50, "section 9", errors);
@@ -99,7 +188,7 @@ public class ExplainTests
         Assert.AreEqual(2, section["speed"]!.GetValue<int>());
         CollectionAssert.AreEqual(new[] { 40, 60 }, section["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray());
         Assert.AreEqual("That is one candle.", Texts(section)[^1]);
-        Assert.AreEqual(11, Texts(section).Count);
+        Assert.AreEqual(9, Texts(section).Count);
     }
 
     [TestMethod]
@@ -111,9 +200,17 @@ public class ExplainTests
         Assert.IsNotNull(section, problem);
         Assert.AreEqual(75, section["until"]!.GetValue<int>());
         CollectionAssert.AreEqual(new[] { 39, 81 }, section["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray());
-        var pins = section["cues"]!.AsArray().Where(x => x!["on"] != null).Select(x => $"#{x!["at"]} {x["text"]}").ToList();
-        Assert.IsTrue(Texts(section).Any(x => x.StartsWith("This is a 1st order Upswing. It begins")));
-        Assert.IsTrue(Texts(section).Contains("The MSB inside it makes it a Weak Upswing."));
+        var pins = section["cues"]!.AsArray().Where(x => x!["on"] != null).Select(x => $"#{x!["at"]} {x["texts"]!["summary"]}").ToList();
+        CollectionAssert.AreEqual(new[]
+        {
+            "1st order Upswing, from an HH at 16751, at 21:00 on Monday 2 January 2023.",
+            "MSB at 16693, below the Swing Low of the Upswing before.",
+            "Swing Low: an LL at 16616.",
+            "BoS at 16856.",
+            "The Downleg is nineteen hours; the Upleg is eleven hours.",
+            "Weak: it has an MSB.",
+        }, Texts(section).Where(x => !pins.Any(p => p.EndsWith($" {x}"))).ToList());
+        Assert.AreEqual("Its Downleg runs from the high to the Swing Low, and its Upleg from the Swing Low to the BoS.", Texts(section, EnumDetail.Education)[^4], "What its legs are is for Education.");
         Assert.IsTrue(pins.Contains("#46 MSB"));
         Assert.IsTrue(pins.Contains("#75 BoS"));
     }
@@ -136,10 +233,17 @@ public class ExplainTests
         Assert.IsNotNull(section, problem);
         var texts = Texts(section);
         Assert.IsNull(section["until"], "The replay is already at the candle.");
-        Assert.IsTrue(texts.Contains("Here it is an Uptrend of twelve Upswings."), texts[4]);
-        Assert.IsTrue(texts.Contains("Four of the twelve are Weak: the fourth, seventh, tenth and twelfth. Each has an MSB inside it, a close below the Swing Low of the Upswing before."), texts[5]);
-        Assert.IsTrue(texts.Contains("Its Strength is eight of twelve: 66%."), texts[6]);
-        Assert.IsTrue(texts.Contains("No Downswing has been Confirmed since, so it is still running."), texts[7]);
+        CollectionAssert.AreEqual(new[]
+        {
+            "1st order Uptrend, beginning at 01:00 on Sunday 1 January 2023.",
+            "Uptrend begins",
+            "Confirmed at the second Upswing's BoS, at 16:00 on Sunday 1 January 2023.",
+            "second Upswing",
+            "Twelve Upswings so far.",
+            "Four Weak: the fourth, seventh, tenth and twelfth.",
+            "Strength 66%: eight of twelve.",
+            "Still running: no Downswing Confirmed since.",
+        }, texts);
     }
 
     [TestMethod]
@@ -150,10 +254,10 @@ public class ExplainTests
 
         Assert.IsNotNull(section, problem);
         var texts = Texts(section);
-        Assert.IsTrue(texts.Any(x => x.StartsWith("By its end it is an Uptrend of")), texts[4]);
-        Assert.IsTrue(texts.Any(x => x.StartsWith("It ended at") && x.EndsWith("at the BoS of the first Downswing since it began.")), texts[^1]);
+        Assert.IsTrue(texts.Contains("Nine Upswings."), string.Join("\n", texts));
+        Assert.IsTrue(texts.Contains("Ended at the first Downswing's BoS, at 14:00 on Tuesday 3 January 2023."), string.Join("\n", texts));
         var end = section["cues"]!.AsArray().Last(x => x!["on"] != null)!;
-        Assert.AreEqual("Uptrend ends", end["text"]!.GetValue<string>());
+        Assert.AreEqual("Uptrend ends", end["texts"]!["summary"]!.GetValue<string>());
         Assert.AreEqual(62, end["at"]!.GetValue<int>());
     }
 
@@ -176,48 +280,19 @@ public class ExplainTests
         var trend = Tours.Compile(Explain.Tour("Trend", "btc-1h", prices, "2023-01-02T12:00", seen: "2023-01-03T16:00")!, prices);
         Assert.AreEqual(0, trend.Errors.Count, string.Join("\n", trend.Errors));
         Assert.AreEqual(36, trend.Sections[0].Until, "The candle clicked.");
-        Assert.IsTrue(trend.Sections[0].Cues.Any(c => c.Text == "No Downswing has been Confirmed since, so it is still running."), "Seen from #36 the Uptrend still runs.");
+        Assert.IsTrue(trend.Sections[0].Cues.Any(c => c.Text == "Still running: no Downswing Confirmed since."), "Seen from #36 the Uptrend still runs.");
         Assert.IsNull(Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T12:00", seen: "2023-01-03T13:00"), "At #61 the Upswing from #45 has no BoS yet, so the page did not show it.");
 
         // A 2nd order Swing the page showed at #100 is not on the chart at its own BoS, so the tour runs on to the cursor.
         var finer = Tours.Compile(Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T12:00", level: 2, seen: "2023-01-05T04:00")!, prices);
         Assert.AreEqual(0, finer.Errors.Count, string.Join("\n", finer.Errors));
         Assert.AreEqual(100, finer.Sections[0].Until);
-        Assert.IsTrue(finer.Sections[0].Cues.Any(c => c.Text.StartsWith("This is a 2nd order ")), finer.Sections[0].Cues[0].Text);
+        Assert.IsTrue(finer.Sections[0].Cues.Any(c => c.Text.StartsWith("2nd order ")), finer.Sections[0].Cues[1].Text);
 
         // At #290 the Uptrend had ended at a Downswing's BoS; by the cursor those Downswings were Ghosts and it ran on, so the tour runs to the cursor.
         var ghosted = Tours.Compile(Explain.Tour("Trend", "btc-1h", prices, "2023-01-13T02:00", seen: "2023-01-14T00:00")!, prices);
         Assert.AreEqual(0, ghosted.Errors.Count, string.Join("\n", ghosted.Errors));
         Assert.AreEqual(312, ghosted.Sections[0].Until);
-    }
-
-    [TestMethod]
-    public void Tour_InPlace_SaysWhatIsInsideAndListsItToStepInto()
-    {
-        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
-        static List<string> Steps(JsonObject def) => (def["inside"]?.AsArray() ?? []).Select(x => $"{x!["explain"]} {x["level"]} {x["name"]} {x["at"]}").ToList();
-
-        // The 1st order Downswing from #47 to #62, as the chart had it at #72.
-        var def = Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T10:00", seen: "2023-01-04T00:00", inPlace: true)!;
-        var tour = Tours.Compile(def, prices);
-
-        Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
-        Assert.AreEqual(2, tour.Sections.Count, "Its own section, then what is inside it.");
-        CollectionAssert.AreEqual(
-            new[] { "Inside it are two 2nd order Upswings and one Downswing.", "The two Upswings are part of a 2nd order Uptrend that began before it." },
-            tour.Sections[1].Cues.Select(c => c.Text).ToList());
-        Assert.IsTrue(tour.Sections[1].Cues.All(c => c.At == 62), "Told at its BoS, once its own texts are done.");
-        CollectionAssert.AreEqual(
-            new[] { "Trend 2 Uptrend 2023-01-03T09:00", "Swing 2 Upswing 2023-01-03T00:00", "Swing 2 Upswing 2023-01-03T07:00", "Swing 2 Downswing 2023-01-03T12:00" },
-            Steps(def));
-
-        // That Uptrend lists its own Upswings, at its own level.
-        var trend = Explain.Tour("Trend", "btc-1h", prices, "2023-01-03T09:00", level: 2, seen: "2023-01-04T00:00", inPlace: true)!;
-        CollectionAssert.AreEqual(
-            new[] { "Swing 2 Upswing 2023-01-02T05:00", "Swing 2 Upswing 2023-01-03T00:00", "Swing 2 Upswing 2023-01-03T07:00" },
-            Steps(trend));
-
-        Assert.IsNull(Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T10:00", seen: "2023-01-04T00:00")!["inside"], "Only an analysis played in place steps in.");
     }
 
     [TestMethod]
@@ -265,13 +340,13 @@ public class ExplainTests
         var tour = Tours.Compile(def, prices);
 
         Assert.AreEqual("Candle at 00:00 on 3 January 2023", def["title"]!.GetValue<string>());
-        Assert.AreEqual("2023-01-02T16:00", def["start"]!["time"]!.GetValue<string>());
         Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
-        Assert.AreEqual(2, tour.Sections.Count);
-        Assert.AreEqual(8, tour.Sections[0].Until, "The first section runs to the candle, saying nothing.");
-        Assert.AreEqual(0, tour.Sections[0].Cues.Count);
-        Assert.AreEqual(8, tour.Sections[1].From, "The section that explains the candle begins with it drawn.");
-        Assert.AreEqual("This candle is the hour from 00:00 to 01:00 on Tuesday 3 January 2023.", tour.Sections[1].Cues[0].Text);
+        Assert.AreEqual(1, tour.Sections.Count);
+        Assert.AreEqual(44, tour.Sections[0].From, "A few candles before it.");
+        Assert.AreEqual(48, tour.Sections[0].Until, "It runs to the candle, then explains it.");
+        CollectionAssert.AreEqual(new[] { 44, 51 }, tour.Sections[0].View.ToArray(), "The view is the candle and a few either side.");
+        CollectionAssert.AreEqual(new[] { EnumDetail.Education }, tour.Sections[0].Cues[0].Texts.Keys.ToArray(), "What a candle is comes first, at Education only.");
+        Assert.AreEqual("The hour from 00:00 to 01:00 on Tuesday 3 January 2023.", tour.Sections[0].Cues[1].Text);
         Assert.IsNull(Explain.Tour("Weather", "btc-1h", prices, "2023-01-03T00:00"));
     }
 

@@ -4,6 +4,30 @@ using System.Text.Json.Nodes;
 namespace Gradient.CryptoAnalysis.Site;
 
 /// <summary>
+/// What an explanation is told with: the page's settings that decide which things are worth telling of. GreenRuns and
+/// RedRuns are how many candles of a colour in a row make Successive Candles, as the page's Candles layers have it.
+/// </summary>
+public sealed record ExplainOptions(int GreenRuns = 5, int RedRuns = 5)
+{
+    public static readonly ExplainOptions Default = new();
+
+    /// <summary>
+    /// The options a tour.json section gives: "runs" as one number for both colours, or { "green", "red" }.
+    /// </summary>
+    public static ExplainOptions From(JsonNode? node)
+    {
+        return node switch
+        {
+            JsonValue value when value.TryGetValue<int>(out var both) => new ExplainOptions(both, both),
+            JsonObject each => new ExplainOptions(each["green"]?.GetValue<int>() ?? Default.GreenRuns, each["red"]?.GetValue<int>() ?? Default.RedRuns),
+            _ => Default,
+        };
+    }
+
+    public JsonNode ToJson() => GreenRuns == RedRuns ? JsonValue.Create(GreenRuns) : new JsonObject { ["green"] = GreenRuns, ["red"] = RedRuns };
+}
+
+/// <summary>
 /// Writes tour sections from the prices. A section of tour.json that says { "explain": "Candle", "at": 48 } is filled in
 /// here: its view, the layers it needs, how far the replay runs so the thing explained is drawn, and its texts, worked out
 /// from the candle it names, so the same section explains whichever candle the tour points it at. A Swing or a Trend is
@@ -16,7 +40,30 @@ public static class Explain
     /// <summary>
     /// The things a section can explain.
     /// </summary>
-    public static readonly IReadOnlyList<string> Terms = ["Candle", "Swing", "Trend"];
+    public static readonly IReadOnlyList<string> Terms = ["Candle", "SuccessiveCandles", "Point", "Swing", "Trend"];
+
+    /// <summary>
+    /// A thing at a candle that can be explained: its kind (one of <see cref="Terms"/>), the sawtooth level it is at when
+    /// that matters, and how the page names it. Id is how an address names it: "Candle", "SuccessiveCandles", "Point:1",
+    /// "Swing:2".
+    /// </summary>
+    public sealed record Thing(string Kind, int? Level, string Name)
+    {
+        public string Id => Level is int level ? $"{Kind}:{level}" : Kind;
+
+        /// <summary>
+        /// A thing from its id, named by its kind alone; null when the kind is not one that can be explained.
+        /// </summary>
+        public static Thing? Parse(string id)
+        {
+            var parts = id.Trim().Split(':');
+            if (!Terms.Contains(parts[0]))
+                return null;
+            return new Thing(parts[0], parts.Length > 1 && int.TryParse(parts[1], out var level) ? level : null, parts[0]);
+        }
+
+        public JsonObject ToJson() => new() { ["id"] = Id, ["kind"] = Kind, ["level"] = Level, ["name"] = Name };
+    }
 
     private const EnumPriceBasis Basis = EnumPriceBasis.Close;
     private const int CandlesBefore = 4;
@@ -42,6 +89,7 @@ public static class Explain
         result.Remove("at");
         result.Remove("level");
         result.Remove("known");
+        result.Remove("runs");
         var term = node["explain"]?.GetValue<string>() ?? "";
         if (!Terms.Contains(term))
         {
@@ -66,7 +114,7 @@ public static class Explain
         var level = node["level"] is JsonValue given && given.TryGetValue<int>(out var l) ? l : 1;
         var until = node["until"] is JsonValue end && end.TryGetValue<int>(out var u) ? u : (int?)null;
         var known = node["known"] is JsonValue read && read.TryGetValue<int>(out var k) ? k : (int?)null;
-        var written = Write(term, prices, at.Value, level, reached, until, known, out var problem);
+        var written = Write(term, prices, at.Value, level, reached, until, known, ExplainOptions.From(node["runs"]), out var problem);
         if (written == null)
         {
             errors.Add($"{where}: {problem}");
@@ -83,54 +131,150 @@ public static class Explain
     }
 
     /// <summary>
-    /// A tour of its own around one thing, in the shape of tour.json. For a Candle it starts a few candles before the one
-    /// a time lands on, with candles drawn, runs to it in silence and then explains it, so the texts come in their own
-    /// order. For a Swing or a Trend it starts where the dataset does, so the structure is the Replay page's, and the
-    /// section jumps to just before the thing and runs through it, the texts coming as the replay reaches each part: a
-    /// Swing to its BoS, a Trend to the candle. The thing is looked for in the prices up to seen, the Replay page's cursor,
-    /// so it is the one the page showed. Null when the term is not one that can be explained or nothing of the kind is at
-    /// that candle.
+    /// What is at a candle, as the chart had it at the cursor it was seen from (seen, the Replay page's; else the end of
+    /// the prices), from the candle outwards: the Candle; the Successive Candles it is in, when its run is as long as the
+    /// settings ask; then at each level from the finest down to the 1st order, the high or low it is labelled as, the
+    /// Swing it is in and the Trend it is in. The card's checklist, and the order the chapters of an analysis come in.
     /// </summary>
-    public static JsonObject? Tour(string term, string dataset, List<Price> prices, string time, int level = 1, string? seen = null, bool inPlace = false)
+    public static List<Thing> At(List<Price> prices, string time, string? seen, ExplainOptions? options = null, int maxLevel = 8)
     {
-        if (!Terms.Contains(term) || prices.Count == 0)
-            return null;
-
+        options ??= ExplainOptions.Default;
         var index = Tours.AnchorOf(time, prices);
-        var when = prices[index].DateTime;
-        var title = $"{term} at {when:HH:mm} on {when.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)}";
-        if (term == "Candle")
+        var cursor = seen == null ? prices.Count - 1 : Math.Max(index, Tours.AnchorOf(seen, prices));
+        var known = cursor < prices.Count - 1 ? prices.GetRange(0, cursor + 1) : prices;
+        var things = new List<Thing> { new("Candle", null, "Candle") };
+        if (RunAt(known, index, options) is { } run)
+            things.Add(new Thing("SuccessiveCandles", null, $"{Capital(Words(run.Length))} Successive {(known[index].Close > known[index].Open ? "Green" : "Red")} Candles"));
+        var levels = Sawtooth.Levels(known, Basis, maxLevel + 1);
+        var when = known[index].DateTime;
+        for (var level = levels.Count - 1; level >= 1; level--)
         {
-            var anchor = Math.Max(0, index - CandlesBefore * 2);
-            var at = index - anchor;
-            return TourOf(title, dataset, prices[anchor].DateTime, [0, at + CandlesAfter], ["level1", "candles"],
-                new JsonObject { ["chapter"] = term, ["until"] = at, ["speed"] = 8.0 },
-                new JsonObject { ["explain"] = term, ["at"] = at });
+            if (Read(known, level, levels) is not { } s)
+                continue;
+            if (LabelAt(s.Points, when) is { } label)
+                things.Add(new Thing("Point", level, $"{Order(level)} {label}"));
+            if (SwingIn(s, when) is { } swing)
+                things.Add(new Thing("Swing", level, $"{Order(level)} {SwingName(swing.Direction)}"));
+            if (TrendIn(s, when) is { } trend)
+                things.Add(new Thing("Trend", level, $"{Order(level)} {TrendName(trend.Direction)}"));
         }
 
-        var cursor = seen == null ? prices.Count - 1 : Tours.AnchorOf(seen, prices);
-        if (index > cursor)
+        return things;
+    }
+
+    /// <summary>
+    /// A tour of the things ticked at a candle, in the shape of tour.json: a chapter for each, in the order <see cref="At"/>
+    /// lists them, from the candle outwards. It starts where the dataset does, so the structure is the Replay page's, and
+    /// each chapter jumps to its thing and runs through it. Each thing is the one the chart had at the cursor it was seen
+    /// from (seen, the Replay page's; else the end of the prices). Played in place, the chart draws the structure as known
+    /// at the cursor a part at a time as the run reaches it, and a Swing or Trend stops on its own last candle; otherwise
+    /// a Swing or Trend runs to its own end when the chart had it there too, else on to the cursor. A thing not at the
+    /// candle is left out and named in missing. Null when nothing is left.
+    /// </summary>
+    public static JsonObject? Tour(IReadOnlyList<Thing> things, string dataset, List<Price> prices, string time, string? seen, out List<string> missing, bool inPlace = true, ExplainOptions? options = null)
+    {
+        options ??= ExplainOptions.Default;
+        missing = [];
+        if (prices.Count == 0)
             return null;
-        // The thing as the page showed it at its cursor. The section runs to the thing's own end when the chart has it
-        // there too (a Swing's BoS, a Trend's second BoS or the candle), else on to the cursor, as the finer levels can be
-        // anchored afresh by the candles between.
+        var index = Tours.AnchorOf(time, prices);
+        var cursor = seen == null ? prices.Count - 1 : Math.Max(index, Tours.AnchorOf(seen, prices));
         var known = cursor < prices.Count - 1 ? prices.GetRange(0, cursor + 1) : prices;
+        var sections = new List<JsonObject>();
+        int? context = null;
+        // From the candle outwards: the Candle, its run, then the finest level's things first.
+        static int Rank(Thing thing) => thing.Kind switch { "Candle" => 0, "SuccessiveCandles" => 1, _ => 2 };
+        foreach (var thing in things.OrderBy(Rank).ThenByDescending(x => x.Level ?? 0).ThenBy(x => Terms.ToList().IndexOf(x.Kind)))
+        {
+            var chapter = Chapter(thing, prices, known, index, cursor, inPlace, options, out var keeps);
+            if (chapter == null)
+            {
+                missing.Add(thing.Name);
+                continue;
+            }
+
+            // The Swing a level coarser that a thing begins inside: the chart keeps the candles from its start, to look back at.
+            if (keeps is int k)
+                context = Math.Min(context ?? k, k);
+            // The thing a chapter tells of, by id, so the page can leave out the chapters of what is unticked.
+            chapter["thing"] = thing.Id;
+            sections.Add(chapter);
+        }
+
+        if (sections.Count == 0)
+            return null;
+        var when = prices[index].DateTime;
+        var one = things.Count == 1 ? things[0] : null;
+        var what = one == null ? "Analysis" : $"{(one.Level is int l ? $"{Order(l)} " : "")}{one.Kind}";
+        var title = $"{what} at {when:HH:mm} on {when.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)}";
+        var tour = TourOf(title, dataset, prices[0].DateTime, [Math.Max(0, index - CandlesBefore), index + CandlesAfter], ["level1", "candles"], sections.ToArray());
+        if (inPlace)
+            tour["known"] = cursor;
+        if (context != null)
+            tour["context"] = context;
+        return tour;
+    }
+
+    /// <summary>
+    /// A tour of its own around one thing, by its kind and level: see <see cref="Tour(IReadOnlyList{Thing}, string, List{Price}, string, string?, out List{string}, bool, ExplainOptions?)"/>.
+    /// Null when the term is not one that can be explained or nothing of the kind is at that candle.
+    /// </summary>
+    public static JsonObject? Tour(string term, string dataset, List<Price> prices, string time, int level = 1, string? seen = null, bool inPlace = false, ExplainOptions? options = null)
+    {
+        if (!Terms.Contains(term))
+            return null;
+        var thing = new Thing(term, term is "Candle" or "SuccessiveCandles" ? null : level, term);
+        return Tour([thing], dataset, prices, time, seen, out _, inPlace, options);
+    }
+
+    // One chapter of a tour: a section that explains the thing, to be written out, with the layers that draw it and the
+    // candle it runs from. Null when the thing is not at the candle. keeps is the candle the chart keeps history from.
+    private static JsonObject? Chapter(Thing thing, List<Price> prices, List<Price> known, int index, int cursor, bool inPlace, ExplainOptions options, out int? keeps)
+    {
+        keeps = null;
+        var level = thing.Level ?? 1;
+        switch (thing.Kind)
+        {
+            case "Candle":
+                return new JsonObject { ["chapter"] = "Candle", ["explain"] = thing.Kind, ["at"] = index, ["from"] = Math.Max(0, index - CandlesBefore), ["known"] = cursor, ["layers"] = Layers("candles"), ["speed"] = 8.0 };
+            case "SuccessiveCandles":
+            {
+                if (RunAt(known, index, options) is not { } run)
+                    return null;
+                return new JsonObject { ["chapter"] = "Successive Candles", ["explain"] = thing.Kind, ["at"] = index, ["from"] = Math.Max(0, run.First - 1), ["known"] = cursor, ["runs"] = options.ToJson(), ["layers"] = Layers("candles"), ["speed"] = 8.0 };
+            }
+            case "Point":
+            {
+                if (PointAt(known, index, level) is not { } point)
+                    return null;
+                return new JsonObject { ["chapter"] = $"{Order(level)} {point.Point.Label}", ["explain"] = thing.Kind, ["at"] = index, ["level"] = level, ["from"] = Math.Max(0, point.PreviousAt - 1), ["known"] = cursor, ["layers"] = Layers($"level{level}", "close", "sawtooth"), ["speed"] = 8.0 };
+            }
+            default:
+                return SwingOrTrend(thing.Kind, prices, known, index, level, cursor, inPlace, out keeps);
+        }
+    }
+
+    // The chapter of a Swing or a Trend: the one at the level that has the candle, as the chart had it at the cursor. The
+    // section runs to the thing's own end when the chart has it there too (a Swing's BoS, a Trend's second BoS or the
+    // candle), else on to the cursor, as the finer levels can be anchored afresh by the candles between. Played in place,
+    // the thing is read at the cursor, as the page showed it, and the run stops on its own last candle whatever the chart
+    // had there at the time.
+    private static JsonObject? SwingOrTrend(string term, List<Price> prices, List<Price> known, int index, int level, int cursor, bool inPlace, out int? keeps)
+    {
+        keeps = null;
         // The chart's own layers mark what the texts speak of: the sawtooth, and for a Trend the points that make it.
         var layers = new List<string> { $"level{level}", "close", "sawtooth" };
-        int first, until;
-        int? last = null;
-        Within? within = null;
+        int first, until, last;
+        string name;
         if (term == "Swing")
         {
             if (SwingAt(known, index, level) is not { } swing)
                 return null;
             first = swing.Span.First;
-            var bos = swing.Span.Last;
-            until = SwingAt(prices.GetRange(0, bos + 1), index, level)?.Span.First == first ? bos : cursor;
-            last = bos;
+            last = swing.Span.Last;
+            until = SwingAt(prices.GetRange(0, last + 1), index, level)?.Span.First == first ? last : cursor;
+            name = SwingName(swing.Swing.Direction);
             layers.AddRange(["HigherHigh", "HigherLow", "LowerLow", "LowerHigh"]);
-            if (inPlace)
-                within = InsideSwing(known, swing, level);
         }
         else
         {
@@ -141,134 +285,35 @@ public static class Explain
             until = TrendAt(prices.GetRange(0, made + 1), index, level)?.Start == first ? made : cursor;
             // Its own last candle: where it ended, or the cursor while it still runs.
             last = trend.Span.Last;
+            name = TrendName(trend.Trend.Direction);
             layers.AddRange(trend.Trend.Direction == EnumSwingDirection.Up ? ["HigherHigh", "HigherLow"] : ["LowerLow", "LowerHigh"]);
-            if (inPlace)
-                within = InsideTrend(known, trend, level);
         }
 
-        // Played in place, the chart draws the thing as it is known where the texts are written from, a part at a time as
-        // the run reaches it. The thing is then read at the cursor, as the page showed it, and the run stops on its own
-        // last candle whatever the chart had there at the time.
         var readAt = until;
-        if (inPlace && last is int own)
+        if (inPlace)
         {
             readAt = cursor;
-            until = own;
+            until = last;
+            if (level > 1)
+                keeps = SwingAt(known, first, level - 1)?.Span.First;
         }
 
-        // The Swing a level coarser that this begins inside: the chart keeps the candles from its start, to look back at.
-        var context = inPlace && level > 1 ? SwingAt(known, first, level - 1)?.Span.First : null;
         // The view is the thing and one candle after it: the run begins on its first candle and stops on its last.
-        var from = first;
-        var view = new[] { from, until + 1 };
-        title = $"{Order(level)} {title}";
-        var section = new JsonObject { ["chapter"] = term, ["explain"] = term, ["at"] = index, ["level"] = level, ["from"] = from, ["until"] = until, ["view"] = new JsonArray(view[0], view[1]), ["speed"] = Pace(until - from) };
+        var section = new JsonObject
+        {
+            ["chapter"] = $"{Order(level)} {name}", ["explain"] = term, ["at"] = index, ["level"] = level, ["from"] = first, ["until"] = until,
+            ["view"] = new JsonArray(first, until + 1), ["speed"] = Pace(until - first), ["layers"] = Layers([.. layers]),
+        };
         if (inPlace)
             section["known"] = readAt;
-        var tour = TourOf(title, dataset, prices[0].DateTime, view, [.. layers], section);
-        if (inPlace)
-            tour["known"] = readAt;
-        if (context != null)
-            tour["context"] = context;
-        // What it has within it: the things the page can step into from here, and, once its own texts are done, a
-        // section that sums them up, whose layers come on with its first text.
-        if (within != null)
-        {
-            tour["inside"] = new JsonArray(within.Steps.ToArray<JsonNode>());
-            if (within.Texts.Count > 0)
-            {
-                tour["sections"]!.AsArray().Add(new JsonObject
-                {
-                    ["chapter"] = "Inside",
-                    ["inside"] = true,
-                    ["add"] = new JsonArray(within.Layers.Distinct().Select(x => (JsonNode)x).ToArray()),
-                    ["cues"] = new JsonArray(within.Texts.Select(x => (JsonNode)Text(until, x)).ToArray()),
-                });
-            }
-        }
-
-        return tour;
+        return section;
     }
 
-    // What a Swing or a Trend has within it: the things to step into, each one the page can analyse in turn, the texts
-    // that sum them up, and the layers that draw them.
-    private sealed record Within(List<JsonObject> Steps, List<string> Texts, List<string> Layers);
+    private static JsonArray Layers(params string[] layers) => new(layers.Select(x => (JsonNode)x).ToArray());
 
-    // The Swings a level finer that are Confirmed inside a Swing, from its start to its BoS, and the Trends they make
-    // there. Null when the level has none.
-    private static Within? InsideSwing(List<Price> prices, FoundSwing found, int level)
-    {
-        if (Read(prices, level + 1) is not { } s)
-            return null;
-        var (from, to) = (found.Swing.Start.Time, found.Swing.BreakOfStructure!.Time);
-        var swings = s.Swings.Where(x => x.BreakOfStructure != null && x.Start.Time >= from && x.BreakOfStructure.Time <= to).ToList();
-        if (swings.Count == 0)
-            return null;
-        // A Trend is told of when any of those Swings is one of its own, whether it began inside or before.
-        int Own(TrendOutline trend) => trend.Parts.Count(part => swings.Any(x => x.Direction == trend.Direction && x.BreakOfStructure == part.BreakOfStructure));
-        var trends = s.Trends.Where(x => Own(x) > 0).OrderBy(x => x.Start.Time).ToList();
-        var order = Order(level + 1);
-        static string Name(EnumSwingDirection direction) => direction == EnumSwingDirection.Up ? "Upswing" : "Downswing";
-        int Count(EnumSwingDirection direction) => swings.Count(x => x.Direction == direction);
+    private static string SwingName(EnumSwingDirection direction) => direction == EnumSwingDirection.Up ? "Upswing" : "Downswing";
 
-        // The direction of the first of them is named first, and the order once.
-        var directions = new[] { swings[0].Direction, swings[0].Direction == EnumSwingDirection.Up ? EnumSwingDirection.Down : EnumSwingDirection.Up }.Where(x => Count(x) > 0).ToList();
-        var counts = directions.Select((x, i) => $"{Words(Count(x))} {(i == 0 ? $"{order} " : "")}{Name(x)}{(Count(x) == 1 ? "" : "s")}").ToList();
-        var texts = new List<string> { $"Inside it {(swings.Count == 1 ? "is" : "are")} {List(counts)}." };
-        var layers = new List<string> { $"level{level + 1}" };
-        foreach (var direction in directions)
-            layers.AddRange([Name(direction), direction == EnumSwingDirection.Up ? "BullishBreakOfStructure" : "BearishBreakOfStructure"]);
-
-        var steps = new List<(DateTime Start, int Kind, JsonObject Step)>();
-        var told = new Dictionary<EnumSwingDirection, int>();
-        foreach (var trend in trends)
-        {
-            var up = trend.Direction == EnumSwingDirection.Up;
-            var name = up ? "Uptrend" : "Downtrend";
-            var (own, all) = (Own(trend), Count(trend.Direction));
-            var before = told.GetValueOrDefault(trend.Direction);
-            told[trend.Direction] = before + 1;
-            var which = own < all ? $"{Capital(Words(own))}{(before > 0 ? " more" : "")} of the {Name(trend.Direction)}s"
-                : all == 1 ? $"The {Name(trend.Direction)}" : $"The {Words(own)} {Name(trend.Direction)}s";
-            var what = before > 0 ? $"another {order} {name}" : An($"{order} {name}");
-            texts.Add(trend.Start.Time >= from && own > 1
-                ? $"{which} are in a row: {what}."
-                : $"{which} {(own == 1 ? "is" : "are")} part of {what} that began {(trend.Start.Time >= from ? "inside it" : "before it")}.");
-            layers.AddRange([name, "trendArrows"]);
-            // A candle that names this Trend and no other, for the page to open it by.
-            var at = new[] { trend.Parts.Count > 0 ? trend.Parts[^1].BreakOfStructure.Time : trend.Confirmed.Time, trend.Confirmed.Time, trend.Start.Time }
-                .Cast<DateTime?>().FirstOrDefault(x => TrendIn(s, x!.Value) == trend);
-            if (at != null)
-                steps.Add((trend.Start.Time, 0, Step("Trend", name, level + 1, at.Value, s.Index[trend.Start.Time])));
-        }
-
-        foreach (var swing in swings.Where(x => SwingIn(s, x.Start.Time) == x))
-            steps.Add((swing.Start.Time, 1, Step("Swing", Name(swing.Direction), level + 1, swing.Start.Time, s.Index[swing.Start.Time])));
-        return new Within(steps.OrderBy(x => x.Start).ThenBy(x => x.Kind).Select(x => x.Step).ToList(), texts, layers);
-    }
-
-    // The Swings of a Trend, each to step into at the Trend's own level. Its texts have counted them already.
-    private static Within? InsideTrend(List<Price> prices, FoundTrend found, int level)
-    {
-        if (Read(prices, level) is not { } s)
-            return null;
-        var name = found.Trend.Direction == EnumSwingDirection.Up ? "Upswing" : "Downswing";
-        var steps = found.Trend.Parts
-            .Select(part => s.Swings.FirstOrDefault(x => x.Direction == found.Trend.Direction && x.BreakOfStructure == part.BreakOfStructure))
-            .Where(x => x != null && SwingIn(s, x!.Start.Time) == x)
-            .Select(x => Step("Swing", name, level, x!.Start.Time, s.Index[x.Start.Time]))
-            .ToList();
-        return steps.Count == 0 ? null : new Within(steps, [], []);
-    }
-
-    private static JsonObject Step(string explain, string name, int level, DateTime at, int index) => new()
-    {
-        ["explain"] = explain,
-        ["name"] = name,
-        ["level"] = level,
-        ["at"] = at.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture),
-        ["index"] = index,
-    };
+    private static string TrendName(EnumSwingDirection direction) => direction == EnumSwingDirection.Up ? "Uptrend" : "Downtrend";
 
     /// <summary>
     /// What a written tour of a Trend says of it, for finding others like it: its level, direction, count of Swings and
@@ -360,13 +405,17 @@ public static class Explain
     // Candles a second for a section that runs a stretch: about twenty seconds of replay, between a brisk walk and a sprint.
     private static double Pace(int candles) => Math.Clamp(Math.Round(candles / 20.0), 10, 200);
 
-    private static JsonObject? Write(string term, List<Price> prices, int at, int level, int reached, int? until, int? known, out string problem)
+    private static JsonObject? Write(string term, List<Price> prices, int at, int level, int reached, int? until, int? known, ExplainOptions options, out string problem)
     {
         problem = "";
         switch (term)
         {
             case "Candle":
-                return Candle(prices, at, reached);
+                return Candle(prices, at, reached, options, known);
+            case "SuccessiveCandles":
+                return Run(prices, at, reached, options, known, out problem);
+            case "Point":
+                return Point(prices, at, level, reached, known, out problem);
             case "Swing":
                 return Swing(prices, at, level, reached, out problem, until, known);
             default:
@@ -375,35 +424,43 @@ public static class Explain
     }
 
     /// <summary>
-    /// The written parts of a section that explains one candle: a view with it a little right of centre, until when the
-    /// replay has not reached it, and the texts: when it is, its four prices pinned to it, why it is green or red, and the
-    /// nearest candle of the other colour for contrast.
+    /// The written parts of a section that explains one candle, a block for each term in it. The Candle: when it is and
+    /// its four prices, pinned to it, with what a candle is at Education. Its colour: why it is green or red, with the
+    /// nearest candle of the other colour for contrast. The view has the candle a little right of centre; until is set
+    /// when the replay has not reached it. The run it may be in is a thing of its own (see <see cref="Run"/>).
     /// </summary>
-    public static JsonObject Candle(List<Price> prices, int at, int reached)
+    public static JsonObject Candle(List<Price> prices, int at, int reached, ExplainOptions? options = null, int? known = null)
     {
         var p = prices[at];
         var length = Length(prices);
+        var unit = Unit(length);
         var up = p.Close > p.Open;
         var flat = p.Close == p.Open;
-        var drawn = Math.Max(at, reached);
+        // The candles there are to read: those the replay has drawn, or up to known, the cursor the candle was seen from.
+        var drawn = Math.Max(Math.Max(at, reached), known ?? 0);
         var view = new[] { Math.Max(0, at - CandlesBefore), at + CandlesAfter };
+        var layers = new List<string> { "candles" };
 
         // Every text waits for the candle, so the replay draws it before anything is said, whether or not it was there already.
+        // The Candle: what one is, then this one.
         var cues = new JsonArray
         {
-            Text(at, $"This candle is {Span(p.DateTime, length)}."),
-            Text(at, $"It opened at {Money(p.Open)} and closed at {Money(p.Close)}.", hold: 0),
+            Teach(at, $"A candle shows a whole {unit} of trading in one shape, drawn from four prices."),
+            Say(at, $"{Capital(Span(p.DateTime, length))}."),
+            Teach(at, $"The open is the price at the start of the {unit} and the close is the price at its end. The body of the candle spans the two."),
+            Say(at, $"Open {Money(p.Open)}, close {Money(p.Close)}.", hold: 0),
             Pin(at, "open", "left", $"open: {Money(p.Open)}", 4),
             Pin(at, "close", "right", $"close: {Money(p.Close)}", 4),
-            Text(at, $"Its high was {Money(p.High)} and its low was {Money(p.Low)}.", hold: 0),
+            Teach(at, $"The high and the low are the furthest the price went during the {unit}. The thin lines above and below the body are wicks, and they reach to them."),
+            Say(at, $"High {Money(p.High)}, low {Money(p.Low)}.", hold: 0),
             Pin(at, "high", "above", $"high: {Money(p.High)}", 2.5),
             Pin(at, "low", "below", $"low: {Money(p.Low)}", 2.5),
-            Text(at, flat
-                ? "The candle closed where it opened, so it has no body: it is neither green nor red."
-                : $"Because the candle closed {(up ? "higher" : "lower")} than the open, it is {(up ? "green" : "red")}."),
         };
 
-        // The nearest drawn candle in view of the other colour, the one before preferred, to set against it.
+        // Its colour: the rule, then this one; at Education, the nearest drawn candle in view of the other colour, the
+        // one before preferred, set against it.
+        cues.Add(Teach(at, "A candle that closes above its open is green. A candle that closes below its open is red. One that closes where it opened has no body, and is neither."));
+        cues.Add(Say(at, flat ? "No body: it closed where it opened." : up ? "Green: it closed above its open." : "Red: it closed below its open."));
         if (!flat)
         {
             var other = Enumerable.Range(1, CandlesBefore + CandlesAfter)
@@ -413,12 +470,112 @@ public static class Explain
             if (other >= 0)
             {
                 var colour = up ? "red" : "green";
-                cues.Add(Text(at, $"{Which(other - at)} closed {(up ? "lower" : "higher")} than the open, so it is {colour}.", hold: 0));
-                cues.Add(Pin(other, up ? "low" : "high", up ? "below" : "above", colour, 3.5));
+                cues.Add(Teach(at, $"{Which(other - at)} closed {(up ? "lower" : "higher")} than the open, so it is {colour}."));
+                cues.Add(Pin(other, up ? "low" : "high", up ? "below" : "above", colour, 3.5, EnumDetail.Education));
             }
         }
 
-        return Section(view, at > reached ? at : null, ["candles"], cues);
+        return Section(view, at > reached ? at : null, layers, cues);
+    }
+
+    /// <summary>
+    /// The written parts of a section that explains the Successive Candles a candle is in: the run of its colour, as drawn
+    /// so far or up to known, when it is as long as the settings ask. What Successive Candles are at Education, then which
+    /// of the run the candle is and how far the run goes, told on the run's last candle, which the replay runs to. Null,
+    /// with the problem, when the candle is in no such run.
+    /// </summary>
+    public static JsonObject? Run(List<Price> prices, int at, int reached, ExplainOptions? options, int? known, out string problem)
+    {
+        options ??= ExplainOptions.Default;
+        var drawn = Math.Max(Math.Max(at, reached), known ?? 0);
+        var p = prices[at];
+        if (p.Close == p.Open || RunAt(prices.GetRange(0, drawn + 1), at, options) is not { } run)
+        {
+            problem = $"#{at} is not in a run of candles of one colour as long as the setting";
+            return null;
+        }
+
+        var up = p.Close > p.Open;
+        var length = Length(prices);
+        var colour = up ? "green" : "red";
+        var term = up ? "Successive Green Candles" : "Successive Red Candles";
+        var cues = new JsonArray
+        {
+            Teach(run.Last, "Candles of one colour that follow one another are Successive Candles, counted from the first of the colour to the last."),
+            Say(run.Last, $"{Capital(Ordinal(run.Position))} of {Words(run.Length)} {term}, {Clock(prices[run.First].DateTime, length)} to {Clock(prices[run.Last].DateTime, length)}."),
+        };
+        problem = "";
+        return Section([Math.Max(0, run.First - 2), run.Last + 2], run.Last > reached ? run.Last : null, ["candles", up ? "SuccessiveGreenCandles" : "SuccessiveRedCandles"], cues);
+    }
+
+    // A candle's place in a run of its colour: which it is, how long the run is and where the run begins and ends.
+    private sealed record CandleRun(int Position, int Length, int First, int Last);
+
+    // The run of one colour that has the candle, when it is as long as the page's setting for that colour.
+    private static CandleRun? RunAt(List<Price> prices, int at, ExplainOptions options)
+    {
+        var run = CandleRuns.Runs(prices, minLength: 2).FirstOrDefault(x => x.Start.Time <= prices[at].DateTime && x.End.Time >= prices[at].DateTime);
+        if (run == null || run.Length < (run.Green ? options.GreenRuns : options.RedRuns))
+            return null;
+        var first = prices.FindIndex(x => x.DateTime == run.Start.Time);
+        return new CandleRun(at - first + 1, run.Length, first, first + run.Length - 1);
+    }
+
+    /// <summary>
+    /// The written parts of a section that explains the high or low a candle is labelled as at a level, as known at the
+    /// chart's cursor: what the label means at Education, then this close against the high or low before it of the same
+    /// kind, both pinned, and whether it can still move. Null, with the problem, when the candle is not a labelled high or
+    /// low at that level.
+    /// </summary>
+    public static JsonObject? Point(List<Price> prices, int at, int level, int reached, int? known, out string problem)
+    {
+        var drawn = Math.Max(Math.Max(at, reached), known ?? 0);
+        if (PointAt(prices.GetRange(0, drawn + 1), at, level) is not { } found)
+        {
+            problem = $"#{at} is not a labelled high or low of the {Order(level)}";
+            return null;
+        }
+
+        var (point, previous, previousAt) = (found.Point, found.Previous, found.PreviousAt);
+        var length = Length(prices);
+        var high = point.Kind == EnumPivotKind.High;
+        var kind = high ? "high" : "low";
+        var label = point.Label;
+        var more = label is "HH" or "HL";
+        var name = label switch { "HH" => "Higher High", "HL" => "Higher Low", "LH" => "Lower High", "LL" => "Lower Low", _ => label };
+        var place = high ? "above" : "below";
+        var cues = new JsonArray
+        {
+            Teach(at, $"{Capital(An(name))} ({label}) is a {kind} of the sawtooth at one order that is {(more ? "higher" : "lower")} than the {kind} before it at that order. Highs and lows are read from the closes."),
+            Say(at, previous == null
+                ? $"{Order(level)} {label} at {Money(point.Price)}."
+                : $"{Order(level)} {label} at {Money(point.Price)}, {(more ? "above" : "below")} the {kind} of {Money(previous.Price)} at {Clock(previous.Time, length)}."),
+            Pin(at, "close", place, $"{label}: {Money(point.Price)}", 4),
+        };
+        if (previous != null)
+            cues.Add(Pin(previousAt, "close", Edge(previousAt, place), $"{(previous.Label.Length > 0 ? previous.Label : kind)}: {Money(previous.Price)}", 4));
+        if (point.Provisional)
+        {
+            cues.Add(Teach(at, $"While the price keeps closing {(high ? "higher" : "lower")}, the {kind} moves on with it to each new close."));
+            cues.Add(Say(at, "Still moving."));
+        }
+        problem = "";
+        return Section([Math.Max(0, previousAt - 2), at + 2], at > reached ? at : null, [$"level{level}", "close", "sawtooth", PointLayer(label)], cues, byCandle: true);
+    }
+
+    private sealed record FoundPoint(StructurePoint Point, StructurePoint? Previous, int PreviousAt);
+
+    // The labelled high or low at a level that the candle is, with the one of its kind before it, which it is read against.
+    private static FoundPoint? PointAt(List<Price> prices, int at, int level)
+    {
+        if (Read(prices, level) is not { } s)
+            return null;
+        var time = prices[at].DateTime;
+        var point = s.Points.FirstOrDefault(x => x.Time == time && x.Type != null && x.Label.Length > 0);
+        if (point == null)
+            return null;
+        var previous = s.Points.LastOrDefault(x => x.Kind == point.Kind && x.Time < point.Time);
+        return new FoundPoint(point, previous, previous != null && s.Index.TryGetValue(previous.Time, out var i) ? i : at);
     }
 
     /// <summary>
@@ -475,26 +632,30 @@ public static class Explain
         var startPlace = up ? "above" : "below";
         var turnPlace = up ? "below" : "above";
 
+        var (first, second) = up ? ("Downleg", "Upleg") : ("Upleg", "Downleg");
         var cues = new JsonArray
         {
-            Text(span.First, $"This is a {Order(level)} {name}. It begins {At(swing.Start.Time, length)}, at {Named(startLabel, startKind)}."),
+            Teach(span.First, $"{Capital(An(name))} begins at a {startKind}. The price {(up ? "falls" : "rises")} to a {turn}, then closes {(up ? "above" : "below")} the {startKind} it began at: the BoS that Confirms the {name}."),
+            Say(span.First, $"{Order(level)} {name}, from {Named(startLabel, startKind)} at {Money(swing.Start.Price)}, {At(swing.Start.Time, length)}."),
             Pin(span.First, "close", Edge(span.First, startPlace), $"{startLabel ?? startKind}: {Money(swing.Start.Price)}", 4),
-            Text(extremeAt, $"The price {(up ? "falls" : "rises")} for {Duration(extremeAt - span.First, length)}, to the {turn}: {Named(turnLabel, up ? "low" : "high")}."),
+            Teach(extremeAt, $"The {turn} is the {(up ? "lowest" : "highest")} close between the {startKind} and the BoS."),
+            Say(extremeAt, $"{turn}: {Named(turnLabel, up ? "low" : "high")} at {Money(swing.Extreme.Price)}."),
             Pin(extremeAt, "close", turnPlace, $"{turn}: {Money(swing.Extreme.Price)}", 4),
         };
         if (msb != null)
         {
-            cues.Add(Text(index[msb.Break.Time], $"On the way, the price closes {(up ? "below" : "above")} the {turn} of the {name} before: an MSB."));
-            cues.Add(Pin(index[msb.Break.Time], "close", "left", "MSB", 3.5));
+            var msbAt = index[msb.Break.Time];
+            cues.Add(Teach(msbAt, $"An MSB is the first close {(up ? "below" : "above")} the {turn} of the {name} before. It goes against the {name}, and Confirms nothing."));
+            cues.Add(Say(msbAt, $"MSB at {Money(prices[msbAt].Close)}, {(up ? "below" : "above")} the {turn} of the {name} before."));
+            cues.Add(Pin(msbAt, "close", "left", "MSB", 3.5));
         }
-        cues.Add(Text(bosAt, $"{Capital(Duration(bosAt - extremeAt, length))} after the {turn}, the price closes {(up ? "above" : "below")} the {startKind} it began at: the BoS that Confirms the {name}."));
+        cues.Add(Teach(bosAt, $"The BoS is the first close {(up ? "above" : "below")} the {startKind} the {name} began at."));
+        cues.Add(Say(bosAt, $"BoS at {Money(swing.BreakOfStructure!.Price)}."));
         cues.Add(Pin(bosAt, "close", startPlace, "BoS", 4));
-        cues.Add(Text(bosAt, up
-            ? $"Its Downleg runs from the high to the Swing Low, and its Upleg from the Swing Low to the BoS. The Upswing lasted {Duration(bosAt - span.First, length)} in all."
-            : $"Its Upleg runs from the low to the Swing High, and its Downleg from the Swing High to the BoS. The Downswing lasted {Duration(bosAt - span.First, length)} in all."));
-        cues.Add(Text(bosAt, msb == null
-            ? $"No MSB fell inside it, so it is a Strong {name}."
-            : $"The MSB inside it makes it a Weak {name}."));
+        cues.Add(Teach(bosAt, $"Its {first} runs from the {startKind} to the {turn}, and its {second} from the {turn} to the BoS."));
+        cues.Add(Say(bosAt, $"The {first} is {Duration(extremeAt - span.First, length)}; the {second} is {Duration(bosAt - extremeAt, length)}."));
+        cues.Add(Teach(bosAt, $"{Capital(An(name))} with no MSB inside it is Strong; one with an MSB inside it is Weak."));
+        cues.Add(Say(bosAt, msb == null ? "Strong: no MSB." : "Weak: it has an MSB."));
 
         var layers = new List<string> { $"level{level}", name, up ? "BullishBreakOfStructure" : "BearishBreakOfStructure", up ? "bosLevelUp" : "bosLevelDown" };
         layers.AddRange(new[] { startLabel, turnLabel }.Where(x => x != null).Select(x => PointLayer(x!)));
@@ -559,24 +720,26 @@ public static class Explain
 
         var cues = new JsonArray
         {
-            Text(startAt, $"This is a {Order(level)} {name}. It begins where its first {swing} begins, {At(trend.Start.Time, length)}."),
+            Teach(startAt, $"A Trend is two or more Swings in a row in one direction. {Capital(An(name))} is a run of {swing}s, and begins where its first {swing} begins."),
+            Say(startAt, $"{Order(level)} {name}, beginning {At(trend.Start.Time, length)}."),
             Pin(startAt, "close", Edge(startAt, place), $"{name} begins", 4),
-            Text(confirmedAt, $"From the BoS of its second {swing} there are two in a row: {An(name)}."),
+            Teach(confirmedAt, $"The BoS of the second {swing} makes two in a row: that Confirms the {name}."),
+            Say(confirmedAt, $"Confirmed at the second {swing}'s BoS, {At(trend.Confirmed.Time, length)}."),
             Pin(confirmedAt, "close", place, $"second {swing}", 4),
-            Text(until, $"{(ended ? "By its end" : "Here")} it is {An(name)} of {Words(count)} {swing}s."),
-            Text(until, weak.Count == 0
-                ? $"Every one of them is Strong: no MSB fell inside any of them."
-                : $"{Capital(Words(weak.Count))} of the {Words(count)} {(weak.Count == 1 ? "is" : "are")} Weak: the {List(weak)}. {(weak.Count == 1 ? "It" : "Each")} has an MSB inside it, a close {(up ? "below" : "above")} the {turn} of the {swing} before."),
-            Text(until, $"Its Strength is {Words(trend.Strong)} of {Words(count)}: {trend.Strength}%."),
+            Say(until, $"{Capital(Words(count))} {swing}s{(ended ? "" : " so far")}."),
+            Teach(until, $"{Capital(An(swing))} with an MSB inside it, a close {(up ? "below" : "above")} the {turn} of the {swing} before, is Weak; one without is Strong. The Trend's Strength is the share of its {swing}s that are Strong."),
+            Say(until, weak.Count == 0 ? "All Strong." : $"{Capital(Words(weak.Count))} Weak: the {List(weak)}."),
+            Say(until, $"Strength {trend.Strength}%: {Words(trend.Strong)} of {Words(count)}."),
+            Teach(until, $"A Trend ends at the BoS of the first Swing the other way: here, the first {other}."),
         };
         if (ended)
         {
-            cues.Add(Text(until, $"It ended {At(trend.End!.Time, length)}, at the BoS of the first {other} since it began."));
+            cues.Add(Say(until, $"Ended at the first {other}'s BoS, {At(trend.End!.Time, length)}."));
             cues.Add(Pin(index[trend.End.Time], "close", up ? "below" : "above", $"{name} ends", 4));
         }
         else
         {
-            cues.Add(Text(until, $"No {other} has been Confirmed since, so it is still running."));
+            cues.Add(Say(until, $"Still running: no {other} Confirmed since."));
         }
 
         var layers = new List<string> { $"level{level}", swing, name, "trendArrows", up ? "BullishBreakOfStructure" : "BearishBreakOfStructure" };
@@ -595,9 +758,9 @@ public static class Explain
 
     private sealed record FoundTrend(TrendOutline Trend, int Start, (int First, int Last) Span, Dictionary<DateTime, int> Index);
 
-    private static Structure? Read(List<Price> prices, int level)
+    private static Structure? Read(List<Price> prices, int level, IReadOnlyList<SawtoothLevel>? levels = null)
     {
-        var levels = Sawtooth.Levels(prices, Basis, level + 1);
+        levels ??= Sawtooth.Levels(prices, Basis, level + 1);
         if (level < 1 || level >= levels.Count)
             return null;
         var swings = Sawtooth.Swings(prices, levels, Basis, level).OrderBy(x => x.Start.Time).ToList();
@@ -657,21 +820,41 @@ public static class Explain
         return section;
     }
 
-    private static JsonObject Text(int at, string text, double? hold = null)
+    // A text of this instance: shown at every level of detail.
+    private static JsonObject Say(int at, string summary, double? hold = null)
     {
-        var cue = new JsonObject { ["at"] = at, ["text"] = text };
+        var cue = new JsonObject { ["at"] = at, ["texts"] = Texts((EnumDetail.Summary, summary)) };
         if (hold != null)
             cue["hold"] = hold;
         return cue;
     }
 
-    private static JsonObject Pin(int at, string on, string place, string text, double hold) =>
-        new() { ["at"] = at, ["on"] = on, ["place"] = place, ["text"] = text, ["hold"] = hold, ["voice"] = false };
+    // A text about things of this kind: shown at Education only.
+    private static JsonObject Teach(int at, string education) => new() { ["at"] = at, ["texts"] = Texts((EnumDetail.Education, education)) };
+
+    // A label pinned to a point of a candle: shown, not read. At Summary unless given, as it marks this instance.
+    private static JsonObject Pin(int at, string on, string place, string text, double hold, EnumDetail detail = EnumDetail.Summary) =>
+        new() { ["at"] = at, ["on"] = on, ["place"] = place, ["texts"] = Texts((detail, text)), ["hold"] = hold, ["voice"] = false };
+
+    private static JsonObject Texts(params (EnumDetail Level, string Text)[] texts) => Details.ToJson(texts.ToDictionary(x => x.Level, x => x.Text));
 
     // A pin on a candle at the chart's left edge goes to the right of it, where there is room for it.
     private static string Edge(int at, string place) => at < Margin ? "right" : place;
 
     private static TimeSpan Length(IReadOnlyList<Price> prices) => prices.Count > 1 ? prices[1].DateTime - prices[0].DateTime : TimeSpan.FromHours(1);
+
+    // What a candle spans, as a word: "hour", "four hours", "day".
+    private static string Unit(TimeSpan length)
+    {
+        if (length >= TimeSpan.FromDays(1))
+            return "day";
+        var hours = (int)Math.Round(length.TotalHours);
+        return hours == 1 ? "hour" : $"{Words(hours)} hours";
+    }
+
+    // A candle's time as the tour says it in passing: its clock time, or its day for daily candles.
+    private static string Clock(DateTime time, TimeSpan length) =>
+        length >= TimeSpan.FromDays(1) ? time.ToString("d MMMM", CultureInfo.InvariantCulture) : time.ToString("HH:mm", CultureInfo.InvariantCulture);
 
     private static string? LabelAt(List<StructurePoint> points, DateTime time) =>
         points.FirstOrDefault(x => x.Time == time && x.Type != null && x.Label.Length > 0)?.Label;

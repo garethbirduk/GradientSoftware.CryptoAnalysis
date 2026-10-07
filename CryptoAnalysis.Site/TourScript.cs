@@ -4,10 +4,42 @@ using System.Text.Json.Nodes;
 namespace Gradient.CryptoAnalysis.Site;
 
 /// <summary>
-/// One text of a tour section. At is the candle it appears at (null: as the section begins), On what it is pinned to. A
-/// line runs from the pinned point to LineTo, the candle and point it ends on, and appears when the replay reaches that.
+/// How much a text tells, from least to most. A cue has a text for each level it is written at and shows the one for the
+/// highest level at or below the page's setting; a cue with none that low is left out. Summary is what this instance is;
+/// Education is what a thing of its kind is and how it works.
 /// </summary>
-public sealed record TourCue(int Index, string Text, int? At, string? On, string? Place, string Keep, double Hold, (int At, string On)? LineTo = null);
+public enum EnumDetail { Summary, Education }
+
+/// <summary>
+/// One text of a tour section, as its texts by level of detail. At is the candle it appears at (null: as the section
+/// begins), On what it is pinned to. A line runs from the pinned point to LineTo, the candle and point it ends on, and
+/// appears when the replay reaches that. Text is the text at the highest level the cue has: what the facts and tests see.
+/// </summary>
+public sealed record TourCue(int Index, IReadOnlyDictionary<EnumDetail, string> Texts, int? At, string? On, string? Place, string Keep, double Hold, (int At, string On)? LineTo = null)
+{
+    public string Text => Texts.Count == 0 ? "" : Texts[Texts.Keys.Max()];
+}
+
+/// <summary>
+/// The names of the levels of detail as the page and tour.json write them: "summary", "education".
+/// </summary>
+public static class Details
+{
+    public static string Name(EnumDetail detail) => detail.ToString().ToLowerInvariant();
+
+    public static EnumDetail? Parse(string name) => Enum.GetValues<EnumDetail>().Cast<EnumDetail?>().FirstOrDefault(x => Name(x!.Value) == name);
+
+    /// <summary>
+    /// A cue's texts as the page reads them: { "summary": "…", "education": "…" }.
+    /// </summary>
+    public static JsonObject ToJson(IReadOnlyDictionary<EnumDetail, string> texts)
+    {
+        var json = new JsonObject();
+        foreach (var (level, text) in texts.OrderBy(x => x.Key))
+            json[Name(level)] = text;
+        return json;
+    }
+}
 
 /// <summary>
 /// A tour section with everything worked out: the scene it is in, the layers on, the sawtooth levels looked at, the candles
@@ -45,7 +77,8 @@ public sealed record TourScript(string? Title, string? Dataset, int Anchor, IRea
 /// structure it describes, and the server can resolve the events a tour refers to.
 /// A candle in the file is a number counted from the tour's start, or an event to look for from a candle on:
 /// { "event": "BullishBreakOfStructure", "level": 1, "nth": 1 }, the nth time that becomes known at that level.
-/// A section with "explain" has its texts written from the prices (see <see cref="Explain"/>).
+/// A section with "explain" has its texts written from the prices (see <see cref="Explain"/>). A text is given for each
+/// level of detail it is written at: { "texts": { "summary": "…", "education": "…" } }.
 /// </summary>
 public static class Tours
 {
@@ -245,9 +278,21 @@ public static class Tours
             foreach (var (cue, j) in (node["cues"]?.AsArray() ?? []).Select((x, j) => (x?.AsObject(), j)))
             {
                 var what = $"{where}, text {j + 1}";
-                var text = cue?["text"]?.GetValue<string>() ?? "";
-                if (text.Length == 0)
+                var texts = new Dictionary<EnumDetail, string>();
+                foreach (var (name, value) in cue?["texts"]?.AsObject() ?? [])
+                {
+                    if (Details.Parse(name) is { } level)
+                        texts[level] = value?.GetValue<string>() ?? "";
+                    else
+                        errors.Add($"{what}: unknown detail \"{name}\": {string.Join(", ", Enum.GetValues<EnumDetail>().Select(Details.Name))}");
+                }
+
+                texts = texts.Where(x => x.Value.Length > 0).ToDictionary();
+                if (cue?["text"] != null)
+                    errors.Add($"{what}: \"text\" is now \"texts\", a text for each level of detail: {{ \"summary\", \"education\" }}");
+                else if (texts.Count == 0)
                     errors.Add($"{what}: no text");
+                var text = texts.Count == 0 ? "" : texts[texts.Keys.Max()];
                 var cueAt = Candle(cue?["at"], prices, from, what, "at", errors);
                 if (cueAt is int c && (c < 0 || c > at))
                     errors.Add($"{what}: at #{c} is not reached, as the section ends at #{at}");
@@ -283,7 +328,7 @@ public static class Tours
 
                 if (cue?["heads"] is JsonNode headsNode && (headsNode is not JsonObject heads || heads.Any(x => x.Key != "start" && x.Key != "end")))
                     errors.Add($"{what}: heads is {{ \"start\", \"end\" }}, true or false each");
-                cues.Add(new TourCue(j, text, cueAt, on, place, keep, hold >= 0 ? hold.Value : Math.Max(2.5, text.Length / 14.0), lineTo));
+                cues.Add(new TourCue(j, texts, cueAt, on, place, keep, hold >= 0 ? hold.Value : Math.Max(2.5, text.Length / 14.0), lineTo));
             }
 
             var levels = layers.Where(x => x.StartsWith("level")).Select(x => int.Parse(x["level".Length..])).OrderBy(x => x).ToList();
