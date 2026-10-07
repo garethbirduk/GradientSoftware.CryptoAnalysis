@@ -65,6 +65,8 @@
   .term-head .label { font-family: ui-monospace, Consolas, monospace; font-size: 14px; color: var(--muted); margin-left: 8px; }
   .term-head p { margin: 8px 0 0; max-width: 72ch; }
   .term-head .remarks { color: var(--muted); font-size: 14px; }
+  .term-head .definitions { max-width: 80ch; margin: 8px 0; padding-left: 20px; line-height: 1.5; }
+  .term-head .definitions li { margin: 3px 0; }
   code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
   .layerbar .section + .section { margin-top: 12px; }
   .layerbar .lead { display: flex; align-items: center; gap: 6px; width: 100%; margin: 0 0 3px; padding: 2px 7px; border: 0; border-radius: 5px;
@@ -228,14 +230,15 @@
   .player-scrub input[type=range]:disabled { opacity: .4; }
   .player-scrub label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: var(--text); }
   .analysis-things { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 8px; font-size: 13px; color: var(--muted); }
-  .analysis-things label, .candle-card .things label { display: inline-flex; align-items: center; gap: 4px; color: var(--text); white-space: nowrap; cursor: pointer; }
-  .analysis-things label.off, .candle-card .things label.off { color: var(--muted); }
   .analysis-things .write { display: inline-flex; gap: 6px; }
   .analysis-things button, .candle-card .analyse button { padding: 3px 10px; font: inherit; font-weight: 600; color: var(--accent); background: var(--panel); border: 1px solid var(--accent); border-radius: 5px; cursor: pointer; }
   .analysis-things button:hover, .candle-card .analyse button:hover { background: var(--chip); }
   .analysis-things button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
   .candle-card .analyse button:disabled { opacity: .45; cursor: default; }
   .analysis-things .warn { color: var(--warn); }
+  .analysis-things button.explain { color: #8b5cf6; border-color: #8b5cf6; }
+  .analysis-things button.explain:hover { background: color-mix(in srgb, #8b5cf6 12%, var(--panel)); }
+  .analysis-things button.explain[aria-pressed="true"] { background: #8b5cf6; color: #fff; }
   #similar { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
   #similar::backdrop { background: rgba(0, 0, 0, .35); }
   #similar h4 { margin: 0 0 4px; font-size: 15px; }
@@ -315,7 +318,6 @@
   .candle-card a { padding: 3px 10px; border: 1px solid var(--accent); border-radius: 5px; color: var(--accent); font-weight: 600; text-decoration: none; }
   .candle-card a:hover { background: var(--chip); }
   .candle-card .hint { font-size: 11px; }
-  .candle-card .things { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; max-height: 280px; overflow-y: auto; font-size: 13px; }
   .ed-chip { padding: 0 7px; border-radius: 999px; background: var(--chip); color: var(--text); }
   .ed-chip.added { box-shadow: inset 0 0 0 1px var(--accent); }
   .ed-chip.removed { text-decoration: line-through; opacity: .6; }
@@ -456,7 +458,12 @@ let closeCandleCard = () => {};
 const layersOf = page => playerHere(page) ? tourLayers : state.pages[page] ?? defaultsFor(page);
 const on = id => layersOf(currentPage).includes(id);
 const setLayers = layers => {
-  if (playerHere(currentPage)) { tourLayers = [...new Set(['replay', ...layers])]; if (currentPage === 'Tour') recordTourLayers(); return; }
+  if (playerHere(currentPage)) {
+    const before = tourLayers;
+    tourLayers = [...new Set(['replay', ...layers])];
+    if (currentPage === 'Tour') recordTourLayers(); else analysisLevelsChanged(before, tourLayers);
+    return;
+  }
   state.pages[currentPage] = layers; save(state);
 };
 
@@ -693,7 +700,10 @@ function renderTerm(type) {
   currentPage = type;
   let html = `<section class="term-head">
     <h2>${esc(term.name)}<span class="label">${esc(term.label)}</span></h2>
-    ${term.summary ? `<p>${prose(term.summary)}</p>` : ''}
+    ${term.definitions?.length
+      // The definitions shared with the tour and the analyses, where the term has them; otherwise its summary from the code.
+      ? `<ul class="definitions">${term.definitions.map(d => `<li>${prose(d)}</li>`).join('')}</ul>`
+      : term.summary ? `<p>${prose(term.summary)}</p>` : ''}
     ${term.remarks ? `<p class="remarks">${prose(term.remarks)}</p>` : ''}
   </section>`;
 
@@ -2168,21 +2178,13 @@ async function renderReplayPage() {
   main.querySelector('[data-window]').addEventListener('change', e => { state.replayWindow = Number(e.target.value); save(state); redrawExample(ex); });
 }
 
-// A click on a candle of the Replay page opens a card beside it with the candle's prices and a checklist of what is at
-// that candle as the chart had it at the cursor (see Explain.At in CryptoAnalysis.Site): the Candle, the run it is in, and
-// at each level the high or low it is, the Swing and the Trend it is in. What the chart shows is ticked to begin with: a
-// thing whose layers and level are on. Analyse opens an analysis of what is ticked, a chapter each, telling what each one
-// is; Explain opens the same, telling also what a thing of each kind is and how it works. A drag still pans; a click
-// elsewhere closes the card. A replay or an analysis that is playing stops for it, as the candle would move away from under
-// the card.
+// A click on a candle of the Replay page opens a card beside it with the candle's prices and Analyse, which opens an
+// analysis of what is at that candle as the chart had it at the cursor (see Explain.At in CryptoAnalysis.Site): a chapter
+// for each thing the chart shows there, a thing whose layers and level are on. The other things at the candle are on the
+// Analysis page, to add. A drag still pans; a click elsewhere closes the card. A replay that is playing stops for it, as
+// the candle would move away from under the card.
 const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ? on('SuccessiveGreenCandles') || on('SuccessiveRedCandles')
   : on(`level${t.level}`) && (t.kind === 'Point' ? POINT_LAYERS.some(on) : t.kind === 'Swing' ? on('Upswing') || on('Downswing') : on('Uptrend') || on('Downtrend')));
-// The buttons that write an analysis: Analyse at Summary, Explain at Education.
-const ANALYSE_BUTTONS = [['summary', 'Analyse', 'Tell what each thing ticked is, a chapter each'],
-  ['education', 'Explain', 'Tell what each thing ticked is, a chapter each, and what a thing of its kind is and how it works']];
-const analyseButtons = (attr, current = null) => ANALYSE_BUTTONS.map(([detail, label, title]) =>
-  `<button type="button" ${attr}="${detail}" title="${esc(title)}"${current ? ` aria-pressed="${detail === current}"` : ''}>${label}</button>`).join('');
-const thingBox = (t, checked) => `<label class="thing${t.kind !== 'Candle' && t.kind !== 'SuccessiveCandles' && !on(`level${t.level}`) ? ' off' : ''}"><input type="checkbox" value="${esc(t.id)}" ${checked ? 'checked' : ''}>${esc(t.name)}</label>`;
 {
   let down = null, asked = 0;
   const card = document.createElement('div');
@@ -2205,9 +2207,8 @@ const thingBox = (t, checked) => `<label class="thing${t.kind !== 'Candle' && t.
     const cursor = cursorOf(ex), seen = p.t[cursor]?.slice(0, 16);
     const base = { dataset: ex.dataset, at: time.slice(0, 16), ...(seen ? { seen } : {}) };
     card.innerHTML = `<b>${esc(fmtTime(time))} UTC</b><span>open ${money(p.o[i])} · close ${money(p.c[i])} · ${colour}</span><span>high ${money(p.h[i])} · low ${money(p.l[i])}</span>
-      <div class="things" data-things><span class="hint">Reading what is at this candle…</span></div>
-      <div class="analyse">${analyseButtons('data-analyse-go')}</div>`;
-    card.querySelectorAll('[data-analyse-go]').forEach(b => { b.disabled = true; });
+      <div class="analyse"><button type="button" data-analyse-go disabled title="A chapter for each thing the chart shows at this candle; the others can be added on the Analysis page">Analyse</button></div>
+      <span class="hint" data-things>Reading what is at this candle…</span>`;
     stopPlaying();
     card.hidden = false;
     const place = () => {
@@ -2220,22 +2221,23 @@ const thingBox = (t, checked) => `<label class="thing${t.kind !== 'Candle' && t.
     const list = await fetch(`api/explain/at?${new URLSearchParams({ ...base, greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') })}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null).catch(() => null);
     if (mine !== asked || card.hidden) return;
+    // What the chart shows at the candle is what is analysed; the candle itself always is.
+    card.things = (list ?? []).filter(thingShown).map(t => t.id);
+    if (!card.things.length) card.things = ['Candle'];
     card.base = base;
-    card.querySelector('[data-things]').innerHTML = list?.length
-      ? list.map(t => thingBox(t, thingShown(t))).join('') + '<span class="hint">Ticked: what the chart shows. Greyed: at a level that is off.</span>'
-      : '<span class="hint">The local server could not say what is at this candle.</span>';
-    card.querySelectorAll('[data-analyse-go]').forEach(b => { b.disabled = !list?.length; });
+    card.querySelector('[data-things]').textContent = list?.length
+      ? `${list.length} things at this candle; ${card.things.length} shown on the chart.`
+      : 'The local server could not say what is at this candle.';
+    card.querySelector('[data-analyse-go]').disabled = !list?.length;
     place();
   }, true);
-  // Analyse and Explain open the Analysis page in a browser tab of its own, which its Close closes: the page opens it
-  // itself, as a tab can only be closed from within when a page opened it.
+  // Analyse opens the Analysis page in a browser tab of its own, which its Close closes: the page opens it itself, as a
+  // tab can only be closed from within when a page opened it. It opens with the explanations on or off as they were last.
   card.addEventListener('click', e => {
     const b = e.target.closest('[data-analyse-go]');
     if (!b || b.disabled) return;
-    const things = [...card.querySelectorAll('[data-things] input:checked')].map(x => x.value);
-    if (!things.length) return;
     close();
-    window.open(`./${analysisHash({ ...card.base, things, detail: b.dataset.analyseGo })}`, '_blank');
+    window.open(`./${analysisHash({ ...card.base, things: card.things, detail: detailOf('Analysis') })}`, '_blank');
   });
   // The card is beside a candle where that was on the screen, so it goes when the chart moves under it: the cursor moves,
   // the chart is zoomed or the page scrolled, a key is pressed or the window changes.
@@ -2483,18 +2485,55 @@ function toggleKind(explains) {
 
 // A thing at the candle the analysis does not tell of yet: it is written again with it, and opens at its chapter.
 function addThing(id) {
-  if (tour?.page !== 'Analysis') return;
-  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), id])], detail: explainsOn() ? 'education' : 'summary', jump: id };
+  addThings([id], id);
+}
+
+// Things at the candle the analysis does not tell of yet: it is written again with them, and opens at the chapter of the
+// thing given, or the one on show.
+function addThings(ids, jump = tourSection()?.thing) {
+  if (tour?.page !== 'Analysis' || !ids.length) return;
+  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), ...ids])], detail: explainsOn() ? 'education' : 'summary', jump };
   history.replaceState(null, '', analysisHash(wantedAnalysis));
   renderAnalysisPage();
 }
 
-// Under an analysis's chapters: Analyse and Explain, pressed while any of their chapters is on, and what was asked for
-// that is not at the candle.
+// The level of a thing, from its id: "Swing:3" is at the 3rd order; a Candle or a run is at none.
+const thingLevel = id => Number(id?.split(':')[1]) || null;
+
+// The layers a section shows: the section's own, beside the page's; on the Analysis page, the levels are every order the
+// analysis has a chapter on for, so the Levels buttons say which orders it tells of. While a candle is being picked, the
+// candles still to come are shown, to pick from.
+function sectionLayers(s) {
+  const analysis = tour.page === 'Analysis';
+  const levels = analysis ? [...new Set(tour.chapters.flatMap((c, i) => tour.chaptersOff.has(i) ? [] : [thingLevel(tour.sections[c.section].thing)]).filter(Boolean))].map(l => `level${l}`) : [];
+  return [...new Set(['replay', ...(tour.extraLayers ?? []), ...s.layers.filter(id => !analysis || !/^level\d+$/.test(id)), ...levels, ...(tour.picking ? ['future'] : [])])];
+}
+
+// On the Analysis page the Levels buttons say which orders the analysis tells of. A level turned on brings the chapters of
+// what is at the candle at that order: those it has, turned on again, and those it has not, written in, with their
+// explanations when Explain is on. A level turned off turns its chapters off, where they stay to be turned on again.
+function analysisLevelsChanged(before, after) {
+  if (tour?.page !== 'Analysis') return;
+  const levels = list => new Set(list.filter(id => /^level\d+$/.test(id)).map(id => Number(id.slice(5))));
+  const was = levels(before), now = levels(after);
+  const added = [...now].filter(l => !was.has(l)), removed = [...was].filter(l => !now.has(l));
+  if (!added.length && !removed.length) return;
+  const explaining = explainsOn();
+  tour.chapters.forEach((c, i) => {
+    const s = tour.sections[c.section], level = thingLevel(s.thing);
+    if (removed.includes(level)) tour.chaptersOff.add(i);
+    else if (added.includes(level) && (!s.explains || (explaining && !s.repeat))) tour.chaptersOff.delete(i);
+  });
+  const missing = (tour.list ?? []).filter(t => added.includes(t.level) && !tour.sections.some(s => s.thing === t.id)).map(t => t.id);
+  if (missing.length) return addThings(missing);
+  chaptersChanged();
+}
+
+// Under an analysis's chapters: Explain, pressed while any explanation is on, in the explanations' purple, and what was
+// asked for that is not at the candle.
 function analysisWriteHtml() {
-  const on = explains => tour.chapters.some((c, i) => tour.sections[c.section].explains === explains && !tour.chaptersOff.has(i));
-  return `<span class="write">${ANALYSE_BUTTONS.map(([detail, label]) => `<button type="button" data-player-write="${detail}" aria-pressed="${on(detail === 'education')}"
-      title="${detail === 'education' ? 'Turn on or off the explanations: what a thing of each kind is and how it works' : 'Turn on or off the analysis of each thing'}">${label}</button>`).join('')}</span>
+  return `<span class="write"><button type="button" class="explain" data-player-write="education" aria-pressed="${explainsOn()}"
+      title="Turn the explanations on or off: what a thing of each kind is and how it works, a chapter before its own">Explain</button></span>
     ${tour.missing.length ? `<span class="warn">Not at this candle as the chart had it: ${esc(tour.missing.join(', '))}</span>` : ''}`;
 }
 
@@ -2527,7 +2566,11 @@ function toggleChapter(i, on) {
 }
 
 function chaptersChanged() {
-  if (sectionOn(tour.index) || tour.ended) return updateTourPanel();
+  if (sectionOn(tour.index) || tour.ended) {
+    // The levels an analysis shows follow its chapters that are on.
+    if (tour.page === 'Analysis' && tourSection()) { tourLayers = sectionLayers(tourSection()); refreshTour(); }
+    return updateTourPanel();
+  }
   const was = !!tour.timer, next = sectionAfter(tour.index, 1);
   pauseTour();
   if (next == null) return tourGo('end');
@@ -2852,7 +2895,8 @@ function defineText(key, direction) {
   const up = direction === 'Up', slots = direction ? {
     'trend': up ? 'Uptrend' : 'Downtrend', 'a trend': up ? 'an Uptrend' : 'a Downtrend', 'swing': up ? 'Upswing' : 'Downswing', 'a swing': up ? 'an Upswing' : 'a Downswing',
     'other swing': up ? 'Downswing' : 'Upswing', 'a other swing': up ? 'a Downswing' : 'an Upswing', 'turn': up ? 'Swing Low' : 'Swing High', 'beyond': up ? 'below' : 'above',
-    'weak turn': up ? 'LL' : 'HH',
+    'weak turn': up ? 'LL' : 'HH', 'turn labels': up ? 'an HL or an LL' : 'an LH or an HH', 'extreme': up ? 'lowest' : 'highest', 'trends': up ? 'upwards' : 'downwards',
+    'start': up ? 'high' : 'low', 'a first leg': up ? 'a Downleg' : 'an Upleg', 'a second leg': up ? 'an Upleg' : 'a Downleg',
   } : {};
   return (DEFINITIONS[key] ?? '').replace(/\{([a-z ]+)\}/g, (m, name) => slots[name] ?? m).replace(/(^|[.!?]\s+)([a-z])/g, (m, before, letter) => before + letter.toUpperCase());
 }
@@ -3103,7 +3147,7 @@ function openSection(i, { journey = false } = {}) {
     && (c.keep === 'always' || (c.keep === 'chapter' && earlier.chapter === s.chapter))));
   // While a candle is being picked, the candles still to come are shown, to pick from.
   // An analysis keeps the page's own layers on beside the section's, all but its levels.
-  tourLayers = [...new Set(['replay', ...(tour.extraLayers ?? []), ...s.layers, ...(tour.picking ? ['future'] : [])])];
+  tourLayers = sectionLayers(s);
   const chapter = tour.chapters[s.chapter];
   if (chapter?.section === i) tour.recording?.chapters.push({ name: chapter.name, at: Date.now() });
   // The Tour page's address names the chapter; an analysis keeps its own.
@@ -3841,7 +3885,7 @@ function renderTourEditor(anchor = 'section') {
       ${c.define != null ? `<div class="ed-define">
         ${(DEFINITIONS[c.define] ?? '').includes('{') ? `<label class="ed-level">Told for<select data-scope="cue" data-field="direction" data-render>${options([['Up', 'up: Uptrend, Upswing'], ['Down', 'down: Downtrend, Downswing']], c.direction ?? '')}</select></label>` : ''}
         <label class="ed-level">The wording of ${esc(c.define)}, the same wherever it is cited<textarea data-scope="definition" data-field="definition" data-key="${esc(c.define)}" aria-label="The definition ${esc(c.define)}">${value(DEFINITIONS[c.define])}</textarea></label>
-        <span class="ed-hint">Slots for its direction: {trend}, {a trend}, {swing}, {a swing}, {other swing}, {a other swing}, {turn}, {beyond}, {weak turn}. Here it reads: ${esc(compiled?.text ?? '')}</span>
+        <span class="ed-hint">Slots for its direction: {trend}, {a trend}, {swing}, {a swing}, {other swing}, {a other swing}, {turn}, {beyond}, {weak turn}, {turn labels}, {extreme}, {trends}, {start}, {a first leg}, {a second leg}. Here it reads: ${esc(compiled?.text ?? '')}</span>
       </div>`
       : DETAILS.map(level => `<label class="ed-level">${DETAIL_NAMES[level]}<textarea data-scope="cue" data-field="texts.${level}" placeholder="${level === DETAILS[0] ? 'Shown at every detail' : `Shown at ${DETAIL_NAMES[level]}, in place of the ${DETAIL_NAMES[DETAILS[0]].toLowerCase()}`}" aria-label="${DETAIL_NAMES[level]} ${j + 1}">${value(c.texts?.[level])}</textarea></label>`).join('')}
       <div class="ed-row">

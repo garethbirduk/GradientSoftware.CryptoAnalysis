@@ -210,7 +210,8 @@ public class ExplainTests
             "The Downleg is nineteen hours; the Upleg is eleven hours.",
             "Weak: it has an MSB.",
         }, Texts(section).Where(x => !pins.Any(p => p.EndsWith($" {x}"))).ToList());
-        Assert.AreEqual("Its Downleg runs from the high to the Swing Low, and its Upleg from the Swing Low to the BoS.", Texts(section, EnumDetail.Education)[^4], "What its legs are is for Education.");
+        CollectionAssert.Contains(Texts(section, EnumDetail.Education), "An Upswing is characterised by a Downleg from the high to the Swing Low, followed by an Upleg from the Swing Low to the BoS.", "What its legs are is for Education.");
+        CollectionAssert.Contains(Texts(section, EnumDetail.Education), Definitions.Text("Swing.weak", EnumSwingDirection.Up), "It has an MSB, so the Weak rules are told.");
         Assert.IsTrue(pins.Contains("#46 MSB"));
         Assert.IsTrue(pins.Contains("#75 BoS"));
     }
@@ -353,8 +354,12 @@ public class ExplainTests
     [TestMethod]
     public void Definitions_AreToldInADirection_AndCitedByTheTourAndTheAnalysisAlike()
     {
-        Assert.AreEqual("A Downswing with an MSB inside it, a close above the Swing High of the Downswing before, is Weak; one with none is Strong. A Weak Downswing always has an HH as its Swing High.",
-            Definitions.Text("Trend.weak", EnumSwingDirection.Down));
+        Assert.AreEqual("A Weak Downswing always has an HH as its Swing High, because the MSB took the price above the Swing High before it.",
+            Definitions.Text("Swing.weak", EnumSwingDirection.Down));
+        Assert.AreEqual("A Downswing is characterised by an Upleg from the low to the Swing High, followed by a Downleg from the Swing High to the BoS.",
+            Definitions.Text("Swing.legs", EnumSwingDirection.Down));
+        CollectionAssert.AreEqual(new[] { "A Swing is a range of positions. It begins at the position that the BoS breaks, and ends at the BoS itself.", "Until the BoS happens it is only a Candidate Swing. The BoS Confirms it." },
+            Definitions.Of(EnumAnnotationType.Downswing).Take(2).ToArray(), "A term page lists its family's definitions.");
         Assert.AreEqual("After an MSB against a Trend, the next BoS decides. An Upswing's BoS continues the Uptrend with a Weak Upswing. A Downswing's BoS ends it.",
             Definitions.Text("Trend.next", EnumSwingDirection.Up));
 
@@ -371,7 +376,7 @@ public class ExplainTests
 
         // The analysis tells the same: a Trend's explanation is its definitions.
         var trend = Explain.Trend(TourPrices.Value, 90, level: 1, reached: 90, out _)!;
-        CollectionAssert.IsSubsetOf(new[] { Definitions.Text("Trend.ends", EnumSwingDirection.Up), Definitions.Text("Trend.weak", EnumSwingDirection.Up) }, Texts(trend, EnumDetail.Education));
+        CollectionAssert.IsSubsetOf(new[] { Definitions.Text("Trend.ends", EnumSwingDirection.Up), Definitions.Text("Swing.weak", EnumSwingDirection.Up) }, Texts(trend, EnumDetail.Education));
     }
 
     [TestMethod]

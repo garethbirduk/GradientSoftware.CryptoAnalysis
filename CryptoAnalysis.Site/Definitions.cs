@@ -6,8 +6,8 @@ namespace Gradient.CryptoAnalysis.Site;
 /// <summary>
 /// The definitions of the terms, each rule a sentence or two, kept once in wwwroot/definitions.json and used by the tour
 /// (a cue with "define"), by the explanations of an analysis and by the page. A definition can have slots for the
-/// direction it is told in: {trend}, {a trend}, {swing}, {a swing}, {other swing}, {a other swing}, {turn}, {beyond} and
-/// {weak turn}. Each sentence then starts with a capital, whatever fills it. The page fills them the same way (see
+/// direction it is told in: {trend}, {a trend}, {swing}, {a swing}, {other swing}, {a other swing}, {turn}, {beyond},
+/// {weak turn}, {turn labels}, {extreme}, {trends}, {start}, {a first leg} and {a second leg}. Each sentence then starts with a capital, whatever fills it. The page fills them the same way (see
 /// defineText in index.html), so a definition's clip is found by either.
 /// </summary>
 public static class Definitions
@@ -55,6 +55,23 @@ public static class Definitions
     }
 
     /// <summary>
+    /// A term's definitions as its page lists them, told in its direction: those of its family, as Uptrend and Downtrend
+    /// are both of Trend. None for a term that has none yet.
+    /// </summary>
+    public static IReadOnlyList<string> Of(EnumAnnotationType type)
+    {
+        var (family, direction) = type switch
+        {
+            EnumAnnotationType.Uptrend => ("Trend", EnumSwingDirection.Up),
+            EnumAnnotationType.Downtrend => ("Trend", EnumSwingDirection.Down),
+            EnumAnnotationType.Upswing => ("Swing", EnumSwingDirection.Up),
+            EnumAnnotationType.Downswing => ("Swing", (EnumSwingDirection?)EnumSwingDirection.Down),
+            _ => ("", null),
+        };
+        return family.Length == 0 ? [] : All.Keys.Where(x => x.StartsWith($"{family}.", StringComparison.Ordinal)).Select(x => Text(x, direction)).ToList();
+    }
+
+    /// <summary>
     /// Whether there is a definition by that key.
     /// </summary>
     public static bool Has(string key) => All.ContainsKey(key);
@@ -84,6 +101,12 @@ public static class Definitions
                 ["turn"] = up ? "Swing Low" : "Swing High",
                 ["beyond"] = up ? "below" : "above",
                 ["weak turn"] = up ? "LL" : "HH",
+                ["turn labels"] = up ? "an HL or an LL" : "an LH or an HH",
+                ["extreme"] = up ? "lowest" : "highest",
+                ["trends"] = up ? "upwards" : "downwards",
+                ["start"] = up ? "high" : "low",
+                ["a first leg"] = up ? "a Downleg" : "an Upleg",
+                ["a second leg"] = up ? "an Upleg" : "a Downleg",
             };
             text = Regex.Replace(text, @"\{([a-z ]+)\}", m => slots.TryGetValue(m.Groups[1].Value, out var said) ? said : m.Value);
         }

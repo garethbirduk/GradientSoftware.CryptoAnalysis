@@ -632,29 +632,36 @@ public static class Explain
         var startPlace = up ? "above" : "below";
         var turnPlace = up ? "below" : "above";
 
+        // What a Swing is, from the definitions, each rule where it shows on this one; the MSB's and Weak ones only when
+        // it has an MSB inside it.
         var (first, second) = up ? ("Downleg", "Upleg") : ("Upleg", "Downleg");
+        var direction = swing.Direction;
         var cues = new JsonArray
         {
-            Teach(span.First, $"{Capital(An(name))} begins at a {startKind}. The price {(up ? "falls" : "rises")} to a {turn}, then closes {(up ? "above" : "below")} the {startKind} it began at: the BoS that Confirms the {name}."),
+            Teach(span.First, Definitions.Text("Swing.what", direction)),
             Say(span.First, $"{Order(level)} {name}, from {Named(startLabel, startKind)} at {Money(swing.Start.Price)}, {At(swing.Start.Time, length)}."),
             Pin(span.First, "close", Edge(span.First, startPlace), $"{startLabel ?? startKind}: {Money(swing.Start.Price)}", 4),
-            Teach(extremeAt, $"The {turn} is the {(up ? "lowest" : "highest")} close between the {startKind} and the BoS."),
+            Teach(extremeAt, Definitions.Text("Swing.turn", direction)),
             Say(extremeAt, $"{turn}: {Named(turnLabel, up ? "low" : "high")} at {Money(swing.Extreme.Price)}."),
             Pin(extremeAt, "close", turnPlace, $"{turn}: {Money(swing.Extreme.Price)}", 4),
         };
         if (msb != null)
         {
             var msbAt = index[msb.Break.Time];
-            cues.Add(Teach(msbAt, $"An MSB is the first close {(up ? "below" : "above")} the {turn} of the {name} before. It goes against the {name}, and Confirms nothing."));
+            cues.Add(Teach(msbAt, Definitions.Text("Swing.msb", direction)));
+            cues.Add(Teach(msbAt, Definitions.Text("Swing.against", direction)));
             cues.Add(Say(msbAt, $"MSB at {Money(prices[msbAt].Close)}, {(up ? "below" : "above")} the {turn} of the {name} before."));
             cues.Add(Pin(msbAt, "close", "left", "MSB", 3.5));
         }
-        cues.Add(Teach(bosAt, $"The BoS is the first close {(up ? "above" : "below")} the {startKind} the {name} began at."));
+        cues.Add(Teach(bosAt, Definitions.Text("Swing.bos", direction)));
+        cues.Add(Teach(bosAt, Definitions.Text("Swing.candidate", direction)));
         cues.Add(Say(bosAt, $"BoS at {Money(swing.BreakOfStructure!.Price)}."));
         cues.Add(Pin(bosAt, "close", startPlace, "BoS", 4));
-        cues.Add(Teach(bosAt, $"Its {first} runs from the {startKind} to the {turn}, and its {second} from the {turn} to the BoS."));
+        cues.Add(Teach(bosAt, Definitions.Text("Swing.legs", direction)));
         cues.Add(Say(bosAt, $"The {first} is {Duration(extremeAt - span.First, length)}; the {second} is {Duration(bosAt - extremeAt, length)}."));
-        cues.Add(Teach(bosAt, $"{Capital(An(name))} with no MSB inside it is Strong; one with an MSB inside it is Weak."));
+        cues.Add(Teach(bosAt, Definitions.Text("Swing.strong", direction)));
+        if (msb != null)
+            cues.Add(Teach(bosAt, Definitions.Text("Swing.weak", direction)));
         cues.Add(Say(bosAt, msb == null ? "Strong: no MSB." : "Weak: it has an MSB."));
 
         var layers = new List<string> { $"level{level}", name, up ? "BullishBreakOfStructure" : "BearishBreakOfStructure", up ? "bosLevelUp" : "bosLevelDown" };
@@ -733,7 +740,8 @@ public static class Explain
         };
         if (weak.Count > 0)
         {
-            cues.Add(Teach(until, Definitions.Text("Trend.weak", direction)));
+            cues.Add(Teach(until, Definitions.Text("Swing.strong", direction)));
+            cues.Add(Teach(until, Definitions.Text("Swing.weak", direction)));
             cues.Add(Teach(until, Definitions.Text("Trend.next", direction)));
         }
 

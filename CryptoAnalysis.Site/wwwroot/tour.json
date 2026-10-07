@@ -76,16 +76,16 @@
       "add": ["Upswing"],
       "remove": ["bosLevelUp", "HigherHigh"],
       "cues": [
-        { "texts": { "education": "A Swing is a range of positions. It begins at the position that the BoS breaks, and ends at the BoS itself." } },
-        { "texts": { "education": "Until the BoS happens it is only a Candidate Swing. The BoS Confirms it." } },
-        { "texts": { "education": "An Upswing is a Swing that trends upwards." } }
+        { "define": "Swing.what" },
+        { "define": "Swing.candidate" },
+        { "define": "Swing.direction", "direction": "Up" }
       ]
     },
     {
       "chapter": "Swing Low",
       "add": ["HigherLow", "LowerLow"],
       "cues": [
-        { "texts": { "education": "The Swing Low is the lowest position in the Swing. It is either an HL or an LL." } }
+        { "define": "Swing.turn", "direction": "Up" }
       ]
     },
     {
@@ -322,20 +322,20 @@
       "until": 321,
       "speed": 10,
       "cues": [
-        { "at": 320, "texts": { "education": "A BoS closes beyond the position its Swing begins at." } }
+        { "at": 320, "define": "Swing.bos" }
       ]
     },
     {
       "until": 321,
       "cues": [
-        { "at": 321, "texts": { "education": "An MSB closes beyond the Swing Low or Swing High of a Swing that is already Confirmed." } }
+        { "at": 321, "define": "Swing.msb" }
       ]
     },
     {
       "cues": [
-        { "texts": { "education": "A BoS continues in the direction of its Swing; an MSB goes against it." } },
-        { "texts": { "education": "A BoS Confirms a Swing; an MSB Confirms nothing. It remains an observation." } },
-        { "texts": { "education": "Every Swing has exactly one BoS; a Swing has at most one MSB, and may have none." } },
+        { "define": "Swing.against" },
+        { "define": "Swing.confirms" },
+        { "define": "Swing.count" },
         { "texts": { "education": "Both may or may not coincide with a turning point on the Sawtooth, both exist at every resolution, and both can become Ghosts." } }
       ]
     },
@@ -466,8 +466,9 @@
         { "at": 81, "on": "close", "place": "above", "texts": { "education": "MSB" }, "hold": 3.5, "voice": false },
         { "texts": { "education": "The price falls for three more hours. Then it turns at an LL, and this BoS Confirms the next Upswing." }, "hold": 0 },
         { "at": 89, "on": "close", "place": "left", "texts": { "education": "BoS" }, "hold": 6.5, "voice": false },
-        { "texts": { "education": "The MSB is inside the new Upswing. An Upswing with an MSB inside it is a Weak Upswing. An Upswing with none is a Strong Upswing." } },
-        { "texts": { "education": "A Weak Upswing always has an LL as its Swing Low, because the MSB took the price below the Swing Low before it." } }
+        { "texts": { "education": "The MSB is inside the new Upswing." } },
+        { "define": "Swing.strong", "direction": "Up" },
+        { "define": "Swing.weak", "direction": "Up" }
       ]
     },
     {

@@ -32,6 +32,8 @@ var terms = Terms.All.Select(term =>
         term.Symbol,
         Summary = summary,
         Remarks = remarks,
+        // The definitions the tour and the analyses cite, which the page shows in place of the summary.
+        Definitions = Definitions.Of(term.Type),
     };
 }).ToList();
 
