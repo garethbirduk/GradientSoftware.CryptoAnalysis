@@ -1,0 +1,22 @@
+{
+  "term": "Upswing",
+  "title": "Rally, then the top",
+  "description": "Two upswings take price from 67,400 to the 70,200 high (15 Mar 18:00), whose close is the second break of structure. Two hours later the close of 67,861 breaks the last pullback low (67,894): a bearish market structure break. After the high the swings are downswings, inside the incomplete leg down to 66,882.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Upswing",
+      "direction": "Up",
+      "time": "2024-03-15T06:00:00Z",
+      "price": 68600.14
+    },
+    {
+      "type": "Upswing",
+      "direction": "Up",
+      "time": "2024-03-15T14:00:00Z",
+      "price": 68612.19
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "term": "LowerHigh",
+  "title": "Falling highs",
+  "description": "After the first high of 67,805, four lower highs each sit below the one before: 67,288, 66,776, 66,453 and 64,259. The third is a deep bounce that nearly returns to the second, but it stays below it, so the highs keep falling. The latest bounce, to 63,866 so far, is already a fifth lower high, though it may still move up.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2024-03-21T08:00:00Z",
+      "price": 67288.47
+    },
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2024-03-21T16:00:00Z",
+      "price": 66775.75
+    },
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2024-03-22T06:00:00Z",
+      "price": 66452.54
+    },
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2024-03-22T12:00:00Z",
+      "price": 64258.89
+    },
+    {
+      "type": "LowerHigh",
+      "direction": "Down",
+      "time": "2024-03-22T15:00:00Z",
+      "price": 63866.15
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "term": "Upswing",
+  "title": "Two-step rally",
+  "description": "Price climbs from 65,233 to a 71,072 high (25 Mar 19:00) in two upswings. The 67,205 high (24 Mar 23:00) pulls back to 66,555 and is closed above at 03:00 (67,352); the 67,507 high (25 Mar 04:00) pulls back to 66,828 and is closed above at 13:00 (68,029). The run on to 71,072 is not a swing: no pullback from it has been broken yet.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Upswing",
+      "direction": "Up",
+      "time": "2024-03-24T23:00:00Z",
+      "price": 67204.93
+    },
+    {
+      "type": "Upswing",
+      "direction": "Up",
+      "time": "2024-03-25T04:00:00Z",
+      "price": 67507.36
+    }
+  ]
+}

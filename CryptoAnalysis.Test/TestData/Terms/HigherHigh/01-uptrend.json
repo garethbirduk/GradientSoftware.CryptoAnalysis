@@ -1,0 +1,28 @@
+{
+  "term": "HigherHigh",
+  "title": "Uptrend",
+  "description": "From the 20,598 start, price dips to 20,529 (the first low), then makes highs of 21,394, 22,675 and 24,098. The last two are higher highs; the first has nothing to compare with. Through the straight run from 21,088 to 22,675, each close was the higher high until the next one beat it, so only the top of the run remains. The final close, 24,370, is the snippet high and already a higher high; a higher next close would move it forward.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "HigherHigh",
+      "direction": "Up",
+      "time": "2023-03-13T00:00:00Z",
+      "price": 22675.47
+    },
+    {
+      "type": "HigherHigh",
+      "direction": "Up",
+      "time": "2023-03-13T15:00:00Z",
+      "price": 24097.52
+    },
+    {
+      "type": "HigherHigh",
+      "direction": "Up",
+      "time": "2023-03-13T19:00:00Z",
+      "price": 24370.08
+    }
+  ]
+}

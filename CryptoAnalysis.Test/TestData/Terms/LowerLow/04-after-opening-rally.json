@@ -1,0 +1,40 @@
+{
+  "term": "LowerLow",
+  "title": "Lower lows measured from the high",
+  "description": "The snippet opens at 61,013 and rallies to 62,135 (25 Jun 18:00). From that high, each close below the previous low is a lower low: 61,755, 61,551, 61,247, 60,878 and, so far, 60,817. They are measured from the high, not from the opening price. The bounces to 62,072 and 61,745 are labelled higher highs because each beats the previous high at this level, even though both are below the 62,135 peak.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "LowerLow",
+      "direction": "Down",
+      "time": "2024-06-26T00:00:00Z",
+      "price": 61755.15
+    },
+    {
+      "type": "LowerLow",
+      "direction": "Down",
+      "time": "2024-06-26T05:00:00Z",
+      "price": 61551.07
+    },
+    {
+      "type": "LowerLow",
+      "direction": "Down",
+      "time": "2024-06-26T10:00:00Z",
+      "price": 61247.06
+    },
+    {
+      "type": "LowerLow",
+      "direction": "Down",
+      "time": "2024-06-26T18:00:00Z",
+      "price": 60878.15
+    },
+    {
+      "type": "LowerLow",
+      "direction": "Down",
+      "time": "2024-06-26T23:00:00Z",
+      "price": 60816.68
+    }
+  ]
+}

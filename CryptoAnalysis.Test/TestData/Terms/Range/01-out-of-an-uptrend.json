@@ -1,0 +1,16 @@
+{
+  "term": "Range",
+  "title": "Out of an uptrend",
+  "description": "An uptrend at level 1: the upswing before pulled back to 26,182 (14 Sep 01:00) and the rise from there ran to 26,742 at 14:00. The pullback from that high came 90% of the way back, to 26,234 (15 Sep 14:00), without closing below 26,182. Two hours later the pullback's own structure broke one level finer: a close above a level-2 downswing's bounce high, at 26,378. That is the range: 26,234 to 26,742, with bands 20% of the height either side. It held for 65 hours, with one close just above the top edge but inside the band, until 26,879 (18 Sep 09:00) closed above the band.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Range",
+      "direction": "Up",
+      "time": "2023-09-15T16:00:00Z",
+      "price": 26378.1
+    }
+  ]
+}

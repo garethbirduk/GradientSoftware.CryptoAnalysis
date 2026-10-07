@@ -1,0 +1,16 @@
+{
+  "term": "Uptrend",
+  "title": "Steady climb",
+  "description": "Three upswings in a row take price from 27,260 to 28,608. The second break of structure (28,248 on 16 Oct 17:00) confirms the uptrend, and no downswing follows, so it is still running at the end. Seen live, the pullback overnight looked like the start of a fall: from the prices up to 17 Oct 03:00 a downtrend was confirmed there. The later new high turned that pullback into part of the upleg, which only hindsight shows.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Uptrend",
+      "direction": "Up",
+      "time": "2023-10-16T17:00:00Z",
+      "price": 28248.2
+    }
+  ]
+}

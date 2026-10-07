@@ -1,0 +1,16 @@
+{
+  "term": "BearishMarketStructureBreak",
+  "title": "Failed break",
+  "description": "On 7 Jul 21:00 price closes at 56,583, below the previous higher low (a bearish market structure break), and falls about 4% to 54,954, a lower low at level 1. The swing from the 57,261 high still completes: the 8 Jul 08:00 close of 57,770 breaks above it, so the upswing continues. That same close is a bullish market structure break, closing back above the lower high of the drop.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "BearishMarketStructureBreak",
+      "direction": "Down",
+      "time": "2024-07-07T21:00:00Z",
+      "price": 56582.53
+    }
+  ],
+  "level": 1
+}

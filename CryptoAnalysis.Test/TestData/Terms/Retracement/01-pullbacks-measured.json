@@ -1,0 +1,58 @@
+{
+  "term": "Retracement",
+  "title": "Pullbacks measured",
+  "description": "Level 2 upswings and downswings, each with its counter-move measured against the move before it. The pullback from 30,004 (20 Jul 00:00) came 50% of the way back towards 29,905; the one from 29,876 came 66% back; the next, from 29,905, went 124% back, past the previous pullback low, which is a market structure break; and the pullback from 29,985 (21 Jul 18:00) came 89% back to 29,781 over a day and a half. The bounces in the fall that follows read 67% and 30%. Each retracement is asserted at its deepest reading.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 2,
+  "expected": [
+    {
+      "type": "Retracement",
+      "direction": "Up",
+      "time": "2023-07-20T03:00:00Z",
+      "price": 29954.71
+    },
+    {
+      "type": "Retracement",
+      "direction": "Up",
+      "time": "2023-07-21T00:00:00Z",
+      "price": 29786.58
+    },
+    {
+      "type": "Retracement",
+      "direction": "Up",
+      "time": "2023-07-21T09:00:00Z",
+      "price": 29757.9
+    },
+    {
+      "type": "Retracement",
+      "direction": "Up",
+      "time": "2023-07-23T00:00:00Z",
+      "price": 29781.23
+    },
+    {
+      "type": "Retracement",
+      "direction": "Down",
+      "time": "2023-07-23T23:00:00Z",
+      "price": 30081.61
+    },
+    {
+      "type": "Retracement",
+      "direction": "Down",
+      "time": "2023-07-24T07:00:00Z",
+      "price": 29830.21
+    },
+    {
+      "type": "Retracement",
+      "direction": "Up",
+      "time": "2023-07-24T19:00:00Z",
+      "price": 29108.14
+    },
+    {
+      "type": "Retracement",
+      "direction": "Up",
+      "time": "2023-07-24T22:00:00Z",
+      "price": 29160.06
+    }
+  ]
+}

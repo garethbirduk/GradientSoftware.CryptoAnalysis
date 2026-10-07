@@ -1,0 +1,28 @@
+{
+  "term": "SuccessiveGreenCandles",
+  "title": "Run to a high",
+  "description": "Two short runs of three on 18 and 19 Jul 2024, then ten green candles in a row from 63,691 to 67,207 (+5.5%) on 19 Jul, closing at the snippet high.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "SuccessiveGreenCandles",
+      "direction": "Up",
+      "time": "2024-07-18T22:00:00Z",
+      "price": 64020.28
+    },
+    {
+      "type": "SuccessiveGreenCandles",
+      "direction": "Up",
+      "time": "2024-07-19T03:00:00Z",
+      "price": 64319.52
+    },
+    {
+      "type": "SuccessiveGreenCandles",
+      "direction": "Up",
+      "time": "2024-07-19T19:00:00Z",
+      "price": 67207.36
+    }
+  ]
+}

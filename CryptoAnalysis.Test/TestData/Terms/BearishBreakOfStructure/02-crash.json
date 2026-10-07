@@ -1,0 +1,22 @@
+{
+  "term": "BearishBreakOfStructure",
+  "title": "Crash",
+  "description": "The 4 and 5 Aug 2024 crash, from 61k to 51.6k. A bearish market structure break comes first (4 Aug 14:00, 59,539), then two bearish breaks of structure: 56,142 at 00:00 and 53,898 at 03:00 on 5 Aug, each closing below the previous low after a bounce.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "BearishBreakOfStructure",
+      "direction": "Down",
+      "time": "2024-08-05T00:00:00Z",
+      "price": 56142.48
+    },
+    {
+      "type": "BearishBreakOfStructure",
+      "direction": "Down",
+      "time": "2024-08-05T03:00:00Z",
+      "price": 53897.58
+    }
+  ]
+}

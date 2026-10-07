@@ -5,3 +5,16 @@ coverage/
 TestResults/
 
 **/*/coverage.opencover.xml
+ConcatenateCsFiles.ps1
+Combined/CryptoAnalysis.Test_Combined.cs
+Combined/CryptoAnalysis_Combined.cs
+
+artifacts/
+
+CryptoAnalysis.Site/wwwroot/tour-audio/
+tools/tour-video/node_modules/
+
+temp/
+
+# Charts the tests write for comparison
+actual_*.html

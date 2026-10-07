@@ -1,0 +1,16 @@
+{
+  "term": "Range",
+  "title": "The training example, on 4-hour candles",
+  "description": "The range the training drew, November 2021 on 4-hour Coinbase candles from the all-time high of the 10th. A downtrend at level 1: the downswing from 59,061 bounced to A, 60,761 (17 Nov 08:00), and the fall from there ran to B, 55,927 (19 Nov 00:00), the LL. The bounce made C at 58,686, a higher low G at 57,664 and F at 59,761 on Saturday 20 Nov 20:00: 79% of the way back to A. On 22 Nov 00:00 the close at 57,431 broke below G, a bearish market structure break one level finer, and that identified the range: 55,927 to 59,761, bands at 60,527 and 55,160 (the training\u0027s chart has 60,517 and 55,173 from another exchange). It held until 26 Nov 08:00, when 53,751 closed below the lower band; that close was also the downswing\u0027s break of structure. On hourly candles the same week has three lower lows between A and B, and no range here.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Range",
+      "direction": "Down",
+      "time": "2021-11-22T00:00:00Z",
+      "price": 57431.02
+    }
+  ]
+}

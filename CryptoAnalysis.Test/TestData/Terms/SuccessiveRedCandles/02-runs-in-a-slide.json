@@ -1,0 +1,34 @@
+{
+  "term": "SuccessiveRedCandles",
+  "title": "Runs in a slide",
+  "description": "Four red runs as price slides from 28.3k to 27.2k on 21 Apr 2023. The eight-candle run from 13:00 to 20:00 carries most of the fall (-3.4%); the others are three candles each.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "SuccessiveRedCandles",
+      "direction": "Down",
+      "time": "2023-04-21T06:00:00Z",
+      "price": 27920.13
+    },
+    {
+      "type": "SuccessiveRedCandles",
+      "direction": "Down",
+      "time": "2023-04-21T10:00:00Z",
+      "price": 27999.33
+    },
+    {
+      "type": "SuccessiveRedCandles",
+      "direction": "Down",
+      "time": "2023-04-21T20:00:00Z",
+      "price": 27260.2
+    },
+    {
+      "type": "SuccessiveRedCandles",
+      "direction": "Down",
+      "time": "2023-04-22T00:00:00Z",
+      "price": 27214.16
+    }
+  ]
+}

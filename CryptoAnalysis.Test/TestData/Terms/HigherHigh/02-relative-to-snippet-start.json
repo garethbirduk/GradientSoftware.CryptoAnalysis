@@ -1,0 +1,22 @@
+{
+  "term": "HigherHigh",
+  "title": "Dip before the first high",
+  "description": "The snippet starts at 24,944 and dips to 24,151 before any close beats the start, so at level 1 that dip is the first low. The first high is 25,018 (16 Mar 10:00), and 25,027 at 19:00 is a higher high by 9. The recovery's own highs and lows appear a level down, at level 2. The final close, 25,052, is the snippet high and already a higher high; a higher next close would move it forward.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "HigherHigh",
+      "direction": "Up",
+      "time": "2023-03-16T19:00:00Z",
+      "price": 25026.8
+    },
+    {
+      "type": "HigherHigh",
+      "direction": "Up",
+      "time": "2023-03-16T23:00:00Z",
+      "price": 25051.85
+    }
+  ]
+}

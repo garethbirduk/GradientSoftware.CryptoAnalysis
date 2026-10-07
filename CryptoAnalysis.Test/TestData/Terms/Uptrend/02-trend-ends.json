@@ -1,0 +1,16 @@
+{
+  "term": "Uptrend",
+  "title": "Trend ends",
+  "description": "Three upswings from 25,792 to the 27,687 high (18 Mar 00:00); the second break of structure (27,163 on 17 Mar 21:00) confirms the uptrend. An hour after the high, the close of 27,394 breaks the last pullback low (a bearish market structure break), but the trend only ends when a downswing breaks structure: 27,289 on 18 Mar 08:00.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Uptrend",
+      "direction": "Up",
+      "time": "2023-03-17T21:00:00Z",
+      "price": 27163.38
+    }
+  ]
+}

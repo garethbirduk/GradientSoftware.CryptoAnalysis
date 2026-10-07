@@ -1,0 +1,16 @@
+{
+  "term": "Downtrend",
+  "title": "Survives a break",
+  "description": "Five downswings from 47,044 to 44,688. The downtrend is confirmed at 46,194 on 9 Jan 12:00; an hour later the bounce closes at 46,858, above the previous bounce high (46,644): a bullish market structure break. No upswing breaks structure, so the downtrend carries on and counts one break against it.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "Downtrend",
+      "direction": "Down",
+      "time": "2024-01-09T12:00:00Z",
+      "price": 46193.87
+    }
+  ]
+}

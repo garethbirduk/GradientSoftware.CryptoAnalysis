@@ -1,0 +1,16 @@
+{
+  "term": "Range",
+  "title": "Out of a downtrend",
+  "description": "A downtrend at level 2: the downswing before bounced to 28,130 (20 Mar 14:00), and the fall from there reached 27,651 at 16:00. The bounce from that low came 93% of the way back, to 28,101 at 20:00, without closing above 28,130. Three hours later a close below a level-3 upswing's pullback low, at 27,823, broke the bounce's own structure: a range from 27,651 to 28,101. The price then closed just beyond each edge once, inside the bands, so the range held, and it ended 13 hours after it was identified when 28,278 (21 Mar 12:00) closed above the upper band.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 2,
+  "expected": [
+    {
+      "type": "Range",
+      "direction": "Down",
+      "time": "2023-03-20T23:00:00Z",
+      "price": 27823.32
+    }
+  ]
+}

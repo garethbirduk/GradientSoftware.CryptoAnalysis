@@ -1,0 +1,22 @@
+{
+  "term": "SuccessiveGreenCandles",
+  "title": "Long run",
+  "description": "Eleven green candles in a row on 13 and 14 Jan 2023, from the 19,135 open to a 20,971 close (+9.6%). The arrow runs from the first candle's open to the last candle's close. An earlier run of three (+1.1%) is the shortest that counts.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "SuccessiveGreenCandles",
+      "direction": "Up",
+      "time": "2023-01-13T10:00:00Z",
+      "price": 19040.41
+    },
+    {
+      "type": "SuccessiveGreenCandles",
+      "direction": "Up",
+      "time": "2023-01-14T03:00:00Z",
+      "price": 20971.44
+    }
+  ]
+}

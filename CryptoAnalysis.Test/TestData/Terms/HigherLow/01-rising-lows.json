@@ -1,0 +1,28 @@
+{
+  "term": "HigherLow",
+  "title": "Rising lows",
+  "description": "Three higher lows rise through an uptrend: 38,332, 38,704 and 38,721, each above the one before (the opening low, 38,191, has nothing to compare with). The last two differ by less than 20: a higher low only has to be above the previous low, by any margin.",
+  "reviewed": false,
+  "closeType": "Close",
+  "expected": [
+    {
+      "type": "HigherLow",
+      "direction": "Up",
+      "time": "2023-12-01T14:00:00Z",
+      "price": 38331.63
+    },
+    {
+      "type": "HigherLow",
+      "direction": "Up",
+      "time": "2023-12-01T23:00:00Z",
+      "price": 38703.54
+    },
+    {
+      "type": "HigherLow",
+      "direction": "Up",
+      "time": "2023-12-02T07:00:00Z",
+      "price": 38721.32
+    }
+  ],
+  "level": 1
+}

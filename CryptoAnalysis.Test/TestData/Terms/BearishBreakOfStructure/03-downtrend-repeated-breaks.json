@@ -1,0 +1,34 @@
+{
+  "term": "BearishBreakOfStructure",
+  "title": "Downtrend: repeated breaks",
+  "description": "A four-step slide from 48.6k to 42.5k on 11 and 12 Jan 2024. After a bearish market structure break on 11 Jan 15:00, four bearish breaks of structure: 45,880, 45,868, 43,416 and 42,485. The first two are only 12 apart: a break only has to close below the low it follows, by any margin.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "BearishBreakOfStructure",
+      "direction": "Down",
+      "time": "2024-01-12T08:00:00Z",
+      "price": 45880.44
+    },
+    {
+      "type": "BearishBreakOfStructure",
+      "direction": "Down",
+      "time": "2024-01-12T12:00:00Z",
+      "price": 45867.7
+    },
+    {
+      "type": "BearishBreakOfStructure",
+      "direction": "Down",
+      "time": "2024-01-12T18:00:00Z",
+      "price": 43415.67
+    },
+    {
+      "type": "BearishBreakOfStructure",
+      "direction": "Down",
+      "time": "2024-01-12T22:00:00Z",
+      "price": 42484.61
+    }
+  ]
+}

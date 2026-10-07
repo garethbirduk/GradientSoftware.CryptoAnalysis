@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>GradientSoftware.$(AssemblyName)</Title>
+    <Description>A utility library for dotnet 8 and above.</Description>
+    <Copyright>© 2024 Gareth Bird</Copyright>
+    <ErrorReport>none</ErrorReport>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType></RepositoryType>
+    <PackageTags>utils; gradient; software</PackageTags>
+    <RepositoryUrl>https://github.com/garethbirduk/GradientSoftware.CryptoAnalysis</RepositoryUrl>
+    <PackageId>GradientSoftware.$(AssemblyName)</PackageId>
+    <Version>0.0.2</Version>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Combined\**" />
+    <EmbeddedResource Remove="Combined\**" />
+    <None Remove="Combined\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\resources\icon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CsvHelper" Version="33.0.1" />
+    <PackageReference Include="GradientSoftware.Utils" Version="0.3.2" />
+    <PackageReference Include="Plotly.NET" Version="5.1.0" />
+  </ItemGroup>
+
+</Project>

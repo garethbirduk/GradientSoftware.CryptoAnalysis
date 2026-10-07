@@ -1,0 +1,22 @@
+{
+  "term": "SuccessiveRedCandles",
+  "title": "Long run, small move",
+  "description": "Eleven red candles in a row on 16 and 17 Dec 2023, yet only a 1.7% fall, from 42,570 to 41,832. A run counts candles, not size: a slow bleed and a crash can be the same length.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "SuccessiveRedCandles",
+      "direction": "Down",
+      "time": "2023-12-16T06:00:00Z",
+      "price": 42178.49
+    },
+    {
+      "type": "SuccessiveRedCandles",
+      "direction": "Down",
+      "time": "2023-12-17T02:00:00Z",
+      "price": 41831.58
+    }
+  ]
+}

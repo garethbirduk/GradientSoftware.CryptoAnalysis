@@ -1,0 +1,16 @@
+{
+  "term": "BearishMarketStructureBreak",
+  "title": "Uptrend top",
+  "description": "An uptrend with four bullish breaks of structure peaks at 69,800 (29 Jul 2024 12:00). The next candle closes at 69,267, below the last higher low: a bearish market structure break. Two bearish breaks of structure follow, to 66,771 and 65,777. The mirror of the upswing reversal example.",
+  "reviewed": false,
+  "closeType": "Close",
+  "level": 1,
+  "expected": [
+    {
+      "type": "BearishMarketStructureBreak",
+      "direction": "Down",
+      "time": "2024-07-29T13:00:00Z",
+      "price": 69266.64
+    }
+  ]
+}
