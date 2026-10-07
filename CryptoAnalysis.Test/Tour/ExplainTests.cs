@@ -351,6 +351,30 @@ public class ExplainTests
     }
 
     [TestMethod]
+    public void Definitions_AreToldInADirection_AndCitedByTheTourAndTheAnalysisAlike()
+    {
+        Assert.AreEqual("A Downswing with an MSB inside it, a close above the Swing High of the Downswing before, is Weak; one with none is Strong. A Weak Downswing always has an HH as its Swing High.",
+            Definitions.Text("Trend.weak", EnumSwingDirection.Down));
+        Assert.AreEqual("After an MSB against a Trend, the next BoS decides. An Upswing's BoS continues the Uptrend with a Weak Upswing. A Downswing's BoS ends it.",
+            Definitions.Text("Trend.next", EnumSwingDirection.Up));
+
+        // A cue that cites a definition has it as its text, written out in the expanded tour for the narration.
+        var def = JsonNode.Parse("""{ "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [{ "cues": [{ "define": "Trend.ends" }, { "define": "Trend.next" }, { "define": "Trend.nothing" }] }] }""")!;
+        var tour = Tours.Compile(def, TourPrices.Value);
+        Assert.AreEqual("A Trend ends at the BoS of the first Swing in the opposite direction.", tour.Sections[0].Cues[0].Text);
+        Assert.AreEqual("A Trend ends at the BoS of the first Swing in the opposite direction.", tour.Expanded!["sections"]![0]!["cues"]![0]!["texts"]!["education"]!.GetValue<string>());
+        CollectionAssert.AreEqual(new[]
+        {
+            "section 1, text 2: the definition \"Trend.next\" is told in a direction: \"direction\": \"Up\" or \"Down\"",
+            "section 1, text 3: no definition \"Trend.nothing\" in definitions.json",
+        }, tour.Errors.Where(x => x.Contains("definition")).ToList());
+
+        // The analysis tells the same: a Trend's explanation is its definitions.
+        var trend = Explain.Trend(TourPrices.Value, 90, level: 1, reached: 90, out _)!;
+        CollectionAssert.IsSubsetOf(new[] { Definitions.Text("Trend.ends", EnumSwingDirection.Up), Definitions.Text("Trend.weak", EnumSwingDirection.Up) }, Texts(trend, EnumDetail.Education));
+    }
+
+    [TestMethod]
     public void Expand_ListsWhatItCannotExplain()
     {
         var errors = new List<string>();

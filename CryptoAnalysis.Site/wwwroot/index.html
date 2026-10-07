@@ -324,6 +324,8 @@
   .ed-cue.shown { border-left-color: var(--muted); }
   .ed-cue.active { border-left-color: var(--accent); }
   .ed-level { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
+  .ed-define { margin-top: 4px; font-size: 13px; line-height: 1.4; }
+  .ed-define .ed-hint { display: block; }
   .ed-cue > .ed-meta { margin-bottom: 2px; white-space: normal; }
   .ed-row { display: none; grid-template-columns: 1.15fr 1fr 1fr; align-items: end; gap: 5px 8px; margin-top: 5px; }
   .ed-cue:focus-within .ed-row { display: grid; }
@@ -2425,7 +2427,7 @@ async function loadAnalysis(params) {
   anchorTour(loaded);
   Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio, loaded.detail));
   // The explanations are on when the analysis was asked for with Explain.
-  loaded.chapters.forEach((c, i) => { if (loaded.sections[c.section].explains && params.detail !== 'education') loaded.chaptersOff.add(i); });
+  loaded.chapters.forEach((c, i) => { const s = loaded.sections[c.section]; if (s.explains && (params.detail !== 'education' || s.repeat)) loaded.chaptersOff.add(i); });
   // With no pins shown, a pinned text is left out altogether, so it does not hold the run for its seconds either.
   for (const s of loaded.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
   if (!loaded.sections.some(s => s.cues.some(c => !c.skipped))) throw new Error('the server wrote no texts for it');
@@ -2444,9 +2446,12 @@ function splitExplanations(def) {
   const at = (cues, level) => cues.filter(c => c.texts?.[level]).map(c => ({ ...c, texts: { [level]: c.texts[level] } }));
   const word = s => s.thing?.startsWith('SuccessiveCandles') ? 'Successive Candles' : (s.chapter ?? '').split(' ').pop();
   const named = s => { const w = word(s); return w === 'Successive Candles' ? 'What are Successive Candles?' : `What is ${/^[AEIOU]|^(HH|HL|LH|LL|MSB)$/.test(w) ? 'an' : 'a'} ${w}?`; };
+  // A kind of thing is explained once: a second Downtrend's explanation is there, but off, one tick away.
+  const told = new Set();
   def.sections = (def.sections ?? []).flatMap(s => {
-    const explained = at(s.cues ?? [], 'education');
-    return [...(explained.length ? [{ ...s, chapter: named(s), explains: true, cues: explained }] : []), { ...s, cues: at(s.cues ?? [], 'summary') }];
+    const explained = at(s.cues ?? [], 'education'), name = named(s), repeat = told.has(name);
+    told.add(name);
+    return [...(explained.length ? [{ ...s, chapter: name, explains: true, repeat, cues: explained }] : []), { ...s, cues: at(s.cues ?? [], 'summary') }];
   });
   return def;
 }
@@ -2465,7 +2470,7 @@ function toggleKind(explains) {
   const anyOn = of.some(x => !tour.chaptersOff.has(x.i));
   for (const x of of) {
     if (anyOn) tour.chaptersOff.add(x.i);
-    else if (!explains || analysed.has(x.s.thing)) tour.chaptersOff.delete(x.i);
+    else if (!explains || (analysed.has(x.s.thing) && !x.s.repeat)) tour.chaptersOff.delete(x.i);
   }
   const detail = explainsOn() ? 'education' : 'summary';
   wantedAnalysis = tour.params = { ...tour.params, detail };
@@ -2725,7 +2730,15 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
     at = Math.max(from, Math.min(until, candles - 1));
 
     const cues = (s.cues ?? []).map((c, j) => {
-      const what = `${where}, text ${j + 1}`, texts = c.texts ?? {}, text = textAt(texts, detail);
+      const what = `${where}, text ${j + 1}`;
+      // A definition, cited by its key, is the text at Education (see definitions.json).
+      let texts = c.texts ?? {};
+      if (c.define != null) {
+        if (!(c.define in DEFINITIONS)) errors.push(`${what}: no definition "${c.define}" in definitions.json`);
+        else if (!c.direction && DEFINITIONS[c.define].includes('{')) errors.push(`${what}: the definition "${c.define}" is told in a direction: "direction": "Up" or "Down"`);
+        else texts = { ...texts, education: defineText(c.define, c.direction) };
+      }
+      const text = textAt(texts, detail);
       if (c.text != null) errors.push(`${what}: "text" is now "texts", a text for each level of detail: { "summary", "education" }`);
       else if (!Object.values(texts).some(Boolean)) errors.push(`${what}: no text`);
       for (const level of Object.keys(texts)) if (!DETAILS.includes(level)) errors.push(`${what}: unknown detail "${level}": ${DETAILS.join(', ')}`);
@@ -2754,7 +2767,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
         clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0, given: c.hold >= 0 ? c.hold : null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
     });
-    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
@@ -2821,6 +2834,29 @@ function sceneSpecs(def) {
     ...(def.sections ?? []).flatMap((s, i) => s.scene != null ? [{ dataset: (typeof s.scene === 'object' && s.scene.dataset) || own, time: typeof s.scene === 'object' ? s.scene.time : undefined, section: i }] : [])];
 }
 
+// The definitions of the terms (see Definitions in CryptoAnalysis.Site), each rule a sentence or two, by key. A tour cue
+// with "define" cites one, told in its "direction" when it has slots; they are filled as the server fills them, so the
+// text, and with it the key of its clip, is the same either way.
+// The editor changes them in place and saves them with the tour, the file's version kept as for tour.json.
+let DEFINITIONS = {}, definitionsSaved = '{}', definitionsBase = '';
+async function loadDefinitions() {
+  const text = await fetch('definitions.json', { cache: 'no-store' }).then(r => r.ok ? r.text() : '{}').catch(() => '{}');
+  DEFINITIONS = JSON.parse(text);
+  definitionsSaved = JSON.stringify(DEFINITIONS);
+  definitionsBase = textKey(text);
+}
+const definitionsDirty = () => JSON.stringify(DEFINITIONS) !== definitionsSaved;
+// definitions.json as text: a line for each definition.
+const formatDefinitions = d => `{\n${Object.entries(d).map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n')}\n}\n`;
+function defineText(key, direction) {
+  const up = direction === 'Up', slots = direction ? {
+    'trend': up ? 'Uptrend' : 'Downtrend', 'a trend': up ? 'an Uptrend' : 'a Downtrend', 'swing': up ? 'Upswing' : 'Downswing', 'a swing': up ? 'an Upswing' : 'a Downswing',
+    'other swing': up ? 'Downswing' : 'Upswing', 'a other swing': up ? 'a Downswing' : 'an Upswing', 'turn': up ? 'Swing Low' : 'Swing High', 'beyond': up ? 'below' : 'above',
+    'weak turn': up ? 'LL' : 'HH',
+  } : {};
+  return (DEFINITIONS[key] ?? '').replace(/\{([a-z ]+)\}/g, (m, name) => slots[name] ?? m).replace(/(^|[.!?]\s+)([a-z])/g, (m, before, letter) => before + letter.toUpperCase());
+}
+
 // The player's state for a tour, on the page it plays on. A tour from tour.json plays on the Tour page at Education; an
 // analysis on the Analysis page (see loadAnalysis), with the options that page sets.
 function newPlayer(def, audio, options = {}) {
@@ -2834,6 +2870,7 @@ async function loadTour() {
   const list = await loadDatasets();
   if (!list.length) throw new Error('the server has no datasets');
   const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+  await loadDefinitions();
   const loaded = newPlayer(def, audio, { base });
   await loadTourDatasets(loaded);
   anchorTour(loaded);
@@ -3741,9 +3778,9 @@ function updateGlossaryStatus() {
 // The section the tour is at is open in the editor unless it has been folded away, which lasts until a section is picked.
 let editorSection = -1, editorFolded = false;
 const editorOn = () => state.tourEditor !== false && !videoMode;
-const tourDirty = () => !!tour && JSON.stringify(tour.def) !== tour.saved;
+const tourDirty = () => !!tour && (JSON.stringify(tour.def) !== tour.saved || definitionsDirty());
 const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
-  section: ['chapter', 'scene', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'to', 'heads', 'color', 'texts', 'hold', 'keep', 'voice'] };
+  section: ['chapter', 'scene', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'to', 'heads', 'color', 'define', 'direction', 'texts', 'hold', 'keep', 'voice'] };
 
 // tour.json as text: a line for each text and for each of a section's settings, so a change shows as a small diff.
 function formatTour(def) {
@@ -3800,7 +3837,13 @@ function renderTourEditor(anchor = 'section') {
     const pinned = c.on != null;
     return `<div class="ed-cue" data-cue="${j}">
       <div class="ed-meta" data-ed-cue></div>
-      ${DETAILS.map(level => `<label class="ed-level">${DETAIL_NAMES[level]}<textarea data-scope="cue" data-field="texts.${level}" placeholder="${level === DETAILS[0] ? 'Shown at every detail' : `Shown at ${DETAIL_NAMES[level]}, in place of the ${DETAIL_NAMES[DETAILS[0]].toLowerCase()}`}" aria-label="${DETAIL_NAMES[level]} ${j + 1}">${value(c.texts?.[level])}</textarea></label>`).join('')}
+      <label class="ed-level">Text from<select data-scope="cue" data-field="define" data-render>${options([['', 'written here'], ...Object.keys(DEFINITIONS).map(k => [k, `the definition ${k}`])], c.define ?? '')}</select></label>
+      ${c.define != null ? `<div class="ed-define">
+        ${(DEFINITIONS[c.define] ?? '').includes('{') ? `<label class="ed-level">Told for<select data-scope="cue" data-field="direction" data-render>${options([['Up', 'up: Uptrend, Upswing'], ['Down', 'down: Downtrend, Downswing']], c.direction ?? '')}</select></label>` : ''}
+        <label class="ed-level">The wording of ${esc(c.define)}, the same wherever it is cited<textarea data-scope="definition" data-field="definition" data-key="${esc(c.define)}" aria-label="The definition ${esc(c.define)}">${value(DEFINITIONS[c.define])}</textarea></label>
+        <span class="ed-hint">Slots for its direction: {trend}, {a trend}, {swing}, {a swing}, {other swing}, {a other swing}, {turn}, {beyond}, {weak turn}. Here it reads: ${esc(compiled?.text ?? '')}</span>
+      </div>`
+      : DETAILS.map(level => `<label class="ed-level">${DETAIL_NAMES[level]}<textarea data-scope="cue" data-field="texts.${level}" placeholder="${level === DETAILS[0] ? 'Shown at every detail' : `Shown at ${DETAIL_NAMES[level]}, in place of the ${DETAIL_NAMES[DETAILS[0]].toLowerCase()}`}" aria-label="${DETAIL_NAMES[level]} ${j + 1}">${value(c.texts?.[level])}</textarea></label>`).join('')}
       <div class="ed-row">
         <label>At candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="cue" data-field="at" data-type="number" placeholder="${esc(compiled?.atSpec ?? 'start')}" value="${numberOr(c.at)}"${eventBox(compiled?.atSpec)}>${pick('at', 'the candle')}</span></label>
         <label>Pinned to<select data-scope="cue" data-field="on" data-type="auto" data-render>${options([['', 'not pinned'], ['open', 'open'], ['high', 'high'], ['low', 'low'], ['close', 'close'],
@@ -3952,7 +3995,8 @@ function toggleTourEditor() {
 // Keeps the definition as it is before a change, for Undo. Typing in one box is one change.
 function rememberTour(key = null) {
   if (key && key === tour.lastEdit) return;
-  tour.history.push(JSON.stringify(tour.def));
+  // The definitions go with the tour, so Undo takes back an edit to either.
+  tour.history.push(JSON.stringify({ def: tour.def, definitions: DEFINITIONS }));
   if (tour.history.length > 200) tour.history.shift();
   tour.lastEdit = key;
 }
@@ -3975,6 +4019,11 @@ function applyTour({ render = false, cue = null, end = false, start = false } = 
 function editTourField(el) {
   const cueEl = el.closest('.ed-cue'), j = cueEl ? Number(cueEl.dataset.cue) : null, { scope, field, type } = el.dataset, def = tour.def;
   rememberTour(`${scope}|${tour.index}|${j}|${field}`);
+  // A definition's wording: one for every cue that cites it, saved to definitions.json with the tour.
+  if (scope === 'definition') {
+    DEFINITIONS = { ...DEFINITIONS, [el.dataset.key]: el.value };
+    return applyTour({ cue: j });
+  }
   const target = scope === 'tour' ? def : scope === 'start' ? (def.start ??= {}) : scope === 'cue' ? def.sections[tour.index].cues[j] : def.sections[tour.index];
   const raw = el.value, value = raw !== '' && (type === 'number' || (type === 'auto' && /^\d+(\.\d+)?$/.test(raw))) ? Number(raw) : raw;
   if (field.startsWith('journey')) {
@@ -4005,6 +4054,19 @@ function editTourField(el) {
     const box = f => el.closest('.ed-grid').querySelector(`[data-field="${f}"]`), dataset = box('sceneDataset').value, time = box('sceneTime').value;
     if (!dataset) delete target.scene;
     else target.scene = { ...(dataset !== (def.dataset ?? datasetList?.[0]?.id) ? { dataset } : {}), ...(time ? { time } : {}) };
+  }
+  // Where a text comes from: written here, or a definition. Cited, it has no texts of its own, and a direction when the
+  // definition has slots; written here again, it starts from what the definition read.
+  else if (field === 'define') {
+    if (value === '') {
+      if (target.define) target.texts = { education: defineText(target.define, target.direction) };
+      delete target.define;
+      delete target.direction;
+    } else {
+      target.define = value;
+      delete target.texts;
+      if ((DEFINITIONS[value] ?? '').includes('{')) target.direction ??= 'Up'; else delete target.direction;
+    }
   }
   // A text for one level of detail; an empty box leaves that level out.
   else if (field.startsWith('texts.')) {
@@ -4094,17 +4156,26 @@ function candleAt(el, e) {
   return view.from + view.t.reduce((best, v, i) => Math.abs(v - at) < Math.abs(view.t[best] - at) ? i : best, 0);
 }
 
+// Save writes what has changed: tour.json, definitions.json, or both, each refused when its file has changed on disk since
+// the page loaded it.
 async function saveTour() {
   if (!tourDirty() || tour?.page !== 'Tour') return;
-  const def = JSON.stringify(tour.def), body = formatTour(tour.def);
-  const response = await fetch('api/tour', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Tour-Base': tour.base }, body }).catch(() => null);
-  if (response?.ok) Object.assign(tour, { saved: def, base: textKey(body) });
+  const notes = [], put = (url, header, base, body) => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', [header]: base }, body }).catch(() => null);
+  const failed = (response, name) => response?.status === 404 || response?.status === 405
+    ? 'Not saved: the local server was started before the editor could save this. Restart ./build-site.ps1 -Serve.'
+    : response?.status === 409 ? `Not saved: ${name} has changed on disk since this page loaded it. Revert loads the newer version; Undo then brings back what was here.`
+    : `Not saved: the local server did not take ${name}.`;
+  if (JSON.stringify(tour.def) !== tour.saved) {
+    const def = JSON.stringify(tour.def), body = formatTour(tour.def), response = await put('api/tour', 'X-Tour-Base', tour.base, body);
+    if (response?.ok) Object.assign(tour, { saved: def, base: textKey(body) }); else notes.push(failed(response, 'tour.json'));
+  }
+  if (definitionsDirty()) {
+    const saved = JSON.stringify(DEFINITIONS), body = formatDefinitions(DEFINITIONS), response = await put('api/definitions', 'X-Definitions-Base', definitionsBase, body);
+    if (response?.ok) { definitionsSaved = saved; definitionsBase = textKey(body); } else notes.push(failed(response, 'definitions.json'));
+  }
   // The server reads the changed texts aloud on saving; the page follows that and loads the clips when it is done.
-  if (response?.ok) { tourExport = null; refreshTourExport(); }
-  tour.note = response?.ok ? '' : response?.status === 404 || response?.status === 405
-    ? 'Not saved: the local server was started before the editor existed. Restart ./build-site.ps1 -Serve.'
-    : response?.status === 409 ? 'Not saved: tour.json has changed on disk since this page loaded it. Revert loads the newer version; Undo then brings back what was here.'
-    : 'Not saved: the local server did not take it.';
+  if (!notes.length) { tourExport = null; refreshTourExport(); }
+  tour.note = notes.join(' ');
   updateEditorStatus();
 }
 
@@ -4113,6 +4184,7 @@ async function revertTour() {
   if (!file) { tour.note = 'tour.json could not be loaded.'; return updateEditorStatus(); }
   rememberTour();
   Object.assign(tour, { def: file.def, base: file.base, saved: JSON.stringify(file.def) });
+  await loadDefinitions();
   applyTour({ render: true, start: true });
 }
 
@@ -4138,7 +4210,7 @@ function tourAction(action, el) {
     case 'undo': {
       const before = tour.history.pop();
       if (!before) return;
-      tour.def = JSON.parse(before);
+      ({ def: tour.def, definitions: DEFINITIONS } = JSON.parse(before));
       tour.lastEdit = null;
       return applyTour({ render: true });
     }

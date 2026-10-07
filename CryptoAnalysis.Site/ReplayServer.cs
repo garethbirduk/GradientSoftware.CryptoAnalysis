@@ -202,6 +202,34 @@ public static class ReplayServer
             }
 
             app.MapGet("/api/tour", () => ExpandedTour() is { } tour ? Results.Text(tour, "application/json") : Results.NotFound());
+
+            // The definitions are read from the source copy, which the editor saves, so a change is used at once. Saving
+            // works as the tour's does: the page says which version it started from, and a file changed since is kept.
+            var definitionsPath = Path.Combine(sourceDir, "definitions.json");
+            Definitions.UseFile(definitionsPath);
+            app.MapPut("/api/definitions", async (HttpRequest request) =>
+            {
+                using var reader = new StreamReader(request.Body);
+                var text = await reader.ReadToEndAsync();
+                try
+                {
+                    using var parsed = JsonDocument.Parse(text);
+                    if (parsed.RootElement.ValueKind != JsonValueKind.Object || parsed.RootElement.EnumerateObject().Any(x => x.Value.ValueKind != JsonValueKind.String))
+                        return Results.BadRequest("The definitions are an object of texts by key.");
+                }
+                catch (JsonException)
+                {
+                    return Results.BadRequest("The definitions are not valid JSON.");
+                }
+
+                if (File.Exists(definitionsPath) && request.Headers["X-Definitions-Base"].ToString() != TextKey(await File.ReadAllTextAsync(definitionsPath)))
+                    return Results.Conflict("definitions.json has changed on disk since the page loaded it.");
+
+                await File.WriteAllTextAsync(definitionsPath, text);
+                // The texts that cite a definition changed with it, so they are read aloud again.
+                ReadAloud();
+                return Results.NoContent();
+            });
             if (video != null)
                 video.TourSource = ExpandedTour;
             app.MapPut("/api/tour", async (HttpRequest request) =>

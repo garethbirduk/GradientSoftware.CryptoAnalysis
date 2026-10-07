@@ -718,20 +718,29 @@ public static class Explain
         var weak = trend.Parts.Select((part, i) => (part, i)).Where(x => !x.part.Strong).Select(x => Ordinal(x.i + 1)).ToList();
         var ended = trend.End != null && index.TryGetValue(trend.End.Time, out var endAt) && endAt <= until;
 
+        // What a Trend is, from the definitions, each rule where it shows on this one; the rules about Weak Swings only when
+        // one of its Swings is Weak.
+        var direction = trend.Direction;
         var cues = new JsonArray
         {
-            Teach(startAt, $"A Trend is two or more Swings in a row in one direction. {Capital(An(name))} is a run of {swing}s, and begins where its first {swing} begins."),
+            Teach(startAt, Definitions.Text("Trend.what", direction)),
             Say(startAt, $"{Order(level)} {name}, beginning {At(trend.Start.Time, length)}."),
             Pin(startAt, "close", Edge(startAt, place), $"{name} begins", 4),
-            Teach(confirmedAt, $"The BoS of the second {swing} makes two in a row: that Confirms the {name}."),
+            Teach(confirmedAt, Definitions.Text("Trend.confirmed", direction)),
             Say(confirmedAt, $"Confirmed at the second {swing}'s BoS, {At(trend.Confirmed.Time, length)}."),
             Pin(confirmedAt, "close", place, $"second {swing}", 4),
             Say(until, $"{Capital(Words(count))} {swing}s{(ended ? "" : " so far")}."),
-            Teach(until, $"{Capital(An(swing))} with an MSB inside it, a close {(up ? "below" : "above")} the {turn} of the {swing} before, is Weak; one without is Strong. The Trend's Strength is the share of its {swing}s that are Strong."),
-            Say(until, weak.Count == 0 ? "All Strong." : $"{Capital(Words(weak.Count))} Weak: the {List(weak)}."),
-            Say(until, $"Strength {trend.Strength}%: {Words(trend.Strong)} of {Words(count)}."),
-            Teach(until, $"A Trend ends at the BoS of the first Swing the other way: here, the first {other}."),
         };
+        if (weak.Count > 0)
+        {
+            cues.Add(Teach(until, Definitions.Text("Trend.weak", direction)));
+            cues.Add(Teach(until, Definitions.Text("Trend.next", direction)));
+        }
+
+        cues.Add(Say(until, weak.Count == 0 ? "All Strong." : $"{Capital(Words(weak.Count))} Weak: the {List(weak)}."));
+        cues.Add(Teach(until, Definitions.Text("Trend.strength", direction)));
+        cues.Add(Say(until, $"Strength {trend.Strength}%: {Words(trend.Strong)} of {Words(count)}."));
+        cues.Add(Teach(until, Definitions.Text("Trend.ends", direction)));
         if (ended)
         {
             cues.Add(Say(until, $"Ended at the first {other}'s BoS, {At(trend.End!.Time, length)}."));
@@ -741,6 +750,8 @@ public static class Explain
         {
             cues.Add(Say(until, $"Still running: no {other} Confirmed since."));
         }
+
+        cues.Add(Teach(until, Definitions.Text("Trend.count", direction)));
 
         var layers = new List<string> { $"level{level}", swing, name, "trendArrows", up ? "BullishBreakOfStructure" : "BearishBreakOfStructure" };
         if (weak.Count > 0)

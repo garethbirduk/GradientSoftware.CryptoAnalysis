@@ -1,0 +1,9 @@
+{
+  "Trend.what": "A Trend is two or more Swings in a row in one direction: {a trend} is a run of {swing}s, and begins where its first {swing} begins.",
+  "Trend.confirmed": "The BoS of the second {swing} makes two in a row: that Confirms the {trend}.",
+  "Trend.weak": "{a swing} with an MSB inside it, a close {beyond} the {turn} of the {swing} before, is Weak; one with none is Strong. A Weak {swing} always has an {weak turn} as its {turn}.",
+  "Trend.next": "After an MSB against a Trend, the next BoS decides. {a swing}'s BoS continues the {trend} with a Weak {swing}. {a other swing}'s BoS ends it.",
+  "Trend.strength": "The Strength of a Trend is the share of its Swings that are Strong.",
+  "Trend.ends": "A Trend ends at the BoS of the first Swing in the opposite direction.",
+  "Trend.count": "Like Successive Candles, a Trend is a count of what has happened. It does not say what the price will do next."
+}

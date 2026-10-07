@@ -288,6 +288,23 @@ public static class Tours
                 }
 
                 texts = texts.Where(x => x.Value.Length > 0).ToDictionary();
+                // A definition, cited by its key and told in a direction when it has slots, is the text at Education. The
+                // expanded tour has it written out, so what reads the texts aloud reads it too.
+                if (cue?["define"]?.GetValue<string>() is { } define)
+                {
+                    var direction = cue["direction"]?.GetValue<string>() switch { "Up" => EnumSwingDirection.Up, "Down" => EnumSwingDirection.Down, _ => (EnumSwingDirection?)null };
+                    if (!Definitions.Has(define))
+                        errors.Add($"{what}: no definition \"{define}\" in definitions.json");
+                    else if (direction == null && Definitions.NeedsDirection(define))
+                        errors.Add($"{what}: the definition \"{define}\" is told in a direction: \"direction\": \"Up\" or \"Down\"");
+                    else
+                    {
+                        texts[EnumDetail.Education] = Definitions.Text(define, direction);
+                        if (node == written && expandedSections?[i]?["cues"]?[j] is JsonObject told)
+                            told["texts"] = Details.ToJson(texts);
+                    }
+                }
+
                 if (cue?["text"] != null)
                     errors.Add($"{what}: \"text\" is now \"texts\", a text for each level of detail: {{ \"summary\", \"education\" }}");
                 else if (texts.Count == 0)

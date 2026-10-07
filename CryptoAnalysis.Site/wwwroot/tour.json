@@ -446,7 +446,7 @@
         { "texts": { "education": "It begins where its first Upswing begins. From the BoS of its second Upswing there are two in a row." }, "hold": 0 },
         { "at": 16, "on": "close", "place": "above", "texts": { "education": "second Upswing" }, "hold": 5, "voice": false },
         { "texts": { "education": "The band along the top of the chart marks the Uptrend, with a segment for each Upswing. Some segments are paler, and we will come to why." } },
-        { "texts": { "education": "Like Successive Candles, a Trend is a count of what has happened. It does not say what the price will do next." } }
+        { "define": "Trend.count" }
       ]
     },
     {
@@ -474,7 +474,7 @@
       "cues": [
         { "texts": { "education": "An Uptrend is a run of Upswings, and only a Confirmed Downswing can break the run." } },
         { "texts": { "education": "The MSB did not Confirm a Downswing, so the run went on, from eleven Upswings to twelve. The twelfth is a Weak one." } },
-        { "texts": { "education": "After an MSB against a Trend, the next BoS decides. An Upswing's BoS continues the Uptrend with a Weak Upswing. A Downswing's BoS ends it." } }
+        { "define": "Trend.next", "direction": "Up" }
       ]
     },
     {
@@ -484,7 +484,7 @@
       "cues": [
         { "texts": { "education": "Four of the twelve Upswings are Weak: the fourth, seventh, tenth and twelfth. Each has an MSB inside it and an LL as its Swing Low." } },
         { "texts": { "education": "On the band along the top, the Weak Upswings are the paler segments." } },
-        { "texts": { "education": "The Strength of a Trend is the share of its Swings that are Strong." } }
+        { "define": "Trend.strength" }
       ]
     },
     {
@@ -532,7 +532,8 @@
     {
       "until": 62,
       "cues": [
-        { "at": 62, "texts": { "education": "A Trend ends at the BoS of the first Swing in the opposite direction. Here a Downswing is Confirmed, and the Uptrend ends." } }
+        { "at": 62, "define": "Trend.ends" },
+        { "at": 62, "texts": { "education": "Here a Downswing is Confirmed, and the Uptrend ends." } }
       ]
     },
     {
