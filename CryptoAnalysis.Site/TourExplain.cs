@@ -667,7 +667,7 @@ public static class Explain
         // view is the Swing, and on to where the replay runs when it runs on past the BoS.
         problem = "";
         return Section([Math.Max(0, span.First - Margin), Math.Max(s.BosAt, end > reached ? end : s.BosAt) + Margin], end > reached ? end : null,
-            SwingBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(s)).ToArray());
+            SwingBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(s) with { Name = x.Name }).ToArray());
     }
 
     // A Swing as the chart has it, read once for its blocks: where it begins, turns and breaks structure, the labels of
@@ -793,7 +793,7 @@ public static class Explain
         // when one of its Swings is Weak.
         problem = "";
         return Section([Math.Max(0, t.StartAt - Margin), end + Margin], end > reached ? end : null,
-            TrendBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(t)).ToArray());
+            TrendBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(t) with { Name = x.Name }).ToArray());
     }
 
     // The blocks a Swing is told in, by name, in the order they are told.
@@ -884,6 +884,9 @@ public static class Explain
     private sealed record Block(IReadOnlyList<JsonObject> Cues, IReadOnlyList<string> Layers)
     {
         public static readonly Block None = new([], []);
+
+        // The block's name among the term's blocks, which its cues' ids begin with.
+        public string Name { get; init; } = "";
     }
 
     // The page's layer for a point's label, when it has one.
@@ -945,6 +948,10 @@ public static class Explain
     // written among those at the same candle.
     private static JsonObject Section(int[] view, int? until, IEnumerable<string> layers, JsonArray cues, bool byCandle = false)
     {
+        // A text not told in a block is named by its place among the section's texts as written.
+        foreach (var (cue, k) in cues.Select((x, k) => (x, k)))
+            if (cue is JsonObject named && named["id"] == null)
+                named["id"] = $"{k + 1}";
         var section = new JsonObject { ["view"] = new JsonArray(view[0], view[1]), ["add"] = new JsonArray(layers.Distinct().Select(x => (JsonNode)x).ToArray()) };
         if (until != null)
             section["until"] = until;
@@ -959,8 +966,14 @@ public static class Explain
     }
 
     // A section told in blocks, a term at a time: their cues by candle, and every layer any of them draws.
-    private static JsonObject Section(int[] view, int? until, params Block[] blocks) =>
-        Section(view, until, blocks.SelectMany(x => x.Layers), new JsonArray(blocks.SelectMany(x => x.Cues).ToArray<JsonNode>()), byCandle: true);
+    private static JsonObject Section(int[] view, int? until, params Block[] blocks)
+    {
+        // Each text is named by its block and its place in it, so an edit to it can be kept against that name.
+        foreach (var block in blocks)
+            foreach (var (cue, k) in block.Cues.Select((x, k) => (x, k)))
+                cue["id"] = $"{block.Name}.{k + 1}";
+        return Section(view, until, blocks.SelectMany(x => x.Layers), new JsonArray(blocks.SelectMany(x => x.Cues).ToArray<JsonNode>()), byCandle: true);
+    }
 
     // A text of this instance: shown at every level of detail.
     private static JsonObject Say(int at, string summary, double? hold = null)

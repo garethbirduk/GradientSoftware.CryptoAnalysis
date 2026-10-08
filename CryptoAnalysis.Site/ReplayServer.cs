@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
@@ -253,6 +255,47 @@ public static class ReplayServer
                 await File.WriteAllTextAsync(tourPath, text);
                 // The texts that changed are read aloud at once, so Voice has their clips by the time they are played.
                 ReadAloud();
+                return Results.NoContent();
+            });
+
+            // An analysis's own edits: texts changed for that analysis alone, laid over what is written from the prices each
+            // time it opens. They are kept in a file of their own, named from the analysis's key (the address that defines
+            // it) and holding the key, so no other analysis reads them.
+            var editsDir = Path.Combine(sourceDir, "analysis-edits");
+            string EditsPath(string key) => Path.Combine(editsDir, $"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..16].ToLowerInvariant()}.json");
+            app.MapGet("/api/analysis/edits", (string key) =>
+            {
+                var path = EditsPath(key);
+                var kept = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path)) as JsonObject : null;
+                return kept?["key"]?.GetValue<string>() == key
+                    ? Results.Text(kept.ToJsonString(), "application/json")
+                    : Results.Json(new JsonObject { ["key"] = key, ["edits"] = new JsonObject() }, Json);
+            });
+            app.MapPut("/api/analysis/edits", async (string key, HttpRequest request) =>
+            {
+                JsonObject? edits;
+                try
+                {
+                    edits = (await JsonNode.ParseAsync(request.Body))?["edits"] as JsonObject;
+                }
+                catch (JsonException)
+                {
+                    return Results.BadRequest("The edits are not valid JSON.");
+                }
+
+                if (edits == null || edits.Any(x => x.Value is not JsonObject texts || texts.Any(t => t.Value is not JsonValue v || v.GetValueKind() != JsonValueKind.String)))
+                    return Results.BadRequest("The edits are { \"edits\": { \"<thing>|<text id>\": { \"<detail>\": \"<text>\" } } }.");
+
+                var path = EditsPath(key);
+                // No edits left: the analysis is as written from the prices again, and its file goes.
+                if (edits.Count == 0)
+                {
+                    File.Delete(path);
+                    return Results.NoContent();
+                }
+
+                Directory.CreateDirectory(editsDir);
+                await File.WriteAllTextAsync(path, new JsonObject { ["key"] = key, ["edits"] = edits.DeepClone() }.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
                 return Results.NoContent();
             });
 

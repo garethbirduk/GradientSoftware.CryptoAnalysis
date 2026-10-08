@@ -415,6 +415,10 @@ public class ExplainTests
         }, section["cues"]!.AsArray().Where(x => x!["on"] == null && x["texts"]!["summary"] != null).Select(x => x!["texts"]!["summary"]!.GetValue<string>()).ToList(),
             "No Strength block, so nothing of MSBs.");
 
+        // Each written text is named by its block and its place in it, which is what an analysis's edits are kept against.
+        CollectionAssert.AreEqual(new[] { "Begins.2", "Begins.3", "Turn.2", "Turn.3", "Bos.1", "Bos.2", "Bos.3", "Bos.4", "Legs.1", "Legs.2" },
+            section["cues"]!.AsArray().Select(x => x!["id"]!.GetValue<string>()).ToArray());
+
         Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Wicks"] }""")!.AsObject(), TourPrices.Value, 100, "section 13", errors);
         Explain.Expand(JsonNode.Parse("""{ "explain": "Candle", "at": 12, "blocks": ["Begins"] }""")!.AsObject(), TourPrices.Value, 100, "section 14", errors);
         CollectionAssert.AreEqual(new[]

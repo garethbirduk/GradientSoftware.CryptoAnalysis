@@ -154,9 +154,19 @@
     background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 2px 4px; color-scheme: light dark; }
   .replay-controls .readout { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .replay-controls .keys { color: var(--muted); font-size: 11px; white-space: nowrap; }
-  #events { display: none; border-right: 0; border-left: 1px solid var(--border); padding: 0; flex-direction: column; }
-  body.replaying.show-eventlog .layout { grid-template-columns: 72px 230px minmax(0, 1fr) 300px; }
-  body.replaying.show-eventlog #events { display: flex; }
+  /* Beside the chart: the event log, and the contents of a tour or an analysis, as tabs (see updateSide). */
+  #side { display: none; flex-direction: column; border-right: 0; border-left: 1px solid var(--border); padding: 0; font-size: 13px; }
+  body.side-open .layout { grid-template-columns: 72px 230px minmax(0, 1fr) 340px; }
+  body.side-open.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr) 400px; }
+  body.side-open #side { display: flex; }
+  .side-tabs { display: flex; gap: 2px; padding: 6px 10px 0; border-bottom: 1px solid var(--border); flex: none; }
+  .side-tabs button { font: inherit; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em;
+    background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px; cursor: pointer; }
+  .side-tabs button:hover { color: var(--text); }
+  .side-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  .side-tabs button[hidden] { display: none; }
+  .side-panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .side-panel.on { display: flex; }
   #events h4 { margin: 0; padding: 12px 12px 8px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
   #events .for { padding: 0 12px 8px; font-size: 13px; border-bottom: 1px solid var(--border); }
   #events .for b { font-weight: 600; }
@@ -174,30 +184,12 @@
   .eventlog .empty-log { color: var(--muted); padding: 10px; cursor: default; display: block; }
   body.replaying .example.replay-active { box-shadow: 0 0 0 2px var(--accent); }
   body.replaying .example .chart { cursor: pointer; }
-  @media (max-width: 1100px) { body.replaying.show-eventlog .layout { grid-template-columns: 72px 230px minmax(0, 1fr); }
-    body.replaying.show-eventlog #events { grid-column: 3; position: static; height: 320px; border-left: 0; border-top: 1px solid var(--border); } }
+  @media (max-width: 1100px) { body.side-open .layout, body.side-open.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr); }
+    body.side-open #side { grid-column: 3; position: static; height: 70vh; border-left: 0; border-top: 1px solid var(--border); } }
   .empty { margin-top: 24px; padding: 20px; border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); }
   body.touring .replay-controls, body.analysing .replay-controls { display: none; }
   body.touring .example.replay-active { box-shadow: none; }
   body.touring .replay-big .chart { height: clamp(320px, calc(100vh - 440px), 600px); }
-  .tour-chapters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
-  .tour-chapters.in-panel { margin-top: 8px; font-size: 13px; }
-  .chapter-pill { display: inline-flex; align-items: center; gap: 2px; padding-left: 7px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); }
-  .chapter-pill input { margin: 0; accent-color: var(--accent); cursor: pointer; }
-  .tour-chapters .chapter-pill a { border: 0; background: none; padding-left: 5px; }
-  /* The chapter on show: a border twice as thick, drawn as a ring outside it so the pills do not shift. */
-  .chapter-pill.active { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent); }
-  .chapter-pill.explains { background: color-mix(in srgb, #8b5cf6 10%, var(--panel)); border-color: color-mix(in srgb, #8b5cf6 45%, var(--border)); }
-  .chapter-pill.explains input { accent-color: #8b5cf6; }
-  .chapter-pill.explains.active { border-color: #8b5cf6; box-shadow: 0 0 0 1.5px #8b5cf6; }
-  .chapter-pill.off a { color: var(--muted); text-decoration: line-through; }
-  .chapter-pill.add { padding: 3px 12px; font: inherit; color: var(--muted); border-style: dashed; cursor: pointer; opacity: .8; }
-  .chapter-pill.add:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
-  .tour-chapters a { padding: 3px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text);
-    font-size: 13px; text-decoration: none; }
-  .tour-chapters a:hover { background: var(--chip); }
-  .tour-chapters a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .tour-chapters a.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .tour-caption { min-height: 4.4em; margin-top: 12px; max-width: 62ch; font-size: 19px; line-height: 1.45; }
   .tour-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 8px; font-size: 13px; color: var(--muted); }
   .tour-controls button, .tour-controls a.button, .tour-glossary button { min-width: 38px; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border);
@@ -229,16 +221,12 @@
   .player-scrub input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); }
   .player-scrub input[type=range]:disabled { opacity: .4; }
   .player-scrub label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: var(--text); }
-  .analysis-things { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 8px; font-size: 13px; color: var(--muted); }
-  .analysis-things .write { display: inline-flex; gap: 6px; }
-  .analysis-things button, .candle-card .analyse button { padding: 3px 10px; font: inherit; font-weight: 600; color: var(--accent); background: var(--panel); border: 1px solid var(--accent); border-radius: 5px; cursor: pointer; }
-  .analysis-things button:hover, .candle-card .analyse button:hover { background: var(--chip); }
-  .analysis-things button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+  .candle-card .analyse button { padding: 3px 10px; font: inherit; font-weight: 600; color: var(--accent); background: var(--panel); border: 1px solid var(--accent); border-radius: 5px; cursor: pointer; }
+  .candle-card .analyse button:hover { background: var(--chip); }
   .candle-card .analyse button:disabled { opacity: .45; cursor: default; }
-  .analysis-things .warn { color: var(--warn); }
-  .analysis-things button.explain { color: #8b5cf6; border-color: #8b5cf6; }
-  .analysis-things button.explain:hover { background: color-mix(in srgb, #8b5cf6 12%, var(--panel)); }
-  .analysis-things button.explain[aria-pressed="true"] { background: #8b5cf6; color: #fff; }
+  /* Explain, pressed while any explanation is on, in the explanations' purple. */
+  #tour-editor button[data-ed="explain"] { color: #8b5cf6; border-color: #8b5cf6; }
+  #tour-editor button[data-ed="explain"][aria-pressed="true"] { background: #8b5cf6; color: #fff; }
   #similar { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
   #similar::backdrop { background: rgba(0, 0, 0, .35); }
   #similar h4 { margin: 0 0 4px; font-size: 15px; }
@@ -257,7 +245,7 @@
   #similar li.current a { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
   .tour-errors ul { margin: 6px 0 0; padding-left: 20px; }
   body.picking .chart .nsewdrag { cursor: cell !important; }
-  body.video .topnav, body.video aside, body.video #replaybar, body.video .term-head, body.video .tour-chapters, body.video .tour-controls,
+  body.video .topnav, body.video aside, body.video #replaybar, body.video .term-head, body.video .tour-controls,
     body.video .tour-warning, body.video [data-tour="errors"] { display: none !important; }
   body.video .layout { grid-template-columns: 1fr; min-height: 100vh; }
   body.video main { max-width: none; padding: 12px 24px 0; }
@@ -265,10 +253,32 @@
   body.video .example h3 { font-size: 22px; }
   body.video .replay-big .chart { height: calc(100vh - 230px); }
   body.video .tour-caption { font-size: 26px; max-width: none; min-height: 3em; }
-  #tour-editor { display: none; flex-direction: column; border-right: 0; border-left: 1px solid var(--border); padding: 0; font-size: 13px; }
-  body.touring.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr) 400px; }
-  body.touring.editing #tour-editor { display: flex; }
-  body.touring.editing #events { display: none; }
+  /* The contents of a tour or an analysis: a row for each chapter, grouped, each to tick, go to and, while editing, open. */
+  .ct-group { display: flex; flex-direction: column; gap: 3px; }
+  .ct-group + .ct-group { margin-top: 6px; }
+  .ct-group > header { display: flex; align-items: baseline; gap: 8px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .ct-group > header span { flex: 1; }
+  .ct-row { display: flex; align-items: baseline; gap: 6px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  .ct-row a { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); text-decoration: none; }
+  .ct-row a:hover { text-decoration: underline; }
+  .ct-row.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .ct-row.off a { color: var(--muted); text-decoration: line-through; }
+  .ct-row.explains { background: color-mix(in srgb, #8b5cf6 10%, var(--panel)); border-color: color-mix(in srgb, #8b5cf6 45%, var(--border)); }
+  .ct-row.explains input { accent-color: #8b5cf6 !important; }
+  .ct-row.explains.active { border-color: #8b5cf6; box-shadow: 0 0 0 1px #8b5cf6; }
+  .ct-row .ed-meta { flex: none; }
+  #tour-editor .ct-row button.ct-fold { padding: 0 5px; border: 0; background: none; color: var(--muted); }
+  #tour-editor .ct-add { width: 100%; text-align: left; color: var(--muted); border-style: dashed; border-radius: 8px; padding: 4px 8px; }
+  #tour-editor .ct-add:hover { color: var(--accent); border-color: var(--accent); }
+  .ct-sections { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 6px 14px; }
+  .ct-learn { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .ct-learn a { color: var(--accent); }
+  .ct-warn { font-size: 12px; color: var(--warn); }
+  .ct-edit { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 6px 14px; }
+  .ct-edit .ed-cue { margin-top: 0; }
+  .ct-edit .ed-cue.edited { border-left-color: var(--accent); }
+  .ct-edit .ed-meta { display: flex; gap: 6px; align-items: baseline; }
+  .ct-edit .ed-meta span { flex: 1; }
   #tour-editor button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border);
     border-radius: 5px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
   #tour-editor button:hover:not(:disabled) { background: var(--chip); }
@@ -337,14 +347,13 @@
   #tour-editor input[type="checkbox"] { width: auto; margin: 0; accent-color: var(--accent); }
   .ed-split { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
   .ed-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-  @media (max-width: 1100px) { body.touring.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr); }
-    body.touring.editing #tour-editor { grid-column: 3; position: static; height: auto; border-left: 0; border-top: 1px solid var(--border); } }
+
   @media (max-width: 800px) {
     .topnav { padding: 8px 16px; }
     .topnav .foot { display: none; }
     .dropdown { position: fixed; left: 16px; right: 16px; top: var(--nav-h, 50px); min-width: 0; }
-    .layout, body.replaying.show-eventlog .layout, body.touring.editing .layout { grid-template-columns: 1fr; }
-    body.replaying.show-eventlog #events, body.touring.editing #tour-editor { grid-column: 1; }
+    .layout, body.side-open .layout, body.side-open.editing .layout { grid-template-columns: 1fr; }
+    body.side-open #side { grid-column: 1; }
     aside, #levels { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 12px 16px; }
     .layerbar { display: flex; flex-wrap: wrap; gap: 10px 18px; }
     .layerbar .section + .section { margin-top: 0; }
@@ -366,12 +375,18 @@
     <main id="main"></main>
     <div id="replaybar"></div>
   </div>
-  <aside id="events" aria-label="Replay events">
-    <h4>Events so far</h4>
-    <div class="for" data-events-for></div>
-    <ol class="eventlog" aria-label="Events up to the replay cursor"></ol>
+  <aside id="side" aria-label="Beside the chart">
+    <div class="side-tabs" role="tablist">
+      <button type="button" role="tab" data-side-tab="events" title="What the replay has seen so far">Events</button>
+      <button type="button" role="tab" data-side-tab="contents" data-contents-name title="The chapters, to tick, go to and edit">Contents</button>
+    </div>
+    <div id="events" class="side-panel" role="tabpanel" aria-label="Replay events">
+      <h4>Events so far</h4>
+      <div class="for" data-events-for></div>
+      <ol class="eventlog" aria-label="Events up to the replay cursor"></ol>
+    </div>
+    <div id="tour-editor" class="side-panel" role="tabpanel" aria-label="Contents"></div>
   </aside>
-  <aside id="tour-editor" aria-label="Tour editor"></aside>
 </div>
 <script>
 const DATA = window.SITE_DATA || { terms: [], examples: [] };
@@ -948,12 +963,44 @@ function owningSwing(ex, a) {
 
 let layoutMode = '';
 
+// Beside the chart, as tabs: Events, the replay's log, while the Event log layer is on; and the contents of the tour or
+// the analysis on show, named after it, on those pages. The tab last chosen stays chosen while it is there.
+const contentsHere = () => (currentPage === 'Tour' || currentPage === 'Analysis') && !videoMode;
+const sideTab = () => {
+  const events = on('replay') && on('eventlog'), contents = contentsHere();
+  return state.sideTab === 'events' && events ? 'events' : contents ? 'contents' : events ? 'events' : null;
+};
+// Whether the contents on show are being edited: the tour's in its editor, an analysis's in its own edits.
+const contentsEditing = () => sideTab() === 'contents' && (currentPage === 'Tour' ? editorOn() : currentPage === 'Analysis' && analysisEditing);
+
+function updateSide() {
+  const tab = sideTab();
+  document.body.classList.toggle('side-open', !!tab);
+  document.body.classList.toggle('editing', contentsEditing());
+  document.querySelector('[data-side-tab="events"]').hidden = !(on('replay') && on('eventlog'));
+  const contents = document.querySelector('[data-side-tab="contents"]');
+  contents.hidden = !contentsHere();
+  contents.textContent = currentPage === 'Tour' ? 'Tour' : 'Analysis';
+  document.querySelectorAll('[data-side-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.sideTab === tab));
+  document.getElementById('events').classList.toggle('on', tab === 'events');
+  document.getElementById('tour-editor').classList.toggle('on', tab === 'contents');
+}
+
+document.querySelector('.side-tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-side-tab]');
+  if (!b) return;
+  state.sideTab = b.dataset.sideTab;
+  save(state);
+  drawAll(currentPage);
+  if (b.dataset.sideTab === 'contents') renderContents();
+});
+
 function drawAll(page) {
   document.body.classList.toggle('replaying', on('replay'));
-  document.body.classList.toggle('show-eventlog', on('eventlog'));
+  updateSide();
   if (!on('replay')) stopPlaying();
-  // Showing or hiding the event panel changes the chart's width, which Plotly only notices on a window resize.
-  const mode = `${on('replay')}|${on('eventlog')}|${page === 'Tour' && editorOn()}`, resized = mode !== layoutMode;
+  // Showing or hiding the panel beside the chart changes the chart's width, which Plotly only notices on a window resize.
+  const mode = `${on('replay')}|${document.body.classList.contains('side-open')}|${document.body.classList.contains('editing')}`, resized = mode !== layoutMode;
   layoutMode = mode;
   document.querySelectorAll('.chart').forEach(el => {
     draw(el, viewFor(findExample(el.dataset.id)), focusOf(page));
@@ -2228,7 +2275,8 @@ const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ?
     // What the chart shows at the candle is what is analysed; the candle itself always is.
     card.things = (list ?? []).filter(t => thingShown(t) || isBasic(t.id)).map(t => t.id);
     if (!card.things.length) card.things = ['Candle'];
-    card.base = base;
+    // The analysis is written with the Successive Candles settings the page has now, which its address keeps.
+    card.base = { ...base, greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') };
     card.querySelector('[data-things]').textContent = list?.length
       ? `${list.length} things at this candle; ${card.things.length} shown on the chart.`
       : 'The local server could not say what is at this candle.';
@@ -2280,8 +2328,7 @@ function playerPanel(page) {
       ${tourPage ? `<button type="button" data-tour-go="glossary" title="Show or hide the glossary: what the voice says in place of what is written, such as Break of Structure for BoS">Glossary</button>
         <button type="button" data-tour-go="video" title="Make the video of the tour as saved in tour.json, to download: the texts are read aloud, then the tour is recorded with the clips, which takes as long as the tour">Generate video</button>
         <a class="button" data-tour="download" href="api/video/file" download="tour.mp4" hidden>Download video</a>
-        <span data-tour="video" aria-live="polite"></span>
-        <button type="button" class="edit" data-tour-go="edit" title="Show or hide the editor">Editor</button>`
+        <span data-tour="video" aria-live="polite"></span>`
       : `<button type="button" data-tour-go="similar" title="Find the other Trends like this one: the same level, direction, count of Swings and Strength, or any of those" hidden>Find similar</button>
         <button type="button" class="edit" data-tour-go="close" title="Close the analysis and its tab">Close</button>`}
     </div>
@@ -2291,8 +2338,7 @@ function playerPanel(page) {
       <span class="readout" data-tour="where-in"></span>
       <label title="At the end of a chapter, play the next one; unticked, it pauses there"><input type="checkbox" data-tour="autonext">Play the next chapter</label>
     </div>
-    ${tourPage ? '<div class="tour-glossary" data-tour="glossary" role="group" aria-label="Glossary" hidden></div>'
-      : '<nav class="tour-chapters in-panel" aria-label="Chapters" data-tour="chapters"></nav><div class="analysis-things" data-tour="things"></div>'}
+    ${tourPage ? '<div class="tour-glossary" data-tour="glossary" role="group" aria-label="Glossary" hidden></div>' : ''}
   </div>`;
 }
 
@@ -2303,8 +2349,7 @@ function wirePlayerPanel(root) {
     if (write) return toggleKind(write === 'education');
     const go = e.target.closest('[data-tour-go]')?.dataset.tourGo;
     if (!go) return;
-    if (go === 'edit') toggleTourEditor();
-    else if (go === 'voice') toggleTourVoice();
+    if (go === 'voice') toggleTourVoice();
     else if (go === 'glossary') toggleTourGlossary();
     else if (go === 'video') generateTour();
     else if (go === 'similar') { pauseTour(); openSimilar(); }
@@ -2321,16 +2366,7 @@ function wirePlayerPanel(root) {
   // While it is held, the slider is where the hand puts it, not where the player is.
   scrub.addEventListener('pointerdown', () => { scrubbing = true; });
   panel.querySelector('[data-tour="autonext"]').addEventListener('change', e => { state.tourAutoNext = e.target.checked; save(state); });
-  // The chapters: in the panel on the Analysis page, above the chart on the Tour page.
-  const chapters = root.querySelector('[data-tour="chapters"]');
-  chapters?.addEventListener('change', e => { const box = e.target.closest('[data-chapter-on]'); if (box) toggleChapter(Number(box.dataset.chapterOn), box.checked); });
-  chapters?.addEventListener('click', e => {
-    const add = e.target.closest('[data-add]'), jump = e.target.closest('a[data-chapter]');
-    if (add) return addThing(add.dataset.add);
-    if (!jump || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
-    e.preventDefault();
-    jumpToChapter(Number(jump.dataset.chapter));
-  });
+
   const glossary = panel.querySelector('[data-tour="glossary"]');
   glossary?.addEventListener('input', e => { const row = e.target.closest('.gl-row'); if (row) readGlossary(`glossary|${[...row.parentElement.children].indexOf(row)}|${e.target.dataset.gl}`); });
   glossary?.addEventListener('click', e => { const b = e.target.closest('button[data-gl]'); if (b && !b.disabled) glossaryAction(b.dataset.gl, b); });
@@ -2347,10 +2383,18 @@ const autoNext = () => state.tourAutoNext !== false;
 // liveView). Analyse tells what each thing is (Summary); Explain also what a thing of its kind is and how it works
 // (Education). Unticking a thing in the checklist leaves its chapter out at once; Analyse or Explain there writes it again.
 // The page's address says which analysis it is, so it can be copied and opens the same one: the dataset, the candle, the
-// Replay cursor it was seen from, the things told of and the detail. An older address naming one thing by explain and
-// level opens that thing.
+// Replay cursor it was seen from, the things told of, the Successive Candles settings it was written with and the detail.
+// One analysis has one address: its things are in the order they are told, and the basic building blocks are always
+// among them (see loadAnalysis). An older address naming one thing by explain and level opens that thing.
 let wantedAnalysis = null;
-const analysisHash = p => `#Analysis?${new URLSearchParams({ dataset: p.dataset, at: p.at, ...(p.seen ? { seen: p.seen } : {}), things: p.things.join(','), detail: p.detail })}`;
+// The order things are told in, as the server tells them: the candle, its run, then each order's from the finest.
+const thingRank = id => { const [kind, level] = String(id).split(':'); return [{ Candle: 0, SuccessiveCandles: 1 }[kind] ?? 2, -(Number(level) || 0), ['Point', 'Swing', 'Trend'].indexOf(kind)]; };
+const byThing = (a, b) => { const x = thingRank(a), y = thingRank(b); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; };
+const runsOf = p => p.greenRuns != null ? { greenRuns: p.greenRuns, redRuns: p.redRuns } : {};
+// What defines an analysis's content, which its own edits are kept against: the address without the detail, which only
+// says which of its chapters are on.
+const analysisKey = p => new URLSearchParams({ dataset: p.dataset, at: p.at, ...(p.seen ? { seen: p.seen } : {}), things: [...p.things].sort(byThing).join(','), ...runsOf(p) }).toString();
+const analysisHash = p => `#Analysis?${analysisKey(p)}&detail=${encodeURIComponent(p.detail)}`;
 // The level of the Trend an analysis tells of, for Find similar.
 const trendLevel = t => Number(t?.params?.things.find(id => id.startsWith('Trend:'))?.split(':')[1]) || null;
 // Whether an analysis has the cursor: from when it starts until it has ended. The replay controls are hidden for that long,
@@ -2363,7 +2407,8 @@ async function renderAnalysisPage(query) {
     ?? (explain ? [explain === 'Candle' ? 'Candle' : `${explain}:${Number(query.get('level')) || 1}`] : null);
   if (things?.length && query.get('dataset') && query.get('at')) {
     const detail = DETAILS.includes(query.get('detail')) ? query.get('detail') : detailOf('Analysis');
-    const asked = { dataset: query.get('dataset'), at: query.get('at'), ...(query.get('seen') ? { seen: query.get('seen') } : {}), things, detail };
+    const runs = Number(query.get('greenRuns')) > 0 ? { greenRuns: Number(query.get('greenRuns')), redRuns: Number(query.get('redRuns')) || Number(query.get('greenRuns')) } : {};
+    const asked = { dataset: query.get('dataset'), at: query.get('at'), ...(query.get('seen') ? { seen: query.get('seen') } : {}), things, ...runs, detail };
     if (!wantedAnalysis || analysisHash(wantedAnalysis) !== analysisHash(asked)) wantedAnalysis = asked;
     if (`#Analysis?${query}` !== analysisHash(asked)) history.replaceState(null, '', analysisHash(asked));
   } else if (wantedAnalysis) history.replaceState(null, '', analysisHash(wantedAnalysis));
@@ -2390,6 +2435,9 @@ async function renderAnalysisPage(query) {
     }
     if (currentPage !== 'Analysis' || wantedAnalysis !== params) return;
     tours.Analysis = loaded;
+    // Written, the analysis has its one address: every thing it has, in order, and the settings it was written with.
+    wantedAnalysis = loaded.params;
+    history.replaceState(null, '', loaded.hash);
   }
   tour = tours.Analysis;
   // The mode asked for is the one the next analysis opens in.
@@ -2401,7 +2449,7 @@ async function renderAnalysisPage(query) {
       ${chartRow(tour.ex)}
     </article>`);
   wirePlayerPanel(main);
-  renderAnalysisWrite();
+  renderContents();
   // Written again to add a thing, or at the other detail, it opens at that thing's chapter.
   const jumped = params.jump ? tour.sections.findIndex((s, i) => s.thing === params.jump && sectionOn(i)) : -1;
   const first = jumped >= 0 ? jumped : sectionAfter(-1, 1) ?? 0;
@@ -2415,21 +2463,27 @@ async function renderAnalysisPage(query) {
 // The written tour of an analysis, ready to play: the things at the candle for its checklist, the clips read so far, its
 // scene on the dataset from its first candle, and the structure as known at the cursor it was seen from, fetched.
 async function loadAnalysis(params) {
-  // The page's Successive Candles settings say how long a run must be to count.
-  const runs = { greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') };
+  // How long a run must be to count: as the address says, else the page's Successive Candles settings.
+  const runs = params.greenRuns != null ? runsOf(params) : { greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') };
   const where = { dataset: params.dataset, at: params.at, ...(params.seen ? { seen: params.seen } : {}) };
   const list = await fetch(`api/explain/at?${new URLSearchParams({ ...where, ...runs })}`, { cache: 'no-store' }).then(x => x.ok ? x.json() : null).catch(() => null);
   // The basic building blocks at the candle are always there to tick, whatever the analysis was asked for with.
-  const things = [...new Set([...params.things, ...(list ?? []).map(t => t.id).filter(isBasic)])];
-  const [r, audio] = await Promise.all([
+  const things = [...new Set([...params.things, ...(list ?? []).map(t => t.id).filter(isBasic)])].sort(byThing);
+  const written = { ...params, things, ...runs };
+  // The analysis's own changes to its texts, kept against its key (see Analysis edits).
+  const editsKey = analysisKey(written);
+  const [r, audio, stored] = await Promise.all([
     fetch(`api/explain/tour?${new URLSearchParams({ ...where, things: things.join(','), expanded: true, ...runs })}`, { cache: 'no-store' }),
     fetch('tour-audio/index.json', { cache: 'no-store' }).then(x => x.ok ? x.json() : {}).catch(() => ({})),
+    fetch(`api/analysis/edits?key=${encodeURIComponent(editsKey)}`, { cache: 'no-store' }).then(x => x.ok ? x.json() : null).catch(() => null),
   ]);
   const text = await r.text();
   if (!r.ok) throw new Error(r.status === 404 ? `the server has no dataset "${params.dataset}"` : text.replace(/^"|"$/g, '') || `the server answered ${r.status}`);
-  const def = splitExplanations(JSON.parse(text));
+  const writtenDef = JSON.parse(text), edits = stored?.edits ?? {};
+  const def = splitExplanations(withEdits(writtenDef, edits));
   // Every text is kept at its own level: an explanation's at Education, an analysis's at Summary.
-  const loaded = newPlayer(def, audio, { page: 'Analysis', idPrefix: 'Analysis', detail: 'education', params: { ...params, things }, hash: analysisHash(params), list, missing: def.missing ?? [],
+  const loaded = newPlayer(def, audio, { page: 'Analysis', idPrefix: 'Analysis', detail: 'education', params: written, hash: analysisHash(written), list, missing: def.missing ?? [],
+    writtenDef, edits, editsSaved: JSON.stringify(edits), editsKey,
     pins: false, waitForClips: true, extraLayers: (state.pages.Analysis ?? defaultsFor('Analysis')).filter(id => id !== 'replay' && !/^level\d+$/.test(id)) });
   await loadTourDatasets(loaded);
   anchorTour(loaded);
@@ -2450,9 +2504,9 @@ async function loadAnalysis(params) {
 }
 
 // ---- Chapters --------------------------------------------------------------------------------------------------------
-// The chapters are a row of pills, the same on both pages: the name jumps to the chapter, and the tick box beside it turns
-// the chapter on or off, a chapter that is off being skipped by the player and its steps. An analysis has a chapter for
-// each thing it tells of, and lists the other things at its candle in their places, faded, each to add.
+// The chapters are listed beside the chart, in the Tour or Analysis tab (see Contents): the name goes to the chapter, and
+// the tick box beside it turns the chapter on or off, a chapter that is off being skipped by the player and its steps. An
+// analysis has a chapter for each thing it tells of, and lists the other things at its candle in their places, to add.
 
 // An analysis's sections, each thing's in two chapters: what a thing of its kind is, from its texts at Education, then
 // what this one is, from its texts at Summary. Both run through the same candles.
@@ -2486,13 +2540,18 @@ function toggleKind(explains) {
     if (anyOn) tour.chaptersOff.add(x.i);
     else if (!explains || (analysed.has(x.s.thing) && !x.s.repeat)) tour.chaptersOff.delete(x.i);
   }
+  analysisDetailChanged();
+  chaptersChanged();
+}
+
+// The detail an analysis is at is whether any explanation is on, which its address says and the next analysis opens in.
+function analysisDetailChanged() {
   const detail = explainsOn() ? 'education' : 'summary';
   wantedAnalysis = tour.params = { ...tour.params, detail };
   tour.hash = analysisHash(tour.params);
   state.detail = { ...state.detail, Analysis: detail };
   save(state);
   history.replaceState(null, '', tour.hash);
-  chaptersChanged();
 }
 
 // A thing at the candle the analysis does not tell of yet: it is written again with it, and opens at its chapter.
@@ -2543,33 +2602,276 @@ function analysisLevelsChanged(before, after) {
   chaptersChanged();
 }
 
-// Under an analysis's chapters: Explain, pressed while any explanation is on, in the explanations' purple, and what was
-// asked for that is not at the candle.
-function analysisWriteHtml() {
-  return `<span class="write"><button type="button" class="explain" data-player-write="education" aria-pressed="${explainsOn()}"
-      title="Turn the explanations on or off: what a thing of each kind is and how it works, a chapter before its own">Explain</button></span>
-    ${tour.missing.length ? `<span class="warn">Not at this candle as the chart had it: ${esc(tour.missing.join(', '))}</span>` : ''}`;
+// ---- Contents --------------------------------------------------------------------------------------------------------
+// Beside the chart, the Tour or Analysis tab: a row for each chapter (see chapterRow) to tick, go to and, with Edit, open
+// to change. A tour's rows are its chapters in order, each opening to its sections in the tour's editor (see
+// renderTourEditor), and what is changed there is saved to tour.json. An analysis's rows are grouped as its things are at
+// the candle, the candle first and then each order from the finest, each group with Learn more; above them, links to the
+// tour's chapter on each kind of thing, and Explain. With Edit, an analysis's chapters open to their texts, and what is
+// changed there is kept for that analysis alone (see Analysis edits).
+let analysisEditing = false;
+// The chapters opened or folded by hand while editing: a tour's chapter on show is open unless it was folded, and any
+// other chapter is folded unless it was opened; an analysis's chapters are folded unless opened.
+const tourOpened = new Set(), tourFolded = new Set(), analysisToggled = new Set();
+const tourChapterOpen = k => k === tourSection()?.chapter ? !tourFolded.has(k) : tourOpened.has(k);
+
+function renderContents() {
+  if (currentPage === 'Tour') renderTourEditor();
+  else if (currentPage === 'Analysis') renderAnalysisContents();
 }
 
-function renderAnalysisWrite() {
-  const box = document.querySelector('[data-tour="things"]');
-  if (box && tour?.page === 'Analysis') box.innerHTML = analysisWriteHtml();
+// A chapter's sections: from its first to the next chapter's first.
+const chapterSections = i => tour.sections.slice(tour.chapters[i].section, tour.chapters[i + 1]?.section ?? tour.sections.length);
+const minutes = seconds => { const s = Math.round(seconds); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+// A chapter's row: its tick box, its name, which goes to it, and how long it plays, the one on show marked; while editing,
+// a fold that opens it. An explanation is in the explanations' purple.
+function chapterRow(i, { number = false, open = null } = {}) {
+  const c = tour.chapters[i], on = !tour.chaptersOff.has(i), explains = tour.sections[c.section]?.explains;
+  return `<div class="ct-row${explains ? ' explains' : ''}${on ? '' : ' off'}${i === tourSection()?.chapter ? ' active' : ''}" data-chapter-row="${i}">` +
+    `<input type="checkbox" data-chapter-on="${i}" ${on ? 'checked' : ''} title="Play this chapter, or leave it out" aria-label="Play ${esc(c.name)}">` +
+    `<a href="#Tour/${c.slug}" data-chapter="${i}" title="Go to this chapter">${number ? `${i + 1}. ` : ''}${esc(c.name)}</a>` +
+    `<span class="ed-meta" data-chapter-meta></span>` +
+    (open == null ? '' : `<button type="button" class="ct-fold" data-ed="chapter-fold" data-chapter-fold="${i}" aria-expanded="${open}" title="${open ? 'Fold this chapter away' : 'Open this chapter to edit it'}">${open ? '▾' : '▸'}</button>`) +
+    `</div>`;
 }
 
-// The pills: a chapter's tick box and name, the one on show marked; for an analysis, the things at the candle in their
-// order, those it does not tell of faded, to add.
-function chapterPills() {
-  const s = tourSection(), pill = (c, i) => {
-    const on = !tour.chaptersOff.has(i), explains = tour.sections[c.section]?.explains;
-    return `<span class="chapter-pill${explains ? ' explains' : ''}${i === s?.chapter ? ' active' : ''}${on ? '' : ' off'}"><input type="checkbox" data-chapter-on="${i}" ${on ? 'checked' : ''} title="Play this chapter, or leave it out" aria-label="Play ${esc(c.name)}">` +
-      `<a href="#Tour/${c.slug}" data-chapter="${i}" title="Go to this chapter">${tour.page === 'Tour' ? `${i + 1}. ` : ''}${esc(c.name)}</a></span>`;
+// The rows as the player has them: which are on, which is on show, and how long each plays.
+function syncContents() {
+  if (!tour) return;
+  document.querySelectorAll('#tour-editor [data-chapter-row]').forEach(row => {
+    const i = Number(row.dataset.chapterRow);
+    if (!tour.chapters[i]) return;
+    const on = !tour.chaptersOff.has(i);
+    row.classList.toggle('off', !on);
+    row.classList.toggle('active', i === tourSection()?.chapter);
+    row.querySelector('[data-chapter-on]').checked = on;
+    row.querySelector('[data-chapter-meta]').textContent = minutes(chapterSections(i).reduce((n, s) => n + sectionSeconds(s), 0));
+  });
+  document.querySelector('#tour-editor [data-ed="explain"]')?.setAttribute('aria-pressed', explainsOn());
+}
+
+// What the contents' own buttons do, before the tour editor's: true when it was one of them.
+function contentsAction(action, el) {
+  switch (action) {
+    case 'edit':
+      if (currentPage === 'Tour') toggleTourEditor();
+      else { analysisEditing = !analysisEditing; drawAll(currentPage); renderAnalysisContents(); }
+      return true;
+    case 'chapter-fold': {
+      const i = Number(el.dataset.chapterFold);
+      const toggled = currentPage !== 'Tour' ? analysisToggled : i === tourSection()?.chapter ? tourFolded : tourOpened;
+      if (toggled.has(i)) toggled.delete(i); else toggled.add(i);
+      editorSection = -1;
+      renderContents();
+      return true;
+    }
+    case 'explain': toggleKind(true); return true;
+    case 'learn': learnMore(el.dataset.learn.split(',')); return true;
+    case 'an-save': saveAnalysisEdits(); return true;
+    case 'an-revert': revertAnalysisEdits(); return true;
+    case 'an-default': {
+      const cue = el.closest('[data-edit-key]');
+      setAnalysisText(cue.dataset.editKey, cue.dataset.editLevel, null);
+      renderAnalysisContents();
+      return true;
+    }
+  }
+  return currentPage === 'Analysis';
+}
+
+// The tour's chapter on each kind of thing: the chapter where the tour first turns on the thing's layer.
+let termChapters = null;
+function loadTermChapters() {
+  return termChapters ??= fetch('tour.json', { cache: 'no-store' }).then(r => r.json()).then(def => {
+    const found = new Map();
+    let chapter = null;
+    for (const s of def.sections ?? []) {
+      if (s.scene != null) break;
+      if (s.chapter) chapter = s.chapter;
+      for (const id of [...(s.layers ?? []), ...(s.add ?? [])]) {
+        const layer = LAYER_ALIASES[id] ?? id;
+        if (chapter && !found.has(layer)) found.set(layer, chapter);
+      }
+    }
+    return found;
+  }).catch(() => new Map());
+}
+
+// A thing at the candle as a kind of thing to learn about: the word for it and the layer that draws it.
+function termOf(t) {
+  const last = t.name.split(' ').pop();
+  if (t.kind === 'Candle') return { word: 'Candles', layer: 'price' };
+  if (t.kind === 'SuccessiveCandles') return { word: 'Successive Candles', layer: t.name.includes('Green') ? 'SuccessiveGreenCandles' : 'SuccessiveRedCandles' };
+  if (t.kind === 'Point') return { word: last, layer: { HH: 'HigherHigh', HL: 'HigherLow', LH: 'LowerHigh', LL: 'LowerLow' }[last] };
+  return { word: `${last}s`, layer: last };
+}
+
+// "Learn more about Candles, LL, Downswings and Downtrends", each a link to its chapter of the tour.
+async function fillLearnLinks() {
+  const box = document.querySelector('#tour-editor [data-learn-links]');
+  if (!box || !tour?.list) return;
+  const chapters = await loadTermChapters(), seen = new Set(), links = [];
+  for (const t of tour.list) {
+    const { word, layer } = termOf(t);
+    if (seen.has(word)) continue;
+    seen.add(word);
+    const chapter = chapters.get(layer);
+    links.push(chapter ? `<a href="#Tour/${slugOf(chapter)}" title="The tour's chapter ${esc(chapter)}">${esc(word)}</a>` : esc(word));
+  }
+  box.innerHTML = links.length ? `Learn more in the tour about ${links.length > 1 ? `${links.slice(0, -1).join(', ')} and ${links.at(-1)}` : links[0]}.` : '';
+}
+
+function renderAnalysisContents() {
+  const box = document.getElementById('tour-editor');
+  if (!tour || tour.page !== 'Analysis' || currentPage !== 'Analysis') { box.innerHTML = ''; return; }
+  const scrolled = box.querySelector('.ed-body')?.scrollTop ?? 0;
+  // The things at the candle, grouped: the candle and its run, then each order from the finest.
+  const groups = [];
+  for (const t of tour.list ?? []) {
+    const name = t.level ? orderOf(t.level) : 'The candle';
+    if (groups.at(-1)?.name !== name) groups.push({ name, things: [] });
+    groups.at(-1).things.push(t);
+  }
+  const chaptersOf = t => tour.chapters.flatMap((c, i) => tour.sections[c.section]?.thing === t.id ? [i] : []);
+  const thing = t => {
+    const own = chaptersOf(t);
+    if (!own.length) return `<button type="button" class="ct-add" data-add="${esc(t.id)}" title="Add this to the analysis, and go to it">+ ${esc(t.name)}</button>`;
+    return own.map(i => {
+      const open = analysisEditing ? analysisToggled.has(i) : null;
+      return chapterRow(i, { open }) + (open ? analysisChapterEditor(i) : '');
+    }).join('');
   };
-  if (tour.page !== 'Analysis' || !tour.list) return tour.chapters.map(pill).join('');
-  return tour.list.map(t => {
-    // A thing's explanation, then its analysis.
-    const own = tour.chapters.flatMap((c, i) => tour.sections[c.section]?.thing === t.id ? [i] : []);
-    return own.length ? own.map(i => pill(tour.chapters[i], i)).join('') : `<button type="button" class="chapter-pill add" data-add="${esc(t.id)}" title="Add this to the analysis, and go to it">+ ${esc(t.name)}</button>`;
-  }).join('');
+  const group = g => `<div class="ct-group"><header><span>${esc(g.name)}</span>${g.things.some(t => chaptersOf(t).length)
+    ? `<button type="button" data-ed="learn" data-learn="${esc(g.things.map(t => t.id).join(','))}" title="Play what each of these is, then what this one is">Learn more</button>` : ''}</header>${g.things.map(thing).join('')}</div>`;
+  box.innerHTML = `<div class="ed-head"><h4>Contents</h4>
+      ${analysisEditing ? `<button type="button" data-ed="an-revert" title="Drop the changes not saved">Revert</button>
+        <button type="button" data-ed="an-save" title="Keep these texts for this analysis (Ctrl+S)">Save</button>` : ''}
+      <button type="button" data-ed="explain" aria-pressed="${explainsOn()}" title="Turn the explanations on or off: what a thing of each kind is and how it works, a chapter before its own">Explain</button>
+      <button type="button" data-ed="edit" aria-pressed="${analysisEditing}" title="Open the chapters to change their texts, for this analysis alone">Edit</button></div>
+    ${analysisEditing ? '<div class="ed-status" data-ed-status aria-live="polite"></div>' : ''}
+    <div class="ed-body">
+      <div class="ct-learn" data-learn-links></div>
+      ${tour.missing.length ? `<div class="ct-warn">Not at this candle as the chart had it: ${esc(tour.missing.join(', '))}</div>` : ''}
+      ${groups.map(group).join('')}
+    </div>`;
+  box.querySelector('.ed-body').scrollTop = scrolled;
+  syncContents();
+  updateAnalysisStatus();
+  fillLearnLinks();
+}
+
+// Learn more on a group: what each thing in it is, a chapter before its own, played from the first. The things are those
+// whose chapters are on, or all of the group's when none is.
+function learnMore(ids) {
+  const of = tour.chapters.map((c, i) => ({ i, s: tour.sections[c.section] })).filter(x => ids.includes(x.s.thing));
+  let analysed = of.filter(x => !x.s.explains && !tour.chaptersOff.has(x.i));
+  if (!analysed.length) {
+    analysed = of.filter(x => !x.s.explains);
+    analysed.forEach(x => tour.chaptersOff.delete(x.i));
+  }
+  const things = new Set(analysed.map(x => x.s.thing));
+  of.filter(x => x.s.explains && things.has(x.s.thing)).forEach(x => tour.chaptersOff.delete(x.i));
+  analysisDetailChanged();
+  const first = of.find(x => !tour.chaptersOff.has(x.i));
+  pauseTour();
+  if (first) jumpToChapter(first.i);
+  playTour();
+  syncContents();
+}
+
+// ---- Analysis edits --------------------------------------------------------------------------------------------------
+// An analysis's texts can be changed for that analysis alone. The changes are kept by the local server against the
+// analysis's key (analysisKey: the address that defines it), each by its thing and its text's id (its block and its place
+// in it, written by the server), and laid over the texts written from the prices each time the analysis is written, so
+// whatever is not changed follows the prices and the definitions as they are.
+const editKey = (thing, id) => `${thing}|${id}`;
+const analysisDirty = () => tour?.page === 'Analysis' && JSON.stringify(tour.edits) !== tour.editsSaved;
+
+// The written analysis with its own changes over it, as a copy.
+function withEdits(def, edits) {
+  const copy = JSON.parse(JSON.stringify(def));
+  for (const s of copy.sections ?? []) for (const c of s.cues ?? []) {
+    const own = c.id != null ? edits[editKey(s.thing, c.id)] : null;
+    if (own) c.texts = { ...c.texts, ...own };
+  }
+  return copy;
+}
+
+// The text as written from the prices, before any change.
+const writtenText = (key, level) => {
+  const [thing, id] = key.split('|');
+  return tour.writtenDef.sections.find(s => s.thing === thing)?.cues.find(c => c.id === id)?.texts?.[level] ?? '';
+};
+
+// A chapter's texts, each to change; a pin is left out, as an analysis shows none.
+function analysisChapterEditor(i) {
+  const cues = chapterSections(i).flatMap(s => s.cues.filter(c => c.on == null && c.id != null).map(c => ({ s, c })));
+  if (!cues.length) return '<div class="ct-edit"><div class="ed-meta">No texts to change.</div></div>';
+  return `<div class="ct-edit">${cues.map(({ s, c }) => {
+    const key = editKey(s.thing, c.id), level = Object.keys(c.texts)[0], edited = tour.edits[key]?.[level] != null;
+    return `<div class="ed-cue${edited ? ' edited' : ''}" data-edit-key="${esc(key)}" data-edit-level="${esc(level)}">
+      <div class="ed-meta"><span>${c.at != null ? `at #${c.at} · ` : ''}${DETAIL_NAMES[level] ?? level}${edited ? ' · changed for this analysis' : ''}</span>${edited
+        ? '<button type="button" data-ed="an-default" title="Back to the text written from the prices">Default</button>' : ''}</div>
+      <textarea data-an-text aria-label="${esc(DETAIL_NAMES[level] ?? level)} text">${esc(c.texts[level] ?? '')}</textarea></div>`;
+  }).join('')}</div>`;
+}
+
+// A text changed: kept when it differs from the one written from the prices, dropped when it is the same or empty.
+function setAnalysisText(key, level, text) {
+  const own = { ...tour.edits[key] };
+  if (text == null || !text.trim() || text === writtenText(key, level)) delete own[level]; else own[level] = text;
+  if (Object.keys(own).length) tour.edits[key] = own; else delete tour.edits[key];
+  applyAnalysisEdits();
+}
+
+function editAnalysisText(el) {
+  const cue = el.closest('[data-edit-key]');
+  setAnalysisText(cue.dataset.editKey, cue.dataset.editLevel, el.value);
+  const edited = tour.edits[cue.dataset.editKey]?.[cue.dataset.editLevel] != null;
+  cue.classList.toggle('edited', edited);
+}
+
+// The analysis played again with the texts as they now are, from where it was.
+function applyAnalysisEdits() {
+  pauseTour();
+  const was = { t: cursorOf(tour.ex), shown: tour.shown.length };
+  tour.def = splitExplanations(withEdits(tour.writtenDef, tour.edits));
+  Object.assign(tour, compileTour(tour.def, tour.scenes, tour.resolved, tour.audio, tour.detail));
+  for (const s of tour.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
+  seekTour(tour.index, was);
+  updateAnalysisStatus();
+}
+
+function updateAnalysisStatus() {
+  const status = document.querySelector('#tour-editor [data-ed-status]');
+  if (!status || tour?.page !== 'Analysis') return;
+  const count = Object.keys(tour.edits).length, dirty = analysisDirty();
+  status.textContent = tour.note || (dirty ? 'Changes not saved'
+    : count ? `${count} text${count === 1 ? '' : 's'} changed for this analysis, saved` : 'As written from the prices: change a text to keep it for this analysis');
+  status.classList.toggle('warn', !!tour.note);
+  const save = document.querySelector('#tour-editor [data-ed="an-save"]');
+  if (save) { save.disabled = !dirty; save.classList.toggle('dirty', dirty); }
+  const revert = document.querySelector('#tour-editor [data-ed="an-revert"]');
+  if (revert) revert.disabled = !dirty;
+}
+
+async function saveAnalysisEdits() {
+  if (!analysisDirty()) return;
+  const edits = JSON.stringify(tour.edits);
+  const response = await fetch(`api/analysis/edits?key=${encodeURIComponent(tour.editsKey)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edits: tour.edits }) }).catch(() => null);
+  tour.note = response?.ok ? '' : response?.status === 404 || response?.status === 405
+    ? 'Not saved: the local server was started before analyses could keep their own texts. Restart ./build-site.ps1 -Serve.'
+    : 'Not saved: the local server did not take the changes.';
+  if (response?.ok) tour.editsSaved = edits;
+  updateAnalysisStatus();
+}
+
+function revertAnalysisEdits() {
+  tour.edits = JSON.parse(tour.editsSaved);
+  tour.note = '';
+  applyAnalysisEdits();
+  renderAnalysisContents();
 }
 
 // Turning a chapter on or off. The chapter on show, turned off, gives way to the next that is on, playing on if it was.
@@ -2827,7 +3129,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       // A text with "voice": false is shown but not read aloud, so it stays for the time it takes to read. A cue with no
       // text at the page's detail is skipped: kept in its place for the editor, never queued.
       const silent = c.voice === false, clip = silent || !text ? null : audio[textKey(text)];
-      return { texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
+      return { id: c.id ?? null, texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
         to, heads: { start: c.heads?.start === true, end: c.heads?.end !== false }, color: c.color ?? null,
         clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0, given: c.hold >= 0 ? c.hold : null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
@@ -2859,7 +3161,8 @@ async function resolveTour(retry = 0) {
     tour.resolved.set(key, found?.index ?? null);
   }
   tour.resolving = false;
-  if (tour.scenes !== scenes || currentPage !== 'Tour') return;
+  // Applied again while it looked up, the tour has looked up for itself; the status still says it is done.
+  if (tour.scenes !== scenes || currentPage !== 'Tour') return updateEditorStatus();
   Object.assign(tour, compileTour(tour.def, scenes, tour.resolved, tour.audio, tour.detail));
   if (tour.wanted.length) return resolveTour(retry + 1);
   editorSection = -1;
@@ -3307,14 +3610,13 @@ function updateTourPanel() {
   // The chapters and the problems change as the tour is edited, so they are redrawn when they differ.
   const fill = (el, html) => { if (el && el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; } };
   fill(part('errors'), tour.errors.length ? `<div class="empty tour-errors"><b>The tour has problems</b><ul>${tour.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>` : '');
-  fill(part('chapters'), chapterPills());
-  if (tour.page === 'Analysis') fill(part('things'), analysisWriteHtml());
+  syncContents();
 
   const play = go('play');
   play.textContent = tour.timer ? '❚❚' : '▶';
   play.setAttribute('aria-label', tour.timer ? 'Pause (Space)' : 'Play (Space)');
   go('next').disabled = tour.ended;
-  go('edit')?.setAttribute('aria-pressed', editorOn());
+
   go('glossary')?.setAttribute('aria-pressed', glossaryOn());
   if (go('similar')) go('similar').hidden = !trendLevel(tour);
   const voice = go('voice'), clips = Object.keys(tour.audio ?? {}).length;
@@ -3327,7 +3629,7 @@ function updateTourPanel() {
   showScrub();
 
   // The editor marks the texts shown so far, and the one on show.
-  document.querySelectorAll('#tour-editor .ed-cue').forEach((el, j) => {
+  if (tour.page === 'Tour') document.querySelectorAll('#tour-editor .ed-cue').forEach((el, j) => {
     const cue = s?.cues[j], active = !!cue && cue === tour.active;
     el.classList.toggle('shown', tour.shown.includes(cue));
     if (active && !el.classList.contains('active') && tour.timer) el.scrollIntoView({ block: 'nearest' });
@@ -3640,7 +3942,6 @@ async function renderTourPage(chapter) {
 
   const ex = tour.ex;
   show(`<div data-tour="errors"></div>
-    <nav class="tour-chapters" aria-label="Chapters" data-tour="chapters"></nav>
     <article class="example replay-big" id="ex-${esc(ex.id)}">
       <header><h3 data-tour="chapter"></h3><span class="id" data-tour="where"></span></header>
       ${playerPanel('Tour')}
@@ -3847,7 +4148,7 @@ function updateGlossaryStatus() {
 // The section the tour is at is open in the editor unless it has been folded away, which lasts until a section is picked.
 let editorSection = -1, editorFolded = false;
 const editorOn = () => state.tourEditor !== false && !videoMode;
-const tourDirty = () => !!tour && (JSON.stringify(tour.def) !== tour.saved || definitionsDirty());
+const tourDirty = () => !!tours.Tour && (JSON.stringify(tours.Tour.def) !== tours.Tour.saved || definitionsDirty());
 const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
   section: ['chapter', 'scene', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'to', 'heads', 'color', 'define', 'direction', 'texts', 'hold', 'keep', 'voice'] };
 
@@ -3873,13 +4174,31 @@ function sectionSeconds(s) {
   return sum(s.cues.filter(c => c.at != null)) + Math.max(journey + (s.until - s.from) / s.speed, sum(s.cues.filter(c => c.at == null)));
 }
 
+// The tour's contents, not being edited: a row for each chapter, in order, with Edit to open them.
+function renderTourContents(box) {
+  const scrolled = box.querySelector('.ed-body')?.scrollTop ?? 0;
+  editorSection = tour.index;
+  box.innerHTML = `<div class="ed-head"><h4>Contents</h4>
+      <button type="button" data-ed="edit" aria-pressed="false" title="Open the chapters to edit the tour: their sections, texts and settings">Edit</button></div>
+    <div class="ed-body"><div class="ct-group">${tour.chapters.map((c, i) => chapterRow(i, { number: true })).join('')}</div></div>`;
+  const body = box.querySelector('.ed-body');
+  body.scrollTop = scrolled;
+  syncContents();
+  // The chapter on show is kept in view.
+  const row = body.querySelector('.ct-row.active'), at = row?.getBoundingClientRect(), view = body.getBoundingClientRect();
+  if (at && (at.top < view.top || at.bottom > view.bottom)) body.scrollTop += at.top - view.top - 40;
+}
+
 // The list is drawn anew each time, so it is put back where it was rather than at its top: the section the tour is at stays
 // where it was in view, or the tour's own card when that is the anchor, as it is when that card is folded or unfolded.
+// Being edited, the tour's chapters are rows (see chapterRow), the one on show open to its sections unless folded, and any
+// other opened by hand.
 function renderTourEditor(anchor = 'section') {
   const box = document.getElementById('tour-editor');
-  if (!tour || currentPage !== 'Tour' || !editorOn()) { box.innerHTML = ''; editorSection = -1; return; }
+  if (!tour || currentPage !== 'Tour') { box.innerHTML = ''; editorSection = -1; return; }
+  if (!editorOn()) return renderTourContents(box);
   const spot = body => {
-    const el = body && (anchor === 'tour' ? body.firstElementChild : body.querySelector(`:scope > [data-section="${tour.index}"]`));
+    const el = body && (anchor === 'tour' ? body.firstElementChild : body.querySelector(`[data-section="${tour.index}"]`));
     return el ? { top: el.getBoundingClientRect().top - body.getBoundingClientRect().top, height: el.offsetHeight } : null;
   };
   const before = box.querySelector('.ed-body'), scrolled = before?.scrollTop ?? 0, was = spot(before);
@@ -3981,15 +4300,25 @@ function renderTourEditor(anchor = 'section') {
         </div></section>`
     : `<button type="button" class="ed-section" data-ed="tour-card" aria-expanded="false" title="Show the tour's settings">${tourHead}</button>`;
 
-  box.innerHTML = `<div class="ed-head"><h4>Tour editor</h4>
+  const sectionCard = i => i === tour.index && !editorFolded ? openCard(def.sections[i], i)
+    : `<button type="button" class="ed-section${i === tour.index ? ' current' : ''}" data-ed="go" data-section="${i}" aria-expanded="false" title="${i === tour.index ? 'Open this section' : 'Go to this section'}">${head(i)}</button>`;
+  const range = (from, to) => Array.from({ length: Math.max(0, to - from) }, (_, k) => from + k);
+  // Sections before the first chapter, then each chapter with its sections when it is open.
+  const lead = tour.chapters[0]?.section ?? (def.sections ?? []).length;
+  const chapters = tour.chapters.map((c, k) => {
+    const open = tourChapterOpen(k), to = tour.chapters[k + 1]?.section ?? (def.sections ?? []).length;
+    return chapterRow(k, { number: true, open }) + (open ? `<div class="ct-sections">${range(c.section, to).map(sectionCard).join('')}</div>` : '');
+  });
+  box.innerHTML = `<div class="ed-head"><h4>Contents</h4>
       <button type="button" data-ed="undo" title="Undo the last change">Undo</button>
       <button type="button" data-ed="revert" title="Load tour.json again, dropping what is not saved (Undo brings it back)">Revert</button>
-      <button type="button" data-ed="save" title="Save to tour.json (Ctrl+S)">Save</button></div>
+      <button type="button" data-ed="save" title="Save to tour.json (Ctrl+S)">Save</button>
+      <button type="button" data-ed="edit" aria-pressed="true" title="Close the editor, leaving the chapters">Edit</button></div>
     <div class="ed-status" data-ed-status aria-live="polite"></div>
     <div class="ed-body">
       ${tourCard}
-      ${(def.sections ?? []).map((d, i) => i === tour.index && !editorFolded ? openCard(d, i)
-        : `<button type="button" class="ed-section${i === tour.index ? ' current' : ''}" data-ed="go" data-section="${i}" aria-expanded="false" title="${i === tour.index ? 'Open this section' : 'Go to this section'}">${head(i)}</button>`).join('')}
+      ${range(0, lead).map(sectionCard).join('')}
+      ${chapters.join('')}
       ${sections.length ? '' : '<button type="button" data-ed="add-section">+ Section</button>'}
     </div>`;
   updateEditorMeta();
@@ -4026,6 +4355,7 @@ function updateEditorMeta() {
 }
 
 function updateEditorStatus() {
+  if (tour?.page !== 'Tour') return updateAnalysisStatus();
   updateGlossaryStatus();
   document.body.classList.toggle('picking', !!tour?.picking);
   const status = document.querySelector('[data-ed-status]');
@@ -4364,12 +4694,33 @@ function tourAction(action, el) {
 
 {
   const box = document.getElementById('tour-editor');
-  // A box is applied as it is typed in; the start time only once it is complete.
-  box.addEventListener('input', e => { const el = e.target.closest('[data-field]'); if (el && !el.hasAttribute('data-commit')) editTourField(el); });
-  box.addEventListener('change', e => { const el = e.target.closest('[data-field][data-commit]'); if (el) editTourField(el); });
+  // A box is applied as it is typed in; the start time only once it is complete. An analysis's text is its own edit.
+  box.addEventListener('input', e => {
+    const text = e.target.closest('[data-an-text]');
+    if (text) return editAnalysisText(text);
+    const el = e.target.closest('[data-field]');
+    if (el && !el.hasAttribute('data-commit')) editTourField(el);
+  });
+  box.addEventListener('change', e => {
+    const tick = e.target.closest('[data-chapter-on]');
+    if (tick) return toggleChapter(Number(tick.dataset.chapterOn), tick.checked);
+    const el = e.target.closest('[data-field][data-commit]');
+    if (el) editTourField(el);
+  });
   box.addEventListener('keydown', e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') stepFromInherited(e.target.closest('input[data-field]')); });
   box.addEventListener('mousedown', e => stepFromInherited(e.target.closest('input[data-field]')));
-  box.addEventListener('click', e => { const b = e.target.closest('[data-ed]'); if (b && !b.disabled) tourAction(b.dataset.ed, b); });
+  box.addEventListener('click', e => {
+    // A chapter's name goes to it; a thing not told of yet is added; the rest are the contents' and the editor's buttons.
+    const add = e.target.closest('[data-add]'), jump = e.target.closest('a[data-chapter]');
+    if (add) return addThing(add.dataset.add);
+    if (jump) {
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
+      e.preventDefault();
+      return jumpToChapter(Number(jump.dataset.chapter));
+    }
+    const b = e.target.closest('[data-ed]');
+    if (b && !b.disabled && !contentsAction(b.dataset.ed, b)) tourAction(b.dataset.ed, b);
+  });
   // Going into one of a text's boxes shows that text on the chart.
   box.addEventListener('focusin', e => {
     const cueEl = e.target.closest('.ed-cue'), cue = cueEl && tourSection()?.cues[Number(cueEl.dataset.cue)];
@@ -4391,11 +4742,12 @@ function tourAction(action, el) {
   }, true);
 
   document.addEventListener('keydown', e => {
+    if (currentPage === 'Analysis' && analysisEditing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); return saveAnalysisEdits(); }
     if (currentPage !== 'Tour' || !tour) return;
     if (e.key === 'Escape' && tour.picking) { e.preventDefault(); pickFromChart(tour.picking.field, tour.picking.cue); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && (editorOn() || glossaryOn())) { e.preventDefault(); saveTour(); }
   });
-  window.addEventListener('beforeunload', e => { if (tourDirty()) e.preventDefault(); });
+  window.addEventListener('beforeunload', e => { if (tourDirty() || (tours.Analysis && JSON.stringify(tours.Analysis.edits) !== tours.Analysis.editsSaved)) e.preventDefault(); });
 }
 
 function renderStructure() {
