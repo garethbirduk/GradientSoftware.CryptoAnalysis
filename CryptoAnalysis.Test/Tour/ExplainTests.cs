@@ -162,6 +162,17 @@ public class ExplainTests
     }
 
     [TestMethod]
+    public void Candle_SeenFromALaterCursor_ContrastsOnlyWithCandlesTheSectionReaches()
+    {
+        // #47 is red and #48, after it, green; as an analysis has it, the chart is known on to #60 but the section stops on #47.
+        var section = Explain.Candle(TourPrices.Value, 47, reached: 43, known: 60);
+
+        Assert.AreEqual(47, section["until"]!.GetValue<int>());
+        Assert.IsTrue(section["cues"]!.AsArray().All(x => x!["at"]!.GetValue<int>() <= 47), "Every text is on a candle the section reaches.");
+        Assert.IsFalse(Texts(section, EnumDetail.Education).Any(x => x.StartsWith("The candle after")));
+    }
+
+    [TestMethod]
     public void Candle_FourHourCandles_NamesTheHoursSpanned()
     {
         var start = new DateTime(2021, 11, 10, 16, 0, 0, DateTimeKind.Utc);
@@ -449,6 +460,52 @@ public class ExplainTests
         Assert.IsTrue(once.Sections[2].Cues.Any(c => c.Text == "BoS at 16655."), "It still says its own BoS.");
         Assert.IsTrue(each.Sections[2].Cues.Any(c => c.Text == bos), "An analysis teaches each chapter in full.");
         Assert.AreEqual(Definitions.Text("Swing.count"), once.Expanded!["sections"]![2]!["cues"]!.AsArray()[^1]!["texts"]!["education"]!.GetValue<string>(), "A definition an explaining section cites is written out for the narration.");
+    }
+
+    [TestMethod]
+    public void Expand_ChangesWrittenTextsByTheirId_AndTellsOneDetail()
+    {
+        var errors = new List<string>();
+        var plain = Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Bos"] }""")!.AsObject(), TourPrices.Value, 100, "section 1", errors);
+        var said = plain["cues"]!.AsArray().First(x => x!["on"] == null && x["texts"]!["summary"] != null)!;
+        var id = said["id"]!.GetValue<string>();
+
+        var node = JsonNode.Parse($$"""{ "explain": "Swing", "at": 12, "blocks": ["Bos"], "detail": "summary", "edits": { "{{id}}": { "summary": "Changed here." } } }""")!.AsObject();
+        var section = Explain.Expand(node, TourPrices.Value, 100, "section 2", errors);
+
+        Assert.AreEqual(0, errors.Count, string.Join("\n", errors));
+        Assert.IsNull(section["edits"]);
+        Assert.IsNull(section["detail"]);
+        var cues = section["cues"]!.AsArray();
+        Assert.AreEqual("Changed here.", cues.First(x => x!["id"]!.GetValue<string>() == id)!["texts"]!["summary"]!.GetValue<string>());
+        Assert.IsTrue(cues.All(x => x!["texts"]!.AsObject().Select(t => t.Key).SequenceEqual(["summary"])), "At Summary alone, so what a BoS is is left out.");
+        Assert.AreEqual(plain["cues"]!.AsArray().Count(x => x!["texts"]!["summary"] != null), cues.Count);
+
+        Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "detail": "everything" }""")!.AsObject(), TourPrices.Value, 100, "section 3", errors);
+        Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "edits": ["Bos.1"] }""")!.AsObject(), TourPrices.Value, 100, "section 4", errors);
+        Assert.AreEqual(2, errors.Count, string.Join("\n", errors));
+        StringAssert.StartsWith(errors[0], "section 3: detail is the one level");
+        StringAssert.StartsWith(errors[1], "section 4: edits are the written texts changed");
+    }
+
+    [TestMethod]
+    public void Compile_TeachOnce_GoesByTheTextAsWritten_NotAsChanged()
+    {
+        var bos = Definitions.Text("Swing.bos");
+        var first = Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Bos"] }""")!.AsObject(), TourPrices.Value, 67, "section 2", []);
+        var id = first["cues"]!.AsArray().First(x => Explain.Taught(x) == bos)!["id"]!.GetValue<string>();
+        var def = JsonNode.Parse($$"""
+            { "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [
+              { "from": 0, "until": 67 },
+              { "explain": "Swing", "at": 12, "blocks": ["Bos"], "edits": { "{{id}}": { "education": "A BoS, told my way." } } },
+              { "explain": "Swing", "at": 47, "until": 67, "blocks": ["Bos"] } ] }
+            """)!;
+
+        var once = Tours.Compile(def, TourPrices.Value, teachOnce: true);
+
+        Assert.AreEqual(0, once.Errors.Count, string.Join("\n", once.Errors));
+        Assert.IsTrue(once.Sections[1].Cues.Any(c => c.Text == "A BoS, told my way."));
+        Assert.IsFalse(once.Sections[2].Cues.Any(c => c.Text == bos), "What a BoS is was taught, in other words.");
     }
 
     [TestMethod]

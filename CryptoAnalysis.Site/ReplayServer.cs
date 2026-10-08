@@ -141,7 +141,9 @@ public static class ReplayServer
         // the background at once, so the clips are there by the time Voice is pressed.
         var byDataset = datasets.ToDictionary(x => x.Id, x => (IReadOnlyList<Price>)x.Prices);
         var tourFile = sourceDir != null ? Path.Combine(sourceDir, "tour.json") : null;
-        // With expanded, the tour comes with its sections written out, as the Replay page plays it in place.
+        // With expanded, the tour comes with its sections written out, as the Replay page plays it in place; with inPlace
+        // alone it is played in place but comes as tour.json has it, for the page to write out section by section as the
+        // Tour page does, so its editor works the same on both.
         // What is at a candle, as the chart had it at the cursor (seen): the checklist the Replay page's candle card shows.
         // greenRuns and redRuns are the page's Successive Candles settings: how long a run must be to count.
         app.MapGet("/api/explain/at", (string dataset, string at, string? seen, int? greenRuns, int? redRuns) =>
@@ -154,7 +156,7 @@ public static class ReplayServer
 
         // things lists what to explain, by id as /api/explain/at gives them ("Candle,SuccessiveCandles,Swing:1"), a chapter
         // each; explain and level name one thing the old way. A thing not at the candle is left out and named in missing.
-        app.MapGet("/api/explain/tour", (string dataset, string at, string? things, string? explain, int? level, string? seen, bool? expanded, int? greenRuns, int? redRuns) =>
+        app.MapGet("/api/explain/tour", (string dataset, string at, string? things, string? explain, int? level, string? seen, bool? expanded, bool? inPlace, int? greenRuns, int? redRuns) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
@@ -163,7 +165,7 @@ public static class ReplayServer
             if (unknown.Count > 0)
                 return Results.BadRequest($"\"{string.Join(", ", unknown)}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.");
             var options = new ExplainOptions(greenRuns ?? ExplainOptions.Default.GreenRuns, redRuns ?? ExplainOptions.Default.RedRuns);
-            var def = Explain.Tour(ids.Select(x => Explain.Thing.Parse(x)!).ToList(), data.Id, data.Prices, at, seen, out var missing, expanded == true, options);
+            var def = Explain.Tour(ids.Select(x => Explain.Thing.Parse(x)!).ToList(), data.Id, data.Prices, at, seen, out var missing, inPlace ?? expanded == true, options);
             if (def == null)
                 return Results.BadRequest($"Nothing of that is at the candle at {at}: {string.Join(", ", missing)}.");
             if (missing.Count > 0)
@@ -258,9 +260,10 @@ public static class ReplayServer
                 return Results.NoContent();
             });
 
-            // An analysis's own edits: texts changed for that analysis alone, laid over what is written from the prices each
-            // time it opens. They are kept in a file of their own, named from the analysis's key (the address that defines
-            // it) and holding the key, so no other analysis reads them.
+            // An analysis's own edits: its sections as changed for that analysis alone, by the thing and detail each tells
+            // of, laid over the sections written from the prices each time it opens. They are kept in a file of their own,
+            // named from the analysis's key (its candle, the cursor it was seen from and its settings) and holding the key,
+            // so no other analysis reads them.
             var editsDir = Path.Combine(sourceDir, "analysis-edits");
             string EditsPath(string key) => Path.Combine(editsDir, $"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..16].ToLowerInvariant()}.json");
             app.MapGet("/api/analysis/edits", (string key) =>
@@ -269,22 +272,22 @@ public static class ReplayServer
                 var kept = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path)) as JsonObject : null;
                 return kept?["key"]?.GetValue<string>() == key
                     ? Results.Text(kept.ToJsonString(), "application/json")
-                    : Results.Json(new JsonObject { ["key"] = key, ["edits"] = new JsonObject() }, Json);
+                    : Results.Json(new JsonObject { ["key"] = key, ["sections"] = new JsonObject() }, Json);
             });
             app.MapPut("/api/analysis/edits", async (string key, HttpRequest request) =>
             {
                 JsonObject? edits;
                 try
                 {
-                    edits = (await JsonNode.ParseAsync(request.Body))?["edits"] as JsonObject;
+                    edits = (await JsonNode.ParseAsync(request.Body))?["sections"] as JsonObject;
                 }
                 catch (JsonException)
                 {
                     return Results.BadRequest("The edits are not valid JSON.");
                 }
 
-                if (edits == null || edits.Any(x => x.Value is not JsonObject texts || texts.Any(t => t.Value is not JsonValue v || v.GetValueKind() != JsonValueKind.String)))
-                    return Results.BadRequest("The edits are { \"edits\": { \"<thing>|<text id>\": { \"<detail>\": \"<text>\" } } }.");
+                if (edits == null || edits.Any(x => x.Value is not JsonObject))
+                    return Results.BadRequest("The edits are { \"sections\": { \"<thing>|<detail>\": { the section's settings changed } } }.");
 
                 var path = EditsPath(key);
                 // No edits left: the analysis is as written from the prices again, and its file goes.
@@ -295,7 +298,7 @@ public static class ReplayServer
                 }
 
                 Directory.CreateDirectory(editsDir);
-                await File.WriteAllTextAsync(path, new JsonObject { ["key"] = key, ["edits"] = edits.DeepClone() }.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+                await File.WriteAllTextAsync(path, new JsonObject { ["key"] = key, ["sections"] = edits.DeepClone() }.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
                 return Results.NoContent();
             });
 

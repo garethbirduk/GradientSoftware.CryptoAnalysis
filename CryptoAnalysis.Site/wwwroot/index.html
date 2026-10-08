@@ -274,11 +274,6 @@
   .ct-learn { font-size: 12px; color: var(--muted); line-height: 1.6; }
   .ct-learn a { color: var(--accent); }
   .ct-warn { font-size: 12px; color: var(--warn); }
-  .ct-edit { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 6px 14px; }
-  .ct-edit .ed-cue { margin-top: 0; }
-  .ct-edit .ed-cue.edited { border-left-color: var(--accent); }
-  .ct-edit .ed-meta { display: flex; gap: 6px; align-items: baseline; }
-  .ct-edit .ed-meta span { flex: 1; }
   #tour-editor button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border);
     border-radius: 5px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
   #tour-editor button:hover:not(:disabled) { background: var(--chip); }
@@ -318,8 +313,9 @@
   .ed-use button { flex: 1; }
   #tour-editor .ed-pick button { padding: 1px 6px; }
   .ed-layers { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 10px; font-size: 11px; color: var(--muted); }
-  .ed-written { margin: 6px 0 0; padding-left: 22px; font-size: 12px; line-height: 1.4; color: var(--muted); }
-  .ed-written li { margin: 2px 0; }
+  /* A text written from the prices is dashed until its wording is changed here. */
+  .ed-cue.written { border-left-style: dashed; }
+  .ed-cue.written.edited { border-left-style: solid; }
   .candle-card { position: fixed; z-index: 30; display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px solid var(--border);
     border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .candle-card[hidden] { display: none; }
@@ -2230,9 +2226,9 @@ async function renderReplayPage() {
 // for each thing the chart shows there, a thing whose layers and level are on. The other things at the candle are on the
 // Analysis page, to add. A drag still pans; a click elsewhere closes the card. A replay that is playing stops for it, as
 // the candle would move away from under the card.
-// The basic building blocks, the candle and its highs and lows: nearly always there to be seen rather than read about, so
-// an analysis always has their chapters, off until ticked (see loadAnalysis), whatever the chart shows.
-const BASIC_KINDS = new Set(['Candle', 'Point']);
+// The basic building blocks, the candle, its run and its highs and lows: nearly always there to be seen rather than read
+// about, so an analysis always has their chapters, off until ticked (see loadAnalysis), whatever the chart shows.
+const BASIC_KINDS = new Set(['Candle', 'SuccessiveCandles', 'Point']);
 const isBasic = id => BASIC_KINDS.has(String(id ?? '').split(':')[0]);
 const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ? on('SuccessiveGreenCandles') || on('SuccessiveRedCandles')
   : on(`level${t.level}`) && (t.kind === 'Point' ? POINT_LAYERS.some(on) : t.kind === 'Swing' ? on('Upswing') || on('Downswing') : on('Uptrend') || on('Downtrend')));
@@ -2391,10 +2387,12 @@ let wantedAnalysis = null;
 const thingRank = id => { const [kind, level] = String(id).split(':'); return [{ Candle: 0, SuccessiveCandles: 1 }[kind] ?? 2, -(Number(level) || 0), ['Point', 'Swing', 'Trend'].indexOf(kind)]; };
 const byThing = (a, b) => { const x = thingRank(a), y = thingRank(b); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; };
 const runsOf = p => p.greenRuns != null ? { greenRuns: p.greenRuns, redRuns: p.redRuns } : {};
-// What defines an analysis's content, which its own edits are kept against: the address without the detail, which only
-// says which of its chapters are on.
+// What defines an analysis's content: the address without the detail, which only says which of its chapters are on.
 const analysisKey = p => new URLSearchParams({ dataset: p.dataset, at: p.at, ...(p.seen ? { seen: p.seen } : {}), things: [...p.things].sort(byThing).join(','), ...runsOf(p) }).toString();
 const analysisHash = p => `#Analysis?${analysisKey(p)}&detail=${encodeURIComponent(p.detail)}`;
+// What an analysis's own edits are kept against: the candle, as seen from its cursor, with its settings. Not its things,
+// as each edit names its thing, so a thing added keeps the edits made before it.
+const editsKeyOf = p => new URLSearchParams({ dataset: p.dataset, at: p.at, ...(p.seen ? { seen: p.seen } : {}), ...runsOf(p) }).toString();
 // The level of the Trend an analysis tells of, for Find similar.
 const trendLevel = t => Number(t?.params?.things.find(id => id.startsWith('Trend:'))?.split(':')[1]) || null;
 // Whether an analysis has the cursor: from when it starts until it has ended. The replay controls are hidden for that long,
@@ -2469,25 +2467,38 @@ async function loadAnalysis(params) {
   const list = await fetch(`api/explain/at?${new URLSearchParams({ ...where, ...runs })}`, { cache: 'no-store' }).then(x => x.ok ? x.json() : null).catch(() => null);
   // The basic building blocks at the candle are always there to tick, whatever the analysis was asked for with.
   const things = [...new Set([...params.things, ...(list ?? []).map(t => t.id).filter(isBasic)])].sort(byThing);
-  const written = { ...params, things, ...runs };
+  // Changes not saved yet, carried from the analysis as it was before a thing was added.
+  const { changes: carried, ...asked } = params;
+  const written = { ...asked, things, ...runs };
   // The analysis's own changes to its texts, kept against its key (see Analysis edits).
-  const editsKey = analysisKey(written);
+  const editsKey = editsKeyOf(written);
   const [r, audio, stored] = await Promise.all([
-    fetch(`api/explain/tour?${new URLSearchParams({ ...where, things: things.join(','), expanded: true, ...runs })}`, { cache: 'no-store' }),
+    fetch(`api/explain/tour?${new URLSearchParams({ ...where, things: things.join(','), inPlace: true, ...runs })}`, { cache: 'no-store' }),
     fetch('tour-audio/index.json', { cache: 'no-store' }).then(x => x.ok ? x.json() : {}).catch(() => ({})),
     fetch(`api/analysis/edits?key=${encodeURIComponent(editsKey)}`, { cache: 'no-store' }).then(x => x.ok ? x.json() : null).catch(() => null),
+    definitionsBase ? null : loadDefinitions(),
   ]);
   const text = await r.text();
   if (!r.ok) throw new Error(r.status === 404 ? `the server has no dataset "${params.dataset}"` : text.replace(/^"|"$/g, '') || `the server answered ${r.status}`);
-  const writtenDef = JSON.parse(text), edits = stored?.edits ?? {};
-  const def = splitExplanations(withEdits(writtenDef, edits));
+  // The analysis as written from the prices, in the shape of tour.json, and as changed for this analysis alone.
+  const writtenDef = splitExplanations(JSON.parse(text)), saved = stored?.sections ?? {}, changes = { ...saved, ...carried };
   // Every text is kept at its own level: an explanation's at Education, an analysis's at Summary.
-  const loaded = newPlayer(def, audio, { page: 'Analysis', idPrefix: 'Analysis', detail: 'education', params: written, hash: analysisHash(written), list, missing: def.missing ?? [],
-    writtenDef, edits, editsSaved: JSON.stringify(edits), editsKey,
+  const loaded = newPlayer(withChanges(writtenDef, changes), audio, { page: 'Analysis', idPrefix: 'Analysis', detail: 'education', params: written, hash: analysisHash(written), list, missing: writtenDef.missing ?? [],
+    writtenDef, changesSaved: canonical(saved), editsKey,
     pins: false, waitForClips: true, extraLayers: (state.pages.Analysis ?? defaultsFor('Analysis')).filter(id => id !== 'replay' && !/^level\d+$/.test(id)) });
   await loadTourDatasets(loaded);
   anchorTour(loaded);
-  Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio, loaded.detail));
+  recompile(loaded);
+  await resolveAll(loaded);
+  // A kind of thing with nothing written to explain it has no explanation.
+  const empty = new Set(loaded.sections.flatMap((s, i) => s.explains && !s.cues.length ? [i] : []));
+  if (empty.size) {
+    for (const d of [loaded.writtenDef, loaded.def]) d.sections = d.sections.filter((s, i) => !empty.has(i));
+    recompile(loaded);
+  }
+  // The changes kept for things this analysis does not tell of are kept as they are when it is saved.
+  const present = new Set(loaded.writtenDef.sections.map(sectionKey));
+  loaded.elsewhere = Object.fromEntries(Object.entries(changes).filter(([k]) => !present.has(k)));
   // The explanations are on when the analysis was asked for with Explain.
   loaded.chapters.forEach((c, i) => { const s = loaded.sections[c.section]; if (s.explains && (params.detail !== 'education' || s.repeat)) loaded.chaptersOff.add(i); });
   // The basic building blocks, the candle and its highs and lows, start off, one tick away, even when the chart shows
@@ -2496,10 +2507,8 @@ async function loadAnalysis(params) {
   const kept = new Set(params.basicOn ?? []);
   if (loaded.chapters.some((c, i) => !basic.includes(i) && !loaded.chaptersOff.has(i)))
     basic.filter(i => !kept.has(loaded.sections[loaded.chapters[i].section].thing)).forEach(i => loaded.chaptersOff.add(i));
-  // With no pins shown, a pinned text is left out altogether, so it does not hold the run for its seconds either.
-  for (const s of loaded.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
-  if (!loaded.sections.some(s => s.cues.some(c => !c.skipped))) throw new Error('the server wrote no texts for it');
-  if (Number.isInteger(def.known)) { loaded.known = def.known; await fetchBatch(loaded.ex, loaded.known); }
+  if (!loaded.sections.some(s => s.cues.some(c => !c.skipped))) throw new Error(loaded.errors[0] ?? 'the server wrote no texts for it');
+  if (Number.isInteger(writtenDef.known)) { loaded.known = writtenDef.known; await fetchBatch(loaded.ex, loaded.known); }
   return loaded;
 }
 
@@ -2508,18 +2517,18 @@ async function loadAnalysis(params) {
 // the tick box beside it turns the chapter on or off, a chapter that is off being skipped by the player and its steps. An
 // analysis has a chapter for each thing it tells of, and lists the other things at its candle in their places, to add.
 
-// An analysis's sections, each thing's in two chapters: what a thing of its kind is, from its texts at Education, then
-// what this one is, from its texts at Summary. Both run through the same candles.
+// An analysis's sections, each thing's in two chapters: what a thing of its kind is, told from its texts at Education, then
+// what this one is, from its texts at Summary, each a section of tour.json with its "detail". Both run through the same
+// candles.
 function splitExplanations(def) {
-  const at = (cues, level) => cues.filter(c => c.texts?.[level]).map(c => ({ ...c, texts: { [level]: c.texts[level] } }));
   const word = s => s.thing?.startsWith('SuccessiveCandles') ? 'Successive Candles' : (s.chapter ?? '').split(' ').pop();
   const named = s => { const w = word(s); return w === 'Successive Candles' ? 'What are Successive Candles?' : `What is ${/^[AEIOU]|^(HH|HL|LH|LL|MSB)$/.test(w) ? 'an' : 'a'} ${w}?`; };
   // A kind of thing is explained once: a second Downtrend's explanation is there, but off, one tick away.
   const told = new Set();
   def.sections = (def.sections ?? []).flatMap(s => {
-    const explained = at(s.cues ?? [], 'education'), name = named(s), repeat = told.has(name);
+    const name = named(s), repeat = told.has(name);
     told.add(name);
-    return [...(explained.length ? [{ ...s, chapter: name, explains: true, repeat, cues: explained }] : []), { ...s, cues: at(s.cues ?? [], 'summary') }];
+    return [{ ...s, chapter: name, detail: 'education', explains: true, ...(repeat ? { repeat } : {}) }, { ...s, detail: 'summary' }];
   });
   return def;
 }
@@ -2565,7 +2574,7 @@ function addThings(ids, jump = tourSection()?.thing) {
   if (tour?.page !== 'Analysis' || !ids.length) return;
   // The basic building blocks keep their chapters, each off or on as it was.
   wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), ...tour.params.things.filter(isBasic), ...ids])],
-    detail: explainsOn() ? 'education' : 'summary', jump, basicOn: [...thingsOn(), ...ids].filter(isBasic) };
+    detail: explainsOn() ? 'education' : 'summary', jump, basicOn: [...thingsOn(), ...ids].filter(isBasic), changes: analysisDirty() ? analysisChanges() : undefined };
   history.replaceState(null, '', analysisHash(wantedAnalysis));
   renderAnalysisPage();
 }
@@ -2607,13 +2616,13 @@ function analysisLevelsChanged(before, after) {
 // to change. A tour's rows are its chapters in order, each opening to its sections in the tour's editor (see
 // renderTourEditor), and what is changed there is saved to tour.json. An analysis's rows are grouped as its things are at
 // the candle, the candle first and then each order from the finest, each group with Learn more; above them, links to the
-// tour's chapter on each kind of thing, and Explain. With Edit, an analysis's chapters open to their texts, and what is
-// changed there is kept for that analysis alone (see Analysis edits).
+// tour's chapter on each kind of thing, and Explain. With Edit, an analysis's chapters open to their sections in the same
+// editor as the tour's, and what is changed there is kept for that analysis alone (see Analysis edits).
 let analysisEditing = false;
-// The chapters opened or folded by hand while editing: a tour's chapter on show is open unless it was folded, and any
-// other chapter is folded unless it was opened; an analysis's chapters are folded unless opened.
-const tourOpened = new Set(), tourFolded = new Set(), analysisToggled = new Set();
-const tourChapterOpen = k => k === tourSection()?.chapter ? !tourFolded.has(k) : tourOpened.has(k);
+// The chapters opened or folded by hand while editing, on each page: the chapter on show is open unless it was folded,
+// and any other chapter is folded unless it was opened.
+const chapterFolds = { Tour: { opened: new Set(), folded: new Set() }, Analysis: { opened: new Set(), folded: new Set() } };
+const tourChapterOpen = k => { const f = chapterFolds[tour.page]; return k === tourSection()?.chapter ? !f.folded.has(k) : f.opened.has(k); };
 
 function renderContents() {
   if (currentPage === 'Tour') renderTourEditor();
@@ -2659,8 +2668,8 @@ function contentsAction(action, el) {
       else { analysisEditing = !analysisEditing; drawAll(currentPage); renderAnalysisContents(); }
       return true;
     case 'chapter-fold': {
-      const i = Number(el.dataset.chapterFold);
-      const toggled = currentPage !== 'Tour' ? analysisToggled : i === tourSection()?.chapter ? tourFolded : tourOpened;
+      const i = Number(el.dataset.chapterFold), f = chapterFolds[tour.page];
+      const toggled = i === tourSection()?.chapter ? f.folded : f.opened;
       if (toggled.has(i)) toggled.delete(i); else toggled.add(i);
       editorSection = -1;
       renderContents();
@@ -2668,16 +2677,8 @@ function contentsAction(action, el) {
     }
     case 'explain': toggleKind(true); return true;
     case 'learn': learnMore(el.dataset.learn.split(',')); return true;
-    case 'an-save': saveAnalysisEdits(); return true;
-    case 'an-revert': revertAnalysisEdits(); return true;
-    case 'an-default': {
-      const cue = el.closest('[data-edit-key]');
-      setAnalysisText(cue.dataset.editKey, cue.dataset.editLevel, null);
-      renderAnalysisContents();
-      return true;
-    }
   }
-  return currentPage === 'Analysis';
+  return false;
 }
 
 // The tour's chapter on each kind of thing: the chapter where the tour first turns on the thing's layer.
@@ -2734,21 +2735,25 @@ function renderAnalysisContents() {
     groups.at(-1).things.push(t);
   }
   const chaptersOf = t => tour.chapters.flatMap((c, i) => tour.sections[c.section]?.thing === t.id ? [i] : []);
+  // While editing, a chapter opens to its sections in the tour's editor (see editorCards).
+  const cards = analysisEditing ? editorCards() : null;
+  if (cards) editorSection = tour.index;
   const thing = t => {
     const own = chaptersOf(t);
     if (!own.length) return `<button type="button" class="ct-add" data-add="${esc(t.id)}" title="Add this to the analysis, and go to it">+ ${esc(t.name)}</button>`;
     return own.map(i => {
-      const open = analysisEditing ? analysisToggled.has(i) : null;
-      return chapterRow(i, { open }) + (open ? analysisChapterEditor(i) : '');
+      const open = cards ? tourChapterOpen(i) : null;
+      return chapterRow(i, { open }) + (open ? `<div class="ct-sections">${chapterSections(i).map(s => cards.sectionCard(s.index)).join('')}</div>` : '');
     }).join('');
   };
   const group = g => `<div class="ct-group"><header><span>${esc(g.name)}</span>${g.things.some(t => chaptersOf(t).length)
     ? `<button type="button" data-ed="learn" data-learn="${esc(g.things.map(t => t.id).join(','))}" title="Play what each of these is, then what this one is">Learn more</button>` : ''}</header>${g.things.map(thing).join('')}</div>`;
   box.innerHTML = `<div class="ed-head"><h4>Contents</h4>
-      ${analysisEditing ? `<button type="button" data-ed="an-revert" title="Drop the changes not saved">Revert</button>
-        <button type="button" data-ed="an-save" title="Keep these texts for this analysis (Ctrl+S)">Save</button>` : ''}
+      ${analysisEditing ? `<button type="button" data-ed="undo" title="Undo the last change">Undo</button>
+        <button type="button" data-ed="revert" title="Back to this analysis as last saved (Undo brings back what was here)">Revert</button>
+        <button type="button" data-ed="save" title="Keep these sections for this analysis alone (Ctrl+S)">Save</button>` : ''}
       <button type="button" data-ed="explain" aria-pressed="${explainsOn()}" title="Turn the explanations on or off: what a thing of each kind is and how it works, a chapter before its own">Explain</button>
-      <button type="button" data-ed="edit" aria-pressed="${analysisEditing}" title="Open the chapters to change their texts, for this analysis alone">Edit</button></div>
+      <button type="button" data-ed="edit" aria-pressed="${analysisEditing}" title="Open the chapters to edit their sections, for this analysis alone">Edit</button></div>
     ${analysisEditing ? '<div class="ed-status" data-ed-status aria-live="polite"></div>' : ''}
     <div class="ed-body">
       <div class="ct-learn" data-learn-links></div>
@@ -2757,7 +2762,8 @@ function renderAnalysisContents() {
     </div>`;
   box.querySelector('.ed-body').scrollTop = scrolled;
   syncContents();
-  updateAnalysisStatus();
+  if (cards) updateEditorMeta();
+  updateEditorStatus();
   fillLearnLinks();
 }
 
@@ -2781,97 +2787,64 @@ function learnMore(ids) {
 }
 
 // ---- Analysis edits --------------------------------------------------------------------------------------------------
-// An analysis's texts can be changed for that analysis alone. The changes are kept by the local server against the
-// analysis's key (analysisKey: the address that defines it), each by its thing and its text's id (its block and its place
-// in it, written by the server), and laid over the texts written from the prices each time the analysis is written, so
-// whatever is not changed follows the prices and the definitions as they are.
-const editKey = (thing, id) => `${thing}|${id}`;
-const analysisDirty = () => tour?.page === 'Analysis' && JSON.stringify(tour.edits) !== tour.editsSaved;
+// An analysis's sections are edited as the tour's are, in the same editor (see Tour editor), for that analysis alone. Each
+// section is known by the thing it tells of and its detail; what is changed in it, its settings, its own texts and its
+// written texts' edits (by id), is kept by the local server against the analysis's candle, cursor and settings
+// (editsKeyOf), and laid over the sections written from the prices each time the analysis is written, so whatever is not
+// changed follows the prices and the definitions as they are.
+const sectionKey = s => `${s.thing}|${s.detail}`;
+// The settings of a section an analysis writes for itself, which its changes do not keep.
+const OWN_KEYS = ['thing', 'detail', 'explains', 'repeat', 'explain', 'at', 'level', 'known', 'runs'];
 
-// The written analysis with its own changes over it, as a copy.
-function withEdits(def, edits) {
+// The written analysis with its own changes over it, as a copy: a setting changed to nothing is as written, or left out
+// when nothing was written for it.
+function withChanges(def, changes) {
   const copy = JSON.parse(JSON.stringify(def));
-  for (const s of copy.sections ?? []) for (const c of s.cues ?? []) {
-    const own = c.id != null ? edits[editKey(s.thing, c.id)] : null;
-    if (own) c.texts = { ...c.texts, ...own };
-  }
+  copy.sections = (copy.sections ?? []).map(s => {
+    const own = changes[sectionKey(s)];
+    if (!own) return s;
+    const changed = { ...s, ...own };
+    for (const [k, v] of Object.entries(own)) if (v === null) { if (k in s) changed[k] = s[k]; else delete changed[k]; }
+    return changed;
+  });
   return copy;
 }
 
-// The text as written from the prices, before any change.
-const writtenText = (key, level) => {
-  const [thing, id] = key.split('|');
-  return tour.writtenDef.sections.find(s => s.thing === thing)?.cues.find(c => c.id === id)?.texts?.[level] ?? '';
-};
-
-// A chapter's texts, each to change; a pin is left out, as an analysis shows none.
-function analysisChapterEditor(i) {
-  const cues = chapterSections(i).flatMap(s => s.cues.filter(c => c.on == null && c.id != null).map(c => ({ s, c })));
-  if (!cues.length) return '<div class="ct-edit"><div class="ed-meta">No texts to change.</div></div>';
-  return `<div class="ct-edit">${cues.map(({ s, c }) => {
-    const key = editKey(s.thing, c.id), level = Object.keys(c.texts)[0], edited = tour.edits[key]?.[level] != null;
-    return `<div class="ed-cue${edited ? ' edited' : ''}" data-edit-key="${esc(key)}" data-edit-level="${esc(level)}">
-      <div class="ed-meta"><span>${c.at != null ? `at #${c.at} · ` : ''}${DETAIL_NAMES[level] ?? level}${edited ? ' · changed for this analysis' : ''}</span>${edited
-        ? '<button type="button" data-ed="an-default" title="Back to the text written from the prices">Default</button>' : ''}</div>
-      <textarea data-an-text aria-label="${esc(DETAIL_NAMES[level] ?? level)} text">${esc(c.texts[level] ?? '')}</textarea></div>`;
-  }).join('')}</div>`;
+// What the analysis on show has changed in its sections, by each section's key, with those kept for things it does not
+// tell of.
+function analysisChanges(t = tour) {
+  const changes = { ...t.elsewhere };
+  t.def.sections.forEach((d, i) => {
+    const w = t.writtenDef.sections[i], own = {};
+    if (!w) return;
+    for (const k of new Set([...Object.keys(d), ...Object.keys(w)])) {
+      if (OWN_KEYS.includes(k) || JSON.stringify(d[k]) === JSON.stringify(w[k])) continue;
+      own[k] = d[k] ?? null;
+    }
+    if (Object.keys(own).length) changes[sectionKey(w)] = own;
+  });
+  return changes;
 }
-
-// A text changed: kept when it differs from the one written from the prices, dropped when it is the same or empty.
-function setAnalysisText(key, level, text) {
-  const own = { ...tour.edits[key] };
-  if (text == null || !text.trim() || text === writtenText(key, level)) delete own[level]; else own[level] = text;
-  if (Object.keys(own).length) tour.edits[key] = own; else delete tour.edits[key];
-  applyAnalysisEdits();
-}
-
-function editAnalysisText(el) {
-  const cue = el.closest('[data-edit-key]');
-  setAnalysisText(cue.dataset.editKey, cue.dataset.editLevel, el.value);
-  const edited = tour.edits[cue.dataset.editKey]?.[cue.dataset.editLevel] != null;
-  cue.classList.toggle('edited', edited);
-}
-
-// The analysis played again with the texts as they now are, from where it was.
-function applyAnalysisEdits() {
-  pauseTour();
-  const was = { t: cursorOf(tour.ex), shown: tour.shown.length };
-  tour.def = splitExplanations(withEdits(tour.writtenDef, tour.edits));
-  Object.assign(tour, compileTour(tour.def, tour.scenes, tour.resolved, tour.audio, tour.detail));
-  for (const s of tour.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
-  seekTour(tour.index, was);
-  updateAnalysisStatus();
-}
-
-function updateAnalysisStatus() {
-  const status = document.querySelector('#tour-editor [data-ed-status]');
-  if (!status || tour?.page !== 'Analysis') return;
-  const count = Object.keys(tour.edits).length, dirty = analysisDirty();
-  status.textContent = tour.note || (dirty ? 'Changes not saved'
-    : count ? `${count} text${count === 1 ? '' : 's'} changed for this analysis, saved` : 'As written from the prices: change a text to keep it for this analysis');
-  status.classList.toggle('warn', !!tour.note);
-  const save = document.querySelector('#tour-editor [data-ed="an-save"]');
-  if (save) { save.disabled = !dirty; save.classList.toggle('dirty', dirty); }
-  const revert = document.querySelector('#tour-editor [data-ed="an-revert"]');
-  if (revert) revert.disabled = !dirty;
-}
+// Changes as text with every object's keys in order, so the same changes read the same however they were made.
+const canonical = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : x);
+const analysisDirty = (t = tour) => t?.page === 'Analysis' && canonical(analysisChanges(t)) !== t.changesSaved;
 
 async function saveAnalysisEdits() {
   if (!analysisDirty()) return;
-  const edits = JSON.stringify(tour.edits);
-  const response = await fetch(`api/analysis/edits?key=${encodeURIComponent(tour.editsKey)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edits: tour.edits }) }).catch(() => null);
-  tour.note = response?.ok ? '' : response?.status === 404 || response?.status === 405
-    ? 'Not saved: the local server was started before analyses could keep their own texts. Restart ./build-site.ps1 -Serve.'
+  const changes = analysisChanges(), saved = canonical(changes);
+  const response = await fetch(`api/analysis/edits?key=${encodeURIComponent(tour.editsKey)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sections: changes }) }).catch(() => null);
+  tour.note = response?.ok ? '' : response?.status === 404 || response?.status === 405 || response?.status === 400
+    ? 'Not saved: the local server was started before analyses could keep their own sections. Restart ./build-site.ps1 -Serve.'
     : 'Not saved: the local server did not take the changes.';
-  if (response?.ok) tour.editsSaved = edits;
-  updateAnalysisStatus();
+  if (response?.ok) tour.changesSaved = saved;
+  updateEditorStatus();
 }
 
+// Back to the analysis as last saved; Undo brings back what was here.
 function revertAnalysisEdits() {
-  tour.edits = JSON.parse(tour.editsSaved);
-  tour.note = '';
-  applyAnalysisEdits();
-  renderAnalysisContents();
+  rememberTour();
+  tour.def = withChanges(tour.writtenDef, JSON.parse(tour.changesSaved));
+  applyTour({ render: true });
 }
 
 // Turning a chapter on or off. The chapter on show, turned off, gives way to the next that is on, playing on if it was.
@@ -3013,7 +2986,8 @@ const eventKey = (spec, from, scene = 0) => `${scene}|${spec.event}|${spec.level
 const eventName = (spec, from) => `${{ 1: 'the first', 2: 'the second', 3: 'the third' }[spec.nth ?? 1] ?? `the ${spec.nth}th`} ${TERMS.get(spec.event)?.name ?? spec.event} at level ${spec.level ?? 1} after #${from}`;
 
 // A text stays for its narration clip's length when there is one (plus a breath), else for the time it takes to read.
-function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'education') {
+// With teachOnce, as the tour is played start to end, what a written section teaches is not taught again by the next.
+function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'education', { teachOnce = true } = {}) {
   const errors = [], known = new Set(LAYERS.map(l => l.id)), chapters = [], wanted = [];
   // The definitions told so far, cited or taught by a written section: a section that explains something does not teach
   // them again.
@@ -3057,16 +3031,19 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
     }
     // A section that explains something is written out by the local server from the prices of its scene (see resolveTour),
     // one writing for each section and the candle it starts from; until it has been, the section is listed as waiting.
+    // Its written texts changed by its "edits" are laid over them here, so a change to one is not written out again.
     if (s.explain != null) {
-      const from = Number.isInteger(s.from) ? s.from : at, key = `explain|${scene}|${from}|${JSON.stringify(s)}|${cited.join('|')}`;
-      if (!resolved.has(key)) { wanted.push({ key, explain: s, from, scene, where, cited: [...cited] }); errors.push(`${where}: the texts explaining ${s.explain} are being written`); }
+      const { edits = {}, ...asked } = s;
+      const from = Number.isInteger(s.from) ? s.from : at, key = `explain|${scene}|${from}|${JSON.stringify(asked)}|${cited.join('|')}`;
+      if (!resolved.has(key)) { wanted.push({ key, explain: asked, from, scene, where, cited: [...cited] }); errors.push(`${where}: the texts explaining ${s.explain} are being written`); }
       else errors.push(...resolved.get(key).errors);
-      s = resolved.get(key)?.section ?? { ...s, cues: [] };
-      // What its written texts teach, ahead of its own, is told: the tour teaches a definition once.
-      for (const c of s.cues.slice(0, s.cues.length - (given.cues ?? []).length)) {
+      const got = resolved.get(key)?.section ?? { ...asked, cues: [] }, writtenCount = got.cues.length - (given.cues ?? []).length;
+      // What its written texts teach, as written, is told: the tour teaches a definition once.
+      if (teachOnce) for (const c of got.cues.slice(0, writtenCount)) {
         const levels = Object.keys(c.texts ?? {});
         if (levels.length === 1 && levels[0] === 'education') cited.push(c.texts.education);
       }
+      s = { ...got, cues: got.cues.map((c, k) => k >= writtenCount ? c : { ...c, written: c.texts, texts: { ...c.texts, ...(c.id != null ? edits[c.id] : null) } }) };
     }
     if (s.layers) layers = ids(s.layers, where);
     const removed = ids(s.remove, where);
@@ -3129,41 +3106,64 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       // A text with "voice": false is shown but not read aloud, so it stays for the time it takes to read. A cue with no
       // text at the page's detail is skipped: kept in its place for the editor, never queued.
       const silent = c.voice === false, clip = silent || !text ? null : audio[textKey(text)];
-      return { id: c.id ?? null, texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
+      return { id: c.id ?? null, written: c.written ?? null, texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
         to, heads: { start: c.heads?.start === true, end: c.heads?.end !== false }, color: c.color ?? null,
         clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0, given: c.hold >= 0 ? c.hold : null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
     });
-    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, detail: given.detail ?? null, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
 
-// Looks up the events a compiled tour is waiting for, then compiles again, until nothing is waiting: a lookup can move a
-// section's start, and with it what the next section waits from.
-async function resolveTour(retry = 0) {
-  const scenes = tour.scenes, pending = tour.wanted;
-  if (!pending.length || retry > 12) return;
-  tour.resolving = true;
-  updateEditorStatus();
-  for (const { key, spec, explain, from, scene, where, cited } of pending) {
-    if (tour.resolved.has(key)) continue;
+// A player's definition compiled again, as its page plays it: the tour teaches each definition once from start to end,
+// and an analysis, which shows no pins, leaves its pinned texts out, so they do not hold the run for their seconds either.
+function recompile(t = tour) {
+  Object.assign(t, compileTour(t.def, t.scenes, t.resolved, t.audio, t.detail, { teachOnce: t.page === 'Tour' }));
+  if (t.pins === false) for (const s of t.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
+  return t;
+}
+
+// What a compiled player is waiting for, looked up: each event, and each section that explains something, which goes to
+// the server as the definition has it and comes back with its texts written. A few are asked at a time.
+async function lookUp(t) {
+  const scenes = t.scenes, jobs = t.wanted.filter(w => !t.resolved.has(w.key));
+  let next = 0;
+  const one = async ({ key, spec, explain, from, scene, where, cited }) => {
     const ex = scenes[scene ?? 0]?.ex ?? scenes[0].ex;
     if (explain) {
-      // The section as the tour has it goes to the server, which sends back the section to play, texts written.
       const body = JSON.stringify({ dataset: ex.dataset, anchor: ex.anchor, from, where, cited, section: explain });
       const got = await fetch('api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).then(r => r.ok ? r.json() : null).catch(() => null);
-      tour.resolved.set(key, got ? { section: got.section, errors: got.errors ?? [] } : { section: null, errors: [`${where}: the local server could not write the texts explaining ${explain.explain}`] });
-      continue;
+      t.resolved.set(key, got ? { section: got.section, errors: got.errors ?? [] } : { section: null, errors: [`${where}: the local server could not write the texts explaining ${explain.explain}`] });
+      return;
     }
     const query = `dataset=${encodeURIComponent(ex.dataset)}&anchor=${ex.anchor}&from=${from}&type=${encodeURIComponent(spec.event)}&level=${spec.level ?? 1}&nth=${spec.nth ?? 1}`;
     const found = await fetch(`api/event?${query}`).then(r => r.ok ? r.json() : null).catch(() => null);
-    tour.resolved.set(key, found?.index ?? null);
+    t.resolved.set(key, found?.index ?? null);
+  };
+  await Promise.all(Array.from({ length: Math.min(4, jobs.length) }, async () => { while (next < jobs.length) await one(jobs[next++]); }));
+}
+
+// A player looked up and compiled again until nothing is waiting, before it is shown.
+async function resolveAll(t) {
+  for (let retry = 0; t.wanted.length && retry <= 12; retry++) {
+    await lookUp(t);
+    recompile(t);
   }
-  tour.resolving = false;
+}
+
+// Looks up what the player on show is waiting for, then compiles again, until nothing is waiting: a lookup can move a
+// section's start, and with it what the next section waits from.
+async function resolveTour(retry = 0) {
+  const t = tour, scenes = t.scenes;
+  if (!t.wanted.length || retry > 12) return;
+  t.resolving = true;
+  updateEditorStatus();
+  await lookUp(t);
+  t.resolving = false;
   // Applied again while it looked up, the tour has looked up for itself; the status still says it is done.
-  if (tour.scenes !== scenes || currentPage !== 'Tour') return updateEditorStatus();
-  Object.assign(tour, compileTour(tour.def, scenes, tour.resolved, tour.audio, tour.detail));
+  if (tour !== t || t.scenes !== scenes || currentPage !== t.page) return updateEditorStatus();
+  recompile();
   if (tour.wanted.length) return resolveTour(retry + 1);
   editorSection = -1;
   seekTour(tour.index, { t: cursorOf(tour.ex), shown: tour.shown.length });
@@ -3246,7 +3246,7 @@ async function loadTour() {
   const loaded = newPlayer(def, audio, { base });
   await loadTourDatasets(loaded);
   anchorTour(loaded);
-  return Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio, loaded.detail));
+  return recompile(loaded);
 }
 
 // Every dataset the tour's scenes name is loaded once; the tour's own falls back to the server's first dataset.
@@ -3582,7 +3582,7 @@ function refreshTour() {
   // Room is kept for all of the section's pins from its start, so the prices do not move each time one appears.
   ex.pinRoom = tour.pins === false ? [] : pins([...tour.kept, ...(tourSection()?.cues ?? [])]);
   syncLayerButtons();
-  if (tour.page === 'Tour' && editorSection !== tour.index) renderTourEditor();
+  if (editorSection !== tour.index && (tour.page === 'Tour' || analysisEditing)) renderContents();
   drawAll(tour.page);
   updateTourPanel();
 }
@@ -3629,7 +3629,7 @@ function updateTourPanel() {
   showScrub();
 
   // The editor marks the texts shown so far, and the one on show.
-  if (tour.page === 'Tour') document.querySelectorAll('#tour-editor .ed-cue').forEach((el, j) => {
+  document.querySelectorAll('#tour-editor .ed-card.open .ed-cue').forEach((el, j) => {
     const cue = s?.cues[j], active = !!cue && cue === tour.active;
     el.classList.toggle('shown', tour.shown.includes(cue));
     if (active && !el.classList.contains('active') && tour.timer) el.scrollIntoView({ block: 'nearest' });
@@ -4189,22 +4189,11 @@ function renderTourContents(box) {
   if (at && (at.top < view.top || at.bottom > view.bottom)) body.scrollTop += at.top - view.top - 40;
 }
 
-// The list is drawn anew each time, so it is put back where it was rather than at its top: the section the tour is at stays
-// where it was in view, or the tour's own card when that is the anchor, as it is when that card is folded or unfolded.
-// Being edited, the tour's chapters are rows (see chapterRow), the one on show open to its sections unless folded, and any
-// other opened by hand.
-function renderTourEditor(anchor = 'section') {
-  const box = document.getElementById('tour-editor');
-  if (!tour || currentPage !== 'Tour') { box.innerHTML = ''; editorSection = -1; return; }
-  if (!editorOn()) return renderTourContents(box);
-  const spot = body => {
-    const el = body && (anchor === 'tour' ? body.firstElementChild : body.querySelector(`[data-section="${tour.index}"]`));
-    return el ? { top: el.getBoundingClientRect().top - body.getBoundingClientRect().top, height: el.offsetHeight } : null;
-  };
-  const before = box.querySelector('.ed-body'), scrolled = before?.scrollTop ?? 0, was = spot(before);
-  const seen = !!was && was.top + was.height > 0 && was.top < before.clientHeight;
-  const { def, sections } = tour, start = def.start ?? {};
-  editorSection = tour.index;
+// The cards the editor shows sections in, for the tour and an analysis alike: the section on show open to its settings and
+// texts, its written texts among them, the others a row to go to. An analysis's sections are its own, one to a chapter, so
+// it cannot add, move, copy or delete one, begin a scene there, or change a definition's wording, which is the tour's.
+function editorCards() {
+  const { def, sections } = tour, start = def.start ?? {}, fixed = tour.page !== 'Tour';
   const value = v => esc(v ?? '');
   const options = (list, current) => list.map(([v, label]) => `<option value="${esc(v)}" ${String(current ?? '') === String(v) ? 'selected' : ''}>${esc(label)}</option>`).join('');
   // The first and last candle shown. Left empty, the view is as before, which the boxes then say.
@@ -4228,7 +4217,7 @@ function renderTourEditor(anchor = 'section') {
       <label class="ed-level">Text from<select data-scope="cue" data-field="define" data-render>${options([['', 'written here'], ...Object.keys(DEFINITIONS).map(k => [k, `the definition ${k}`])], c.define ?? '')}</select></label>
       ${c.define != null ? `<div class="ed-define">
         ${needsDirection(c.define) ? `<label class="ed-level">Told for<select data-scope="cue" data-field="direction" data-render>${options([['Up', 'up: Uptrend, Upswing'], ['Down', 'down: Downtrend, Downswing']], c.direction ?? '')}</select></label>` : ''}
-        <label class="ed-level">The wording of ${esc(c.define)}, the same wherever it is cited<textarea data-scope="definition" data-field="definition" data-key="${esc(c.define)}" aria-label="The definition ${esc(c.define)}">${value(DEFINITIONS[c.define])}</textarea></label>
+        <label class="ed-level">The wording of ${esc(c.define)}, the same wherever it is cited${fixed ? ', changed in the tour' : ''}<textarea data-scope="definition" data-field="definition" data-key="${esc(c.define)}" aria-label="The definition ${esc(c.define)}" ${fixed ? 'readonly' : ''}>${value(DEFINITIONS[c.define])}</textarea></label>
         <span class="ed-hint">Slots for its direction: {trend}, {a trend}, {swing}, {a swing}, {other swing}, {a other swing}, {turn}, {beyond}, {weak turn}, {turn labels}, {extreme}, {trends}, {start}, {a first leg}, {a second leg}. Here it reads: ${esc(compiled?.text ?? '')}</span>
       </div>`
       : DETAILS.map(level => `<label class="ed-level">${DETAIL_NAMES[level]}<textarea data-scope="cue" data-field="texts.${level}" placeholder="${level === DETAILS[0] ? 'Shown at every detail' : `Shown at ${DETAIL_NAMES[level]}, in place of the ${DETAIL_NAMES[DETAILS[0]].toLowerCase()}`}" aria-label="${DETAIL_NAMES[level]} ${j + 1}">${value(c.texts?.[level])}</textarea></label>`).join('')}
@@ -4247,8 +4236,19 @@ function renderTourEditor(anchor = 'section') {
         <label class="ed-check" title="An arrow head where the line ends"><input type="checkbox" data-scope="cue" data-field="headEnd" ${c.to ? '' : 'disabled'} ${c.heads?.end !== false ? 'checked' : ''}>Head at end</label>
         <label title="The line's colour: up (green), down (red), accent, or any CSS colour">Line colour<input data-scope="cue" data-field="color" ${c.to ? '' : 'disabled'} placeholder="accent" value="${value(c.color)}"></label>
         ${ops('cue', 'text')}
-        ${j ? `<span class="ed-split"><button type="button" data-ed="cue-split" title="Start a new section with this text and those after it, so it can have layers of its own">Split the section here</button></span>` : ''}
+        ${j && !fixed ? `<span class="ed-split"><button type="button" data-ed="cue-split" title="Start a new section with this text and those after it, so it can have layers of its own">Split the section here</button></span>` : ''}
       </div>
+    </div>`;
+  };
+
+  // A text written from the prices: its wording at each level it is written at can be changed, kept in the section's
+  // "edits" by the text's id, and the rest of it is as written. Default takes it back to the wording written.
+  const writtenCard = (d, c, k) => {
+    const own = c.id != null ? d.edits?.[c.id] : null, levels = Object.keys(c.written ?? {});
+    return `<div class="ed-cue written${own ? ' edited' : ''}" data-written="${k}" data-id="${esc(c.id ?? '')}">
+      <div class="ed-meta" data-ed-cue></div>
+      ${levels.map(level => `<label class="ed-level">${DETAIL_NAMES[level] ?? level}${own?.[level] != null ? ', changed here' : ', as written'}<textarea data-scope="written" data-field="${esc(level)}" aria-label="${esc(DETAIL_NAMES[level] ?? level)}, written text ${k + 1}" ${c.id == null ? 'disabled title="This text has no id to keep a change by"' : ''}>${value(c.texts?.[level])}</textarea></label>`).join('')}
+      ${own ? '<div class="ed-row"><span class="ed-ops"><button type="button" data-ed="written-default" title="Back to the wording written from the prices">Default</button></span></div>' : ''}
     </div>`;
   };
 
@@ -4262,7 +4262,7 @@ function renderTourEditor(anchor = 'section') {
     const chips = [...s.layers.map(id => `<span class="ed-chip${was.includes(id) ? '' : ' added'}">${was.includes(id) ? '' : '+ '}${esc(layerName(id))}</span>`),
       ...was.filter(id => !s.layers.includes(id)).map(id => `<span class="ed-chip removed">${esc(layerName(id))}</span>`)];
     return `<section class="ed-card open" data-section="${i}">
-      <header><button type="button" class="ed-fold" data-ed="section-fold" aria-expanded="true" title="Fold this section away">${head(i)}</button>${ops('section', 'section')}</header>
+      <header><button type="button" class="ed-fold" data-ed="section-fold" aria-expanded="true" title="Fold this section away">${head(i)}</button>${fixed ? '' : ops('section', 'section')}</header>
       <div class="ed-grid">
         <label class="wide">Chapter<input data-scope="section" data-field="chapter" placeholder="${before ? `continues ${esc(tour.chapters[before.chapter]?.name ?? 'the section before')}` : 'Name a chapter to start one'}" value="${value(d.chapter)}"></label>
         <label>Runs from candle<span class="ed-pick"><input type="number" min="0" step="1" data-scope="section" data-field="from" data-type="number" placeholder="${esc(s.fromSpec ?? `#${before?.until ?? 0}, as before`)}" value="${numberOr(d.from)}"${eventBox(s.fromSpec)}>${pick('from', 'the first candle')}</span></label>
@@ -4274,18 +4274,41 @@ function renderTourEditor(anchor = 'section') {
         <label>${back ? 'Rewinds' : 'Fast forwards'} to candle<input type="number" min="0" step="1" data-scope="section" data-field="journeyTo" ${runs ? '' : 'disabled'} value="${numberOr(trip?.to)}"></label>
         <label>Candles a second on the way<input type="number" min="1" step="5" data-scope="section" data-field="journeySpeed" placeholder="${JOURNEY_SPEED}" ${runs ? '' : 'disabled'} value="${value(trip?.speed)}"></label>
         <label class="ed-check" title="Ticked, the replay runs there, ${back ? 'erasing' : 'drawing'} the closes and the rest as it goes. Unticked, the replay stays where it is and only the view moves"><input type="checkbox" data-scope="section" data-field="journeyRun" data-render ${tripKind ? '' : 'disabled'} ${runs ? 'checked' : ''}>${back ? 'Erases' : 'Draws'} as it goes</label>
-        <label title="Begins a new scene here: a replay of its own on a dataset from a time, with its candles numbered from #0 again. A cut, not a journey">Begins a scene on<select data-scope="section" data-field="sceneDataset" data-render>${options([['', 'no scene: carries on'], ...(datasetList ?? []).map(x => [x.id, x.name])], d.scene ? (d.scene.dataset ?? def.dataset ?? datasetList?.[0]?.id) : '')}</select></label>
-        <label>Scene starts at (candle #0, UTC)<input type="datetime-local" step="3600" data-scope="section" data-field="sceneTime" data-commit data-render ${d.scene ? '' : 'disabled'} value="${value(d.scene?.time)}"></label>
+        ${fixed ? '' : `<label title="Begins a new scene here: a replay of its own on a dataset from a time, with its candles numbered from #0 again. A cut, not a journey">Begins a scene on<select data-scope="section" data-field="sceneDataset" data-render>${options([['', 'no scene: carries on'], ...(datasetList ?? []).map(x => [x.id, x.name])], d.scene ? (d.scene.dataset ?? def.dataset ?? datasetList?.[0]?.id) : '')}</select></label>
+        <label>Scene starts at (candle #0, UTC)<input type="datetime-local" step="3600" data-scope="section" data-field="sceneTime" data-commit data-render ${d.scene ? '' : 'disabled'} value="${value(d.scene?.time)}"></label>`}
       </div>
-      <div class="ed-layers"><span>Layers</span>${chips.join('') || '<span class="ed-chip">none</span>'}<span class="ed-hint">Set with the layer buttons on the left.</span></div>
-      ${d.explain == null ? '' : `<div class="ed-layers"><span>Explains</span><span class="ed-chip">${esc(String(d.explain))} at #${esc(String(d.at ?? '?'))}</span><span class="ed-hint">The texts are written from the prices; texts added here follow them.</span></div>
-        ${written.length ? `<ol class="ed-written">${written.map(c => `<li>${esc(c.text ?? cueText(c))}${c.on != null ? ` <em>(pinned to the ${esc(String(c.on))} of #${c.at})</em>` : ''}</li>`).join('')}</ol>` : ''}`}
+      <div class="ed-layers"><span>Layers</span>${chips.join('') || '<span class="ed-chip">none</span>'}<span class="ed-hint">${fixed ? 'Those the thing told of is drawn with, beside the page\'s own.' : 'Set with the layer buttons on the left.'}</span></div>
+      ${d.explain == null ? '' : `<div class="ed-layers"><span>Explains</span><span class="ed-chip">${esc(String(d.explain))}${d.level > 1 ? ` at level ${d.level}` : ''} at #${esc(String(d.at ?? '?'))}${d.detail ? `, at ${esc(DETAIL_NAMES[d.detail] ?? d.detail)}` : ''}${d.blocks ? `: ${esc(d.blocks.join(', '))}` : ''}</span><span class="ed-hint">The texts are written from the prices: their wording can be changed here, and texts added here follow them.</span></div>`}
+      ${written.map((c, k) => writtenCard(d, c, k)).join('')}
       ${(d.cues ?? []).map((c, j) => cueCard(c, j, s.cues[written.length + j])).join('')}
-      <div class="ed-foot"><button type="button" data-ed="add-cue">+ Text</button><button type="button" data-ed="add-section">+ Section after</button>
-        <button type="button" data-ed="section-copy" title="Add a copy of this section after it">Duplicate</button>
+      <div class="ed-foot"><button type="button" data-ed="add-cue">+ Text</button>${fixed ? '' : `<button type="button" data-ed="add-section">+ Section after</button>
+        <button type="button" data-ed="section-copy" title="Add a copy of this section after it">Duplicate</button>`}
         <button type="button" data-ed="play-here" title="Play from the start of this section">▶ From here</button></div>
     </section>`;
   };
+
+  const sectionCard = i => i === tour.index && !editorFolded ? openCard(def.sections[i], i)
+    : `<button type="button" class="ed-section${i === tour.index ? ' current' : ''}" data-ed="go" data-section="${i}" aria-expanded="false" title="${i === tour.index ? 'Open this section' : 'Go to this section'}">${head(i)}</button>`;
+  return { value, viewBoxes, sectionCard };
+}
+
+// The list is drawn anew each time, so it is put back where it was rather than at its top: the section the tour is at stays
+// where it was in view, or the tour's own card when that is the anchor, as it is when that card is folded or unfolded.
+// Being edited, the tour's chapters are rows (see chapterRow), the one on show open to its sections unless folded, and any
+// other opened by hand.
+function renderTourEditor(anchor = 'section') {
+  const box = document.getElementById('tour-editor');
+  if (!tour || currentPage !== 'Tour') { box.innerHTML = ''; editorSection = -1; return; }
+  if (!editorOn()) return renderTourContents(box);
+  const spot = body => {
+    const el = body && (anchor === 'tour' ? body.firstElementChild : body.querySelector(`[data-section="${tour.index}"]`));
+    return el ? { top: el.getBoundingClientRect().top - body.getBoundingClientRect().top, height: el.offsetHeight } : null;
+  };
+  const before = box.querySelector('.ed-body'), scrolled = before?.scrollTop ?? 0, was = spot(before);
+  const seen = !!was && was.top + was.height > 0 && was.top < before.clientHeight;
+  const { def, sections } = tour, start = def.start ?? {};
+  editorSection = tour.index;
+  const { value, viewBoxes, sectionCard } = editorCards();
 
   // The tour's own settings fold away like a section, as they are seldom changed.
   const tourHead = `<span class="ed-num">Tour</span><span class="ed-name chapter" data-ed-title></span><span class="ed-meta" data-ed-total></span>`;
@@ -4299,9 +4322,6 @@ function renderTourEditor(anchor = 'section') {
           <label>Candles a second<input type="number" min="0.5" step="0.5" data-scope="start" data-field="speed" data-type="number" placeholder="4" value="${value(start.speed)}"></label>
         </div></section>`
     : `<button type="button" class="ed-section" data-ed="tour-card" aria-expanded="false" title="Show the tour's settings">${tourHead}</button>`;
-
-  const sectionCard = i => i === tour.index && !editorFolded ? openCard(def.sections[i], i)
-    : `<button type="button" class="ed-section${i === tour.index ? ' current' : ''}" data-ed="go" data-section="${i}" aria-expanded="false" title="${i === tour.index ? 'Open this section' : 'Go to this section'}">${head(i)}</button>`;
   const range = (from, to) => Array.from({ length: Math.max(0, to - from) }, (_, k) => from + k);
   // Sections before the first chapter, then each chapter with its sections when it is open.
   const lead = tour.chapters[0]?.section ?? (def.sections ?? []).length;
@@ -4342,11 +4362,11 @@ function updateEditorMeta() {
     name.classList.toggle('chapter', !!d.chapter);
     card.querySelector('[data-ed-meta]').textContent = `#${s.from}${s.until > s.from ? ` → #${s.until}` : ''} · ${Math.round(sectionSeconds(s))}s`;
   });
-  // A text's settings are folded away until it is being edited, so each says when it appears and for how long.
-  const cueCards = document.querySelectorAll('#tour-editor [data-ed-cue]'), written = Math.max(0, (tourSection()?.cues.length ?? 0) - cueCards.length);
-  cueCards.forEach((el, j) => {
-    const c = tourSection()?.cues[written + j];
-    if (c) el.textContent = `${j + 1} · ${c.at != null ? `at #${c.at}` : 'as the section begins'}${c.on != null ? ` · pinned to ${typeof c.on === 'number' ? c.on : `the ${c.on}`}` : ''} · ${c.hold.toFixed(1)}s${c.silent ? ' · silent' : ''}`;
+  // A text's settings are folded away until it is being edited, so each says when it appears and for how long; a written
+  // text says it is written, and a pin that an analysis does not show, that it is left out.
+  document.querySelectorAll('#tour-editor .ed-card.open [data-ed-cue]').forEach((el, j) => {
+    const c = tourSection()?.cues[j];
+    if (c) el.textContent = `${j + 1}${c.written ? ' · written' : ''} · ${c.at != null ? `at #${c.at}` : 'as the section begins'}${c.on != null ? ` · pinned to ${typeof c.on === 'number' ? c.on : `the ${c.on}`}` : ''}${c.skipped ? ' · not shown here' : ` · ${c.hold.toFixed(1)}s`}${c.silent ? ' · silent' : ''}`;
   });
   const total = document.querySelector('[data-ed-total]'), seconds = Math.round(tour.sections.reduce((n, s) => n + sectionSeconds(s), 0));
   if (total) total.textContent = `${tour.sections.length} section${tour.sections.length === 1 ? '' : 's'} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -4354,22 +4374,30 @@ function updateEditorMeta() {
   if (title) title.textContent = tour.def.title || 'no title yet';
 }
 
+// What the editor says of the tour or analysis on show: being picked from, looked up, its problems, or whether it is saved,
+// in tour.json or, for an analysis, against that analysis alone.
 function updateEditorStatus() {
-  if (tour?.page !== 'Tour') return updateAnalysisStatus();
-  updateGlossaryStatus();
-  document.body.classList.toggle('picking', !!tour?.picking);
-  const status = document.querySelector('[data-ed-status]');
+  if (!tour) return;
+  const analysis = tour.page === 'Analysis';
+  if (!analysis) updateGlossaryStatus();
+  document.body.classList.toggle('picking', !!tour.picking);
+  const status = document.querySelector('#tour-editor [data-ed-status]');
   if (!status) return;
-  const problems = tour.errors.length, dirty = tourDirty();
+  const problems = tour.errors.length, dirty = analysis ? analysisDirty() : tourDirty(), changed = analysis ? Object.keys(JSON.parse(tour.changesSaved)).length : 0;
   status.textContent = tour.picking ? 'Click a candle on the chart. Esc cancels.'
-    : tour.resolving ? 'Looking up the events the tour waits for…'
-    : tour.note || (problems ? `${problems} problem${problems === 1 ? '' : 's'}, listed above the chart`
-    : dirty ? 'Changes not saved' : 'Saved in tour.json');
+    : tour.resolving ? `Looking up what the ${analysis ? 'analysis' : 'tour'} waits for…`
+    : tour.note || [dirty ? 'Changes not saved'
+      : !analysis ? 'Saved in tour.json'
+      : changed ? `${changed} section${changed === 1 ? '' : 's'} changed for this analysis alone, saved` : 'As written from the prices: a change is kept for this analysis alone',
+      problems ? `${problems} problem${problems === 1 ? '' : 's'}${analysis ? `: ${tour.errors[0]}${problems > 1 ? ' …' : ''}` : ', listed above the chart'}` : ''].filter(Boolean).join(' · ');
   status.classList.toggle('warn', !tour.picking && (!!tour.note || problems > 0));
-  const save = document.querySelector('[data-ed="save"]');
+  const save = document.querySelector('#tour-editor [data-ed="save"]');
+  if (!save) return;
   save.disabled = !dirty;
   save.classList.toggle('dirty', dirty);
-  document.querySelector('[data-ed="undo"]').disabled = !tour.history.length;
+  document.querySelector('#tour-editor [data-ed="undo"]').disabled = !tour.history.length;
+  const revert = document.querySelector('#tour-editor [data-ed="revert"]');
+  if (analysis && revert) revert.disabled = !dirty;
   document.querySelectorAll('[data-ed="pick"]').forEach(b => b.setAttribute('aria-pressed',
     tour.picking?.field === b.dataset.pick && (b.dataset.pick !== 'at' || tour.picking.cue === Number(b.closest('.ed-cue')?.dataset.cue))));
 }
@@ -4407,7 +4435,12 @@ function applyTour({ render = false, cue = null, end = false, start = false } = 
   const was = { t: cursorOf(tour.ex), shown: tour.shown.length };
   tour.note = '';
   anchorTour();
-  Object.assign(tour, compileTour(tour.def, tour.scenes, tour.resolved, tour.audio, tour.detail));
+  // In an analysis a setting left empty is as written from the prices, not as the section before has it.
+  if (tour.page === 'Analysis') tour.def.sections.forEach((d, i) => {
+    const w = tour.writtenDef.sections[i] ?? {};
+    for (const k of Object.keys(w)) if (!(k in d)) d[k] = JSON.parse(JSON.stringify(w[k]));
+  });
+  recompile();
   if (render) { editorSection = -1; renderTourGlossary(); }
   seekTour(tour.index, start ? {} : end ? { t: Infinity, shown: Infinity } : cue != null ? { cue } : was);
   updateEditorMeta();
@@ -4415,13 +4448,28 @@ function applyTour({ render = false, cue = null, end = false, start = false } = 
   if (tour.wanted.length) resolveTour();
 }
 
+// How many of a section's texts are written from the prices, ahead of its own.
+const writtenCount = i => Math.max(0, (tour.sections[i]?.cues.length ?? 0) - (tour.def.sections[i]?.cues ?? []).length);
+
 function editTourField(el) {
-  const cueEl = el.closest('.ed-cue'), j = cueEl ? Number(cueEl.dataset.cue) : null, { scope, field, type } = el.dataset, def = tour.def;
+  const cueEl = el.closest('.ed-cue'), j = cueEl ? Number(cueEl.dataset.cue ?? cueEl.dataset.written) : null, { scope, field, type } = el.dataset, def = tour.def;
   rememberTour(`${scope}|${tour.index}|${j}|${field}`);
+  // A written text's wording at a level: kept in the section's edits by the text's id while it differs from the wording
+  // written, dropped when it is the same or empty.
+  if (scope === 'written') {
+    const d = def.sections[tour.index], id = cueEl.dataset.id, was = tourSection().cues[j]?.written?.[field] ?? '';
+    const own = { ...d.edits?.[id] };
+    if (!el.value.trim() || el.value === was) delete own[field]; else own[field] = el.value;
+    const edits = { ...d.edits, [id]: own };
+    if (!Object.keys(own).length) delete edits[id];
+    if (Object.keys(edits).length) d.edits = edits; else delete d.edits;
+    cueEl.classList.toggle('edited', !!d.edits?.[id]);
+    return applyTour({ cue: j });
+  }
   // A definition's wording: one for every cue that cites it, saved to definitions.json with the tour.
   if (scope === 'definition') {
     DEFINITIONS = { ...DEFINITIONS, [el.dataset.key]: el.value };
-    return applyTour({ cue: j });
+    return applyTour({ cue: writtenCount(tour.index) + j });
   }
   const target = scope === 'tour' ? def : scope === 'start' ? (def.start ??= {}) : scope === 'cue' ? def.sections[tour.index].cues[j] : def.sections[tour.index];
   const raw = el.value, value = raw !== '' && (type === 'number' || (type === 'auto' && /^\d+(\.\d+)?$/.test(raw))) ? Number(raw) : raw;
@@ -4484,7 +4532,7 @@ function editTourField(el) {
   // An empty box leaves the setting out, so it is as before.
   else if (value === '' || Number.isNaN(value)) delete target[field]; else target[field] = value;
   if (field.startsWith('texts.')) cueEl.querySelector('[data-field="hold"]').placeholder = readingSeconds(textAt(target.texts, detailOf('Tour')) ?? '').toFixed(1);
-  applyTour(scope === 'cue' ? { cue: j, render: el.hasAttribute('data-render') } : { end: field === 'until', start: field === 'from', render: el.hasAttribute('data-render') });
+  applyTour(scope === 'cue' ? { cue: writtenCount(tour.index) + j, render: el.hasAttribute('data-render') } : { end: field === 'until', start: field === 'from', render: el.hasAttribute('data-render') });
   // Where the change redrew the editor, the box that was being used is found again: a text's settings only show once
   // the text has the focus.
   if (!el.isConnected && cueEl) focusCue(j);
@@ -4515,7 +4563,7 @@ function stepFromInherited(el) {
 // adds to the layers before it and what it takes away.
 function recordTourLayers() {
   const s = tour?.sections[tour.index];
-  if (!s || !editorOn() || tour.picking) return;
+  if (!s || tour.page !== 'Tour' || !editorOn() || tour.picking) return;
   const wanted = tourLayers.filter(id => id !== 'replay'), before = tour.index ? tour.sections[tour.index - 1].layers : tour.startLayers;
   if (wanted.length === s.layers.length && wanted.every(id => s.layers.includes(id))) return;
   const d = tour.def.sections[tour.index], name = id => LAYER_NAMES[id] ?? id;
@@ -4541,11 +4589,12 @@ function pickCandle(i) {
   tour.picking = null;
   rememberTour();
   if (field === 'at') d.cues[cue].at = i; else d[field] = i;
-  applyTour(field === 'at' ? { render: true, cue } : { render: true, end: field === 'until', start: field === 'from' });
+  applyTour(field === 'at' ? { render: true, cue: writtenCount(tour.index) + cue } : { render: true, end: field === 'until', start: field === 'from' });
   if (cue != null) focusCue(cue);
 }
 
-const focusCue = j => document.querySelectorAll('#tour-editor .ed-cue')[j]?.querySelector('textarea')?.focus();
+// A section's own text j, by its place among the section's own texts.
+const focusCue = j => document.querySelector(`#tour-editor .ed-cue[data-cue="${j}"]`)?.querySelector('textarea')?.focus();
 
 // The candle under the pointer, by its number in the tour.
 function candleAt(el, e) {
@@ -4596,16 +4645,21 @@ function tourAction(action, el) {
     case 'go': {
       const to = Number(el.dataset.section), here = to === tour.index;
       editorFolded = false;
-      if (here) return renderTourEditor();
+      if (here) return renderContents();
       pauseTour();
       return enterSection(to);
     }
     case 'section-fold':
       editorFolded = true;
-      return renderTourEditor();
+      return renderContents();
     case 'play-here': pauseTour(); enterSection(i, { journey: true }); return playTour();
-    case 'save': return saveTour();
-    case 'revert': return revertTour();
+    case 'save': return tour.page === 'Tour' ? saveTour() : saveAnalysisEdits();
+    case 'revert': return tour.page === 'Tour' ? revertTour() : revertAnalysisEdits();
+    case 'written-default':
+      rememberTour();
+      if (d.edits) delete d.edits[cueEl.dataset.id];
+      if (d.edits && !Object.keys(d.edits).length) delete d.edits;
+      return applyTour({ render: true, cue: Number(cueEl.dataset.written) });
     case 'undo': {
       const before = tour.history.pop();
       if (!before) return;
@@ -4651,7 +4705,7 @@ function tourAction(action, el) {
     case 'add-cue':
       rememberTour();
       (d.cues ??= []).push({ texts: {} });
-      applyTour({ render: true, cue: d.cues.length - 1 });
+      applyTour({ render: true, cue: writtenCount(i) + d.cues.length - 1 });
       return focusCue(d.cues.length - 1);
     case 'section-copy': {
       // The copy carries on the chapter, rather than starting another of the same name.
@@ -4675,7 +4729,7 @@ function tourAction(action, el) {
     case 'cue-copy':
       rememberTour();
       d.cues.splice(j + 1, 0, JSON.parse(JSON.stringify(d.cues[j])));
-      applyTour({ render: true, cue: j + 1 });
+      applyTour({ render: true, cue: writtenCount(i) + j + 1 });
       return focusCue(j + 1);
     case 'cue-delete':
       rememberTour();
@@ -4686,7 +4740,7 @@ function tourAction(action, el) {
       if (to < 0 || to >= d.cues.length) return;
       rememberTour();
       swap(d.cues, j, to);
-      applyTour({ render: true, cue: to });
+      applyTour({ render: true, cue: writtenCount(i) + to });
       return focusCue(to);
     }
   }
@@ -4694,10 +4748,8 @@ function tourAction(action, el) {
 
 {
   const box = document.getElementById('tour-editor');
-  // A box is applied as it is typed in; the start time only once it is complete. An analysis's text is its own edit.
+  // A box is applied as it is typed in; the start time only once it is complete.
   box.addEventListener('input', e => {
-    const text = e.target.closest('[data-an-text]');
-    if (text) return editAnalysisText(text);
     const el = e.target.closest('[data-field]');
     if (el && !el.hasAttribute('data-commit')) editTourField(el);
   });
@@ -4723,10 +4775,11 @@ function tourAction(action, el) {
   });
   // Going into one of a text's boxes shows that text on the chart.
   box.addEventListener('focusin', e => {
-    const cueEl = e.target.closest('.ed-cue'), cue = cueEl && tourSection()?.cues[Number(cueEl.dataset.cue)];
+    const cueEl = e.target.closest('.ed-cue'), k = cueEl && (cueEl.dataset.written != null ? Number(cueEl.dataset.written) : writtenCount(tour.index) + Number(cueEl.dataset.cue));
+    const cue = cueEl && tourSection()?.cues[k];
     if (!cue || !e.target.matches('[data-field]') || cue === tour.active) return;
     pauseTour();
-    seekTour(tour.index, { cue: Number(cueEl.dataset.cue) });
+    seekTour(tour.index, { cue: k });
   });
 
   // A click on the chart picks a candle; a drag still pans. Plotly covers the page while the button is down, so the
@@ -4736,18 +4789,19 @@ function tourAction(action, el) {
   window.addEventListener('pointerup', e => {
     const chart = document.querySelector('#main .chart'), from = down;
     down = null;
-    if (!from || !tour?.picking || !chart || currentPage !== 'Tour' || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 4) return;
+    if (!from || !tour?.picking || !chart || currentPage !== tour.page || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 4) return;
     const i = candleAt(chart, e);
     if (i != null) pickCandle(i);
   }, true);
 
   document.addEventListener('keydown', e => {
-    if (currentPage === 'Analysis' && analysisEditing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); return saveAnalysisEdits(); }
-    if (currentPage !== 'Tour' || !tour) return;
+    if (!tour || currentPage !== tour.page) return;
     if (e.key === 'Escape' && tour.picking) { e.preventDefault(); pickFromChart(tour.picking.field, tour.picking.cue); }
+    if (currentPage === 'Analysis' && analysisEditing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); return saveAnalysisEdits(); }
+    if (currentPage !== 'Tour') return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && (editorOn() || glossaryOn())) { e.preventDefault(); saveTour(); }
   });
-  window.addEventListener('beforeunload', e => { if (tourDirty() || (tours.Analysis && JSON.stringify(tours.Analysis.edits) !== tours.Analysis.editsSaved)) e.preventDefault(); });
+  window.addEventListener('beforeunload', e => { if (tourDirty() || analysisDirty(tours.Analysis)) e.preventDefault(); });
 }
 
 function renderStructure() {

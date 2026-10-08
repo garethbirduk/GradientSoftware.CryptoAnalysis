@@ -92,10 +92,12 @@ public static class Explain
     /// before it (so the section runs on to the thing it explains when that is further on). The section's "explain", "at"
     /// and "level" are taken out, so what comes back compiles as any other section does. "blocks" tells only the blocks it
     /// names (see <see cref="BlocksOf"/>). A written text that is one of the cited definitions, which the tour has already
-    /// told, is left out. Problems are listed, not thrown, and a section with a problem comes back with only what it says
-    /// for itself.
+    /// told, is left out. "edits" changes written texts by their id ({ "Begins.2": { "education": "..." } }), and "detail"
+    /// tells the written texts at that one level alone, as an analysis tells what a thing is apart from what this one is.
+    /// Problems are listed, not thrown, and a section with a problem comes back with only what it says
+    /// for itself. What the written texts teach, as written before any edit, is added to taught.
     /// </summary>
-    public static JsonObject Expand(JsonObject node, List<Price> prices, int reached, string where, List<string> errors, IReadOnlySet<string>? cited = null)
+    public static JsonObject Expand(JsonObject node, List<Price> prices, int reached, string where, List<string> errors, IReadOnlySet<string>? cited = null, ICollection<string>? taught = null)
     {
         var result = (JsonObject)node.DeepClone();
         result.Remove("explain");
@@ -104,7 +106,22 @@ public static class Explain
         result.Remove("known");
         result.Remove("runs");
         result.Remove("blocks");
+        result.Remove("detail");
+        result.Remove("edits");
         var term = node["explain"]?.GetValue<string>() ?? "";
+        var detail = node["detail"]?.GetValue<string>();
+        if (detail != null && Details.Parse(detail) == null)
+        {
+            errors.Add($"{where}: detail is the one level of the written texts told: {string.Join(", ", Enum.GetValues<EnumDetail>().Select(Details.Name))}");
+            return result;
+        }
+
+        if (node["edits"] is { } edits && (edits is not JsonObject byId || byId.Any(x => x.Value is not JsonObject)))
+        {
+            errors.Add($"{where}: edits are the written texts changed, by id: {{ \"Begins.2\": {{ \"education\": \"...\" }} }}");
+            return result;
+        }
+
         if (!Terms.Contains(term))
         {
             errors.Add($"{where}: explain names \"{term}\", which is not a thing the tour can explain: {string.Join(", ", Terms)}");
@@ -157,10 +174,37 @@ public static class Explain
             result[key] ??= value?.DeepClone();
         // A definition is taught once, where the tour first tells it; a written section does not teach it again.
         var cues = new JsonArray();
-        foreach (var cue in (written["cues"]?.AsArray() ?? []).Where(x => cited == null || Taught(x) is not { } text || !cited.Contains(text)).Concat(node["cues"]?.AsArray() ?? []))
+        foreach (var cue in (written["cues"]?.AsArray() ?? []).Where(x => cited == null || Taught(x) is not { } text || !cited.Contains(text)))
+        {
+            if (Taught(cue) is { } text)
+                taught?.Add(text);
+            if (Edited(cue!.DeepClone().AsObject(), node["edits"] as JsonObject, detail) is { } told)
+                cues.Add(told);
+        }
+        foreach (var cue in node["cues"]?.AsArray() ?? [])
             cues.Add(cue?.DeepClone());
         result["cues"] = cues;
         return result;
+    }
+
+    /// <summary>
+    /// A written cue as the section tells it: its texts changed by the section's "edits" for its id, then, when the section
+    /// tells at one detail, that text alone. Null when it has no text at that detail.
+    /// </summary>
+    private static JsonObject? Edited(JsonObject cue, JsonObject? edits, string? detail)
+    {
+        var texts = cue["texts"] as JsonObject ?? [];
+        if (cue["id"]?.GetValue<string>() is { } id && edits?[id] is JsonObject own)
+            foreach (var (level, text) in own)
+                texts[level] = text?.DeepClone();
+        if (detail != null)
+        {
+            if (texts[detail]?.DeepClone() is not { } kept)
+                return null;
+            cue["texts"] = new JsonObject { [detail] = kept };
+        }
+
+        return cue;
     }
 
     /// <summary>
@@ -476,8 +520,6 @@ public static class Explain
         var unit = Unit(length);
         var up = p.Close > p.Open;
         var flat = p.Close == p.Open;
-        // The candles there are to read: those the replay has drawn, or up to known, the cursor the candle was seen from.
-        var drawn = Math.Max(Math.Max(at, reached), known ?? 0);
         var view = new[] { Math.Max(0, at - CandlesBefore), at + CandlesAfter };
         var layers = new List<string> { "candles" };
 
@@ -497,15 +539,17 @@ public static class Explain
             Pin(at, "low", "below", $"low: {Money(p.Low)}", 2.5),
         };
 
-        // Its colour: the rule, then this one; at Education, the nearest drawn candle in view of the other colour, the
-        // one before preferred, set against it.
+        // Its colour: the rule, then this one; at Education, the nearest candle in view of the other colour, the one before
+        // preferred, set against it. It is one the section reaches, so its pin is shown: a candle known from the cursor but
+        // after the section's last is not.
         cues.Add(Teach(at, Definitions.Text("Candle.colour")));
         cues.Add(Say(at, flat ? "No body: it closed where it opened." : up ? "Green: it closed above its open." : "Red: it closed below its open."));
         if (!flat)
         {
+            var last = Math.Max(at, reached);
             var other = Enumerable.Range(1, CandlesBefore + CandlesAfter)
                 .SelectMany(d => new[] { at - d, at + d })
-                .Where(i => i >= view[0] && i <= Math.Min(drawn, view[1]) && i != at)
+                .Where(i => i >= view[0] && i <= Math.Min(last, view[1]) && i != at)
                 .FirstOrDefault(i => up ? prices[i].Close < prices[i].Open : prices[i].Close > prices[i].Open, -1);
             if (other >= 0)
             {
