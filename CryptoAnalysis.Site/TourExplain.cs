@@ -77,12 +77,25 @@ public static class Explain
         "eleventh", "twelfth", "thirteenth", "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth", "nineteenth"];
 
     /// <summary>
+    /// The names of the blocks a term is told in, in the order they are told, for a section's "blocks" to choose from.
+    /// Empty for a term that is not told in blocks.
+    /// </summary>
+    public static IReadOnlyList<string> BlocksOf(string term) => term switch
+    {
+        "Swing" => SwingBlocks.Select(x => x.Name).ToList(),
+        "Trend" => TrendBlocks.Select(x => x.Name).ToList(),
+        _ => [],
+    };
+
+    /// <summary>
     /// The section with its written parts filled in, from the prices of its scene and the candle the replay has reached
     /// before it (so the section runs on to the thing it explains when that is further on). The section's "explain", "at"
-    /// and "level" are taken out, so what comes back compiles as any other section does. Problems are listed, not thrown,
-    /// and a section with a problem comes back with only what it says for itself.
+    /// and "level" are taken out, so what comes back compiles as any other section does. "blocks" tells only the blocks it
+    /// names (see <see cref="BlocksOf"/>). A written text that is one of the cited definitions, which the tour has already
+    /// told, is left out. Problems are listed, not thrown, and a section with a problem comes back with only what it says
+    /// for itself.
     /// </summary>
-    public static JsonObject Expand(JsonObject node, List<Price> prices, int reached, string where, List<string> errors)
+    public static JsonObject Expand(JsonObject node, List<Price> prices, int reached, string where, List<string> errors, IReadOnlySet<string>? cited = null)
     {
         var result = (JsonObject)node.DeepClone();
         result.Remove("explain");
@@ -90,11 +103,30 @@ public static class Explain
         result.Remove("level");
         result.Remove("known");
         result.Remove("runs");
+        result.Remove("blocks");
         var term = node["explain"]?.GetValue<string>() ?? "";
         if (!Terms.Contains(term))
         {
             errors.Add($"{where}: explain names \"{term}\", which is not a thing the tour can explain: {string.Join(", ", Terms)}");
             return result;
+        }
+
+        List<string>? blocks = null;
+        if (node["blocks"] is JsonNode chosen)
+        {
+            blocks = chosen is JsonArray names ? names.Select(x => x?.GetValue<string>() ?? "").ToList() : [];
+            var told = BlocksOf(term);
+            if (told.Count == 0)
+            {
+                errors.Add($"{where}: {term} is not told in blocks, so the section has no \"blocks\"");
+                return result;
+            }
+
+            if (blocks.Count == 0 || blocks.Any(x => !told.Contains(x)))
+            {
+                errors.Add($"{where}: blocks are a list of the blocks of a {term} to tell: {string.Join(", ", told)}");
+                return result;
+            }
         }
 
         var at = Tours.Candle(node["at"], prices, reached, where, "at", errors);
@@ -114,7 +146,7 @@ public static class Explain
         var level = node["level"] is JsonValue given && given.TryGetValue<int>(out var l) ? l : 1;
         var until = node["until"] is JsonValue end && end.TryGetValue<int>(out var u) ? u : (int?)null;
         var known = node["known"] is JsonValue read && read.TryGetValue<int>(out var k) ? k : (int?)null;
-        var written = Write(term, prices, at.Value, level, reached, until, known, ExplainOptions.From(node["runs"]), out var problem);
+        var written = Write(term, prices, at.Value, level, reached, until, known, ExplainOptions.From(node["runs"]), blocks, out var problem);
         if (written == null)
         {
             errors.Add($"{where}: {problem}");
@@ -123,8 +155,11 @@ public static class Explain
 
         foreach (var (key, value) in written.Where(x => x.Key != "cues"))
             result[key] ??= value?.DeepClone();
+        // A definition is taught where the tour cites it; a written section does not teach it again.
+        static bool Cited(JsonNode? cue, IReadOnlySet<string> cited) => cue?["texts"] is JsonObject texts && texts.Count == 1
+            && texts[Details.Name(EnumDetail.Education)]?.GetValue<string>() is { } text && cited.Contains(text);
         var cues = new JsonArray();
-        foreach (var cue in (written["cues"]?.AsArray() ?? []).Concat(node["cues"]?.AsArray() ?? []))
+        foreach (var cue in (written["cues"]?.AsArray() ?? []).Where(x => cited == null || !Cited(x, cited)).Concat(node["cues"]?.AsArray() ?? []))
             cues.Add(cue?.DeepClone());
         result["cues"] = cues;
         return result;
@@ -405,7 +440,7 @@ public static class Explain
     // Candles a second for a section that runs a stretch: about twenty seconds of replay, between a brisk walk and a sprint.
     private static double Pace(int candles) => Math.Clamp(Math.Round(candles / 20.0), 10, 200);
 
-    private static JsonObject? Write(string term, List<Price> prices, int at, int level, int reached, int? until, int? known, ExplainOptions options, out string problem)
+    private static JsonObject? Write(string term, List<Price> prices, int at, int level, int reached, int? until, int? known, ExplainOptions options, IReadOnlyCollection<string>? blocks, out string problem)
     {
         problem = "";
         switch (term)
@@ -417,9 +452,9 @@ public static class Explain
             case "Point":
                 return Point(prices, at, level, reached, known, out problem);
             case "Swing":
-                return Swing(prices, at, level, reached, out problem, until, known);
+                return Swing(prices, at, level, reached, out problem, until, known, blocks);
             default:
-                return Trend(prices, at, level, reached, out problem, until, known);
+                return Trend(prices, at, level, reached, out problem, until, known, blocks);
         }
     }
 
@@ -585,7 +620,7 @@ public static class Explain
     /// Confirms it, its two legs, and whether it is Strong or Weak. Null, with the problem, when no Swing at that level has
     /// the candle.
     /// </summary>
-    public static JsonObject? Swing(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null, int? known = null)
+    public static JsonObject? Swing(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null, int? known = null, IReadOnlyCollection<string>? blocks = null)
     {
         FoundSwing? seen;
         int end;
@@ -617,59 +652,93 @@ public static class Explain
             }
         }
 
-        var (swing, span, breaks, points, index) = (seen.Swing, seen.Span, seen.Breaks, seen.Points, seen.Index);
-        var up = swing.Direction == EnumSwingDirection.Up;
-        var length = Length(prices);
-        var name = up ? "Upswing" : "Downswing";
-        var startKind = up ? "high" : "low";
-        var turn = up ? "Swing Low" : "Swing High";
-        var extremeAt = index[swing.Extreme.Time];
-        var bosAt = span.Last;
-        var startLabel = LabelAt(points, swing.Start.Time);
-        var turnLabel = LabelAt(points, swing.Extreme.Time);
-        var against = up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
-        var msb = breaks.FirstOrDefault(b => b.Type == against && b.Break.Time > swing.Start.Time && b.Break.Time < swing.BreakOfStructure!.Time);
-        var startPlace = up ? "above" : "below";
-        var turnPlace = up ? "below" : "above";
+        var (swing, span, index) = (seen.Swing, seen.Span, seen.Index);
+        var against = swing.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
+        var msb = seen.Breaks.FirstOrDefault(b => b.Type == against && b.Break.Time > swing.Start.Time && b.Break.Time < swing.BreakOfStructure!.Time);
+        var s = new SwingRead(prices, swing, level, span.First, index[swing.Extreme.Time], span.Last,
+            LabelAt(seen.Points, swing.Start.Time), LabelAt(seen.Points, swing.Extreme.Time), msb != null ? index[msb.Break.Time] : null);
 
-        // What a Swing is, from the definitions, each rule where it shows on this one; the MSB's and Weak ones only when
-        // it has an MSB inside it.
-        var (first, second) = up ? ("Downleg", "Upleg") : ("Upleg", "Downleg");
-        var direction = swing.Direction;
-        var cues = new JsonArray
-        {
-            Teach(span.First, Definitions.Text("Swing.what", direction)),
-            Say(span.First, $"{Order(level)} {name}, from {Named(startLabel, startKind)} at {Money(swing.Start.Price)}, {At(swing.Start.Time, length)}."),
-            Pin(span.First, "close", Edge(span.First, startPlace), $"{startLabel ?? startKind}: {Money(swing.Start.Price)}", 4),
-            Teach(extremeAt, Definitions.Text("Swing.turn", direction)),
-            Say(extremeAt, $"{turn}: {Named(turnLabel, up ? "low" : "high")} at {Money(swing.Extreme.Price)}."),
-            Pin(extremeAt, "close", turnPlace, $"{turn}: {Money(swing.Extreme.Price)}", 4),
-        };
-        if (msb != null)
-        {
-            var msbAt = index[msb.Break.Time];
-            cues.Add(Teach(msbAt, Definitions.Text("Swing.msb", direction)));
-            cues.Add(Teach(msbAt, Definitions.Text("Swing.against", direction)));
-            cues.Add(Say(msbAt, $"MSB at {Money(prices[msbAt].Close)}, {(up ? "below" : "above")} the {turn} of the {name} before."));
-            cues.Add(Pin(msbAt, "close", "left", "MSB", 3.5));
-        }
-        cues.Add(Teach(bosAt, Definitions.Text("Swing.bos", direction)));
-        cues.Add(Teach(bosAt, Definitions.Text("Swing.candidate", direction)));
-        cues.Add(Say(bosAt, $"BoS at {Money(swing.BreakOfStructure!.Price)}."));
-        cues.Add(Pin(bosAt, "close", startPlace, "BoS", 4));
-        cues.Add(Teach(bosAt, Definitions.Text("Swing.legs", direction)));
-        cues.Add(Say(bosAt, $"The {first} is {Duration(extremeAt - span.First, length)}; the {second} is {Duration(bosAt - extremeAt, length)}."));
-        cues.Add(Teach(bosAt, Definitions.Text("Swing.strong", direction)));
-        if (msb != null)
-            cues.Add(Teach(bosAt, Definitions.Text("Swing.weak", direction)));
-        cues.Add(Say(bosAt, msb == null ? "Strong: no MSB." : "Weak: it has an MSB."));
-
-        var layers = new List<string> { $"level{level}", name, up ? "BullishBreakOfStructure" : "BearishBreakOfStructure", up ? "bosLevelUp" : "bosLevelDown" };
-        layers.AddRange(new[] { startLabel, turnLabel }.Where(x => x != null).Select(x => PointLayer(x!)));
-        if (msb != null)
-            layers.AddRange([up ? "BearishMarketStructureBreak" : "BullishMarketStructureBreak", up ? "msbLevelDown" : "msbLevelUp"]);
+        // A block for each term a Swing is made of, each where it shows on this one; the MSB's only when it has one. The
+        // view is the Swing, and on to where the replay runs when it runs on past the BoS.
         problem = "";
-        return Section([Math.Max(0, span.First - Margin), Math.Max(bosAt, end) + Margin], end > reached ? end : null, layers, cues, byCandle: true);
+        return Section([Math.Max(0, span.First - Margin), Math.Max(s.BosAt, end > reached ? end : s.BosAt) + Margin], end > reached ? end : null,
+            SwingBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(s)).ToArray());
+    }
+
+    // A Swing as the chart has it, read once for its blocks: where it begins, turns and breaks structure, the labels of
+    // its high and low, and its MSB, when it has one.
+    private sealed record SwingRead(List<Price> Prices, SwingOutline Swing, int Level, int First, int ExtremeAt, int BosAt, string? StartLabel, string? TurnLabel, int? MsbAt)
+    {
+        public EnumSwingDirection Direction => Swing.Direction;
+        public bool Up => Direction == EnumSwingDirection.Up;
+        public string Name => SwingName(Direction);
+        public string Turn => Up ? "Swing Low" : "Swing High";
+        public TimeSpan Period => Length(Prices);
+    }
+
+    // The Swing: what one is, then where this one begins and at what kind of high or low.
+    private static Block SwingBegins(SwingRead s)
+    {
+        var kind = s.Up ? "high" : "low";
+        return new Block(
+        [
+            Teach(s.First, Definitions.Text("Swing.what", s.Direction)),
+            Say(s.First, $"{Order(s.Level)} {s.Name}, from {Named(s.StartLabel, kind)} at {Money(s.Swing.Start.Price)}, {At(s.Swing.Start.Time, s.Period)}."),
+            Pin(s.First, "close", Edge(s.First, s.Up ? "above" : "below"), $"{s.StartLabel ?? kind}: {Money(s.Swing.Start.Price)}", 4),
+        ], [$"level{s.Level}", s.Name, .. Labelled(s.StartLabel)]);
+    }
+
+    // Its Swing Low or Swing High: what the turn is, then this one and what kind of low or high it is.
+    private static Block SwingTurn(SwingRead s) => new(
+    [
+        Teach(s.ExtremeAt, Definitions.Text("Swing.turn", s.Direction)),
+        Say(s.ExtremeAt, $"{s.Turn}: {Named(s.TurnLabel, s.Up ? "low" : "high")} at {Money(s.Swing.Extreme.Price)}."),
+        Pin(s.ExtremeAt, "close", s.Up ? "below" : "above", $"{s.Turn}: {Money(s.Swing.Extreme.Price)}", 4),
+    ], Labelled(s.TurnLabel));
+
+    // The MSB inside it, when it has one: what an MSB is and how it goes against the Swing, then this one.
+    private static Block SwingMsb(SwingRead s)
+    {
+        if (s.MsbAt is not int at)
+            return Block.None;
+        return new Block(
+        [
+            Teach(at, Definitions.Text("Swing.msb", s.Direction)),
+            Teach(at, Definitions.Text("Swing.against", s.Direction)),
+            Say(at, $"MSB at {Money(s.Prices[at].Close)}, {(s.Up ? "below" : "above")} the {s.Turn} of the {s.Name} before."),
+            Pin(at, "close", "left", "MSB", 3.5),
+        ], [s.Up ? "BearishMarketStructureBreak" : "BullishMarketStructureBreak", s.Up ? "msbLevelDown" : "msbLevelUp"]);
+    }
+
+    // Its BoS: what a BoS is and that it Confirms the Swing, then this one.
+    private static Block SwingBos(SwingRead s) => new(
+    [
+        Teach(s.BosAt, Definitions.Text("Swing.bos", s.Direction)),
+        Teach(s.BosAt, Definitions.Text("Swing.candidate", s.Direction)),
+        Say(s.BosAt, $"BoS at {Money(s.Swing.BreakOfStructure!.Price)}."),
+        Pin(s.BosAt, "close", s.Up ? "above" : "below", "BoS", 4),
+    ], [s.Up ? "BullishBreakOfStructure" : "BearishBreakOfStructure", s.Up ? "bosLevelUp" : "bosLevelDown"]);
+
+    // Its two legs: what they are, then how long each of this one's is.
+    private static Block SwingLegs(SwingRead s)
+    {
+        var (first, second) = s.Up ? ("Downleg", "Upleg") : ("Upleg", "Downleg");
+        return new Block(
+        [
+            Teach(s.BosAt, Definitions.Text("Swing.legs", s.Direction)),
+            Say(s.BosAt, $"The {first} is {Duration(s.ExtremeAt - s.First, s.Period)}; the {second} is {Duration(s.BosAt - s.ExtremeAt, s.Period)}."),
+        ], []);
+    }
+
+    // Strong or Weak: the rule, the Weak one only when it has an MSB, then which this one is.
+    private static Block SwingStrength(SwingRead s)
+    {
+        var weak = s.MsbAt != null;
+        List<JsonObject> cues = [Teach(s.BosAt, Definitions.Text("Swing.strong", s.Direction))];
+        if (weak)
+            cues.Add(Teach(s.BosAt, Definitions.Text("Swing.weak", s.Direction)));
+        cues.Add(Say(s.BosAt, weak ? "Weak: it has an MSB." : "Strong: no MSB."));
+        return new Block(cues, []);
     }
 
     /// <summary>
@@ -678,7 +747,7 @@ public static class Explain
     /// Where it begins, that second BoS, its count, which of its Swings are Weak, its Strength, and whether it has ended at
     /// a Swing the other way or still runs. Null, with the problem, when no Trend at that level has the candle.
     /// </summary>
-    public static JsonObject? Trend(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null, int? known = null)
+    public static JsonObject? Trend(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null, int? known = null, IReadOnlyCollection<string>? blocks = null)
     {
         FoundTrend? seen;
         int end;
@@ -710,65 +779,110 @@ public static class Explain
             }
         }
 
-        var until = end;
         var (trend, index) = (seen.Trend, seen.Index);
-        var up = trend.Direction == EnumSwingDirection.Up;
-        var length = Length(prices);
-        var name = up ? "Uptrend" : "Downtrend";
-        var swing = up ? "Upswing" : "Downswing";
-        var other = up ? "Downswing" : "Upswing";
-        var turn = up ? "Swing Low" : "Swing High";
-        var place = up ? "above" : "below";
-        var startAt = seen.Start;
-        var confirmedAt = index[trend.Confirmed.Time];
-        var count = trend.Swings;
         var weak = trend.Parts.Select((part, i) => (part, i)).Where(x => !x.part.Strong).Select(x => Ordinal(x.i + 1)).ToList();
-        var ended = trend.End != null && index.TryGetValue(trend.End.Time, out var endAt) && endAt <= until;
+        var endedAt = trend.End != null && index.TryGetValue(trend.End.Time, out var e) && e <= end ? e : (int?)null;
+        var t = new TrendRead(prices, trend, level, seen.Start, index[trend.Confirmed.Time], end, endedAt, weak);
 
-        // What a Trend is, from the definitions, each rule where it shows on this one; the rules about Weak Swings only when
-        // one of its Swings is Weak.
-        var direction = trend.Direction;
-        var cues = new JsonArray
-        {
-            Teach(startAt, Definitions.Text("Trend.what", direction)),
-            Say(startAt, $"{Order(level)} {name}, beginning {At(trend.Start.Time, length)}."),
-            Pin(startAt, "close", Edge(startAt, place), $"{name} begins", 4),
-            Teach(confirmedAt, Definitions.Text("Trend.confirmed", direction)),
-            Say(confirmedAt, $"Confirmed at the second {swing}'s BoS, {At(trend.Confirmed.Time, length)}."),
-            Pin(confirmedAt, "close", place, $"second {swing}", 4),
-            Say(until, $"{Capital(Words(count))} {swing}s{(ended ? "" : " so far")}."),
-        };
-        if (weak.Count > 0)
-        {
-            cues.Add(Teach(until, Definitions.Text("Swing.strong", direction)));
-            cues.Add(Teach(until, Definitions.Text("Swing.weak", direction)));
-            cues.Add(Teach(until, Definitions.Text("Trend.next", direction)));
-        }
-
-        cues.Add(Say(until, weak.Count == 0 ? "All Strong." : $"{Capital(Words(weak.Count))} Weak: the {List(weak)}."));
-        cues.Add(Teach(until, Definitions.Text("Trend.strength", direction)));
-        cues.Add(Say(until, $"Strength {trend.Strength}%: {Words(trend.Strong)} of {Words(count)}."));
-        cues.Add(Teach(until, Definitions.Text("Trend.ends", direction)));
-        if (ended)
-        {
-            cues.Add(Say(until, $"Ended at the first {other}'s BoS, {At(trend.End!.Time, length)}."));
-            cues.Add(Pin(index[trend.End.Time], "close", up ? "below" : "above", $"{name} ends", 4));
-        }
-        else
-        {
-            cues.Add(Say(until, $"Still running: no {other} Confirmed since."));
-        }
-
-        cues.Add(Teach(until, Definitions.Text("Trend.count", direction)));
-
-        var layers = new List<string> { $"level{level}", swing, name, "trendArrows", up ? "BullishBreakOfStructure" : "BearishBreakOfStructure" };
-        if (weak.Count > 0)
-            layers.Add(up ? "BearishMarketStructureBreak" : "BullishMarketStructureBreak");
-        if (ended)
-            layers.Add(other);
+        // A block for each term a Trend is made of, each where it shows on this one; the rules about Weak Swings only
+        // when one of its Swings is Weak.
         problem = "";
-        return Section([Math.Max(0, startAt - Margin), until + Margin], until > reached ? until : null, layers, cues, byCandle: true);
+        return Section([Math.Max(0, t.StartAt - Margin), end + Margin], end > reached ? end : null,
+            TrendBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(t)).ToArray());
     }
+
+    // The blocks a Swing is told in, by name, in the order they are told.
+    private static readonly (string Name, Func<SwingRead, Block> Tell)[] SwingBlocks =
+        [("Begins", SwingBegins), ("Turn", SwingTurn), ("Msb", SwingMsb), ("Bos", SwingBos), ("Legs", SwingLegs), ("Strength", SwingStrength)];
+
+    // The blocks a Trend is told in, by name, in the order they are told.
+    private static readonly (string Name, Func<TrendRead, Block> Tell)[] TrendBlocks =
+        [("Begins", TrendBegins), ("Confirmed", TrendConfirmed), ("Swings", TrendSwings), ("Weak", TrendWeak), ("Strength", TrendStrength), ("Ends", TrendEnds), ("IsACount", TrendIsACount)];
+
+    // A Trend as the chart has it at until, read once for its blocks: where it begins and is Confirmed, which of its
+    // Swings are Weak (as ordinals), and where it ended, when it has by until.
+    private sealed record TrendRead(List<Price> Prices, TrendOutline Trend, int Level, int StartAt, int ConfirmedAt, int Until, int? EndedAt, IReadOnlyList<string> Weak)
+    {
+        public EnumSwingDirection Direction => Trend.Direction;
+        public bool Up => Direction == EnumSwingDirection.Up;
+        public string Name => TrendName(Direction);
+        public string Swing => SwingName(Direction);
+        public string Other => SwingName(Up ? EnumSwingDirection.Down : EnumSwingDirection.Up);
+        public string Place => Up ? "above" : "below";
+        public TimeSpan Period => Length(Prices);
+    }
+
+    // The Trend: what one is, then where this one begins.
+    private static Block TrendBegins(TrendRead t) => new(
+    [
+        Teach(t.StartAt, Definitions.Text("Trend.what", t.Direction)),
+        Say(t.StartAt, $"{Order(t.Level)} {t.Name}, beginning {At(t.Trend.Start.Time, t.Period)}."),
+        Pin(t.StartAt, "close", Edge(t.StartAt, t.Place), $"{t.Name} begins", 4),
+    ], [$"level{t.Level}", t.Swing, t.Name, "trendArrows"]);
+
+    // The second Swing's BoS: what Confirms a Trend, then where this one was.
+    private static Block TrendConfirmed(TrendRead t) => new(
+    [
+        Teach(t.ConfirmedAt, Definitions.Text("Trend.confirmed", t.Direction)),
+        Say(t.ConfirmedAt, $"Confirmed at the second {t.Swing}'s BoS, {At(t.Trend.Confirmed.Time, t.Period)}."),
+        Pin(t.ConfirmedAt, "close", t.Place, $"second {t.Swing}", 4),
+    ], [t.Up ? "BullishBreakOfStructure" : "BearishBreakOfStructure"]);
+
+    // How many Swings it has.
+    private static Block TrendSwings(TrendRead t) => new(
+    [
+        Say(t.Until, $"{Capital(Words(t.Trend.Swings))} {t.Swing}s{(t.EndedAt != null ? "" : " so far")}."),
+    ], []);
+
+    // Its Weak Swings: when it has any, what makes a Swing Weak and what an MSB against a Trend leads to; then which.
+    private static Block TrendWeak(TrendRead t)
+    {
+        List<JsonObject> cues = [];
+        if (t.Weak.Count > 0)
+            cues.AddRange([
+                Teach(t.Until, Definitions.Text("Swing.strong", t.Direction)),
+                Teach(t.Until, Definitions.Text("Swing.weak", t.Direction)),
+                Teach(t.Until, Definitions.Text("Trend.next", t.Direction)),
+            ]);
+        cues.Add(Say(t.Until, t.Weak.Count == 0 ? "All Strong." : $"{Capital(Words(t.Weak.Count))} Weak: the {List(t.Weak)}."));
+        return new Block(cues, t.Weak.Count > 0 ? [t.Up ? "BearishMarketStructureBreak" : "BullishMarketStructureBreak"] : []);
+    }
+
+    // Its Strength: what it is, then this one's.
+    private static Block TrendStrength(TrendRead t) => new(
+    [
+        Teach(t.Until, Definitions.Text("Trend.strength", t.Direction)),
+        Say(t.Until, $"Strength {t.Trend.Strength}%: {Words(t.Trend.Strong)} of {Words(t.Trend.Swings)}."),
+    ], []);
+
+    // Its end: what ends a Trend, then where this one ended, or that it still runs.
+    private static Block TrendEnds(TrendRead t)
+    {
+        if (t.EndedAt is not int at)
+            return new Block(
+            [
+                Teach(t.Until, Definitions.Text("Trend.ends", t.Direction)),
+                Say(t.Until, $"Still running: no {t.Other} Confirmed since."),
+            ], []);
+        return new Block(
+        [
+            Teach(t.Until, Definitions.Text("Trend.ends", t.Direction)),
+            Say(t.Until, $"Ended at the first {t.Other}'s BoS, {At(t.Trend.End!.Time, t.Period)}."),
+            Pin(at, "close", t.Up ? "below" : "above", $"{t.Name} ends", 4),
+        ], [t.Other]);
+    }
+
+    // What a Trend's count claims: nothing about what the price does next.
+    private static Block TrendIsACount(TrendRead t) => new([Teach(t.Until, Definitions.Text("Trend.count", t.Direction))], []);
+
+    // What a section tells of one term: its cues, and the layers that draw what they speak of.
+    private sealed record Block(IReadOnlyList<JsonObject> Cues, IReadOnlyList<string> Layers)
+    {
+        public static readonly Block None = new([], []);
+    }
+
+    // The page's layer for a point's label, when it has one.
+    private static string[] Labelled(string? label) => label != null ? [PointLayer(label)] : [];
 
     // What the structure at a level has, read from these prices alone.
     private sealed record Structure(List<SwingOutline> Swings, List<MarketStructureBreakOutline> Breaks, List<TrendOutline> Trends, List<StructurePoint> Points, Dictionary<DateTime, int> Index);
@@ -838,6 +952,10 @@ public static class Explain
         section["cues"] = cues;
         return section;
     }
+
+    // A section told in blocks, a term at a time: their cues by candle, and every layer any of them draws.
+    private static JsonObject Section(int[] view, int? until, params Block[] blocks) =>
+        Section(view, until, blocks.SelectMany(x => x.Layers), new JsonArray(blocks.SelectMany(x => x.Cues).ToArray<JsonNode>()), byCandle: true);
 
     // A text of this instance: shown at every level of detail.
     private static JsonObject Say(int at, string summary, double? hold = null)

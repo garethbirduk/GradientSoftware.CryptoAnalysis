@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace Gradient.CryptoAnalysis.Site;
@@ -176,6 +176,8 @@ public static class Tours
         var sections = new List<TourSection>();
         var expanded = def.DeepClone();
         var expandedSections = expanded["sections"]?.AsArray();
+        // The definitions cited so far, which a written section does not teach again.
+        var cited = new HashSet<string>();
 
         foreach (var (written, i) in (def["sections"]?.AsArray() ?? []).Select((x, i) => (x?.AsObject(), i)))
         {
@@ -219,7 +221,7 @@ public static class Tours
             // A section that explains something is written out from the prices before it is read like any other.
             if (node["explain"] != null)
             {
-                node = Explain.Expand(node, prices, node["from"] is JsonValue f && f.TryGetValue<int>(out var begins) ? begins : at, where, errors);
+                node = Explain.Expand(node, prices, node["from"] is JsonValue f && f.TryGetValue<int>(out var begins) ? begins : at, where, errors, cited);
                 if (expandedSections != null)
                     expandedSections[i] = node.DeepClone();
             }
@@ -300,6 +302,7 @@ public static class Tours
                     else
                     {
                         texts[EnumDetail.Education] = Definitions.Text(define, direction);
+                        cited.Add(texts[EnumDetail.Education]);
                         if (node == written && expandedSections?[i]?["cues"]?[j] is JsonObject told)
                             told["texts"] = Details.ToJson(texts);
                     }

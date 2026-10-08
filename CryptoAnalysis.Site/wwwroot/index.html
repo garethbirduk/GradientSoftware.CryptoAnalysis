@@ -2430,6 +2430,10 @@ async function loadAnalysis(params) {
   Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio, loaded.detail));
   // The explanations are on when the analysis was asked for with Explain.
   loaded.chapters.forEach((c, i) => { const s = loaded.sections[c.section]; if (s.explains && (params.detail !== 'education' || s.repeat)) loaded.chaptersOff.add(i); });
+  // The candle is nearly always there to be seen, not read about: its chapters start off, one tick away, unless it was
+  // ticked before the analysis was written again, or it is all there is to tell of.
+  const candle = loaded.chapters.flatMap((c, i) => loaded.sections[c.section].thing === 'Candle' ? [i] : []);
+  if (!params.candle && loaded.chapters.some((c, i) => !candle.includes(i) && !loaded.chaptersOff.has(i))) candle.forEach(i => loaded.chaptersOff.add(i));
   // With no pins shown, a pinned text is left out altogether, so it does not hold the run for its seconds either.
   for (const s of loaded.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
   if (!loaded.sections.some(s => s.cues.some(c => !c.skipped))) throw new Error('the server wrote no texts for it');
@@ -2492,7 +2496,10 @@ function addThing(id) {
 // thing given, or the one on show.
 function addThings(ids, jump = tourSection()?.thing) {
   if (tour?.page !== 'Analysis' || !ids.length) return;
-  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), ...ids])], detail: explainsOn() ? 'education' : 'summary', jump };
+  // The candle keeps its chapter, off or on as it was.
+  const candle = thingsOn().includes('Candle');
+  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), ...(tour.params.things.includes('Candle') ? ['Candle'] : []), ...ids])],
+    detail: explainsOn() ? 'education' : 'summary', jump, candle: candle || ids.includes('Candle') };
   history.replaceState(null, '', analysisHash(wantedAnalysis));
   renderAnalysisPage();
 }
@@ -2699,6 +2706,8 @@ const eventName = (spec, from) => `${{ 1: 'the first', 2: 'the second', 3: 'the 
 // A text stays for its narration clip's length when there is one (plus a breath), else for the time it takes to read.
 function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'education') {
   const errors = [], known = new Set(LAYERS.map(l => l.id)), chapters = [], wanted = [];
+  // The definitions cited so far: a section that explains something does not teach them again.
+  const cited = [];
   // The scene the sections are in, and how many candles it has.
   let scene = 0, candles = scenes[0]?.ex.prices.t.length ?? 0;
   // A candle number as given, or looked up for an event; null when it is not known (yet).
@@ -2739,8 +2748,8 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
     // A section that explains something is written out by the local server from the prices of its scene (see resolveTour),
     // one writing for each section and the candle it starts from; until it has been, the section is listed as waiting.
     if (s.explain != null) {
-      const from = Number.isInteger(s.from) ? s.from : at, key = `explain|${scene}|${from}|${JSON.stringify(s)}`;
-      if (!resolved.has(key)) { wanted.push({ key, explain: s, from, scene, where }); errors.push(`${where}: the texts explaining ${s.explain} are being written`); }
+      const from = Number.isInteger(s.from) ? s.from : at, key = `explain|${scene}|${from}|${JSON.stringify(s)}|${cited.join('|')}`;
+      if (!resolved.has(key)) { wanted.push({ key, explain: s, from, scene, where, cited: [...cited] }); errors.push(`${where}: the texts explaining ${s.explain} are being written`); }
       else errors.push(...resolved.get(key).errors);
       s = resolved.get(key)?.section ?? { ...s, cues: [] };
     }
@@ -2779,7 +2788,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       if (c.define != null) {
         if (!(c.define in DEFINITIONS)) errors.push(`${what}: no definition "${c.define}" in definitions.json`);
         else if (!c.direction && needsDirection(c.define)) errors.push(`${what}: the definition "${c.define}" is told in a direction: "direction": "Up" or "Down"`);
-        else texts = { ...texts, education: defineText(c.define, c.direction) };
+        else { texts = { ...texts, education: defineText(c.define, c.direction) }; cited.push(texts.education); }
       }
       const text = textAt(texts, detail);
       if (c.text != null) errors.push(`${what}: "text" is now "texts", a text for each level of detail: { "summary", "education" }`);
@@ -2822,12 +2831,12 @@ async function resolveTour(retry = 0) {
   if (!pending.length || retry > 12) return;
   tour.resolving = true;
   updateEditorStatus();
-  for (const { key, spec, explain, from, scene, where } of pending) {
+  for (const { key, spec, explain, from, scene, where, cited } of pending) {
     if (tour.resolved.has(key)) continue;
     const ex = scenes[scene ?? 0]?.ex ?? scenes[0].ex;
     if (explain) {
       // The section as the tour has it goes to the server, which sends back the section to play, texts written.
-      const body = JSON.stringify({ dataset: ex.dataset, anchor: ex.anchor, from, where, section: explain });
+      const body = JSON.stringify({ dataset: ex.dataset, anchor: ex.anchor, from, where, cited, section: explain });
       const got = await fetch('api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).then(r => r.ok ? r.json() : null).catch(() => null);
       tour.resolved.set(key, got ? { section: got.section, errors: got.errors ?? [] } : { section: null, errors: [`${where}: the local server could not write the texts explaining ${explain.explain}`] });
       continue;
