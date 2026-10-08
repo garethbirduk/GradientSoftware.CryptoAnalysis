@@ -2706,7 +2706,8 @@ const eventName = (spec, from) => `${{ 1: 'the first', 2: 'the second', 3: 'the 
 // A text stays for its narration clip's length when there is one (plus a breath), else for the time it takes to read.
 function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'education') {
   const errors = [], known = new Set(LAYERS.map(l => l.id)), chapters = [], wanted = [];
-  // The definitions cited so far: a section that explains something does not teach them again.
+  // The definitions told so far, cited or taught by a written section: a section that explains something does not teach
+  // them again.
   const cited = [];
   // The scene the sections are in, and how many candles it has.
   let scene = 0, candles = scenes[0]?.ex.prices.t.length ?? 0;
@@ -2752,6 +2753,11 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       if (!resolved.has(key)) { wanted.push({ key, explain: s, from, scene, where, cited: [...cited] }); errors.push(`${where}: the texts explaining ${s.explain} are being written`); }
       else errors.push(...resolved.get(key).errors);
       s = resolved.get(key)?.section ?? { ...s, cues: [] };
+      // What its written texts teach, ahead of its own, is told: the tour teaches a definition once.
+      for (const c of s.cues.slice(0, s.cues.length - (given.cues ?? []).length)) {
+        const levels = Object.keys(c.texts ?? {});
+        if (levels.length === 1 && levels[0] === 'education') cited.push(c.texts.education);
+      }
     }
     if (s.layers) layers = ids(s.layers, where);
     const removed = ids(s.remove, where);

@@ -123,17 +123,19 @@ public static class Tours
     /// <summary>
     /// Compiles the tour against one dataset, the tour's own: a tour without scenes needs no other.
     /// </summary>
-    public static TourScript Compile(JsonNode def, IReadOnlyList<Price> dataset)
+    public static TourScript Compile(JsonNode def, IReadOnlyList<Price> dataset, bool teachOnce = false)
     {
-        return Compile(def, new Dictionary<string, IReadOnlyList<Price>> { [def["dataset"]?.GetValue<string>() ?? ""] = dataset });
+        return Compile(def, new Dictionary<string, IReadOnlyList<Price>> { [def["dataset"]?.GetValue<string>() ?? ""] = dataset }, teachOnce);
     }
 
     /// <summary>
     /// Compiles the tour against its datasets, by id: the candle each scene's start time lands on, then every section worked out
     /// from the start state and the sections before it. A scene names a dataset the tour does not have, or none, and it plays on
-    /// the tour's own, which is the one named by the tour or else the first given. Problems are listed, not thrown.
+    /// the tour's own, which is the one named by the tour or else the first given. Problems are listed, not thrown. A written
+    /// section never teaches a definition the tour has cited before it; with teachOnce, as tour.json is played start to end,
+    /// nor one a written section before it has taught. An analysis, whose chapters are ticked on and off, teaches each in full.
     /// </summary>
-    public static TourScript Compile(JsonNode def, IReadOnlyDictionary<string, IReadOnlyList<Price>> datasets)
+    public static TourScript Compile(JsonNode def, IReadOnlyDictionary<string, IReadOnlyList<Price>> datasets, bool teachOnce = false)
     {
         var errors = new List<string>();
         var known = new HashSet<string>(PageLayers.Concat(Terms.All.Select(x => x.Type.ToString())));
@@ -176,7 +178,7 @@ public static class Tours
         var sections = new List<TourSection>();
         var expanded = def.DeepClone();
         var expandedSections = expanded["sections"]?.AsArray();
-        // The definitions cited so far, which a written section does not teach again.
+        // The definitions told so far, which a written section does not teach again.
         var cited = new HashSet<string>();
 
         foreach (var (written, i) in (def["sections"]?.AsArray() ?? []).Select((x, i) => (x?.AsObject(), i)))
@@ -221,9 +223,14 @@ public static class Tours
             // A section that explains something is written out from the prices before it is read like any other.
             if (node["explain"] != null)
             {
+                var ownCues = node["cues"]?.AsArray().Count ?? 0;
                 node = Explain.Expand(node, prices, node["from"] is JsonValue f && f.TryGetValue<int>(out var begins) ? begins : at, where, errors, cited);
                 if (expandedSections != null)
                     expandedSections[i] = node.DeepClone();
+                // What the written texts taught, ahead of the section's own, is told.
+                if (teachOnce && node["cues"] is JsonArray told)
+                    foreach (var text in told.Take(told.Count - ownCues).Select(Explain.Taught).OfType<string>())
+                        cited.Add(text);
             }
 
             if (node["layers"] != null)

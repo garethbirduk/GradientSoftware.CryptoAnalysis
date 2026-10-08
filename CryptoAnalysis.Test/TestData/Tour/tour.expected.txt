@@ -15,6 +15,15 @@
 #45 · section 13 (Upswings in real time) runs to it: L1 HH* · L1 upswing BoS
 #16 · section 13 (Upswings in real time) text 2 "Each Upswing appears only when its BoS Confirms it." · seen at #45: L1 upswing BoS
 #67 · section 14 (Downswings) runs to it: nothing
+#47 · section 17 text 1 "1st order Downswing, from an LL at 16666, at 23:00 on Monday 2 January 2023." · seen at #67: L1 LL · L1 downswing start
+#47 · section 17 text 2 "LL: 16666" on close · seen at #67: L1 LL · L1 downswing start
+#57 · section 17 text 3 "The Swing High is the highest position in the Swing. It is either an LH or an HH." · seen at #67: L1 LH · L1 downswing high
+#57 · section 17 text 4 "Swing High: an LH at 16736." · seen at #67: L1 LH · L1 downswing high
+#57 · section 17 text 5 "Swing High: 16736" on close · seen at #67: L1 LH · L1 downswing high
+#62 · section 17 text 6 "BoS at 16655." · seen at #67: L1 LL · L1 downswing BoS · L1 downswing start
+#62 · section 17 text 7 "BoS" on close · seen at #67: L1 LL · L1 downswing BoS · L1 downswing start
+#62 · section 17 text 8 "A Downswing is characterised by an Upleg from the low to the Swing High, followed by a Downleg from the Swing High to the BoS." · seen at #67: L1 LL · L1 downswing BoS · L1 downswing start
+#62 · section 17 text 9 "The Upleg is ten hours; the Downleg is five hours." · seen at #67: L1 LL · L1 downswing BoS · L1 downswing start
 #74 · section 18 runs to it: L1 HH*
 #75 · section 19 runs to it: L1 HH* · L1 upswing BoS
 #45 · section 19 text 2 "HH" on close · seen at #75: L1 HH · L1 upswing BoS · L1 upswing start

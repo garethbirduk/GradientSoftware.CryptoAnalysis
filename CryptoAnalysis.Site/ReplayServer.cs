@@ -200,7 +200,7 @@ public static class ReplayServer
             {
                 if (!File.Exists(tourPath) || JsonNode.Parse(File.ReadAllText(tourPath)) is not { } def)
                     return null;
-                return (Tours.Compile(def, byDataset).Expanded ?? def).ToJsonString();
+                return (Tours.Compile(def, byDataset, teachOnce: true).Expanded ?? def).ToJsonString();
             }
 
             app.MapGet("/api/tour", () => ExpandedTour() is { } tour ? Results.Text(tour, "application/json") : Results.NotFound());
