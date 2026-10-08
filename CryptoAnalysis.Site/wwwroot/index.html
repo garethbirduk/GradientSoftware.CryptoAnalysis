@@ -3039,19 +3039,21 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
     }
     // A section that explains something is written out by the local server from the prices of its scene (see resolveTour),
     // one writing for each section and the candle it starts from; until it has been, the section is listed as waiting.
-    // Its written texts changed by its "edits" are laid over them here, so a change to one is not written out again.
+    // The server writes the section in full, whatever came before it, so each is written once and an edit to one writes
+    // only that one again. A written text that teaches what the tour has told already, cited or taught by a written section
+    // before, is left out here. Its written texts changed by its "edits" are laid over them here too, so a change to one
+    // is not written out again.
     if (s.explain != null) {
       const { edits = {}, ...asked } = s;
-      const from = Number.isInteger(s.from) ? s.from : at, key = `explain|${scene}|${from}|${JSON.stringify(asked)}|${cited.join('|')}`;
-      if (!resolved.has(key)) { wanted.push({ key, explain: asked, from, scene, where, cited: [...cited] }); errors.push(`${where}: the texts explaining ${s.explain} are being written`); }
+      const from = Number.isInteger(s.from) ? s.from : at, key = `explain|${scene}|${from}|${JSON.stringify(asked)}`;
+      if (!resolved.has(key)) { wanted.push({ key, explain: asked, from, scene, where }); errors.push(`${where}: the texts explaining ${s.explain} are being written`); }
       else errors.push(...resolved.get(key).errors);
-      const got = resolved.get(key)?.section ?? { ...asked, cues: [] }, writtenCount = got.cues.length - (given.cues ?? []).length;
+      const got = resolved.get(key)?.section ?? { ...asked, cues: [] }, ownCount = (given.cues ?? []).length;
+      const taught = c => { const levels = Object.keys(c.texts ?? {}); return levels.length === 1 && levels[0] === 'education' ? c.texts.education : null; };
+      const written = got.cues.slice(0, got.cues.length - ownCount).filter(c => !cited.includes(taught(c)));
       // What its written texts teach, as written, is told: the tour teaches a definition once.
-      if (teachOnce) for (const c of got.cues.slice(0, writtenCount)) {
-        const levels = Object.keys(c.texts ?? {});
-        if (levels.length === 1 && levels[0] === 'education') cited.push(c.texts.education);
-      }
-      s = { ...got, cues: got.cues.map((c, k) => k >= writtenCount ? c : { ...c, written: c.texts, texts: { ...c.texts, ...(c.id != null ? edits[c.id] : null) } }) };
+      if (teachOnce) for (const c of written) if (taught(c) != null) cited.push(taught(c));
+      s = { ...got, cues: [...written.map(c => ({ ...c, written: c.texts, texts: { ...c.texts, ...(c.id != null ? edits[c.id] : null) } })), ...got.cues.slice(got.cues.length - ownCount)] };
     }
     if (s.layers) layers = ids(s.layers, where);
     const removed = ids(s.remove, where);
@@ -3147,10 +3149,10 @@ function timeCue(c, audio, pins = true) {
 async function lookUp(t) {
   const scenes = t.scenes, jobs = t.wanted.filter(w => !t.resolved.has(w.key));
   let next = 0;
-  const one = async ({ key, spec, explain, from, scene, where, cited }) => {
+  const one = async ({ key, spec, explain, from, scene, where }) => {
     const ex = scenes[scene ?? 0]?.ex ?? scenes[0].ex;
     if (explain) {
-      const body = JSON.stringify({ dataset: ex.dataset, anchor: ex.anchor, from, where, cited, section: explain });
+      const body = JSON.stringify({ dataset: ex.dataset, anchor: ex.anchor, from, where, section: explain });
       const got = await fetch('api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).then(r => r.ok ? r.json() : null).catch(() => null);
       t.resolved.set(key, got ? { section: got.section, errors: got.errors ?? [] } : { section: null, errors: [`${where}: the local server could not write the texts explaining ${explain.explain}`] });
       return;

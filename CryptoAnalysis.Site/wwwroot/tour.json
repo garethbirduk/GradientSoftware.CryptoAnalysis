@@ -253,7 +253,8 @@
     {
       "add": ["BearishMarketStructureBreak"],
       "cues": [
-        { "texts": { "education": "Where this happens we call it a Market Structure Break (MSB). Sometimes it is called a Change of Character." } }
+        { "texts": { "education": "Where this happens we call it a Market Structure Break (MSB)." } },
+        { "define": "MSB.alias" }
       ]
     },
     {
@@ -447,7 +448,7 @@
       "add": ["Uptrend"],
       "cues": [
         { "texts": { "education": "Just as candles of one colour in a row are Successive Candles, two or more Upswings in a row are an Uptrend." } },
-        { "texts": { "education": "Two or more Downswings in a row are a Downtrend. Either is a Trend." } }
+        { "define": "Trend.what", "direction": "Down" }
       ]
     },
     {
@@ -523,7 +524,8 @@
       "cues": [
         { "texts": { "education": "Strength does not say where the Weak Upswings fall. So we also count the Upswings since the last Weak one, starting with it." } },
         { "texts": { "education": "This Uptrend has had stretches of three, three, three and two Upswings. The twelfth is Weak, so the latest stretch is one Upswing so far." } },
-        { "texts": { "education": "The same holds for Downswings: a Weak Downswing has an MSB inside it, and an HH as its Swing High." } },
+        { "texts": { "education": "The same holds for Downswings." } },
+        { "define": "Swing.weak", "direction": "Down" },
         { "texts": { "education": "Strong, Weak and Strength describe what has happened. They are not a forecast." } }
       ]
     },
@@ -687,7 +689,10 @@
       "cues": [
         { "texts": { "education": "One order finer, the Retracement is a run of Upswings. The dotted line is the Swing Low of the latest one: the level an MSB would close below." } },
         { "at": 68, "on": "close", "place": "below", "texts": { "education": "MSB" }, "hold": 4, "voice": false },
-        { "texts": { "education": "On the 22nd the price closes below that line: a Bearish MSB. A deep Retracement whose own structure has broken is a Range: the box from the LL to the highest close of the Retracement, with the dashed lines its bands, 20% of its height either side." } }
+        { "texts": { "education": "On the 22nd the price closes below that line: a Bearish MSB." } },
+        { "define": "Range.what" },
+        { "define": "Range.box" },
+        { "texts": { "education": "Here the box runs from the LL to the highest close of the Retracement, and the dashed lines are its bands, 20% of its height either side." } }
       ]
     },
     {
@@ -699,6 +704,7 @@
       "cues": [
         { "texts": { "education": "The training divides a Range into a buy-low zone, from the lower band to 25% up, and a sell-high zone, from 75% up to the upper band. With candles on, the wicks show where the price reached into them." } },
         { "define": "Range.holds" },
+        { "define": "Range.ends" },
         { "at": 94, "on": "close", "place": "below", "texts": { "education": "Range ends: 53751" }, "hold": 4, "voice": false },
         { "texts": { "education": "On the 26th the close at 53751 is below the lower band, and the Range ends. The same close is the Downswing's BoS." } }
       ]

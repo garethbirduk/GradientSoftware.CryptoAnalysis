@@ -98,12 +98,11 @@
 #62 · section 67 text 2 "Ended at the first Downswing's BoS, at 14:00 on Tuesday 3 January 2023." · seen at #62: L1 LL* · L1 downswing BoS
 #62 · section 67 text 3 "Uptrend ends" on close · seen at #62: L1 LL* · L1 downswing BoS
 #64 · section 68 runs to it: L1 LL* · L1 downswing BoS
-#47 · section 68 text 1 "A Trend is two or more Swings in a row in one direction: a Downtrend is a run of Downswings, and begins where its first Downswing begins." · seen at #64: L1 LL · L1 downswing start
-#47 · section 68 text 2 "1st order Downtrend, beginning at 23:00 on Monday 2 January 2023." · seen at #64: L1 LL · L1 downswing start
-#47 · section 68 text 3 "Downtrend begins" on close · seen at #64: L1 LL · L1 downswing start
-#64 · section 68 text 4 "The BoS of the second Downswing makes two in a row: that Confirms the Downtrend." · seen at #64: L1 LL* · L1 downswing BoS
-#64 · section 68 text 5 "Confirmed at the second Downswing's BoS, at 16:00 on Tuesday 3 January 2023." · seen at #64: L1 LL* · L1 downswing BoS
-#64 · section 68 text 6 "Downtrend Confirmed" on close · seen at #64: L1 LL* · L1 downswing BoS
+#47 · section 68 text 1 "1st order Downtrend, beginning at 23:00 on Monday 2 January 2023." · seen at #64: L1 LL · L1 downswing start
+#47 · section 68 text 2 "Downtrend begins" on close · seen at #64: L1 LL · L1 downswing start
+#64 · section 68 text 3 "The BoS of the second Downswing makes two in a row: that Confirms the Downtrend." · seen at #64: L1 LL* · L1 downswing BoS
+#64 · section 68 text 4 "Confirmed at the second Downswing's BoS, at 16:00 on Tuesday 3 January 2023." · seen at #64: L1 LL* · L1 downswing BoS
+#64 · section 68 text 5 "Downtrend Confirmed" on close · seen at #64: L1 LL* · L1 downswing BoS
 #75 · section 69 (Ghost Trends) runs to it: L1 HH* · L1 upswing BoS
 #75 · section 69 (Ghost Trends) text 2 "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." · seen at #75: L1 HH* · L1 upswing BoS
 #64 · section 71 text 1 "Confirmed at the second Downswing's BoS, at 16:00 on Tuesday 3 January 2023." · seen at #75: L1 LL · L1 upswing low · L2 LL · L2 downswing BoS · L2 MSB↓
@@ -130,7 +129,7 @@
 #68 · section 80 in scene 2 runs to it: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
 #68 · section 80 in scene 2 text 2 "MSB" on close · seen at #68: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
 #94 · section 81 in scene 2 runs to it: L1 LL* · L1 downswing BoS · L1 range ends below
-#94 · section 81 in scene 2 text 3 "Range ends: 53751" on close · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
+#94 · section 81 in scene 2 text 4 "Range ends: 53751" on close · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
 #69 · section 82 in scene 2 text 2 "1: +1917" on 56885 · seen at #94: nothing
 #71 · section 82 in scene 2 text 2 line ends on 58802 · seen at #94: nothing
 #71 · section 82 in scene 2 text 3 "2: +1917" on 56885 · seen at #94: nothing
