@@ -432,7 +432,7 @@ public class ExplainTests
             { "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [
               { "from": 0, "until": 67 },
               { "explain": "Swing", "at": 12, "blocks": ["Bos"] },
-              { "explain": "Swing", "at": 47, "until": 67, "blocks": ["Bos"] } ] }
+              { "explain": "Swing", "at": 47, "until": 67, "blocks": ["Bos"], "cues": [{ "define": "Swing.count" }] } ] }
             """)!;
         var bos = Definitions.Text("Swing.bos");
 
@@ -444,6 +444,7 @@ public class ExplainTests
         Assert.IsFalse(once.Sections[2].Cues.Any(c => c.Text == bos), "The Downswing does not teach it again.");
         Assert.IsTrue(once.Sections[2].Cues.Any(c => c.Text == "BoS at 16655."), "It still says its own BoS.");
         Assert.IsTrue(each.Sections[2].Cues.Any(c => c.Text == bos), "An analysis teaches each chapter in full.");
+        Assert.AreEqual(Definitions.Text("Swing.count"), once.Expanded!["sections"]![2]!["cues"]!.AsArray()[^1]!["texts"]!["education"]!.GetValue<string>(), "A definition an explaining section cites is written out for the narration.");
     }
 
     [TestMethod]

@@ -72,38 +72,54 @@
 #90 · section 53 (Successive Candles) runs to it: L1 HH*
 #84 · section 53 (Successive Candles) text 2 "Here six red candles follow each other, each hour closing lower than the last. These are Successive Red Candles." · seen at #90: L1 LL · L1 upswing low
 #90 · section 53 (Successive Candles) text 3 "And six green candles follow them, each hour closing higher: Successive Green Candles." · seen at #90: L1 HH*
-#16 · section 55 text 5 "second Upswing" on close · seen at #90: L1 upswing BoS
-#77 · section 57 text 2 "Swing Low" on close · seen at #90: L1 HL · L1 upswing low
-#81 · section 57 text 3 "MSB" on close · seen at #90: L1 MSB↓
-#89 · section 57 text 5 "BoS" on close · seen at #90: L1 upswing BoS
-#61 · section 64 (Trends in real time) gets there by rewind: nothing
-#62 · section 65 runs to it: L1 LL* · L1 downswing BoS
-#62 · section 65 text 1 "A Trend ends at the BoS of the first Swing in the opposite direction." · seen at #62: L1 LL* · L1 downswing BoS
-#62 · section 65 text 2 "Here a Downswing is Confirmed, and the Uptrend ends." · seen at #62: L1 LL* · L1 downswing BoS
-#64 · section 66 runs to it: L1 LL* · L1 downswing BoS
-#64 · section 66 text 1 "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend." · seen at #64: L1 LL* · L1 downswing BoS
-#75 · section 67 (Ghost Trends) runs to it: L1 HH* · L1 upswing BoS
-#75 · section 67 (Ghost Trends) text 2 "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." · seen at #75: L1 HH* · L1 upswing BoS
-#64 · section 68 (2nd order Trends) text 4 "second Downswing" on close · seen at #75: L1 LL · L1 upswing low · L2 LL · L2 downswing BoS · L2 MSB↓
-#68 · section 68 (2nd order Trends) text 5 "Downtrend ends" on close · seen at #75: L2 upswing BoS
-#1103 · section 69 (Orders and timescale) gets there by fast forward: L1 HH* · L1 upswing BoS
-#768 · section 70 text 2 "2 February" on close · seen at #1103: L1 HH · L1 upswing BoS · L1 upswing start · L1 range ends above
-#1049 · section 70 text 4 "Swing Low" on close · seen at #1103: L1 LL · L1 upswing low
-#1103 · section 70 text 6 "BoS" on close · seen at #1103: L1 HH* · L1 upswing BoS
-#40 · section 73 (A Range from the training) in scene 2 runs to it: L1 HH* · L1 MSB↑
-#40 · section 73 (A Range from the training) in scene 2 text 3 "HH and MSB: 60761" on close · seen at #40: L1 HH* · L1 MSB↑
-#50 · section 74 in scene 2 runs to it: L1 LL*
-#47 · section 74 in scene 2 text 1 "BoS" on close · seen at #50: L1 downswing BoS
-#50 · section 74 in scene 2 text 3 "LL: 55927" on close · seen at #50: L1 LL*
-#61 · section 75 in scene 2 runs to it: L1 LH*
-#61 · section 75 in scene 2 text 1 "79% back" on close · seen at #61: L1 LH*
-#68 · section 76 in scene 2 runs to it: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
-#68 · section 76 in scene 2 text 2 "MSB" on close · seen at #68: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
-#94 · section 77 in scene 2 runs to it: L1 LL* · L1 downswing BoS · L1 range ends below
-#94 · section 77 in scene 2 text 3 "Range ends: 53751" on close · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
-#69 · section 78 in scene 2 text 2 "1: +1917" on 56885 · seen at #94: nothing
-#71 · section 78 in scene 2 text 2 line ends on 58802 · seen at #94: nothing
-#71 · section 78 in scene 2 text 3 "2: +1917" on 56885 · seen at #94: nothing
-#89 · section 78 in scene 2 text 3 line ends on 58802 · seen at #94: nothing
-#93 · section 78 in scene 2 text 4 "3: -1725" on 56885 · seen at #94: nothing
-#94 · section 78 in scene 2 text 4 line ends on 55160 · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
+#1 · section 56 text 1 "A Trend is two or more Swings in a row in one direction: an Uptrend is a run of Upswings, and begins where its first Upswing begins." · seen at #90: L1 upswing start
+#1 · section 56 text 2 "1st order Uptrend, beginning at 01:00 on Sunday 1 January 2023." · seen at #90: L1 upswing start
+#1 · section 56 text 3 "Uptrend begins" on close · seen at #90: L1 upswing start
+#16 · section 56 text 4 "The BoS of the second Upswing makes two in a row: that Confirms the Uptrend." · seen at #90: L1 upswing BoS
+#16 · section 56 text 5 "Confirmed at the second Upswing's BoS, at 16:00 on Sunday 1 January 2023." · seen at #90: L1 upswing BoS
+#16 · section 56 text 6 "second Upswing" on close · seen at #90: L1 upswing BoS
+#90 · section 56 text 7 "Twelve Upswings so far." · seen at #90: L1 HH*
+#77 · section 58 text 2 "Swing Low" on close · seen at #90: L1 HL · L1 upswing low
+#81 · section 58 text 3 "MSB" on close · seen at #90: L1 MSB↓
+#89 · section 58 text 5 "BoS" on close · seen at #90: L1 upswing BoS
+#89 · section 59 text 1 "An Upswing with an MSB inside it is a Weak Upswing. An Upswing with none is a Strong Upswing." · seen at #90: L1 upswing BoS
+#89 · section 59 text 2 "A Weak Upswing always has an LL as its Swing Low, because the MSB took the price below the Swing Low before it." · seen at #90: L1 upswing BoS
+#89 · section 59 text 3 "Weak: it has an MSB." · seen at #90: L1 upswing BoS
+#90 · section 61 text 1 "Four Weak: the fourth, seventh, tenth and twelfth." · seen at #90: L1 HH*
+#90 · section 61 text 2 "Each has an MSB inside it and an LL as its Swing Low." · seen at #90: L1 HH*
+#90 · section 61 text 3 "On the band along the top, the Weak Upswings are the paler segments." · seen at #90: L1 HH*
+#90 · section 62 text 1 "The Strength of a Trend is the share of its Swings that are Strong." · seen at #90: L1 HH*
+#90 · section 62 text 2 "Strength 66%: eight of twelve." · seen at #90: L1 HH*
+#90 · section 62 text 3 "The arrow runs from where the Uptrend begins to its latest BoS, and its box shows the count and the Strength." · seen at #90: L1 HH*
+#90 · section 62 text 4 "An Uptrend with a Strength of 100% has no Weak Upswing: Higher Highs and Higher Lows throughout." · seen at #90: L1 HH*
+#61 · section 66 (Trends in real time) gets there by rewind: nothing
+#62 · section 67 runs to it: L1 LL* · L1 downswing BoS
+#62 · section 67 text 1 "A Trend ends at the BoS of the first Swing in the opposite direction." · seen at #62: L1 LL* · L1 downswing BoS
+#62 · section 67 text 2 "Here a Downswing is Confirmed, and the Uptrend ends." · seen at #62: L1 LL* · L1 downswing BoS
+#64 · section 68 runs to it: L1 LL* · L1 downswing BoS
+#64 · section 68 text 1 "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend is Confirmed." · seen at #64: L1 LL* · L1 downswing BoS
+#75 · section 69 (Ghost Trends) runs to it: L1 HH* · L1 upswing BoS
+#75 · section 69 (Ghost Trends) text 2 "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." · seen at #75: L1 HH* · L1 upswing BoS
+#64 · section 70 (2nd order Trends) text 4 "Downtrend Confirmed" on close · seen at #75: L1 LL · L1 upswing low · L2 LL · L2 downswing BoS · L2 MSB↓
+#68 · section 70 (2nd order Trends) text 5 "Downtrend ends" on close · seen at #75: L2 upswing BoS
+#1103 · section 71 (Orders and timescale) gets there by fast forward: L1 HH* · L1 upswing BoS
+#768 · section 72 text 2 "2 February" on close · seen at #1103: L1 HH · L1 upswing BoS · L1 upswing start · L1 range ends above
+#1049 · section 72 text 4 "Swing Low" on close · seen at #1103: L1 LL · L1 upswing low
+#1103 · section 72 text 6 "BoS" on close · seen at #1103: L1 HH* · L1 upswing BoS
+#40 · section 75 (A Range from the training) in scene 2 runs to it: L1 HH* · L1 MSB↑
+#40 · section 75 (A Range from the training) in scene 2 text 3 "HH and MSB: 60761" on close · seen at #40: L1 HH* · L1 MSB↑
+#50 · section 76 in scene 2 runs to it: L1 LL*
+#47 · section 76 in scene 2 text 1 "BoS" on close · seen at #50: L1 downswing BoS
+#50 · section 76 in scene 2 text 3 "LL: 55927" on close · seen at #50: L1 LL*
+#61 · section 77 in scene 2 runs to it: L1 LH*
+#61 · section 77 in scene 2 text 1 "79% back" on close · seen at #61: L1 LH*
+#68 · section 78 in scene 2 runs to it: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
+#68 · section 78 in scene 2 text 2 "MSB" on close · seen at #68: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
+#94 · section 79 in scene 2 runs to it: L1 LL* · L1 downswing BoS · L1 range ends below
+#94 · section 79 in scene 2 text 3 "Range ends: 53751" on close · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
+#69 · section 80 in scene 2 text 2 "1: +1917" on 56885 · seen at #94: nothing
+#71 · section 80 in scene 2 text 2 line ends on 58802 · seen at #94: nothing
+#71 · section 80 in scene 2 text 3 "2: +1917" on 56885 · seen at #94: nothing
+#89 · section 80 in scene 2 text 3 line ends on 58802 · seen at #94: nothing
+#93 · section 80 in scene 2 text 4 "3: -1725" on 56885 · seen at #94: nothing
+#94 · section 80 in scene 2 text 4 line ends on 55160 · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below

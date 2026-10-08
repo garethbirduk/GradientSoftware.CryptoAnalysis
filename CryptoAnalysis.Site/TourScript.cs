@@ -310,7 +310,7 @@ public static class Tours
                     {
                         texts[EnumDetail.Education] = Definitions.Text(define, direction);
                         cited.Add(texts[EnumDetail.Education]);
-                        if (node == written && expandedSections?[i]?["cues"]?[j] is JsonObject told)
+                        if (expandedSections?[i]?["cues"]?[j] is JsonObject told)
                             told["texts"] = Details.ToJson(texts);
                     }
                 }
