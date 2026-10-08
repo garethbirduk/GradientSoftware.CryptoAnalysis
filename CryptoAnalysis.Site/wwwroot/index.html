@@ -2430,6 +2430,10 @@ async function loadAnalysis(params) {
   Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio, loaded.detail));
   // The explanations are on when the analysis was asked for with Explain.
   loaded.chapters.forEach((c, i) => { const s = loaded.sections[c.section]; if (s.explains && (params.detail !== 'education' || s.repeat)) loaded.chaptersOff.add(i); });
+  // The candle is nearly always there to be seen, not read about: its chapters start off, one tick away, unless it was
+  // ticked before the analysis was written again, or it is all there is to tell of.
+  const candle = loaded.chapters.flatMap((c, i) => loaded.sections[c.section].thing === 'Candle' ? [i] : []);
+  if (!params.candle && loaded.chapters.some((c, i) => !candle.includes(i) && !loaded.chaptersOff.has(i))) candle.forEach(i => loaded.chaptersOff.add(i));
   // With no pins shown, a pinned text is left out altogether, so it does not hold the run for its seconds either.
   for (const s of loaded.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
   if (!loaded.sections.some(s => s.cues.some(c => !c.skipped))) throw new Error('the server wrote no texts for it');
@@ -2492,7 +2496,10 @@ function addThing(id) {
 // thing given, or the one on show.
 function addThings(ids, jump = tourSection()?.thing) {
   if (tour?.page !== 'Analysis' || !ids.length) return;
-  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), ...ids])], detail: explainsOn() ? 'education' : 'summary', jump };
+  // The candle keeps its chapter, off or on as it was.
+  const candle = thingsOn().includes('Candle');
+  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), ...(tour.params.things.includes('Candle') ? ['Candle'] : []), ...ids])],
+    detail: explainsOn() ? 'education' : 'summary', jump, candle: candle || ids.includes('Candle') };
   history.replaceState(null, '', analysisHash(wantedAnalysis));
   renderAnalysisPage();
 }
