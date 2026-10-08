@@ -316,6 +316,7 @@
   /* A text written from the prices is dashed until its wording is changed here. */
   .ed-cue.written { border-left-style: dashed; }
   .ed-cue.written.edited { border-left-style: solid; }
+  details.ed-define summary { cursor: pointer; font-size: 11px; color: var(--accent); }
   .candle-card { position: fixed; z-index: 30; display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px solid var(--border);
     border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .candle-card[hidden] { display: none; }
@@ -2835,16 +2836,23 @@ function analysisChanges(t = tour) {
 }
 // Changes as text with every object's keys in order, so the same changes read the same however they were made.
 const canonical = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : x);
-const analysisDirty = (t = tour) => t?.page === 'Analysis' && canonical(analysisChanges(t)) !== t.changesSaved;
+// An analysis is unsaved while its own changes are, or a definition changed from it.
+const analysisDirty = (t = tour) => t?.page === 'Analysis' && (canonical(analysisChanges(t)) !== t.changesSaved || definitionsDirty());
 
+// Saves the analysis's own changes, kept for it alone, and any definition changed from it, to definitions.json.
 async function saveAnalysisEdits() {
   if (!analysisDirty()) return;
-  const changes = analysisChanges(), saved = canonical(changes);
-  const response = await fetch(`api/analysis/edits?key=${encodeURIComponent(tour.editsKey)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sections: changes }) }).catch(() => null);
-  tour.note = response?.ok ? '' : response?.status === 404 || response?.status === 405 || response?.status === 400
-    ? 'Not saved: the local server was started before analyses could keep their own sections. Restart ./build-site.ps1 -Serve.'
-    : 'Not saved: the local server did not take the changes.';
-  if (response?.ok) tour.changesSaved = saved;
+  const changes = analysisChanges(), saved = canonical(changes), notes = [];
+  if (saved !== tour.changesSaved) {
+    const response = await fetch(`api/analysis/edits?key=${encodeURIComponent(tour.editsKey)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sections: changes }) }).catch(() => null);
+    if (response?.ok) tour.changesSaved = saved;
+    else notes.push(response?.status === 404 || response?.status === 405 || response?.status === 400
+      ? 'Not saved: the local server was started before analyses could keep their own sections. Restart ./build-site.ps1 -Serve.'
+      : 'Not saved: the local server did not take the changes.');
+  }
+  const definitions = await saveDefinitions();
+  if (definitions) notes.push(definitions);
+  tour.note = notes.join(' ');
   updateEditorStatus();
 }
 
@@ -2852,6 +2860,7 @@ async function saveAnalysisEdits() {
 function revertAnalysisEdits() {
   rememberTour();
   tour.def = withChanges(tour.writtenDef, JSON.parse(tour.changesSaved));
+  DEFINITIONS = JSON.parse(definitionsSaved);
   applyTour({ render: true });
 }
 
@@ -3050,7 +3059,9 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       else errors.push(...resolved.get(key).errors);
       const got = resolved.get(key)?.section ?? { ...asked, cues: [] }, ownCount = (given.cues ?? []).length;
       const taught = c => { const levels = Object.keys(c.texts ?? {}); return levels.length === 1 && levels[0] === 'education' ? c.texts.education : null; };
-      const written = got.cues.slice(0, got.cues.length - ownCount).filter(c => !cited.includes(taught(c)));
+      // A written text that is a definition reads as the definition does now, so a change to its wording shows at once.
+      const current = c => c.definition && c.definition in DEFINITIONS ? { ...c, texts: { ...c.texts, education: defineText(c.definition, c.direction, c.period) } } : c;
+      const written = got.cues.slice(0, got.cues.length - ownCount).map(current).filter(c => !cited.includes(taught(c)));
       // What its written texts teach, as written, is told: the tour teaches a definition once.
       if (teachOnce) for (const c of written) if (taught(c) != null) cited.push(taught(c));
       s = { ...got, cues: [...written.map(c => ({ ...c, written: c.texts, texts: { ...c.texts, ...(c.id != null ? edits[c.id] : null) } })), ...got.cues.slice(got.cues.length - ownCount)] };
@@ -3116,7 +3127,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       // A text with "voice": false is shown but not read aloud, so it stays for the time it takes to read. A cue with no
       // text at the page's detail is skipped: kept in its place for the editor, never queued.
       const silent = c.voice === false, clip = silent || !text ? null : audio[textKey(text)];
-      return { id: c.id ?? null, written: c.written ?? null, texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
+      return { id: c.id ?? null, written: c.written ?? null, definition: c.definition ?? null, direction: c.direction ?? null, texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
         to, heads: { start: c.heads?.start === true, end: c.heads?.end !== false }, color: c.color ?? null,
         clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0, given: c.hold >= 0 ? c.hold : null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
@@ -4173,6 +4184,8 @@ function updateGlossaryStatus() {
 // of that section. Save writes tour.json back through the local server.
 // The section the tour is at is open in the editor unless it has been folded away, which lasts until a section is picked.
 let editorSection = -1, editorFolded = false;
+// The definitions open to their wording under a written text, kept open as the editor is drawn again.
+const definitionsOpen = new Set();
 const editorOn = () => state.tourEditor !== false && !videoMode;
 const tourDirty = () => !!tours.Tour && (JSON.stringify(tours.Tour.def) !== tours.Tour.saved || definitionsDirty());
 const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
@@ -4221,6 +4234,10 @@ function renderTourContents(box) {
 function editorCards() {
   const { def, sections } = tour, start = def.start ?? {}, fixed = tour.page !== 'Tour';
   const value = v => esc(v ?? '');
+  // A definition's wording, the same wherever it is told, and how it reads here. A change to it is saved to
+  // definitions.json, from the tour or an analysis alike: the one change that is not kept to the analysis.
+  const definitionBox = (key, readsAs) => `<label class="ed-level">The wording of ${esc(key)}, the same wherever it is told<textarea data-scope="definition" data-field="definition" data-key="${esc(key)}" aria-label="The definition ${esc(key)}">${value(DEFINITIONS[key])}</textarea></label>
+    <span class="ed-hint">${needsDirection(key) ? 'Slots for its direction: {trend}, {a trend}, {swing}, {a swing}, {other swing}, {a other swing}, {turn}, {beyond}, {weak turn}, {turn labels}, {extreme}, {trends}, {start}, {a first leg}, {a second leg}. ' : ''}${/\{period\}/.test(DEFINITIONS[key] ?? '') ? '{period} is what a candle spans. ' : ''}Saved to definitions.json: it changes wherever it is told. Here it reads: ${esc(readsAs ?? '')}</span>`;
   const options = (list, current) => list.map(([v, label]) => `<option value="${esc(v)}" ${String(current ?? '') === String(v) ? 'selected' : ''}>${esc(label)}</option>`).join('');
   // The first and last candle shown. Left empty, the view is as before, which the boxes then say.
   const viewBoxes = (scope, view, before, otherwise = 'as before') => [['View from candle', 0], ['View to candle', 1]].map(([label, k]) =>
@@ -4243,8 +4260,7 @@ function editorCards() {
       <label class="ed-level">Text from<select data-scope="cue" data-field="define" data-render>${options([['', 'written here'], ...Object.keys(DEFINITIONS).map(k => [k, `the definition ${k}`])], c.define ?? '')}</select></label>
       ${c.define != null ? `<div class="ed-define">
         ${needsDirection(c.define) ? `<label class="ed-level">Told for<select data-scope="cue" data-field="direction" data-render>${options([['Up', 'up: Uptrend, Upswing'], ['Down', 'down: Downtrend, Downswing']], c.direction ?? '')}</select></label>` : ''}
-        <label class="ed-level">The wording of ${esc(c.define)}, the same wherever it is cited${fixed ? ', changed in the tour' : ''}<textarea data-scope="definition" data-field="definition" data-key="${esc(c.define)}" aria-label="The definition ${esc(c.define)}" ${fixed ? 'readonly' : ''}>${value(DEFINITIONS[c.define])}</textarea></label>
-        <span class="ed-hint">Slots for its direction: {trend}, {a trend}, {swing}, {a swing}, {other swing}, {a other swing}, {turn}, {beyond}, {weak turn}, {turn labels}, {extreme}, {trends}, {start}, {a first leg}, {a second leg}. Here it reads: ${esc(compiled?.text ?? '')}</span>
+        ${definitionBox(c.define, compiled?.text)}
       </div>`
       : DETAILS.map(level => `<label class="ed-level">${DETAIL_NAMES[level]}<textarea data-scope="cue" data-field="texts.${level}" placeholder="${level === DETAILS[0] ? 'Shown at every detail' : `Shown at ${DETAIL_NAMES[level]}, in place of the ${DETAIL_NAMES[DETAILS[0]].toLowerCase()}`}" aria-label="${DETAIL_NAMES[level]} ${j + 1}">${value(c.texts?.[level])}</textarea></label>`).join('')}
       <div class="ed-row">
@@ -4269,12 +4285,19 @@ function editorCards() {
 
   // A text written from the prices: its wording at each level it is written at can be changed, kept in the section's
   // "edits" by the text's id, and the rest of it is as written. Default takes it back to the wording written.
+  // A text written from a definition can change the definition itself, wherever it is told: in the tour, every analysis
+  // and the term pages. That is kept open while it is being edited.
   const writtenCard = (d, c, k) => {
     const own = c.id != null ? d.edits?.[c.id] : null, levels = Object.keys(c.written ?? {});
+    // A change here can be made the definition's wording when the definition has no slots to fill.
+    const promote = own?.education != null && c.definition && c.definition in DEFINITIONS && !/\{/.test(DEFINITIONS[c.definition]);
     return `<div class="ed-cue written${own ? ' edited' : ''}" data-written="${k}" data-id="${esc(c.id ?? '')}">
       <div class="ed-meta" data-ed-cue></div>
       ${levels.map(level => `<label class="ed-level">${DETAIL_NAMES[level] ?? level}${own?.[level] != null ? ', changed here' : ', as written'}<textarea data-scope="written" data-field="${esc(level)}" aria-label="${esc(DETAIL_NAMES[level] ?? level)}, written text ${k + 1}" ${c.id == null ? 'disabled title="This text has no id to keep a change by"' : ''}>${value(c.texts?.[level])}</textarea></label>`).join('')}
-      ${own ? '<div class="ed-row"><span class="ed-ops"><button type="button" data-ed="written-default" title="Back to the wording written from the prices">Default</button></span></div>' : ''}
+      ${own || promote ? `<div class="ed-row"><span class="ed-ops">${own ? '<button type="button" data-ed="written-default" title="Back to the wording written from the prices">Default</button>' : ''}${promote
+        ? `<button type="button" data-ed="written-promote" data-key="${esc(c.definition)}" title="Make this the wording of ${esc(c.definition)} wherever it is told, saved to definitions.json">Make this the definition</button>` : ''}</span></div>` : ''}
+      ${c.definition && c.definition in DEFINITIONS ? `<details class="ed-define" data-definition="${esc(c.definition)}" ${definitionsOpen.has(c.definition) ? 'open' : ''}>
+        <summary>The definition ${esc(c.definition)}: change it everywhere</summary>${definitionBox(c.definition, c.texts?.education)}</details>` : ''}
     </div>`;
   };
 
@@ -4495,7 +4518,7 @@ function editTourField(el) {
   // A definition's wording: one for every cue that cites it, saved to definitions.json with the tour.
   if (scope === 'definition') {
     DEFINITIONS = { ...DEFINITIONS, [el.dataset.key]: el.value };
-    return applyTour({ cue: writtenCount(tour.index) + j });
+    return applyTour({ cue: cueEl?.dataset.written != null ? j : writtenCount(tour.index) + j });
   }
   const target = scope === 'tour' ? def : scope === 'start' ? (def.start ??= {}) : scope === 'cue' ? def.sections[tour.index].cues[j] : def.sections[tour.index];
   const raw = el.value, value = raw !== '' && (type === 'number' || (type === 'auto' && /^\d+(\.\d+)?$/.test(raw))) ? Number(raw) : raw;
@@ -4643,14 +4666,24 @@ async function saveTour() {
     const def = JSON.stringify(tour.def), body = formatTour(tour.def), response = await put('api/tour', 'X-Tour-Base', tour.base, body);
     if (response?.ok) Object.assign(tour, { saved: def, base: textKey(body) }); else notes.push(failed(response, 'tour.json'));
   }
-  if (definitionsDirty()) {
-    const saved = JSON.stringify(DEFINITIONS), body = formatDefinitions(DEFINITIONS), response = await put('api/definitions', 'X-Definitions-Base', definitionsBase, body);
-    if (response?.ok) { definitionsSaved = saved; definitionsBase = textKey(body); } else notes.push(failed(response, 'definitions.json'));
-  }
+  const definitions = await saveDefinitions();
+  if (definitions) notes.push(definitions);
   // The server reads the changed texts aloud on saving; the page follows that and loads the clips when it is done.
   if (!notes.length) { tourExport = null; refreshTourExport(); }
   tour.note = notes.join(' ');
   updateEditorStatus();
+}
+
+// definitions.json saved when it has changed, refused when the file has changed on disk since the page loaded it; what
+// went wrong, or nothing.
+async function saveDefinitions() {
+  if (!definitionsDirty()) return '';
+  const saved = JSON.stringify(DEFINITIONS), body = formatDefinitions(DEFINITIONS);
+  const response = await fetch('api/definitions', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Definitions-Base': definitionsBase }, body }).catch(() => null);
+  if (response?.ok) { definitionsSaved = saved; definitionsBase = textKey(body); return ''; }
+  return response?.status === 409 ? 'Not saved: definitions.json has changed on disk since this page loaded it.'
+    : response?.status === 404 || response?.status === 405 ? 'Not saved: the local server was started before the editor could save this. Restart ./build-site.ps1 -Serve.'
+    : 'Not saved: the local server did not take definitions.json.';
 }
 
 async function revertTour() {
@@ -4681,6 +4714,16 @@ function tourAction(action, el) {
     case 'play-here': pauseTour(); enterSection(i, { journey: true }); return playTour();
     case 'save': return tour.page === 'Tour' ? saveTour() : saveAnalysisEdits();
     case 'revert': return tour.page === 'Tour' ? revertTour() : revertAnalysisEdits();
+    case 'written-promote': {
+      // A change to a written definition becomes the definition's wording, wherever it is told, and the change goes.
+      rememberTour();
+      const key = el.dataset.key;
+      DEFINITIONS = { ...DEFINITIONS, [key]: d.edits[cueEl.dataset.id].education };
+      delete d.edits[cueEl.dataset.id].education;
+      if (!Object.keys(d.edits[cueEl.dataset.id]).length) delete d.edits[cueEl.dataset.id];
+      if (!Object.keys(d.edits).length) delete d.edits;
+      return applyTour({ render: true, cue: Number(cueEl.dataset.written) });
+    }
     case 'written-default':
       rememberTour();
       if (d.edits) delete d.edits[cueEl.dataset.id];
@@ -4786,6 +4829,10 @@ function tourAction(action, el) {
     if (el) editTourField(el);
   });
   box.addEventListener('keydown', e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') stepFromInherited(e.target.closest('input[data-field]')); });
+  box.addEventListener('toggle', e => {
+    const key = e.target.matches?.('details[data-definition]') ? e.target.dataset.definition : null;
+    if (key) { if (e.target.open) definitionsOpen.add(key); else definitionsOpen.delete(key); }
+  }, true);
   box.addEventListener('mousedown', e => stepFromInherited(e.target.closest('input[data-field]')));
   box.addEventListener('click', e => {
     // A chapter's name goes to it; a thing not told of yet is added; the rest are the contents' and the editor's buttons.

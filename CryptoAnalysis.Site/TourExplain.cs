@@ -83,6 +83,8 @@ public static class Explain
     public static IReadOnlyList<string> BlocksOf(string term) => term switch
     {
         "Candle" => CandleBlocks.Select(x => x.Name).ToList(),
+        "SuccessiveCandles" => RunBlocks.Select(x => x.Name).ToList(),
+        "Point" => PointBlocks.Select(x => x.Name).ToList(),
         "Swing" => SwingBlocks.Select(x => x.Name).ToList(),
         "Trend" => TrendBlocks.Select(x => x.Name).ToList(),
         _ => [],
@@ -498,9 +500,9 @@ public static class Explain
             case "Candle":
                 return Candle(prices, at, reached, options, known, blocks);
             case "SuccessiveCandles":
-                return Run(prices, at, reached, options, known, out problem);
+                return Run(prices, at, reached, options, known, out problem, blocks);
             case "Point":
-                return Point(prices, at, level, reached, known, out problem);
+                return Point(prices, at, level, reached, known, out problem, blocks);
             case "Swing":
                 return Swing(prices, at, level, reached, out problem, until, known, blocks);
             default:
@@ -538,13 +540,13 @@ public static class Explain
         var unit = Unit(length);
         return new Block(
         [
-            Teach(at, Definitions.Text("Candle.what", period: unit)),
+            Define(at, "Candle.what", period: unit),
             Say(at, $"{Capital(Span(p.DateTime, length))}."),
-            Teach(at, Definitions.Text("Candle.body", period: unit)),
+            Define(at, "Candle.body", period: unit),
             Say(at, $"Open {Money(p.Open)}, close {Money(p.Close)}.", hold: 0),
             Pin(at, "open", "left", $"open: {Money(p.Open)}", 4),
             Pin(at, "close", "right", $"close: {Money(p.Close)}", 4),
-            Teach(at, Definitions.Text("Candle.wicks", period: unit)),
+            Define(at, "Candle.wicks", period: unit),
             Say(at, $"High {Money(p.High)}, low {Money(p.Low)}.", hold: 0),
             Pin(at, "high", "above", $"high: {Money(p.High)}", 2.5),
             Pin(at, "low", "below", $"low: {Money(p.Low)}", 2.5),
@@ -571,7 +573,7 @@ public static class Explain
             cues.Add(Pin(other, up ? "low" : "high", up ? "below" : "above", colour, 3.5, EnumDetail.Education));
         }
 
-        cues.Add(Teach(Math.Max(at, other), Definitions.Text("Candle.colour")));
+        cues.Add(Define(Math.Max(at, other), "Candle.colour"));
         return new Block(cues, ["candles"]);
     }
 
@@ -581,7 +583,7 @@ public static class Explain
     /// of the run the candle is and how far the run goes, told on the run's last candle, which the replay runs to. Null,
     /// with the problem, when the candle is in no such run.
     /// </summary>
-    public static JsonObject? Run(List<Price> prices, int at, int reached, ExplainOptions? options, int? known, out string problem)
+    public static JsonObject? Run(List<Price> prices, int at, int reached, ExplainOptions? options, int? known, out string problem, IReadOnlyCollection<string>? blocks = null)
     {
         options ??= ExplainOptions.Default;
         var drawn = Math.Max(Math.Max(at, reached), known ?? 0);
@@ -592,17 +594,28 @@ public static class Explain
             return null;
         }
 
-        var up = p.Close > p.Open;
-        var length = Length(prices);
-        var colour = up ? "green" : "red";
-        var term = up ? "Successive Green Candles" : "Successive Red Candles";
-        var cues = new JsonArray
-        {
-            Teach(run.Last, Definitions.Text("SuccessiveCandles.what")),
-            Say(run.Last, $"{Capital(Ordinal(run.Position))} of {Words(run.Length)} {term}, {Clock(prices[run.First].DateTime, length)} to {Clock(prices[run.Last].DateTime, length)}."),
-        };
         problem = "";
-        return Section([Math.Max(0, run.First - 2), run.Last + 2], run.Last > reached ? run.Last : null, ["candles", up ? "SuccessiveGreenCandles" : "SuccessiveRedCandles"], cues);
+        var read = new RunRead(prices, run, p.Close > p.Open);
+        var told = RunBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(read) with { Name = x.Name }).ToArray();
+        return Section([Math.Max(0, run.First - 2), run.Last + 2], run.Last > reached ? run.Last : null, told);
+    }
+
+    // A run of one colour as a section tells it.
+    private sealed record RunRead(List<Price> Prices, CandleRun Run, bool Up);
+
+    // The blocks Successive Candles are told in.
+    private static readonly (string Name, Func<RunRead, Block> Tell)[] RunBlocks = [("Run", RunOf)];
+
+    // What Successive Candles are, then which of the run the candle is and how far the run goes, on the run's last candle.
+    private static Block RunOf(RunRead r)
+    {
+        var length = Length(r.Prices);
+        var term = r.Up ? "Successive Green Candles" : "Successive Red Candles";
+        return new Block(
+        [
+            Define(r.Run.Last, "SuccessiveCandles.what"),
+            Say(r.Run.Last, $"{Capital(Ordinal(r.Run.Position))} of {Words(r.Run.Length)} {term}, {Clock(r.Prices[r.Run.First].DateTime, length)} to {Clock(r.Prices[r.Run.Last].DateTime, length)}."),
+        ], ["candles", r.Up ? "SuccessiveGreenCandles" : "SuccessiveRedCandles"]);
     }
 
     // A candle's place in a run of its colour: which it is, how long the run is and where the run begins and ends.
@@ -624,7 +637,7 @@ public static class Explain
     /// kind, both pinned, and whether it can still move. Null, with the problem, when the candle is not a labelled high or
     /// low at that level.
     /// </summary>
-    public static JsonObject? Point(List<Price> prices, int at, int level, int reached, int? known, out string problem)
+    public static JsonObject? Point(List<Price> prices, int at, int level, int reached, int? known, out string problem, IReadOnlyCollection<string>? blocks = null)
     {
         var drawn = Math.Max(Math.Max(at, reached), known ?? 0);
         if (PointAt(prices.GetRange(0, drawn + 1), at, level) is not { } found)
@@ -633,32 +646,45 @@ public static class Explain
             return null;
         }
 
-        var (point, previous, previousAt) = (found.Point, found.Previous, found.PreviousAt);
-        var length = Length(prices);
+        problem = "";
+        var read = new PointRead(prices, at, level, found);
+        var told = PointBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(read) with { Name = x.Name }).ToArray();
+        return Section([Math.Max(0, found.PreviousAt - 2), at + 2], at > reached ? at : null, told);
+    }
+
+    // A labelled high or low as a section tells it.
+    private sealed record PointRead(List<Price> Prices, int At, int Level, FoundPoint Found);
+
+    // The blocks a high or low is told in.
+    private static readonly (string Name, Func<PointRead, Block> Tell)[] PointBlocks = [("Label", PointLabel), ("Moving", PointMoving)];
+
+    // What the label means and how highs and lows are read, then this close against the high or low before it of the same
+    // kind, both pinned.
+    private static Block PointLabel(PointRead r)
+    {
+        var (point, previous, previousAt) = (r.Found.Point, r.Found.Previous, r.Found.PreviousAt);
         var high = point.Kind == EnumPivotKind.High;
         var kind = high ? "high" : "low";
         var label = point.Label;
-        var more = label is "HH" or "HL";
         var place = high ? "above" : "below";
-        var cues = new JsonArray
-        {
-            Teach(at, Definitions.Text($"Point.{label}")),
-            Teach(at, Definitions.Text("Point.closes")),
-            Say(at, previous == null
-                ? $"{Order(level)} {label} at {Money(point.Price)}."
-                : $"{Order(level)} {label} at {Money(point.Price)}, {(more ? "above" : "below")} the {kind} of {Money(previous.Price)} at {Clock(previous.Time, length)}."),
-            Pin(at, "close", place, $"{label}: {Money(point.Price)}", 4),
-        };
+        List<JsonObject> cues =
+        [
+            Define(r.At, $"Point.{label}"),
+            Define(r.At, "Point.closes"),
+            Say(r.At, previous == null
+                ? $"{Order(r.Level)} {label} at {Money(point.Price)}."
+                : $"{Order(r.Level)} {label} at {Money(point.Price)}, {(label is "HH" or "HL" ? "above" : "below")} the {kind} of {Money(previous.Price)} at {Clock(previous.Time, Length(r.Prices))}."),
+            Pin(r.At, "close", place, $"{label}: {Money(point.Price)}", 4),
+        ];
         if (previous != null)
             cues.Add(Pin(previousAt, "close", Edge(previousAt, place), $"{(previous.Label.Length > 0 ? previous.Label : kind)}: {Money(previous.Price)}", 4));
-        if (point.Provisional)
-        {
-            cues.Add(Teach(at, Definitions.Text("Point.moving")));
-            cues.Add(Say(at, "Still moving."));
-        }
-        problem = "";
-        return Section([Math.Max(0, previousAt - 2), at + 2], at > reached ? at : null, [$"level{level}", "close", "sawtooth", PointLayer(label)], cues, byCandle: true);
+        return new Block(cues, [$"level{r.Level}", "close", "sawtooth", PointLayer(label)]);
     }
+
+    // Whether the high or low can still move: only the latest, while the price keeps closing beyond it.
+    private static Block PointMoving(PointRead r) => r.Found.Point.Provisional
+        ? new Block([Define(r.At, "Point.moving"), Say(r.At, "Still moving.")], [])
+        : Block.None;
 
     private sealed record FoundPoint(StructurePoint Point, StructurePoint? Previous, int PreviousAt);
 
@@ -744,7 +770,7 @@ public static class Explain
         var kind = s.Up ? "high" : "low";
         return new Block(
         [
-            Teach(s.First, Definitions.Text("Swing.what", s.Direction)),
+            Define(s.First, "Swing.what", s.Direction),
             Say(s.First, $"{Order(s.Level)} {s.Name}, from {Named(s.StartLabel, kind)} at {Money(s.Swing.Start.Price)}, {At(s.Swing.Start.Time, s.Period)}."),
             Pin(s.First, "close", Edge(s.First, s.Up ? "above" : "below"), $"{s.StartLabel ?? kind}: {Money(s.Swing.Start.Price)}", 4),
         ], [$"level{s.Level}", s.Name, .. Labelled(s.StartLabel)]);
@@ -753,7 +779,7 @@ public static class Explain
     // Its Swing Low or Swing High: what the turn is, then this one and what kind of low or high it is.
     private static Block SwingTurn(SwingRead s) => new(
     [
-        Teach(s.ExtremeAt, Definitions.Text("Swing.turn", s.Direction)),
+        Define(s.ExtremeAt, "Swing.turn", s.Direction),
         Say(s.ExtremeAt, $"{s.Turn}: {Named(s.TurnLabel, s.Up ? "low" : "high")} at {Money(s.Swing.Extreme.Price)}."),
         Pin(s.ExtremeAt, "close", s.Up ? "below" : "above", $"{s.Turn}: {Money(s.Swing.Extreme.Price)}", 4),
     ], Labelled(s.TurnLabel));
@@ -765,8 +791,8 @@ public static class Explain
             return Block.None;
         return new Block(
         [
-            Teach(at, Definitions.Text("Swing.msb", s.Direction)),
-            Teach(at, Definitions.Text("Swing.against", s.Direction)),
+            Define(at, "Swing.msb", s.Direction),
+            Define(at, "Swing.against", s.Direction),
             Say(at, $"MSB at {Money(s.Prices[at].Close)}, {(s.Up ? "below" : "above")} the {s.Turn} of the {s.Name} before."),
             Pin(at, "close", "left", "MSB", 3.5),
         ], [s.Up ? "BearishMarketStructureBreak" : "BullishMarketStructureBreak", s.Up ? "msbLevelDown" : "msbLevelUp"]);
@@ -775,8 +801,8 @@ public static class Explain
     // Its BoS: what a BoS is and that it Confirms the Swing, then this one.
     private static Block SwingBos(SwingRead s) => new(
     [
-        Teach(s.BosAt, Definitions.Text("Swing.bos", s.Direction)),
-        Teach(s.BosAt, Definitions.Text("Swing.candidate", s.Direction)),
+        Define(s.BosAt, "Swing.bos", s.Direction),
+        Define(s.BosAt, "Swing.candidate", s.Direction),
         Say(s.BosAt, $"BoS at {Money(s.Swing.BreakOfStructure!.Price)}."),
         Pin(s.BosAt, "close", s.Up ? "above" : "below", "BoS", 4),
     ], [s.Up ? "BullishBreakOfStructure" : "BearishBreakOfStructure", s.Up ? "bosLevelUp" : "bosLevelDown"]);
@@ -787,7 +813,7 @@ public static class Explain
         var (first, second) = s.Up ? ("Downleg", "Upleg") : ("Upleg", "Downleg");
         return new Block(
         [
-            Teach(s.BosAt, Definitions.Text("Swing.legs", s.Direction)),
+            Define(s.BosAt, "Swing.legs", s.Direction),
             Say(s.BosAt, $"The {first} is {Duration(s.ExtremeAt - s.First, s.Period)}; the {second} is {Duration(s.BosAt - s.ExtremeAt, s.Period)}."),
         ], []);
     }
@@ -796,9 +822,9 @@ public static class Explain
     private static Block SwingStrength(SwingRead s)
     {
         var weak = s.MsbAt != null;
-        List<JsonObject> cues = [Teach(s.BosAt, Definitions.Text("Swing.strong", s.Direction))];
+        List<JsonObject> cues = [Define(s.BosAt, "Swing.strong", s.Direction)];
         if (weak)
-            cues.Add(Teach(s.BosAt, Definitions.Text("Swing.weak", s.Direction)));
+            cues.Add(Define(s.BosAt, "Swing.weak", s.Direction));
         cues.Add(Say(s.BosAt, weak ? "Weak: it has an MSB." : "Strong: no MSB."));
         return new Block(cues, []);
     }
@@ -877,7 +903,7 @@ public static class Explain
     // The Trend: what one is, then where this one begins.
     private static Block TrendBegins(TrendRead t) => new(
     [
-        Teach(t.StartAt, Definitions.Text("Trend.what", t.Direction)),
+        Define(t.StartAt, "Trend.what", t.Direction),
         Say(t.StartAt, $"{Order(t.Level)} {t.Name}, beginning {At(t.Trend.Start.Time, t.Period)}."),
         Pin(t.StartAt, "close", Edge(t.StartAt, t.Place), $"{t.Name} begins", 4),
     ], [$"level{t.Level}", t.Swing, t.Name, "trendArrows"]);
@@ -885,7 +911,7 @@ public static class Explain
     // The second Swing's BoS: what Confirms a Trend, then where this one was.
     private static Block TrendConfirmed(TrendRead t) => new(
     [
-        Teach(t.ConfirmedAt, Definitions.Text("Trend.confirmed", t.Direction)),
+        Define(t.ConfirmedAt, "Trend.confirmed", t.Direction),
         Say(t.ConfirmedAt, $"Confirmed at the second {t.Swing}'s BoS, {At(t.Trend.Confirmed.Time, t.Period)}."),
         Pin(t.ConfirmedAt, "close", t.Place, $"{t.Name} Confirmed", 4),
     ], [t.Up ? "BullishBreakOfStructure" : "BearishBreakOfStructure"]);
@@ -902,9 +928,9 @@ public static class Explain
         List<JsonObject> cues = [];
         if (t.Weak.Count > 0)
             cues.AddRange([
-                Teach(t.Until, Definitions.Text("Swing.strong", t.Direction)),
-                Teach(t.Until, Definitions.Text("Swing.weak", t.Direction)),
-                Teach(t.Until, Definitions.Text("Trend.next", t.Direction)),
+                Define(t.Until, "Swing.strong", t.Direction),
+                Define(t.Until, "Swing.weak", t.Direction),
+                Define(t.Until, "Trend.next", t.Direction),
             ]);
         cues.Add(Say(t.Until, t.Weak.Count == 0 ? "All Strong." : $"{Capital(Words(t.Weak.Count))} Weak: the {List(t.Weak)}."));
         return new Block(cues, t.Weak.Count > 0 ? [t.Up ? "BearishMarketStructureBreak" : "BullishMarketStructureBreak"] : []);
@@ -913,7 +939,7 @@ public static class Explain
     // Its Strength: what it is, then this one's.
     private static Block TrendStrength(TrendRead t) => new(
     [
-        Teach(t.Until, Definitions.Text("Trend.strength", t.Direction)),
+        Define(t.Until, "Trend.strength", t.Direction),
         Say(t.Until, $"Strength {t.Trend.Strength}%: {Words(t.Trend.Strong)} of {Words(t.Trend.Swings)}."),
     ], []);
 
@@ -923,19 +949,19 @@ public static class Explain
         if (t.EndedAt is not int at)
             return new Block(
             [
-                Teach(t.Until, Definitions.Text("Trend.ends", t.Direction)),
+                Define(t.Until, "Trend.ends", t.Direction),
                 Say(t.Until, $"Still running: no {t.Other} Confirmed since."),
             ], []);
         return new Block(
         [
-            Teach(t.Until, Definitions.Text("Trend.ends", t.Direction)),
+            Define(t.Until, "Trend.ends", t.Direction),
             Say(t.Until, $"Ended at the first {t.Other}'s BoS, {At(t.Trend.End!.Time, t.Period)}."),
             Pin(at, "close", t.Up ? "below" : "above", $"{t.Name} ends", 4),
         ], [t.Other]);
     }
 
     // What a Trend's count claims: nothing about what the price does next.
-    private static Block TrendIsACount(TrendRead t) => new([Teach(t.Until, Definitions.Text("Trend.count", t.Direction))], []);
+    private static Block TrendIsACount(TrendRead t) => new([Define(t.Until, "Trend.count", t.Direction)], []);
 
     // What a section tells of one term: its cues, and the layers that draw what they speak of.
     private sealed record Block(IReadOnlyList<JsonObject> Cues, IReadOnlyList<string> Layers)
@@ -1043,6 +1069,19 @@ public static class Explain
 
     // A text about things of this kind: shown at Education only.
     private static JsonObject Teach(int at, string education) => new() { ["at"] = at, ["texts"] = Texts((EnumDetail.Education, education)) };
+
+    // A definition taught: its text at Education, with the definition it is, so the editor can change that wherever it is
+    // told, and the direction and period it is told in.
+    private static JsonObject Define(int at, string key, EnumSwingDirection? direction = null, string? period = null)
+    {
+        var cue = Teach(at, Definitions.Text(key, direction, period));
+        cue["definition"] = key;
+        if (direction is { } d)
+            cue["direction"] = d == EnumSwingDirection.Up ? "Up" : "Down";
+        if (period != null)
+            cue["period"] = period;
+        return cue;
+    }
 
     // A label pinned to a point of a candle: shown, not read. At Summary unless given, as it marks this instance.
     private static JsonObject Pin(int at, string on, string place, string text, double hold, EnumDetail detail = EnumDetail.Summary) =>

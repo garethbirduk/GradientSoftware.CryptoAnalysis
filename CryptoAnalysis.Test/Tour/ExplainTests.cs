@@ -124,6 +124,24 @@ public class ExplainTests
     }
 
     [TestMethod]
+    public void RunAndPoint_AreToldInBlocks_AndAWrittenDefinitionSaysWhichItIs()
+    {
+        CollectionAssert.AreEqual(new[] { "Run" }, Explain.BlocksOf("SuccessiveCandles").ToArray());
+        CollectionAssert.AreEqual(new[] { "Label", "Moving" }, Explain.BlocksOf("Point").ToArray());
+
+        var run = Explain.Run(TourPrices.Value, 87, reached: 90, null, null, out _)!;
+        CollectionAssert.AreEqual(new[] { "Run.1", "Run.2" }, run["cues"]!.AsArray().Select(x => x!["id"]!.GetValue<string>()).ToArray());
+        Assert.AreEqual("SuccessiveCandles.what", run["cues"]![0]!["definition"]!.GetValue<string>());
+        Assert.IsNull(run["cues"]![1]!["definition"], "This run is not a definition.");
+
+        var swing = Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Bos"] }""")!.AsObject(), TourPrices.Value, 100, "section 1", []);
+        var bos = swing["cues"]!.AsArray().First(x => x!["definition"]?.GetValue<string>() == "Swing.bos")!;
+        Assert.AreEqual("Up", bos["direction"]!.GetValue<string>());
+        Assert.AreEqual(Definitions.Text("Swing.bos", EnumSwingDirection.Up), bos["texts"]!["education"]!.GetValue<string>());
+        Assert.AreEqual("hour", Explain.Candle(TourPrices.Value, 48, reached: 50)["cues"]![0]!["period"]!.GetValue<string>());
+    }
+
+    [TestMethod]
     public void Point_TellsOfTheHighAgainstTheOneBefore()
     {
         var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
