@@ -133,11 +133,12 @@
       ]
     },
     {
+      "explain": "Swing",
+      "at": 47,
+      "until": 67,
+      "blocks": ["Begins", "Turn", "Bos", "Legs"],
       "add": ["Downswing"],
-      "remove": ["bosLevelDown"],
-      "cues": [
-        { "texts": { "education": "And we can define a Downswing, characterised by an Upleg from the LL to the Swing High, followed by a Downleg from the Swing High to the BoS." } }
-      ]
+      "remove": ["bosLevelDown"]
     },
     {
       "remove": ["LowerLow", "LowerHigh", "BearishBreakOfStructure"],

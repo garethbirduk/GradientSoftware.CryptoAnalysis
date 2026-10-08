@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 using CryptoAnalysis.Csv.ClassMaps;
 using Gradient.CryptoAnalysis.Csv;
 using Gradient.CryptoAnalysis.Site;
@@ -28,7 +28,7 @@ public class TourTests
     private static TourScript Compile()
     {
         var def = JsonNode.Parse(File.ReadAllText(TourPath)) ?? throw new InvalidOperationException("tour.json is empty");
-        return Tours.Compile(def, Datasets.Value);
+        return Tours.Compile(def, Datasets.Value, teachOnce: true);
     }
 
     [TestMethod]

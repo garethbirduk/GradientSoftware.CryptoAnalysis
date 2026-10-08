@@ -425,6 +425,28 @@ public class ExplainTests
     }
 
     [TestMethod]
+    public void Compile_TeachOnce_LeavesOutWhatAWrittenSectionBeforeHasTaught()
+    {
+        // The tour's Upswing then its Downswing, both at the 1st order, seen from #67.
+        var def = JsonNode.Parse("""
+            { "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [
+              { "from": 0, "until": 67 },
+              { "explain": "Swing", "at": 12, "blocks": ["Bos"] },
+              { "explain": "Swing", "at": 47, "until": 67, "blocks": ["Bos"] } ] }
+            """)!;
+        var bos = Definitions.Text("Swing.bos");
+
+        var once = Tours.Compile(def, TourPrices.Value, teachOnce: true);
+        var each = Tours.Compile(def, TourPrices.Value);
+
+        Assert.AreEqual(0, once.Errors.Count, string.Join("\n", once.Errors));
+        Assert.IsTrue(once.Sections[1].Cues.Any(c => c.Text == bos), "The Upswing teaches what a BoS is.");
+        Assert.IsFalse(once.Sections[2].Cues.Any(c => c.Text == bos), "The Downswing does not teach it again.");
+        Assert.IsTrue(once.Sections[2].Cues.Any(c => c.Text == "BoS at 16655."), "It still says its own BoS.");
+        Assert.IsTrue(each.Sections[2].Cues.Any(c => c.Text == bos), "An analysis teaches each chapter in full.");
+    }
+
+    [TestMethod]
     public void Expand_ListsWhatItCannotExplain()
     {
         var errors = new List<string>();

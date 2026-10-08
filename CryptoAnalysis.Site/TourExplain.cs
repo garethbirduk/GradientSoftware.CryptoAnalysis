@@ -155,15 +155,20 @@ public static class Explain
 
         foreach (var (key, value) in written.Where(x => x.Key != "cues"))
             result[key] ??= value?.DeepClone();
-        // A definition is taught where the tour cites it; a written section does not teach it again.
-        static bool Cited(JsonNode? cue, IReadOnlySet<string> cited) => cue?["texts"] is JsonObject texts && texts.Count == 1
-            && texts[Details.Name(EnumDetail.Education)]?.GetValue<string>() is { } text && cited.Contains(text);
+        // A definition is taught once, where the tour first tells it; a written section does not teach it again.
         var cues = new JsonArray();
-        foreach (var cue in (written["cues"]?.AsArray() ?? []).Where(x => cited == null || !Cited(x, cited)).Concat(node["cues"]?.AsArray() ?? []))
+        foreach (var cue in (written["cues"]?.AsArray() ?? []).Where(x => cited == null || Taught(x) is not { } text || !cited.Contains(text)).Concat(node["cues"]?.AsArray() ?? []))
             cues.Add(cue?.DeepClone());
         result["cues"] = cues;
         return result;
     }
+
+    /// <summary>
+    /// What a cue teaches: its text when it has one at Education alone, as a written section's teaching does; else null.
+    /// </summary>
+    public static string? Taught(JsonNode? cue) => cue?["texts"] is JsonObject texts && texts.Count == 1
+        ? texts[Details.Name(EnumDetail.Education)]?.GetValue<string>()
+        : null;
 
     /// <summary>
     /// What is at a candle, as the chart had it at the cursor it was seen from (seen, the Replay page's; else the end of
