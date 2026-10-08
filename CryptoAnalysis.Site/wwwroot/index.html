@@ -1112,7 +1112,8 @@ function liveView(ex, t) {
   // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
   const window = ex.tour ? tourWindow(ex, t)
     : isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
-  const cut = a => a.slice(window?.from ?? 0, t + 1);
+  // A tour's chart has the candles either side of its view as well, to pan to.
+  const cut = a => a.slice(ex.tour ? Math.max(0, window.from - TOUR_CONTEXT) : window?.from ?? 0, t + 1);
   const prices = { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) };
   if (!r) {
     prefetch(ex, t);
@@ -1164,7 +1165,7 @@ function drawReplayExtras(ex, traces, level) {
   const box = (start, end, a, b) => ({ x: [start, end, end, start, start], y: [a, a, b, b, a] });
 
   if (on('future') && t + 1 < full.prices.t.length) {
-    const rest = a => a.slice(t + 1, ex.window ? ex.window.to + 1 : undefined), grey = css('--close');
+    const rest = a => a.slice(t + 1, ex.window ? ex.window.to + 1 + (ex.tour ? TOUR_CONTEXT : 0) : undefined), grey = css('--close');
     traces.push({ type: 'candlestick', name: 'Future', x: rest(full.prices.t), open: rest(full.prices.o), high: rest(full.prices.h), low: rest(full.prices.l), close: rest(full.prices.c),
       opacity: 0.3, increasing: { line: { color: grey, width: 1 }, fillcolor: withAlpha(grey, 0.3) }, decreasing: { line: { color: grey, width: 1 }, fillcolor: withAlpha(grey, 0.6) }, hoverinfo: 'skip' });
   }
@@ -1916,8 +1917,12 @@ function draw(el, ex, focus) {
   // follows the cursor with a moving window.
   const full = (ex.hindsight ?? ex).prices, w = ex.window;
   const span = a => w ? a.slice(w.from, w.to + 1) : a;
-  const times = span(full.t).map(Date.parse), first = times[0], last = times[times.length - 1], candle = (last - first) / Math.max(1, times.length - 1);
-  const view = { t: times, h: span(full.h), l: span(full.l), candle, x: [new Date(first - candle).toISOString(), new Date(last + candle).toISOString()],
+  // A view of one candle is as wide as a candle of the dataset either side of it.
+  const oneCandle = full.t.length > 1 ? Date.parse(full.t[1]) - Date.parse(full.t[0]) : 3600000;
+  const times = span(full.t).map(Date.parse), first = times[0], last = times[times.length - 1], candle = times.length > 1 ? (last - first) / (times.length - 1) : oneCandle;
+  // Room either side is a candle, or for a view of one candle just over half of one, so its neighbours stay out of frame.
+  const pad = times.length > 1 ? candle : candle * 0.6;
+  const view = { t: times, h: span(full.h), l: span(full.l), candle, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
     from: w?.from ?? 0, numbered: !!ex.tour, floor: ex.tour ? 0.01 : 0,
     until: ex.tour && !on('future') ? Date.parse(full.t[ex.cursor]) : undefined, now: ex.tour ? [full.l[ex.cursor], full.h[ex.cursor]] : null,
     pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46) };
@@ -2519,16 +2524,19 @@ async function loadAnalysis(params) {
 
 // An analysis's sections, each thing's in two chapters: what a thing of its kind is, told from its texts at Education, then
 // what this one is, from its texts at Summary, each a section of tour.json with its "detail". Both run through the same
-// candles.
+// candles. A Candle has a third, after its own: whether it is green or red, run on to one of the other colour, and the rule
+// (its Colour block), as both kinds are on the chart only then.
+const AFTER_CHAPTERS = { Candle: [{ chapter: 'Green and red candles', blocks: ['Colour'] }] };
+// The blocks a term is told in, as the server has them (Explain.BlocksOf), for those with chapters after their own.
+const BLOCKS = { Candle: ['Shape', 'Colour'] };
 function splitExplanations(def) {
   const word = s => s.thing?.startsWith('SuccessiveCandles') ? 'Successive Candles' : (s.chapter ?? '').split(' ').pop();
   const named = s => { const w = word(s); return w === 'Successive Candles' ? 'What are Successive Candles?' : `What is ${/^[AEIOU]|^(HH|HL|LH|LL|MSB)$/.test(w) ? 'an' : 'a'} ${w}?`; };
   // A kind of thing is explained once: a second Downtrend's explanation is there, but off, one tick away.
-  const told = new Set();
+  const told = new Set(), explains = (s, name) => { const repeat = told.has(name); told.add(name); return { ...s, chapter: name, detail: 'education', explains: true, ...(repeat ? { repeat } : {}) }; };
   def.sections = (def.sections ?? []).flatMap(s => {
-    const name = named(s), repeat = told.has(name);
-    told.add(name);
-    return [{ ...s, chapter: name, detail: 'education', explains: true, ...(repeat ? { repeat } : {}) }, { ...s, detail: 'summary' }];
+    const after = AFTER_CHAPTERS[s.explain] ?? [], own = after.length ? { blocks: BLOCKS[s.explain].filter(b => !after.some(a => a.blocks.includes(b))) } : {};
+    return [explains({ ...s, ...own }, named(s)), { ...s, ...own, detail: 'summary' }, ...after.map(a => explains({ ...s, blocks: a.blocks }, a.chapter))];
   });
   return def;
 }
@@ -2792,9 +2800,9 @@ function learnMore(ids) {
 // written texts' edits (by id), is kept by the local server against the analysis's candle, cursor and settings
 // (editsKeyOf), and laid over the sections written from the prices each time the analysis is written, so whatever is not
 // changed follows the prices and the definitions as they are.
-const sectionKey = s => `${s.thing}|${s.detail}`;
+const sectionKey = s => `${s.thing}|${s.detail}${s.blocks ? `|${s.blocks.join('+')}` : ''}`;
 // The settings of a section an analysis writes for itself, which its changes do not keep.
-const OWN_KEYS = ['thing', 'detail', 'explains', 'repeat', 'explain', 'at', 'level', 'known', 'runs'];
+const OWN_KEYS = ['thing', 'detail', 'blocks', 'explains', 'repeat', 'explain', 'at', 'level', 'known', 'runs'];
 
 // The written analysis with its own changes over it, as a copy: a setting changed to nothing is as written, or left out
 // when nothing was written for it.
@@ -3004,8 +3012,8 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
     return { index: resolved.get(key), spec: `${spec} → #${resolved.get(key)}` };
   };
   const ids = (list, where) => (list ?? []).map(id => LAYER_ALIASES[id] ?? id).filter(id => known.has(id) || void errors.push(`${where}: unknown layer "${id}"`));
-  const range = (v, where) => Array.isArray(v) && v.length === 2 && v.every(Number.isInteger) && v[0] >= 0 && v[1] > v[0] ? v
-    : (errors.push(`${where}: the view is the first and last candle shown, the last after the first`), null);
+  const range = (v, where) => Array.isArray(v) && v.length === 2 && v.every(Number.isInteger) && v[0] >= 0 && v[1] >= v[0] ? v
+    : (errors.push(`${where}: the view is the first and last candle shown, the last at or after the first`), null);
   const renamed = (o, where) => { if (o.window != null) errors.push(`${where}: "window" is now "view", the first and last candle shown`); };
   const rate = (s, where) => s > 0 ? s : (errors.push(`${where}: speed must be more than 0`), 4);
   const start = def.start ?? {}, startLayers = ids(start.layers, 'start');
@@ -3120,8 +3128,18 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
 // and an analysis, which shows no pins, leaves its pinned texts out, so they do not hold the run for their seconds either.
 function recompile(t = tour) {
   Object.assign(t, compileTour(t.def, t.scenes, t.resolved, t.audio, t.detail, { teachOnce: t.page === 'Tour' }));
-  if (t.pins === false) for (const s of t.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
+  if (t.pins === false) for (const s of t.sections) for (const c of s.cues) if (c.on != null) c.skipped = true; else timeCue(c, t.audio, false);
   return t;
+}
+
+// A text's time on show: its clip's length when it has one, else the time it takes to read. A hold the text gives itself
+// stands, but not a hold of 0 on a player that shows no pins, as that is given to leave the caption up while pins show.
+// Called again as clips come in, it changes the text in place, as the player holds it.
+function timeCue(c, audio, pins = true) {
+  if (c.given != null && !(c.given === 0 && pins === false)) return;
+  const clip = !c.silent && c.text ? audio?.[textKey(c.text)] : null;
+  c.clip = clip?.seconds > 0 ? clip.seconds : 0;
+  c.hold = c.clip ? c.clip + NORMAL_PACE.gap : readingSeconds(c.text ?? '');
 }
 
 // What a compiled player is waiting for, looked up: each event, and each section that explains something, which goes to
@@ -3308,6 +3326,8 @@ function sectionView(t) {
 // A view that is not the one on show is not cut to: the chart eases from the one to the other, so it reads as the same
 // chart zooming or moving.
 const TOUR_ZOOM_MS = 1500;
+// Candles a tour's chart has either side of its view, to pan to.
+const TOUR_CONTEXT = 48;
 
 function tourView(t) {
   const view = sectionView(t), zoom = tour.zoom;
@@ -3318,7 +3338,7 @@ function tourView(t) {
 
 function tourWindow(ex, t) {
   const [from, to] = tourView(t), last = ex.prices.t.length - 1;
-  return { from: Math.min(from, last - 1), to: Math.min(Math.max(to, from + 1), last) };
+  return { from: Math.min(from, last), to: Math.min(Math.max(to, from), last) };
 }
 
 function zoomTour(from) {
@@ -3429,7 +3449,8 @@ function hush() {
   tour.voice = { now: null, waiting: [] };
 }
 
-const voiceOn = () => state.tourVoice === true;
+// The voice is on until it is turned off; a page opened for the video tool leaves the voice to the recording.
+const voiceOn = () => !videoMode && state.tourVoice !== false;
 
 // The pace the Speed slider is set to. A recording is always made at Normal, as its clips are laid at their own length.
 const tourPace = () => tour?.recording || videoMode ? NORMAL_PACE : TOUR_PACES.find(p => p.name === state.tourPaceName) ?? NORMAL_PACE;
@@ -3695,7 +3716,10 @@ async function loadPlayerAudio() {
   const mine = tour;
   mine.audioAt = performance.now();
   const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
-  if (audio) mine.audio = audio;
+  if (!audio) return;
+  mine.audio = audio;
+  // A text compiled before its clip was read takes the clip's length now, so it stays on show while it is read.
+  for (const s of mine.sections) for (const c of s.cues) if (!c.skipped) timeCue(c, audio, mine.pins);
 }
 
 // ---- The slider: a chapter in seconds ---------------------------------------------------------------------------------

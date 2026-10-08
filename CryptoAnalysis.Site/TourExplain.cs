@@ -82,6 +82,7 @@ public static class Explain
     /// </summary>
     public static IReadOnlyList<string> BlocksOf(string term) => term switch
     {
+        "Candle" => CandleBlocks.Select(x => x.Name).ToList(),
         "Swing" => SwingBlocks.Select(x => x.Name).ToList(),
         "Trend" => TrendBlocks.Select(x => x.Name).ToList(),
         _ => [],
@@ -320,7 +321,7 @@ public static class Explain
         switch (thing.Kind)
         {
             case "Candle":
-                return new JsonObject { ["chapter"] = "Candle", ["explain"] = thing.Kind, ["at"] = index, ["from"] = Math.Max(0, index - CandlesBefore), ["known"] = cursor, ["layers"] = Layers("candles"), ["speed"] = 8.0 };
+                return new JsonObject { ["chapter"] = "Candle", ["explain"] = thing.Kind, ["at"] = index, ["from"] = index, ["known"] = cursor, ["layers"] = Layers("candles"), ["speed"] = 8.0 };
             case "SuccessiveCandles":
             {
                 if (RunAt(known, index, options) is not { } run)
@@ -495,7 +496,7 @@ public static class Explain
         switch (term)
         {
             case "Candle":
-                return Candle(prices, at, reached, options, known);
+                return Candle(prices, at, reached, options, known, blocks);
             case "SuccessiveCandles":
                 return Run(prices, at, reached, options, known, out problem);
             case "Point":
@@ -508,25 +509,35 @@ public static class Explain
     }
 
     /// <summary>
-    /// The written parts of a section that explains one candle, a block for each term in it. The Candle: when it is and
-    /// its four prices, pinned to it, with what a candle is at Education. Its colour: why it is green or red, with the
-    /// nearest candle of the other colour for contrast. The view has the candle a little right of centre; until is set
-    /// when the replay has not reached it. The run it may be in is a thing of its own (see <see cref="Run"/>).
+    /// The written parts of a section that explains one candle, in two blocks. Shape: what a candle is, when this one is
+    /// and its four prices, pinned to it. Colour: whether this one is green or red, then, run on to the next candle of the
+    /// other colour so both are on the chart, what makes a candle green or red. The view is the candle alone, or the
+    /// candle and the one run on to; the chart has the candles either side to pan to. until is set when the replay has not
+    /// reached the last candle told of. The run it may be in is a thing of its own (see <see cref="Run"/>).
     /// </summary>
-    public static JsonObject Candle(List<Price> prices, int at, int reached, ExplainOptions? options = null, int? known = null)
+    public static JsonObject Candle(List<Price> prices, int at, int reached, ExplainOptions? options = null, int? known = null, IReadOnlyCollection<string>? blocks = null)
+    {
+        var told = CandleBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(prices, at) with { Name = x.Name }).ToArray();
+        var last = told.SelectMany(x => x.Cues).Max(x => x["at"]!.GetValue<int>());
+        return Section([at, last], last > reached ? last : null, told);
+    }
+
+    // The blocks a Candle is told in, in order: each from the prices and the candle.
+    private static readonly (string Name, Func<List<Price>, int, Block> Tell)[] CandleBlocks =
+    [
+        ("Shape", CandleShape),
+        ("Colour", CandleColour),
+    ];
+
+    // What a candle is, and this one: when it is, its open and close and the body between, then its high and low and the
+    // wicks that reach them. Every text waits for the candle, so the replay draws it before anything is said.
+    private static Block CandleShape(List<Price> prices, int at)
     {
         var p = prices[at];
         var length = Length(prices);
         var unit = Unit(length);
-        var up = p.Close > p.Open;
-        var flat = p.Close == p.Open;
-        var view = new[] { Math.Max(0, at - CandlesBefore), at + CandlesAfter };
-        var layers = new List<string> { "candles" };
-
-        // Every text waits for the candle, so the replay draws it before anything is said, whether or not it was there already.
-        // The Candle: what one is, then this one.
-        var cues = new JsonArray
-        {
+        return new Block(
+        [
             Teach(at, Definitions.Text("Candle.what", period: unit)),
             Say(at, $"{Capital(Span(p.DateTime, length))}."),
             Teach(at, Definitions.Text("Candle.body", period: unit)),
@@ -537,29 +548,31 @@ public static class Explain
             Say(at, $"High {Money(p.High)}, low {Money(p.Low)}.", hold: 0),
             Pin(at, "high", "above", $"high: {Money(p.High)}", 2.5),
             Pin(at, "low", "below", $"low: {Money(p.Low)}", 2.5),
-        };
+        ], ["candles"]);
+    }
 
-        // Its colour: the rule, then this one; at Education, the nearest candle in view of the other colour, the one before
-        // preferred, set against it. It is one the section reaches, so its pin is shown: a candle known from the cursor but
-        // after the section's last is not.
-        cues.Add(Teach(at, Definitions.Text("Candle.colour")));
-        cues.Add(Say(at, flat ? "No body: it closed where it opened." : up ? "Green: it closed above its open." : "Red: it closed below its open."));
-        if (!flat)
+    // Candles a Colour block looks ahead for one of the other colour.
+    private const int ColourAhead = 60;
+
+    // Whether this candle is green or red; then the next candle of the other colour, run on to, so both kinds are on the
+    // chart; and only then the rule, with both there to show it. A candle with no body is neither, and has the rule alone.
+    private static Block CandleColour(List<Price> prices, int at)
+    {
+        var p = prices[at];
+        var up = p.Close > p.Open;
+        var flat = p.Close == p.Open;
+        var cues = new List<JsonObject> { Teach(at, flat ? "This one has no body: it closed where it opened." : up ? "This one is green: it closed above its open." : "This one is red: it closed below its open.") };
+        var other = flat ? -1 : Enumerable.Range(at + 1, Math.Max(0, Math.Min(ColourAhead, prices.Count - 1 - at)))
+            .FirstOrDefault(i => up ? prices[i].Close < prices[i].Open : prices[i].Close > prices[i].Open, -1);
+        if (other >= 0)
         {
-            var last = Math.Max(at, reached);
-            var other = Enumerable.Range(1, CandlesBefore + CandlesAfter)
-                .SelectMany(d => new[] { at - d, at + d })
-                .Where(i => i >= view[0] && i <= Math.Min(last, view[1]) && i != at)
-                .FirstOrDefault(i => up ? prices[i].Close < prices[i].Open : prices[i].Close > prices[i].Open, -1);
-            if (other >= 0)
-            {
-                var colour = up ? "red" : "green";
-                cues.Add(Teach(at, $"{Which(other - at)} closed {(up ? "lower" : "higher")} than the open, so it is {colour}."));
-                cues.Add(Pin(other, up ? "low" : "high", up ? "below" : "above", colour, 3.5, EnumDetail.Education));
-            }
+            var colour = up ? "red" : "green";
+            cues.Add(Teach(other, $"{Which(other - at)} closed {(up ? "lower" : "higher")} than its open, so it is {colour}."));
+            cues.Add(Pin(other, up ? "low" : "high", up ? "below" : "above", colour, 3.5, EnumDetail.Education));
         }
 
-        return Section(view, at > reached ? at : null, layers, cues);
+        cues.Add(Teach(Math.Max(at, other), Definitions.Text("Candle.colour")));
+        return new Block(cues, ["candles"]);
     }
 
     /// <summary>

@@ -361,7 +361,8 @@
     },
     {
       "explain": "Candle",
-      "at": 48
+      "at": 48,
+      "view": [44, 51]
     },
     {
       "chapter": "Wicks and breaks",

@@ -156,9 +156,9 @@ public static class Tours
         int[] Range(JsonNode? node, string where, int[] fallback)
         {
             var values = node?.AsArray().Select(x => x?.GetValue<int>()).ToArray();
-            if (values is [int first, int last] && first >= 0 && last > first)
+            if (values is [int first, int last] && first >= 0 && last >= first)
                 return [first, last];
-            errors.Add($"{where}: the view is the first and last candle shown, the last after the first");
+            errors.Add($"{where}: the view is the first and last candle shown, the last at or after the first");
             return fallback;
         }
 

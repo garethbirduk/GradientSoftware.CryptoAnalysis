@@ -56,10 +56,10 @@
 #48 · section 46 text 8 "High 16700, low 16639." · seen at #50: L1 LH*
 #48 · section 46 text 9 "high: 16700" on high · seen at #50: L1 LH*
 #48 · section 46 text 10 "low: 16639" on low · seen at #50: L1 LH*
-#48 · section 46 text 11 "A candle that closes above its open is green. A candle that closes below its open is red. One that closes where it opened has no body, and is neither." · seen at #50: L1 LH*
-#48 · section 46 text 12 "Green: it closed above its open." · seen at #50: L1 LH*
-#48 · section 46 text 13 "The candle before it closed lower than the open, so it is red." · seen at #50: L1 LH*
-#47 · section 46 text 14 "red" on low · seen at #50: L1 LL
+#48 · section 46 text 11 "This one is green: it closed above its open." · seen at #50: L1 LH*
+#49 · section 46 text 12 "The candle after it closed lower than its open, so it is red." · seen at #50: nothing
+#49 · section 46 text 13 "red" on low · seen at #50: nothing
+#49 · section 46 text 14 "A candle that closes above its open is green. A candle that closes below its open is red. One that closes where it opened has no body, and is neither." · seen at #50: nothing
 #75 · section 47 (Wicks and breaks) runs to it: L1 HH* · L1 upswing BoS
 #45 · section 48 text 2 "HH" on close · seen at #75: L1 HH · L1 upswing BoS · L1 upswing start
 #75 · section 48 text 3 "BoS" on close · seen at #75: L1 HH* · L1 upswing BoS
