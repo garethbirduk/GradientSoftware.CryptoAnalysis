@@ -240,7 +240,7 @@ public class ExplainTests
             "1st order Uptrend, beginning at 01:00 on Sunday 1 January 2023.",
             "Uptrend begins",
             "Confirmed at the second Upswing's BoS, at 16:00 on Sunday 1 January 2023.",
-            "second Upswing",
+            "Uptrend Confirmed",
             "Twelve Upswings so far.",
             "Four Weak: the fourth, seventh, tenth and twelfth.",
             "Strength 66%: eight of twelve.",

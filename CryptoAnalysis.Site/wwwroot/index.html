@@ -2183,6 +2183,10 @@ async function renderReplayPage() {
 // for each thing the chart shows there, a thing whose layers and level are on. The other things at the candle are on the
 // Analysis page, to add. A drag still pans; a click elsewhere closes the card. A replay that is playing stops for it, as
 // the candle would move away from under the card.
+// The basic building blocks, the candle and its highs and lows: nearly always there to be seen rather than read about, so
+// an analysis always has their chapters, off until ticked (see loadAnalysis), whatever the chart shows.
+const BASIC_KINDS = new Set(['Candle', 'Point']);
+const isBasic = id => BASIC_KINDS.has(String(id ?? '').split(':')[0]);
 const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ? on('SuccessiveGreenCandles') || on('SuccessiveRedCandles')
   : on(`level${t.level}`) && (t.kind === 'Point' ? POINT_LAYERS.some(on) : t.kind === 'Swing' ? on('Upswing') || on('Downswing') : on('Uptrend') || on('Downtrend')));
 {
@@ -2222,7 +2226,7 @@ const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ?
       .then(r => r.ok ? r.json() : null).catch(() => null);
     if (mine !== asked || card.hidden) return;
     // What the chart shows at the candle is what is analysed; the candle itself always is.
-    card.things = (list ?? []).filter(thingShown).map(t => t.id);
+    card.things = (list ?? []).filter(t => thingShown(t) || isBasic(t.id)).map(t => t.id);
     if (!card.things.length) card.things = ['Candle'];
     card.base = base;
     card.querySelector('[data-things]').textContent = list?.length
@@ -2414,26 +2418,30 @@ async function loadAnalysis(params) {
   // The page's Successive Candles settings say how long a run must be to count.
   const runs = { greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') };
   const where = { dataset: params.dataset, at: params.at, ...(params.seen ? { seen: params.seen } : {}) };
-  const [r, list, audio] = await Promise.all([
-    fetch(`api/explain/tour?${new URLSearchParams({ ...where, things: params.things.join(','), expanded: true, ...runs })}`, { cache: 'no-store' }),
-    fetch(`api/explain/at?${new URLSearchParams({ ...where, ...runs })}`, { cache: 'no-store' }).then(x => x.ok ? x.json() : null).catch(() => null),
+  const list = await fetch(`api/explain/at?${new URLSearchParams({ ...where, ...runs })}`, { cache: 'no-store' }).then(x => x.ok ? x.json() : null).catch(() => null);
+  // The basic building blocks at the candle are always there to tick, whatever the analysis was asked for with.
+  const things = [...new Set([...params.things, ...(list ?? []).map(t => t.id).filter(isBasic)])];
+  const [r, audio] = await Promise.all([
+    fetch(`api/explain/tour?${new URLSearchParams({ ...where, things: things.join(','), expanded: true, ...runs })}`, { cache: 'no-store' }),
     fetch('tour-audio/index.json', { cache: 'no-store' }).then(x => x.ok ? x.json() : {}).catch(() => ({})),
   ]);
   const text = await r.text();
   if (!r.ok) throw new Error(r.status === 404 ? `the server has no dataset "${params.dataset}"` : text.replace(/^"|"$/g, '') || `the server answered ${r.status}`);
   const def = splitExplanations(JSON.parse(text));
   // Every text is kept at its own level: an explanation's at Education, an analysis's at Summary.
-  const loaded = newPlayer(def, audio, { page: 'Analysis', idPrefix: 'Analysis', detail: 'education', params, hash: analysisHash(params), list, missing: def.missing ?? [],
+  const loaded = newPlayer(def, audio, { page: 'Analysis', idPrefix: 'Analysis', detail: 'education', params: { ...params, things }, hash: analysisHash(params), list, missing: def.missing ?? [],
     pins: false, waitForClips: true, extraLayers: (state.pages.Analysis ?? defaultsFor('Analysis')).filter(id => id !== 'replay' && !/^level\d+$/.test(id)) });
   await loadTourDatasets(loaded);
   anchorTour(loaded);
   Object.assign(loaded, compileTour(def, loaded.scenes, loaded.resolved, loaded.audio, loaded.detail));
   // The explanations are on when the analysis was asked for with Explain.
   loaded.chapters.forEach((c, i) => { const s = loaded.sections[c.section]; if (s.explains && (params.detail !== 'education' || s.repeat)) loaded.chaptersOff.add(i); });
-  // The candle is nearly always there to be seen, not read about: its chapters start off, one tick away, unless it was
-  // ticked before the analysis was written again, or it is all there is to tell of.
-  const candle = loaded.chapters.flatMap((c, i) => loaded.sections[c.section].thing === 'Candle' ? [i] : []);
-  if (!params.candle && loaded.chapters.some((c, i) => !candle.includes(i) && !loaded.chaptersOff.has(i))) candle.forEach(i => loaded.chaptersOff.add(i));
+  // The basic building blocks, the candle and its highs and lows, start off, one tick away, even when the chart shows
+  // them: unless one was ticked before the analysis was written again, or they are all there is to tell of.
+  const basic = loaded.chapters.flatMap((c, i) => isBasic(loaded.sections[c.section].thing) ? [i] : []);
+  const kept = new Set(params.basicOn ?? []);
+  if (loaded.chapters.some((c, i) => !basic.includes(i) && !loaded.chaptersOff.has(i)))
+    basic.filter(i => !kept.has(loaded.sections[loaded.chapters[i].section].thing)).forEach(i => loaded.chaptersOff.add(i));
   // With no pins shown, a pinned text is left out altogether, so it does not hold the run for its seconds either.
   for (const s of loaded.sections) for (const c of s.cues) if (c.on != null) c.skipped = true;
   if (!loaded.sections.some(s => s.cues.some(c => !c.skipped))) throw new Error('the server wrote no texts for it');
@@ -2496,10 +2504,9 @@ function addThing(id) {
 // thing given, or the one on show.
 function addThings(ids, jump = tourSection()?.thing) {
   if (tour?.page !== 'Analysis' || !ids.length) return;
-  // The candle keeps its chapter, off or on as it was.
-  const candle = thingsOn().includes('Candle');
-  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), ...(tour.params.things.includes('Candle') ? ['Candle'] : []), ...ids])],
-    detail: explainsOn() ? 'education' : 'summary', jump, candle: candle || ids.includes('Candle') };
+  // The basic building blocks keep their chapters, each off or on as it was.
+  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), ...tour.params.things.filter(isBasic), ...ids])],
+    detail: explainsOn() ? 'education' : 'summary', jump, basicOn: [...thingsOn(), ...ids].filter(isBasic) };
   history.replaceState(null, '', analysisHash(wantedAnalysis));
   renderAnalysisPage();
 }

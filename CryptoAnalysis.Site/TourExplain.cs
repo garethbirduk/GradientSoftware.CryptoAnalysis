@@ -830,7 +830,7 @@ public static class Explain
     [
         Teach(t.ConfirmedAt, Definitions.Text("Trend.confirmed", t.Direction)),
         Say(t.ConfirmedAt, $"Confirmed at the second {t.Swing}'s BoS, {At(t.Trend.Confirmed.Time, t.Period)}."),
-        Pin(t.ConfirmedAt, "close", t.Place, $"second {t.Swing}", 4),
+        Pin(t.ConfirmedAt, "close", t.Place, $"{t.Name} Confirmed", 4),
     ], [t.Up ? "BullishBreakOfStructure" : "BearishBreakOfStructure"]);
 
     // How many Swings it has.
