@@ -1,6 +1,16 @@
 #100 · section 1 (Closes) runs to it: nothing
 #45 · section 9 text 1 "This may coincide with an HH" on close · seen at #100: L1 HH · L1 upswing BoS · L1 upswing start
 #89 · section 9 text 2 "Or not." on close · seen at #100: L1 upswing BoS
+#12 · section 12 (Upswing) text 1 "1st order Upswing, from an HH at 16554, at 12:00 on Sunday 1 January 2023." · seen at #100: L1 HH · L1 upswing start
+#12 · section 12 (Upswing) text 2 "HH: 16554" on close · seen at #100: L1 HH · L1 upswing start
+#14 · section 12 (Upswing) text 3 "Swing Low: an HL at 16534." · seen at #100: L1 HL · L1 upswing low
+#14 · section 12 (Upswing) text 4 "Swing Low: 16534" on close · seen at #100: L1 HL · L1 upswing low
+#16 · section 12 (Upswing) text 5 "A BoS closes beyond the position its Swing begins at." · seen at #100: L1 upswing BoS
+#16 · section 12 (Upswing) text 6 "BoS at 16556." · seen at #100: L1 upswing BoS
+#16 · section 12 (Upswing) text 7 "BoS" on close · seen at #100: L1 upswing BoS
+#16 · section 12 (Upswing) text 8 "An Upswing is characterised by a Downleg from the high to the Swing Low, followed by an Upleg from the Swing Low to the BoS." · seen at #100: L1 upswing BoS
+#16 · section 12 (Upswing) text 9 "The Downleg is two hours; the Upleg is two hours." · seen at #100: L1 upswing BoS
+#16 · section 12 (Upswing) text 10 "The Upleg of the Upswing will always finish at its BoS; the Upleg of the underlying Sawtooth may continue if the BoS itself does not form an HH." · seen at #100: L1 upswing BoS
 #15 · section 13 (Upswings in real time) gets there by rewind: L1 LH*
 #45 · section 13 (Upswings in real time) runs to it: L1 HH* · L1 upswing BoS
 #16 · section 13 (Upswings in real time) text 2 "Each Upswing appears only when its BoS Confirms it." · seen at #45: L1 upswing BoS

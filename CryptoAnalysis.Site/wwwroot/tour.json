@@ -90,10 +90,12 @@
     },
     {
       "chapter": "Upswing",
+      "explain": "Swing",
+      "at": 12,
+      "blocks": ["Begins", "Turn", "Bos", "Legs"],
       "add": ["HigherHigh"],
       "cues": [
-        { "texts": { "education": "An Upswing is characterised by a Downleg from the HH to the Swing Low, followed by an Upleg from the Swing Low to the BoS." } },
-        { "texts": { "education": "The Upleg of the Upswing will always finish at its BoS; the Upleg of the underlying Sawtooth may continue if the BoS itself does not form an HH." } }
+        { "at": 16, "texts": { "education": "The Upleg of the Upswing will always finish at its BoS; the Upleg of the underlying Sawtooth may continue if the BoS itself does not form an HH." } }
       ]
     },
     {

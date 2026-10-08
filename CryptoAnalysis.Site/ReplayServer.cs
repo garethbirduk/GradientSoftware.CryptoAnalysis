@@ -122,12 +122,14 @@ public static class ReplayServer
             }
 
             if (body?["section"] is not JsonObject section || !byId.TryGetValue(body["dataset"]?.GetValue<string>() ?? "", out var data))
-                return Results.BadRequest("The request is { dataset, anchor, from, where, section }.");
+                return Results.BadRequest("The request is { dataset, anchor, from, where, cited, section }.");
 
             var first = Math.Clamp(body["anchor"]?.GetValue<int>() ?? 0, 0, data.Prices.Count - 1);
             var errors = new List<string>();
+            // The definitions the tour has cited before the section, which it does not teach again.
+            var cited = (body["cited"] as JsonArray ?? []).Select(x => x?.GetValue<string>() ?? "").ToHashSet();
             var expanded = Explain.Expand(section, data.Prices.GetRange(first, data.Prices.Count - first), body["from"]?.GetValue<int>() ?? 0,
-                body["where"]?.GetValue<string>() ?? "the section", errors);
+                body["where"]?.GetValue<string>() ?? "the section", errors, cited);
             return Results.Json(new { Section = expanded, Errors = errors }, Json);
         });
 

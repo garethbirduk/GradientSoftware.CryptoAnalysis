@@ -389,6 +389,42 @@ public class ExplainTests
     }
 
     [TestMethod]
+    public void Expand_TellsTheBlocksChosen_AndNotTheDefinitionsTheTourHasCited()
+    {
+        var errors = new List<string>();
+        var cited = new HashSet<string> { Definitions.Text("Swing.what"), Definitions.Text("Swing.turn", EnumSwingDirection.Up) };
+        var node = JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Begins", "Turn", "Bos", "Legs"] }""")!.AsObject();
+
+        // The tour's Upswing chapter: the second Upswing, seen from #100, which the replay has passed.
+        var section = Explain.Expand(node, TourPrices.Value, 100, "section 12", errors, cited);
+
+        Assert.AreEqual(0, errors.Count, string.Join("\n", errors));
+        Assert.IsNull(section["blocks"]);
+        Assert.IsNull(section["until"], "The replay has passed the Upswing.");
+        CollectionAssert.AreEqual(new[] { 6, 22 }, section["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray(), "The view is the Upswing alone.");
+        var education = Texts(section, EnumDetail.Education);
+        CollectionAssert.DoesNotContain(education, Definitions.Text("Swing.what"), "Cited already.");
+        CollectionAssert.DoesNotContain(education, Definitions.Text("Swing.turn", EnumSwingDirection.Up), "Cited already.");
+        CollectionAssert.Contains(education, Definitions.Text("Swing.legs", EnumSwingDirection.Up));
+        CollectionAssert.AreEqual(new[]
+        {
+            "1st order Upswing, from an HH at 16554, at 12:00 on Sunday 1 January 2023.",
+            "Swing Low: an HL at 16534.",
+            "BoS at 16556.",
+            "The Downleg is two hours; the Upleg is two hours.",
+        }, section["cues"]!.AsArray().Where(x => x!["on"] == null && x["texts"]!["summary"] != null).Select(x => x!["texts"]!["summary"]!.GetValue<string>()).ToList(),
+            "No Strength block, so nothing of MSBs.");
+
+        Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Wicks"] }""")!.AsObject(), TourPrices.Value, 100, "section 13", errors);
+        Explain.Expand(JsonNode.Parse("""{ "explain": "Candle", "at": 12, "blocks": ["Begins"] }""")!.AsObject(), TourPrices.Value, 100, "section 14", errors);
+        CollectionAssert.AreEqual(new[]
+        {
+            "section 13: blocks are a list of the blocks of a Swing to tell: Begins, Turn, Msb, Bos, Legs, Strength",
+            "section 14: Candle is not told in blocks, so the section has no \"blocks\"",
+        }, errors);
+    }
+
+    [TestMethod]
     public void Expand_ListsWhatItCannotExplain()
     {
         var errors = new List<string>();
