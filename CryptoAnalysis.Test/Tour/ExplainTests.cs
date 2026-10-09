@@ -26,12 +26,12 @@ public class ExplainTests
         .Where(x => x != null).Select(x => x!).ToList();
 
     [TestMethod]
-    public void Candle_TheToursExample_SaysItsPricesAndWhyItIsGreen()
+    public void Candle_TheToursExample_SaysItsPrices_AndItsColourOnlyAtEducation()
     {
         var section = Explain.Candle(TourPrices.Value, 48, reached: 50);
 
-        CollectionAssert.AreEqual(new[] { 44, 51 }, section["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray());
-        Assert.IsNull(section["until"], "The replay has passed the candle, so the section does not run on.");
+        CollectionAssert.AreEqual(new[] { 48, 49 }, section["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray(), "The candle and the red one after it.");
+        Assert.IsNull(section["until"], "The replay has passed both, so the section does not run on.");
         CollectionAssert.AreEqual(new[]
         {
             "The hour from 00:00 to 01:00 on Tuesday 3 January 2023.",
@@ -41,12 +41,11 @@ public class ExplainTests
             "High 16700, low 16639.",
             "high: 16700",
             "low: 16639",
-            "Green: it closed above its open.",
         }, Texts(section));
 
         // Every pin, at Education, where the candle set against it is pinned too.
         var pins = section["cues"]!.AsArray().Where(x => x!["on"] != null).Select(x => $"#{x!["at"]} {x["on"]} {x["place"]}").ToList();
-        CollectionAssert.AreEqual(new[] { "#48 open left", "#48 close right", "#48 high above", "#48 low below", "#47 low below" }, pins);
+        CollectionAssert.AreEqual(new[] { "#48 open left", "#48 close right", "#48 high above", "#48 low below", "#49 low below" }, pins);
         Assert.IsTrue(section["cues"]!.AsArray().Where(x => x!["on"] != null).All(x => x!["voice"]?.GetValue<bool>() == false), "Pins are shown, not read.");
         CollectionAssert.AreEqual(new[] { "candles" }, section["add"]!.AsArray().Select(x => x!.GetValue<string>()).ToArray(), "Not in a run of five, so no Successive Candles.");
     }
@@ -68,11 +67,12 @@ public class ExplainTests
             "High 16700, low 16639.",
             "high: 16700",
             "low: 16639",
-            "A candle that closes above its open is green. A candle that closes below its open is red. One that closes where it opened has no body, and is neither.",
-            "Green: it closed above its open.",
-            "The candle before it closed lower than the open, so it is red.",
+            "This one is green: it closed above its open.",
+            "The candle after it closed lower than its open, so it is red.",
             "red",
-        }, Texts(section, EnumDetail.Education));
+            "A candle that closes above its open is green. A candle that closes below its open is red. One that closes where it opened has no body, and is neither.",
+        }, Texts(section, EnumDetail.Education), "The rule comes once a candle of each colour is on the chart.");
+        CollectionAssert.AreEqual(new[] { "Shape", "Colour" }, Explain.BlocksOf("Candle").ToArray());
     }
 
     [TestMethod]
@@ -117,9 +117,28 @@ public class ExplainTests
         Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
         CollectionAssert.AreEqual(new[] { "Candle", "Successive Candles", "1st order Upswing" }, tour.Sections.Select(x => x.Chapter).ToArray(), "From the candle outwards.");
         CollectionAssert.AreEqual(new[] { "Trend" }, missing, "No 8th order Trend there.");
-        Assert.AreEqual(87, tour.Sections[0].Until, "The Candle chapter runs to the candle.");
+        Assert.AreEqual(87, tour.Sections[0].From, "The Candle chapter starts on the candle.");
+        Assert.AreEqual(91, tour.Sections[0].Until, "It runs on to the first red candle after the run, for its colour.");
         Assert.AreEqual(90, tour.Sections[1].Until, "The run's chapter runs to its last candle.");
         Assert.IsTrue(tour.Sections[2].Cues.Any(c => c.Text.StartsWith("1st order Upswing, from ")), tour.Sections[2].Cues[1].Text);
+    }
+
+    [TestMethod]
+    public void RunAndPoint_AreToldInBlocks_AndAWrittenDefinitionSaysWhichItIs()
+    {
+        CollectionAssert.AreEqual(new[] { "Run" }, Explain.BlocksOf("SuccessiveCandles").ToArray());
+        CollectionAssert.AreEqual(new[] { "Label", "Moving" }, Explain.BlocksOf("Point").ToArray());
+
+        var run = Explain.Run(TourPrices.Value, 87, reached: 90, null, null, out _)!;
+        CollectionAssert.AreEqual(new[] { "Run.1", "Run.2" }, run["cues"]!.AsArray().Select(x => x!["id"]!.GetValue<string>()).ToArray());
+        Assert.AreEqual("SuccessiveCandles.what", run["cues"]![0]!["definition"]!.GetValue<string>());
+        Assert.IsNull(run["cues"]![1]!["definition"], "This run is not a definition.");
+
+        var swing = Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Bos"] }""")!.AsObject(), TourPrices.Value, 100, "section 1", []);
+        var bos = swing["cues"]!.AsArray().First(x => x!["definition"]?.GetValue<string>() == "Swing.bos")!;
+        Assert.AreEqual("Up", bos["direction"]!.GetValue<string>());
+        Assert.AreEqual(Definitions.Text("Swing.bos", EnumSwingDirection.Up), bos["texts"]!["education"]!.GetValue<string>());
+        Assert.AreEqual("hour", Explain.Candle(TourPrices.Value, 48, reached: 50)["cues"]![0]!["period"]!.GetValue<string>());
     }
 
     [TestMethod]
@@ -138,27 +157,42 @@ public class ExplainTests
     }
 
     [TestMethod]
-    public void Candle_RedCandle_SetsTheNextGreenOneAgainstIt()
+    public void Candle_RedCandle_RunsOnToTheNextGreenOne()
     {
         var section = Explain.Candle(TourPrices.Value, 47, reached: 50);
-        var texts = Texts(section);
+        var education = Texts(section, EnumDetail.Education);
 
-        Assert.AreEqual("Red: it closed below its open.", texts[7]);
-        Assert.AreEqual("The candle after it closed higher than the open, so it is green.", Texts(section, EnumDetail.Education)[^2], "The candle set against it is for Education.");
-        var contrast = section["cues"]!.AsArray()[^1]!;
+        Assert.AreEqual("This one is red: it closed below its open.", education[^4]);
+        Assert.AreEqual("The candle after it closed higher than its open, so it is green.", education[^3]);
+        var contrast = section["cues"]!.AsArray().Last(x => x!["on"] != null)!;
         Assert.AreEqual(48, contrast["at"]!.GetValue<int>());
         Assert.AreEqual("high", contrast["on"]!.GetValue<string>());
         Assert.AreEqual("above", contrast["place"]!.GetValue<string>());
     }
 
     [TestMethod]
-    public void Candle_NotYetReached_RunsOnToItAndContrastsOnlyWithDrawnCandles()
+    public void Candle_NotYetReached_RunsOnToTheCandleOfTheOtherColour()
     {
         var section = Explain.Candle(TourPrices.Value, 48, reached: 40);
 
-        Assert.AreEqual(48, section["until"]!.GetValue<int>());
-        var contrast = section["cues"]!.AsArray()[^1]!;
-        Assert.IsTrue(contrast["at"]!.GetValue<int>() <= 48, "A candle after the one explained is not drawn yet.");
+        Assert.AreEqual(49, section["until"]!.GetValue<int>());
+        Assert.AreEqual(49, section["cues"]!.AsArray()[^1]!["at"]!.GetValue<int>(), "The rule is told on the candle of the other colour.");
+    }
+
+    [TestMethod]
+    public void Candle_EachBlockAlone_IsTheCandle_OrRunsOnForItsColour()
+    {
+        // #47 is red and #48, after it, green, as an analysis has it from a cursor at #60.
+        var shape = Explain.Candle(TourPrices.Value, 47, reached: 47, known: 60, blocks: ["Shape"]);
+        var colour = Explain.Candle(TourPrices.Value, 47, reached: 47, known: 60, blocks: ["Colour"]);
+
+        CollectionAssert.AreEqual(new[] { 47, 47 }, shape["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray(), "The candle alone.");
+        Assert.IsNull(shape["until"], "No run: the replay is on the candle.");
+        Assert.IsTrue(shape["cues"]!.AsArray().All(x => x!["at"]!.GetValue<int>() == 47));
+        CollectionAssert.AreEqual(new[] { 47, 48 }, colour["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray());
+        Assert.AreEqual(48, colour["until"]!.GetValue<int>());
+        Assert.AreEqual("This one is red: it closed below its open.", Texts(colour, EnumDetail.Education)[0]);
+        Assert.AreEqual("Colour.1", colour["cues"]!.AsArray()[0]!["id"]!.GetValue<string>());
     }
 
     [TestMethod]
@@ -170,8 +204,9 @@ public class ExplainTests
         var texts = Texts(Explain.Candle(prices, 2, reached: 7));
 
         Assert.AreEqual("The four hours from 00:00 to 04:00 on Thursday 11 November 2021.", texts[0]);
-        Assert.AreEqual("Green: it closed above its open.", texts[7]);
-        Assert.AreEqual(12, Texts(Explain.Candle(prices, 2, reached: 7), EnumDetail.Education).Count, "Every candle is green, so there is none to set against it.");
+        var education = Texts(Explain.Candle(prices, 2, reached: 7), EnumDetail.Education);
+        Assert.AreEqual("This one is green: it closed above its open.", education[10]);
+        Assert.AreEqual(12, education.Count, "Every candle is green, so there is none to set against it.");
     }
 
     [TestMethod]
@@ -189,7 +224,7 @@ public class ExplainTests
         Assert.AreEqual(2, section["speed"]!.GetValue<int>());
         CollectionAssert.AreEqual(new[] { 40, 60 }, section["view"]!.AsArray().Select(x => x!.GetValue<int>()).ToArray());
         Assert.AreEqual("That is one candle.", Texts(section)[^1]);
-        Assert.AreEqual(9, Texts(section).Count);
+        Assert.AreEqual(8, Texts(section).Count, "Its seven written at Summary, then its own.");
     }
 
     [TestMethod]
@@ -240,7 +275,7 @@ public class ExplainTests
             "1st order Uptrend, beginning at 01:00 on Sunday 1 January 2023.",
             "Uptrend begins",
             "Confirmed at the second Upswing's BoS, at 16:00 on Sunday 1 January 2023.",
-            "second Upswing",
+            "Uptrend Confirmed",
             "Twelve Upswings so far.",
             "Four Weak: the fourth, seventh, tenth and twelfth.",
             "Strength 66%: eight of twelve.",
@@ -344,9 +379,9 @@ public class ExplainTests
         Assert.AreEqual("Candle at 00:00 on 3 January 2023", def["title"]!.GetValue<string>());
         Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
         Assert.AreEqual(1, tour.Sections.Count);
-        Assert.AreEqual(44, tour.Sections[0].From, "A few candles before it.");
-        Assert.AreEqual(48, tour.Sections[0].Until, "It runs to the candle, then explains it.");
-        CollectionAssert.AreEqual(new[] { 44, 51 }, tour.Sections[0].View.ToArray(), "The view is the candle and a few either side.");
+        Assert.AreEqual(48, tour.Sections[0].From, "It starts on the candle.");
+        Assert.AreEqual(49, tour.Sections[0].Until, "It runs on to the next candle of the other colour, for its colour.");
+        CollectionAssert.AreEqual(new[] { 48, 49 }, tour.Sections[0].View.ToArray(), "The view is the candle and that one.");
         CollectionAssert.AreEqual(new[] { EnumDetail.Education }, tour.Sections[0].Cues[0].Texts.Keys.ToArray(), "What a candle is comes first, at Education only.");
         Assert.AreEqual("The hour from 00:00 to 01:00 on Tuesday 3 January 2023.", tour.Sections[0].Cues[1].Text);
         Assert.IsNull(Explain.Tour("Weather", "btc-1h", prices, "2023-01-03T00:00"));
@@ -415,12 +450,16 @@ public class ExplainTests
         }, section["cues"]!.AsArray().Where(x => x!["on"] == null && x["texts"]!["summary"] != null).Select(x => x!["texts"]!["summary"]!.GetValue<string>()).ToList(),
             "No Strength block, so nothing of MSBs.");
 
+        // Each written text is named by its block and its place in it, which is what an analysis's edits are kept against.
+        CollectionAssert.AreEqual(new[] { "Begins.2", "Begins.3", "Turn.2", "Turn.3", "Bos.1", "Bos.2", "Bos.3", "Bos.4", "Legs.1", "Legs.2" },
+            section["cues"]!.AsArray().Select(x => x!["id"]!.GetValue<string>()).ToArray());
+
         Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Wicks"] }""")!.AsObject(), TourPrices.Value, 100, "section 13", errors);
         Explain.Expand(JsonNode.Parse("""{ "explain": "Candle", "at": 12, "blocks": ["Begins"] }""")!.AsObject(), TourPrices.Value, 100, "section 14", errors);
         CollectionAssert.AreEqual(new[]
         {
             "section 13: blocks are a list of the blocks of a Swing to tell: Begins, Turn, Msb, Bos, Legs, Strength",
-            "section 14: Candle is not told in blocks, so the section has no \"blocks\"",
+            "section 14: blocks are a list of the blocks of a Candle to tell: Shape, Colour",
         }, errors);
     }
 
@@ -432,7 +471,7 @@ public class ExplainTests
             { "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [
               { "from": 0, "until": 67 },
               { "explain": "Swing", "at": 12, "blocks": ["Bos"] },
-              { "explain": "Swing", "at": 47, "until": 67, "blocks": ["Bos"] } ] }
+              { "explain": "Swing", "at": 47, "until": 67, "blocks": ["Bos"], "cues": [{ "define": "Swing.count" }] } ] }
             """)!;
         var bos = Definitions.Text("Swing.bos");
 
@@ -444,6 +483,53 @@ public class ExplainTests
         Assert.IsFalse(once.Sections[2].Cues.Any(c => c.Text == bos), "The Downswing does not teach it again.");
         Assert.IsTrue(once.Sections[2].Cues.Any(c => c.Text == "BoS at 16655."), "It still says its own BoS.");
         Assert.IsTrue(each.Sections[2].Cues.Any(c => c.Text == bos), "An analysis teaches each chapter in full.");
+        Assert.AreEqual(Definitions.Text("Swing.count"), once.Expanded!["sections"]![2]!["cues"]!.AsArray()[^1]!["texts"]!["education"]!.GetValue<string>(), "A definition an explaining section cites is written out for the narration.");
+    }
+
+    [TestMethod]
+    public void Expand_ChangesWrittenTextsByTheirId_AndTellsOneDetail()
+    {
+        var errors = new List<string>();
+        var plain = Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Bos"] }""")!.AsObject(), TourPrices.Value, 100, "section 1", errors);
+        var said = plain["cues"]!.AsArray().First(x => x!["on"] == null && x["texts"]!["summary"] != null)!;
+        var id = said["id"]!.GetValue<string>();
+
+        var node = JsonNode.Parse($$"""{ "explain": "Swing", "at": 12, "blocks": ["Bos"], "detail": "summary", "edits": { "{{id}}": { "summary": "Changed here." } } }""")!.AsObject();
+        var section = Explain.Expand(node, TourPrices.Value, 100, "section 2", errors);
+
+        Assert.AreEqual(0, errors.Count, string.Join("\n", errors));
+        Assert.IsNull(section["edits"]);
+        Assert.IsNull(section["detail"]);
+        var cues = section["cues"]!.AsArray();
+        Assert.AreEqual("Changed here.", cues.First(x => x!["id"]!.GetValue<string>() == id)!["texts"]!["summary"]!.GetValue<string>());
+        Assert.IsTrue(cues.All(x => x!["texts"]!.AsObject().Select(t => t.Key).SequenceEqual(["summary"])), "At Summary alone, so what a BoS is is left out.");
+        Assert.AreEqual(plain["cues"]!.AsArray().Count(x => x!["texts"]!["summary"] != null), cues.Count);
+
+        Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "detail": "everything" }""")!.AsObject(), TourPrices.Value, 100, "section 3", errors);
+        Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "edits": ["Bos.1"] }""")!.AsObject(), TourPrices.Value, 100, "section 4", errors);
+        Assert.AreEqual(2, errors.Count, string.Join("\n", errors));
+        StringAssert.StartsWith(errors[0], "section 3: detail is the one level");
+        StringAssert.StartsWith(errors[1], "section 4: edits are the written texts changed");
+    }
+
+    [TestMethod]
+    public void Compile_TeachOnce_GoesByTheTextAsWritten_NotAsChanged()
+    {
+        var bos = Definitions.Text("Swing.bos");
+        var first = Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Bos"] }""")!.AsObject(), TourPrices.Value, 67, "section 2", []);
+        var id = first["cues"]!.AsArray().First(x => Explain.Taught(x) == bos)!["id"]!.GetValue<string>();
+        var def = JsonNode.Parse($$"""
+            { "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [
+              { "from": 0, "until": 67 },
+              { "explain": "Swing", "at": 12, "blocks": ["Bos"], "edits": { "{{id}}": { "education": "A BoS, told my way." } } },
+              { "explain": "Swing", "at": 47, "until": 67, "blocks": ["Bos"] } ] }
+            """)!;
+
+        var once = Tours.Compile(def, TourPrices.Value, teachOnce: true);
+
+        Assert.AreEqual(0, once.Errors.Count, string.Join("\n", once.Errors));
+        Assert.IsTrue(once.Sections[1].Cues.Any(c => c.Text == "A BoS, told my way."));
+        Assert.IsFalse(once.Sections[2].Cues.Any(c => c.Text == bos), "What a BoS is was taught, in other words.");
     }
 
     [TestMethod]

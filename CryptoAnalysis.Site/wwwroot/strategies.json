@@ -1,0 +1,33 @@
+{
+  "strategies": [
+    {
+      "id": "green-run-4",
+      "name": "After 4 green candles",
+      "direction": "Long",
+      "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 4 },
+      "takeProfit": { "type": "HighestWick", "candles": 6 },
+      "stopLoss": { "type": "RiskRatio", "ratio": 1 },
+      "onePositionAtATime": true
+    },
+    {
+      "id": "up-and-down-and-up-copy",
+      "name": "up and down and up wicks",
+      "direction": "Long",
+      "after": [ { "type": "SuccessiveCandles", "colour": "Green", "length": 3 }, { "type": "SuccessiveCandles", "colour": "Red", "length": 3, "within": 3 } ],
+      "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 3, "within": 3 },
+      "takeProfit": { "type": "HighestWick", "candles": 9 },
+      "stopLoss": { "type": "RiskRatio", "ratio": 1 },
+      "onePositionAtATime": true
+    },
+    {
+      "id": "up-and-down-and-up-wicks-copy",
+      "name": "up and down and up wicks (copy)",
+      "direction": "Long",
+      "after": [ { "type": "SuccessiveCandles", "colour": "Green", "length": 3 }, { "type": "SuccessiveCandles", "colour": "Red", "length": 3, "within": 4 } ],
+      "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 3, "within": 4 },
+      "takeProfit": { "type": "HighestWick", "candles": 10 },
+      "stopLoss": { "type": "RiskRatio", "ratio": 1 },
+      "onePositionAtATime": true
+    }
+  ]
+}

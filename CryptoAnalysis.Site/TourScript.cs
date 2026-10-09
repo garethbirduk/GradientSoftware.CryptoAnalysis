@@ -88,7 +88,7 @@ public static class Tours
     public static readonly IReadOnlySet<string> PageLayers = new HashSet<string>(
     [
         "close", "price", "sawtooth", "bosLevelUp", "bosLevelDown", "msbLevelUp", "msbLevelDown", "trendArrows", "rangeBands", "rangeZones",
-        "replay", "candidates", "future", "eventlog", "live",
+        "replay", "candidates", "future", "eventlog", "live", "trade",
         "ghostSwings", "ghostCandidates", "ghostPoints", "ghostTrends", "ghostMsbs", "ghostRanges",
         .. Enumerable.Range(0, 9).Select(x => $"level{x}"),
     ]);
@@ -156,9 +156,9 @@ public static class Tours
         int[] Range(JsonNode? node, string where, int[] fallback)
         {
             var values = node?.AsArray().Select(x => x?.GetValue<int>()).ToArray();
-            if (values is [int first, int last] && first >= 0 && last > first)
+            if (values is [int first, int last] && first >= 0 && last >= first)
                 return [first, last];
-            errors.Add($"{where}: the view is the first and last candle shown, the last after the first");
+            errors.Add($"{where}: the view is the first and last candle shown, the last at or after the first");
             return fallback;
         }
 
@@ -223,14 +223,10 @@ public static class Tours
             // A section that explains something is written out from the prices before it is read like any other.
             if (node["explain"] != null)
             {
-                var ownCues = node["cues"]?.AsArray().Count ?? 0;
-                node = Explain.Expand(node, prices, node["from"] is JsonValue f && f.TryGetValue<int>(out var begins) ? begins : at, where, errors, cited);
+                // What the written texts taught, as written before any edit, is told.
+                node = Explain.Expand(node, prices, node["from"] is JsonValue f && f.TryGetValue<int>(out var begins) ? begins : at, where, errors, cited, teachOnce ? cited : null);
                 if (expandedSections != null)
                     expandedSections[i] = node.DeepClone();
-                // What the written texts taught, ahead of the section's own, is told.
-                if (teachOnce && node["cues"] is JsonArray told)
-                    foreach (var text in told.Take(told.Count - ownCues).Select(Explain.Taught).OfType<string>())
-                        cited.Add(text);
             }
 
             if (node["layers"] != null)
@@ -310,7 +306,7 @@ public static class Tours
                     {
                         texts[EnumDetail.Education] = Definitions.Text(define, direction);
                         cited.Add(texts[EnumDetail.Education]);
-                        if (node == written && expandedSections?[i]?["cues"]?[j] is JsonObject told)
+                        if (expandedSections?[i]?["cues"]?[j] is JsonObject told)
                             told["texts"] = Details.ToJson(texts);
                     }
                 }

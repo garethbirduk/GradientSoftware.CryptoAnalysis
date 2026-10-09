@@ -44,5 +44,13 @@
   "Range.what": "A Range is a deep Retracement whose own structure has broken: one order finer, an MSB closes against it before the Swing's BoS. How deep is a setting on the page.",
   "Range.box": "Its box runs from where the Swing began to the furthest close of the Retracement at that moment, with a band either side, a share of the box's height set on the page.",
   "Range.holds": "The Range holds while the price closes inside the bands.",
-  "Range.ends": "It ends at the first close beyond a band. A BoS or MSB inside the bands does not end it."
+  "Range.ends": "It ends at the first close beyond a band. A BoS or MSB inside the bands does not end it.",
+  "Trade.entry": "A strategy enters a trade when its entry condition is met. The condition is read at the close of each candle, from that candle and the ones before it alone, and the trade is entered at that close.",
+  "Trade.chain": "An entry condition can be a chain of steps. Each step is looked for only once the one before it is met, and only within as many candles of it as the strategy allows. The trade is entered when the last step is met, and the next trade needs the whole chain again.",
+  "Risk.what": "A trade's reward is how far its Take Profit is from its entry: what it wins if the Take Profit is reached. Its risk is how far its Stop Loss is from its entry: what it loses if the Stop Loss is reached.",
+  "Risk.ratio": "R is the unit of risk: 1R is how far the Stop Loss is from the entry. The reward is counted in R, so a Take Profit twice as far from the entry as the Stop Loss is a 2R target.",
+  "Risk.breakeven": "A trade that wins its target in R or loses 1R breaks even over many trades when the share it wins is one divided by one plus its target: half at 1R, a third at 2R.",
+  "Trade.takeProfit": "A trade's Take Profit is set as it is entered: the price where it closes with a gain, above the entry for a long trade and below it for a short one.",
+  "Trade.stopLoss": "A trade's Stop Loss is set as it is entered: the price where it closes with a loss, below the entry for a long trade and above it for a short one.",
+  "Trade.outcome": "Whichever exit the price reaches first ends the trade. From the next candle on, each candle is checked against the exits. When it reaches the Take Profit, the trade closes there with a gain; when it reaches the Stop Loss, it closes there with a loss. A candle that opens beyond an exit closes the trade at its open. A candle that reaches both cannot say which came first, so it counts as the Stop Loss."
 }

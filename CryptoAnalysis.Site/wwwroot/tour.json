@@ -253,7 +253,8 @@
     {
       "add": ["BearishMarketStructureBreak"],
       "cues": [
-        { "texts": { "education": "Where this happens we call it a Market Structure Break (MSB). Sometimes it is called a Change of Character." } }
+        { "texts": { "education": "Where this happens we call it a Market Structure Break (MSB)." } },
+        { "define": "MSB.alias" }
       ]
     },
     {
@@ -361,7 +362,8 @@
     },
     {
       "explain": "Candle",
-      "at": 48
+      "at": 48,
+      "view": [44, 51]
     },
     {
       "chapter": "Wicks and breaks",
@@ -446,10 +448,15 @@
       "add": ["Uptrend"],
       "cues": [
         { "texts": { "education": "Just as candles of one colour in a row are Successive Candles, two or more Upswings in a row are an Uptrend." } },
-        { "texts": { "education": "Two or more Downswings in a row are a Downtrend. Either is a Trend." } },
-        { "texts": { "education": "This is an Uptrend of twelve Upswings." } },
-        { "texts": { "education": "It begins where its first Upswing begins. From the BoS of its second Upswing there are two in a row." }, "hold": 0 },
-        { "at": 16, "on": "close", "place": "above", "texts": { "education": "second Upswing" }, "hold": 5, "voice": false },
+        { "define": "Trend.what", "direction": "Down" }
+      ]
+    },
+    {
+      "explain": "Trend",
+      "at": 1,
+      "until": 90,
+      "blocks": ["Begins", "Confirmed", "Swings"],
+      "cues": [
         { "texts": { "education": "The band along the top of the chart marks the Uptrend, with a segment for each Upswing. Some segments are paler, and we will come to why." } },
         { "define": "Trend.count" }
       ]
@@ -471,10 +478,15 @@
         { "at": 81, "on": "close", "place": "above", "texts": { "education": "MSB" }, "hold": 3.5, "voice": false },
         { "texts": { "education": "The price falls for three more hours. Then it turns at an LL, and this BoS Confirms the next Upswing." }, "hold": 0 },
         { "at": 89, "on": "close", "place": "left", "texts": { "education": "BoS" }, "hold": 6.5, "voice": false },
-        { "texts": { "education": "The MSB is inside the new Upswing." } },
-        { "define": "Swing.strong", "direction": "Up" },
-        { "define": "Swing.weak", "direction": "Up" }
+        { "texts": { "education": "The MSB is inside the new Upswing." } }
       ]
+    },
+    {
+      "explain": "Swing",
+      "at": 78,
+      "until": 90,
+      "blocks": ["Strength"],
+      "view": [74, 92]
     },
     {
       "cues": [
@@ -487,25 +499,33 @@
       "add": ["HigherLow"],
       "remove": ["BullishBreakOfStructure", "msbLevelDown"],
       "view": [0, 92],
+      "explain": "Trend",
+      "at": 1,
+      "until": 90,
+      "blocks": ["Weak"],
       "cues": [
-        { "texts": { "education": "Four of the twelve Upswings are Weak: the fourth, seventh, tenth and twelfth. Each has an MSB inside it and an LL as its Swing Low." } },
-        { "texts": { "education": "On the band along the top, the Weak Upswings are the paler segments." } },
-        { "define": "Trend.strength" }
+        { "at": 90, "texts": { "education": "Each has an MSB inside it and an LL as its Swing Low." } },
+        { "at": 90, "texts": { "education": "On the band along the top, the Weak Upswings are the paler segments." } }
       ]
     },
     {
       "add": ["trendArrows"],
+      "explain": "Trend",
+      "at": 1,
+      "until": 90,
+      "blocks": ["Strength"],
+      "view": [0, 92],
       "cues": [
-        { "texts": { "education": "Here that is eight of twelve. This is an Uptrend of twelve Upswings with a Strength of 66%." } },
-        { "texts": { "education": "The arrow runs from where the Uptrend begins to its latest BoS, and its box shows the count and the Strength." } },
-        { "texts": { "education": "An Uptrend with a Strength of 100% has no Weak Upswing: Higher Highs and Higher Lows throughout." } }
+        { "at": 90, "texts": { "education": "The arrow runs from where the Uptrend begins to its latest BoS, and its box shows the count and the Strength." } },
+        { "at": 90, "texts": { "education": "An Uptrend with a Strength of 100% has no Weak Upswing: Higher Highs and Higher Lows throughout." } }
       ]
     },
     {
       "cues": [
         { "texts": { "education": "Strength does not say where the Weak Upswings fall. So we also count the Upswings since the last Weak one, starting with it." } },
         { "texts": { "education": "This Uptrend has had stretches of three, three, three and two Upswings. The twelfth is Weak, so the latest stretch is one Upswing so far." } },
-        { "texts": { "education": "The same holds for Downswings: a Weak Downswing has an MSB inside it, and an HH as its Swing High." } },
+        { "texts": { "education": "The same holds for Downswings." } },
+        { "define": "Swing.weak", "direction": "Down" },
         { "texts": { "education": "Strong, Weak and Strength describe what has happened. They are not a forecast." } }
       ]
     },
@@ -536,17 +556,18 @@
       ]
     },
     {
+      "explain": "Trend",
+      "at": 1,
       "until": 62,
-      "cues": [
-        { "at": 62, "define": "Trend.ends" },
-        { "at": 62, "texts": { "education": "Here a Downswing is Confirmed, and the Uptrend ends." } }
-      ]
+      "blocks": ["Ends"],
+      "view": [40, 77]
     },
     {
+      "explain": "Trend",
+      "at": 47,
       "until": 64,
-      "cues": [
-        { "at": 64, "texts": { "education": "A second Downswing is Confirmed two hours later. Two Downswings in a row: a Downtrend." } }
-      ]
+      "blocks": ["Begins", "Confirmed"],
+      "view": [40, 77]
     },
     {
       "chapter": "Ghost Trends",
@@ -567,11 +588,18 @@
       "view": [45, 77],
       "cues": [
         { "texts": { "education": "As with the Ghost Downswings, the Ghost Downtrend is still here when we increase the resolution." } },
-        { "texts": { "education": "With two resolutions on the chart, each band carries a thin stripe in the colour of its resolution." } },
-        { "texts": { "education": "This 2nd order Downtrend has two Downswings, and it ends at the BoS of the first Upswing after them." }, "hold": 0 },
-        { "at": 64, "on": "close", "place": "below", "texts": { "education": "second Downswing" }, "hold": 3.5, "voice": false },
-        { "at": 68, "on": "close", "place": "above", "texts": { "education": "Downtrend ends" }, "hold": 3.5, "voice": false },
-        { "texts": { "education": "Two Upswings in a row then make a 2nd order Uptrend. Trends, like Swings, exist at every resolution." } }
+        { "texts": { "education": "With two resolutions on the chart, each band carries a thin stripe in the colour of its resolution." } }
+      ]
+    },
+    {
+      "explain": "Trend",
+      "at": 64,
+      "level": 2,
+      "until": 75,
+      "blocks": ["Confirmed", "Ends"],
+      "view": [45, 77],
+      "cues": [
+        { "at": 75, "texts": { "education": "A second Upswing then Confirms a 2nd order Uptrend. Trends, like Swings, exist at every resolution." } }
       ]
     },
     {
@@ -587,13 +615,17 @@
     },
     {
       "cues": [
-        { "texts": { "education": "It is now the 15th of February. This 1st order Upswing began on the 2nd, at 24195." }, "hold": 0 },
-        { "at": 768, "on": "close", "place": "above", "texts": { "education": "2 February" }, "hold": 3.5, "voice": false },
-        { "texts": { "education": "The price fell for eleven days, to a Swing Low of 21474." }, "hold": 0 },
-        { "at": 1049, "on": "close", "place": "below", "texts": { "education": "Swing Low" }, "hold": 3.5, "voice": false },
-        { "texts": { "education": "Two days later it closed above 24195: a BoS, two weeks after the Upswing began." }, "hold": 0 },
-        { "at": 1103, "on": "close", "place": "above", "texts": { "education": "BoS" }, "hold": 3.5, "voice": false },
-        { "texts": { "education": "Nothing new has been defined. A high, a Swing Low, a close above the high: the same Upswing as the ones that took an hour or two." } }
+        { "texts": { "education": "It is now the 15th of February." } }
+      ]
+    },
+    {
+      "explain": "Swing",
+      "at": 768,
+      "until": 1103,
+      "blocks": ["Begins", "Turn", "Bos", "Legs"],
+      "view": [740, 1110],
+      "cues": [
+        { "at": 1103, "texts": { "education": "Nothing new has been defined. A high, a Swing Low, a close above the high: the same Upswing as the ones that took an hour or two." } }
       ]
     },
     {
@@ -657,7 +689,10 @@
       "cues": [
         { "texts": { "education": "One order finer, the Retracement is a run of Upswings. The dotted line is the Swing Low of the latest one: the level an MSB would close below." } },
         { "at": 68, "on": "close", "place": "below", "texts": { "education": "MSB" }, "hold": 4, "voice": false },
-        { "texts": { "education": "On the 22nd the price closes below that line: a Bearish MSB. A deep Retracement whose own structure has broken is a Range: the box from the LL to the highest close of the Retracement, with the dashed lines its bands, 20% of its height either side." } }
+        { "texts": { "education": "On the 22nd the price closes below that line: a Bearish MSB." } },
+        { "define": "Range.what" },
+        { "define": "Range.box" },
+        { "texts": { "education": "Here the box runs from the LL to the highest close of the Retracement, and the dashed lines are its bands, 20% of its height either side." } }
       ]
     },
     {
@@ -669,6 +704,7 @@
       "cues": [
         { "texts": { "education": "The training divides a Range into a buy-low zone, from the lower band to 25% up, and a sell-high zone, from 75% up to the upper band. With candles on, the wicks show where the price reached into them." } },
         { "define": "Range.holds" },
+        { "define": "Range.ends" },
         { "at": 94, "on": "close", "place": "below", "texts": { "education": "Range ends: 53751" }, "hold": 4, "voice": false },
         { "texts": { "education": "On the 26th the close at 53751 is below the lower band, and the Range ends. The same close is the Downswing's BoS." } }
       ]
