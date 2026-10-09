@@ -309,8 +309,8 @@ public static class StrategyBacktest
         // the end is valued as if closed at the last close, paying the fee to close but not slipping.
         StrategyTrade Made(int exitIndex, double exitPrice, EnumTradeOutcome outcome, bool both)
         {
-            var fees = strategy.FeePercent / 100 * (entry + exitPrice);
-            var slippage = strategy.SlippagePercent / 100 * (entry + (outcome == EnumTradeOutcome.StopLoss ? exitPrice : 0));
+            var fees = (strategy.CountFees ? strategy.FeePercent : 0) / 100 * (entry + exitPrice);
+            var slippage = (strategy.CountSlippage ? strategy.SlippagePercent : 0) / 100 * (entry + (outcome == EnumTradeOutcome.StopLoss ? exitPrice : 0));
             var profit = sign * (exitPrice - entry) - fees - slippage;
             return new StrategyTrade(number, strategy.Direction, index, prices[index].DateTime, entry, takeProfit, stopLoss,
                 exitIndex, prices[exitIndex].DateTime, exitPrice, outcome, profit, 100 * profit / entry, exitIndex - index, both, met, fees, slippage);

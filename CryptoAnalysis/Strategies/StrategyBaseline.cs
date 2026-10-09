@@ -9,9 +9,10 @@ public sealed record BaselineMeasure(string Name, double? Strategy, double Mean,
 
 /// <summary>
 /// A point of a baseline's curve: the profit, as the sum of the ProfitPercent of the trades closed by the candle at Time, of
-/// the strategy and of the random runs, Low, Median and High being their 5th, 50th and 95th percentiles there.
+/// the strategy and of the random runs, Low, Median and High being their 5th, 50th and 95th percentiles there. Gross is the
+/// strategy's before fees and slippage; the others are after them.
 /// </summary>
-public sealed record BaselinePoint(DateTime Time, double Strategy, double Low, double Median, double High);
+public sealed record BaselinePoint(DateTime Time, double Strategy, double Low, double Median, double High, double Gross);
 
 /// <summary>
 /// A strategy set against random entries over a dataset (see <see cref="StrategyBaseline"/>): what was run, how often the
@@ -79,10 +80,11 @@ public static class StrategyBaseline
             curves[r] = Cumulative(trades, points);
         });
         var own = Cumulative(actual.Trades, points);
+        var gross = Cumulative(actual.Trades, points, x => 100 * (x.Profit + x.Fees + x.Slippage) / x.EntryPrice);
         var curve = points.Select((at, k) =>
         {
             var sorted = curves.Select(c => c[k]).Order().ToList();
-            return new BaselinePoint(prices[at].DateTime, own[k], Quantile(sorted, 5), Quantile(sorted, 50), Quantile(sorted, 95));
+            return new BaselinePoint(prices[at].DateTime, own[k], Quantile(sorted, 5), Quantile(sorted, 50), Quantile(sorted, 95), gross[k]);
         }).ToList();
 
         var measures = Totals.Select(t => Measure(t.Name, t.Of(actual.Summary), random.Select(t.Of).OfType<double>())).ToList();
@@ -102,18 +104,19 @@ public static class StrategyBaseline
     }
 
     /// <summary>
-    /// The profit at each of the candles, as the sum of the ProfitPercent of the trades closed by it; a trade still open at
-    /// the end is not counted, as in the totals.
+    /// The profit at each of the candles, as the sum of each trade's percentage closed by it: its ProfitPercent, or what
+    /// percent gives. A trade still open at the end is not counted, as in the totals.
     /// </summary>
-    public static double[] Cumulative(IReadOnlyList<StrategyTrade> trades, IReadOnlyList<int> points)
+    public static double[] Cumulative(IReadOnlyList<StrategyTrade> trades, IReadOnlyList<int> points, Func<StrategyTrade, double>? percent = null)
     {
+        percent ??= x => x.ProfitPercent;
         var closed = trades.Where(x => x.Outcome != EnumTradeOutcome.Open).OrderBy(x => x.ExitIndex).ToList();
         var sums = new double[points.Count];
         var (next, total) = (0, 0.0);
         for (var k = 0; k < points.Count; k++)
         {
             for (; next < closed.Count && closed[next].ExitIndex <= points[k]; next++)
-                total += closed[next].ProfitPercent;
+                total += percent(closed[next]);
             sums[k] = total;
         }
 

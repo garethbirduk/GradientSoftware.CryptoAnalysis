@@ -167,6 +167,23 @@ public class StrategyBacktestTests
     }
 
     [TestMethod]
+    public void Run_CostsTurnedOffAreNotCountedThoughTheirValuesAreKept()
+    {
+        var prices = Candles([.. FourGreen, (160, 165, 150, 152), (152, 153, 140, 141)]);
+        var strategy = WithCosts(RunOf(), fee: 0.1, slippage: 0.1);
+
+        strategy.CountFees = false;
+        var noFees = StrategyBacktest.Run(prices, strategy).Trades.Single();
+        strategy.CountFees = true;
+        strategy.CountSlippage = false;
+        var noSlippage = StrategyBacktest.Run(prices, strategy).Trades.Single();
+
+        Assert.AreEqual((0.0, 0.305), (noFees.Fees, Math.Round(noFees.Slippage, 9)));
+        Assert.AreEqual((0.305, 0.0), (Math.Round(noSlippage.Fees, 9), noSlippage.Slippage));
+        Assert.AreEqual((0.1, 0.1), (strategy.FeePercent, strategy.SlippagePercent));
+    }
+
+    [TestMethod]
     public void Validate_CostsCannotBeNegative()
     {
         Assert.AreEqual(2, WithCosts(RunOf(), fee: -0.1, slippage: -0.1).Validate().Count);
@@ -275,6 +292,19 @@ public class StrategyBacktestTests
         Assert.AreEqual(0, s.Validate().Count);
         s.After[0].Within = 5;
         CollectionAssert.Contains(s.Validate(), "Step 1: Within needs a step before it.");
+    }
+
+    [TestMethod]
+    public void Parse_ReadsTheDefaultCostsAndEachStrategysOwn()
+    {
+        var book = StrategyBook.Parse("""
+            { "defaults": { "feePercent": 0.1, "slippagePercent": 0.05 },
+              "strategies": [ { "id": "costed", "feePercent": 0.2, "slippagePercent": 0 }, { "id": "none" } ] }
+            """);
+
+        Assert.AreEqual((0.1, 0.05), (book.Defaults!.FeePercent, book.Defaults.SlippagePercent));
+        Assert.AreEqual((0.2, 0.0), (book.Strategies[0].FeePercent, book.Strategies[0].SlippagePercent));
+        Assert.AreEqual((0.0, 0.0), (book.Strategies[1].FeePercent, book.Strategies[1].SlippagePercent));
     }
 
     [TestMethod]

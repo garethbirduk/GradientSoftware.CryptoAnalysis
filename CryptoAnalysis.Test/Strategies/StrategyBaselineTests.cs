@@ -146,6 +146,25 @@ public class StrategyBaselineTests
     }
 
     [TestMethod]
+    public void Run_GrossCurveIsTheStrategysBeforeItsCosts()
+    {
+        var prices = Walk(3000, edge: false);
+        var costed = System.Text.Json.JsonSerializer.Deserialize<Strategy>(System.Text.Json.JsonSerializer.Serialize(GreenRun, StrategyBook.JsonOptions), StrategyBook.JsonOptions)!;
+        costed.FeePercent = 0.1;
+        costed.SlippagePercent = 0.05;
+
+        var free = StrategyBaseline.Run(prices, GreenRun, runs: 20).Curve[^1];
+        var paid = StrategyBaseline.Run(prices, costed, runs: 20);
+
+        var trades = StrategyBacktest.Run(prices, costed).Trades.Where(x => x.Outcome != EnumTradeOutcome.Open).ToList();
+        var costs = trades.Sum(x => 100 * (x.Fees + x.Slippage) / x.EntryPrice);
+        Assert.AreEqual(free.Strategy, free.Gross, 1e-9);
+        Assert.IsTrue(costs > 0);
+        Assert.AreEqual(paid.Curve[^1].Strategy + costs, paid.Curve[^1].Gross, 1e-9);
+        Assert.AreEqual(free.Strategy, paid.Curve[^1].Gross, 1e-9);
+    }
+
+    [TestMethod]
     public void Run_StrategyThatNeverEntersHasNoRateToMatch()
     {
         var prices = Walk(3, edge: false);

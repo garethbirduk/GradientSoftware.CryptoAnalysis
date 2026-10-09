@@ -401,6 +401,11 @@
   .strat-fields label.strat-vary { margin-left: -6px; }
   .strat-fields label.strat-vary input[type="number"] { width: 56px; font-size: 12px; }
   .strat-sweep-beats { height: 260px; margin-top: 4px; }
+  /* Fees and Slippage a line each, their checkboxes one width so the numbers beside them line up. */
+  .strat-fields.strat-cost + .strat-fields { margin-top: 6px; }
+  .strat-cost label.check { width: 80px; align-self: center; }
+  .strat-cost input:disabled { opacity: .45; }
+  .strat-costs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 13px; color: var(--muted); }
   .strat-sweep { position: relative; }
   .strat-sweep-card { position: absolute; z-index: 5; width: 260px; transform: translate(12px, 12px); padding: 10px 12px; font-size: 13px; color: var(--text);
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
@@ -5359,9 +5364,9 @@ const strategiesDirty = () => !!strategies && strategyKey(strategies.book) !== s
 const inlineJson = v => Array.isArray(v) ? (v.length ? `[ ${v.map(inlineJson).join(', ')} ]` : '[]')
   : v && typeof v === 'object' ? `{ ${Object.entries(v).map(([a, b]) => `${JSON.stringify(a)}: ${inlineJson(b)}`).join(', ')} }` : JSON.stringify(v);
 // The order a strategy's keys are saved in: the steps of a chain before its entry; any others after these.
-const STRATEGY_KEYS = ['id', 'name', 'direction', 'after', 'entry', 'takeProfit', 'stopLoss', 'onePositionAtATime', 'feePercent', 'slippagePercent', 'vary'];
+const STRATEGY_KEYS = ['id', 'name', 'direction', 'after', 'entry', 'takeProfit', 'stopLoss', 'onePositionAtATime', 'countFees', 'feePercent', 'countSlippage', 'slippagePercent', 'vary'];
 const keyOrder = k => (i => i < 0 ? STRATEGY_KEYS.length : i)(STRATEGY_KEYS.indexOf(k));
-const formatStrategies = book => `{\n  "strategies": [\n${book.strategies.map(s => `    {\n${Object.entries(s).sort(([a], [b]) => keyOrder(a) - keyOrder(b)).map(([k, v]) =>
+const formatStrategies = book => `{\n${book.defaults ? `  "defaults": ${inlineJson(book.defaults)},\n` : ''}  "strategies": [\n${book.strategies.map(s => `    {\n${Object.entries(s).sort(([a], [b]) => keyOrder(a) - keyOrder(b)).map(([k, v]) =>
   `      ${JSON.stringify(k)}: ${inlineJson(v)}`).join(',\n')}\n    }`).join(',\n')}\n  ]\n}\n`;
 window.addEventListener('beforeunload', e => { if (strategiesDirty()) e.preventDefault(); });
 
@@ -5373,6 +5378,9 @@ async function loadStrategies() {
   const base = own ? textKey(own) : '';
   const book = text ? JSON.parse(text) : { strategies: [] };
   book.strategies ??= [];
+  // The costs a strategy is given when it has none of its own, as one kept before strategies had costs.
+  book.defaults ??= { ...FIRST_DEFAULT_COSTS };
+  book.strategies.forEach(s => { s.feePercent ??= book.defaults.feePercent; s.slippagePercent ??= book.defaults.slippagePercent; });
   strategies = { book, base, saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false,
     dataset: strategies?.dataset, sweeps: strategies?.sweeps };
 }
@@ -5405,14 +5413,17 @@ function strategySays(s) {
   const long = s.direction !== 'Short';
   // A level is where the target is; a distance is how far it is from the entry, and on which side.
   const where = (t, side) => STRATEGY_TYPES.target[t?.type]?.level ? `at ${part('target', t)}, when that is ${side} the entry` : `${part('target', t)} ${side} the entry`;
-  const fee = s.feePercent || 0, slip = s.slippagePercent || 0;
-  const costs = fee || slip ? ` Costs: ${fee}% fee a side and ${slip}% slippage on the entry and a Stop Loss.` : ' No fees or slippage are counted.';
+  const fee = s.countFees !== false ? s.feePercent || 0 : 0, slip = s.countSlippage !== false ? s.slippagePercent || 0 : 0;
+  const costs = fee && slip ? ` Costs: ${fee}% fee a side and ${slip}% slippage on the entry and a Stop Loss.`
+    : fee ? ` Costs: ${fee}% fee a side; no slippage is counted.`
+    : slip ? ` Costs: ${slip}% slippage on the entry and a Stop Loss; no fees are counted.` : ' No fees or slippage are counted.';
   return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}. Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}${costs}`;
 }
 
-// The costs a new strategy starts with, as a guide to an exchange's taker fee and a liquid market's slippage; a strategy
-// without them counts none.
-const NEW_STRATEGY_COSTS = { feePercent: 0.1, slippagePercent: 0.05 };
+// The default costs strategies.json starts with when it has none: about an exchange's taker fee and a liquid market's
+// slippage. Set as default on a strategy changes them, kept in strategies.json's "defaults".
+const FIRST_DEFAULT_COSTS = { feePercent: 0.1, slippagePercent: 0.05 };
+const defaultCosts = () => ({ feePercent: strategies.book.defaults.feePercent, slippagePercent: strategies.book.defaults.slippagePercent });
 
 function newStrategyId(name) {
   const base = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'strategy';
@@ -5461,7 +5472,7 @@ function renderStrategyList() {
   box.querySelector('[data-add]').addEventListener('click', () => {
     const name = 'New strategy', s = { id: newStrategyId(name), name, direction: 'Long', entry: { type: 'SuccessiveCandles', ...STRATEGY_TYPES.entry.SuccessiveCandles.defaults },
       takeProfit: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, stopLoss: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, onePositionAtATime: true,
-      ...NEW_STRATEGY_COSTS };
+      ...defaultCosts() };
     strategies.book.strategies.push(s);
     strategies.selected = s.id;
     renderStrategyList();
@@ -5474,17 +5485,40 @@ const selectedStrategy = () => strategies.book.strategies.find(s => s.id === str
 
 // A number's variations in a sweep, beside it: up To, in steps of Step, from the number's own value. Both blank, it is not
 // varied. They are kept in the strategy's "vary", by the number's path, as the server's StrategySweep reads them.
-function varyInputs(s, path, step) {
-  const v = s.vary?.[path] ?? {};
+function varyInputs(s, path, step, off = false) {
+  const v = s.vary?.[path] ?? {}, dis = off ? 'disabled' : '';
   const tip = 'title="Sweeps this from the value beside it up to To in steps of Step. Leave both blank for no variations."';
-  return `<label class="strat-vary" ${tip}>to<input type="number" data-vary="${path}" data-vary-key="to" step="${step}" value="${esc(v.to ?? '')}" placeholder="–"></label>
-    <label class="strat-vary" ${tip}>step<input type="number" data-vary="${path}" data-vary-key="step" min="0" step="${step}" value="${esc(v.step ?? '')}" placeholder="–"></label>`;
+  return `<label class="strat-vary" ${tip}>to<input type="number" data-vary="${path}" data-vary-key="to" step="${step}" value="${esc(v.to ?? '')}" placeholder="–" ${dis}></label>
+    <label class="strat-vary" ${tip}>step<input type="number" data-vary="${path}" data-vary-key="step" min="0" step="${step}" value="${esc(v.step ?? '')}" placeholder="–" ${dis}></label>`;
 }
 
 function setVary(s, path, to, step) {
   if (to === undefined && step === undefined) delete s.vary?.[path];
   else (s.vary ??= {})[path] = { ...(to !== undefined ? { to } : {}), ...(step !== undefined ? { step } : {}) };
   if (s.vary && !Object.keys(s.vary).length) delete s.vary;
+}
+
+// Beside a strategy's costs: Clear (none), Defaults (the book's) and Set as default (the book's become these), each
+// unavailable when it would change nothing, with the defaults as they are. Set as default is saved with Save.
+function costButtons(s) {
+  const d = strategies.book.defaults, fee = s.feePercent ?? 0, slip = s.slippagePercent ?? 0;
+  const isDefault = fee === d.feePercent && slip === d.slippagePercent;
+  return `<div class="strat-costs">
+    <button type="button" data-costs="clear" ${!fee && !slip ? 'disabled' : ''} title="No fees or slippage for this strategy">Clear</button>
+    <button type="button" data-costs="defaults" ${isDefault ? 'disabled' : ''} title="This strategy takes the default costs">Defaults</button>
+    <button type="button" data-costs="set" ${isDefault ? 'disabled' : ''} title="This strategy's costs become the defaults, for new strategies and those without costs of their own">Set as default</button>
+    <span class="strat-note">Default: ${d.feePercent}% fee a side, ${d.slippagePercent}% slippage.</span></div>`;
+}
+
+function wireCostButtons(box, s) {
+  box.querySelectorAll('[data-costs]').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.costs === 'clear') Object.assign(s, { feePercent: 0, slippagePercent: 0 });
+    else if (b.dataset.costs === 'defaults') Object.assign(s, defaultCosts());
+    else strategies.book.defaults = { feePercent: s.feePercent ?? 0, slippagePercent: s.slippagePercent ?? 0 };
+    renderStrategy();
+    updateStrategyStatus();
+    if (b.dataset.costs !== 'set') rerunForCosts(s);
+  }));
 }
 
 // Drops the variations of the numbers whose paths pass the test, as when the part they are in changes type or the steps move.
@@ -5564,10 +5598,15 @@ function renderStrategy() {
         <label>Direction<select data-path="direction">${['Long', 'Short'].map(o => `<option ${o === s.direction ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
         <label class="check"><input type="checkbox" data-path="onePositionAtATime" ${s.onePositionAtATime ? 'checked' : ''}>One trade at a time</label>
       </div>
-      <div class="strat-fields">
-        <label title="The fee on each side of a trade, entry and exit, as a percentage of its value">Fee % a side<input type="number" data-path="feePercent" data-number min="0" step="0.01" value="${esc(s.feePercent ?? 0)}"></label>${varyInputs(s, 'feePercent', 0.01)}
-        <label title="How far a market order fills against the trade: the entry and a Stop Loss. A Take Profit is a limit order and does not slip.">Slippage %<input type="number" data-path="slippagePercent" data-number min="0" step="0.01" value="${esc(s.slippagePercent ?? 0)}"></label>${varyInputs(s, 'slippagePercent', 0.01)}
+      <div class="strat-fields strat-cost">
+        <label class="check" title="Whether the fee is counted; off, the strategy keeps its fee but pays none"><input type="checkbox" data-count="countFees" ${s.countFees !== false ? 'checked' : ''}>Fees</label>
+        <label title="The fee on each side of a trade, entry and exit, as a percentage of its value">Fee % a side<input type="number" data-path="feePercent" data-number min="0" step="0.01" value="${esc(s.feePercent ?? 0)}" ${s.countFees !== false ? '' : 'disabled'}></label>${varyInputs(s, 'feePercent', 0.01, s.countFees === false)}
       </div>
+      <div class="strat-fields strat-cost">
+        <label class="check" title="Whether slippage is counted; off, the strategy keeps its slippage but none is taken"><input type="checkbox" data-count="countSlippage" ${s.countSlippage !== false ? 'checked' : ''}>Slippage</label>
+        <label title="How far a market order fills against the trade: the entry and a Stop Loss. A Take Profit is a limit order and does not slip.">Slippage %<input type="number" data-path="slippagePercent" data-number min="0" step="0.01" value="${esc(s.slippagePercent ?? 0)}" ${s.countSlippage !== false ? '' : 'disabled'}></label>${varyInputs(s, 'slippagePercent', 0.01, s.countSlippage === false)}
+      </div>
+      <div class="strat-fields">${costButtons(s)}</div>
       <div class="strat-fields strat-steps">${stepsHtml}</div>
       <div class="strat-fields">${STRATEGY_PARTS.filter(x => x.kind !== 'entry').map(part).join('')}</div>
       <p class="strat-says">${esc(strategySays(s))}</p>
@@ -5592,6 +5631,21 @@ function renderStrategy() {
     if (key === 'name' || key === 'id') renderStrategyList();
     if (key === 'id') syncStrategiesHash();
     updateStrategyStatus();
+    // The cost buttons are available by how the costs stand against the defaults.
+    if (key === 'feePercent' || key === 'slippagePercent') {
+      box.querySelector('.strat-costs').outerHTML = costButtons(s);
+      wireCostButtons(box, s);
+      rerunForCosts(s);
+    }
+  }));
+  wireCostButtons(box, s);
+  // On is the default, so only a cost turned off is kept, as false.
+  box.querySelectorAll('[data-count]').forEach(el => el.addEventListener('change', () => {
+    if (el.checked) delete s[el.dataset.count];
+    else s[el.dataset.count] = false;
+    renderStrategy();
+    updateStrategyStatus();
+    rerunForCosts(s);
   }));
   box.querySelectorAll('[data-vary]').forEach(el => el.addEventListener('change', () => {
     const path = el.dataset.vary, [to, step] = ['to', 'step'].map(k => box.querySelector(`[data-vary="${path}"][data-vary-key="${k}"]`).value);
@@ -5698,7 +5752,7 @@ function renderStrategyRun() {
     <div class="strat-sweep"></div>
     ${run?.baseline ? baselineResults(run.baseline) : ''}
     <div class="strat-results">${run?.trades ? strategyResults(run) : ''}</div>`;
-  if (run?.baseline?.curve) baselinePlot(box.querySelector('[data-baseline-plot]'), run.baseline);
+  if (run?.baseline?.curve) baselinePlot(box.querySelector('[data-baseline-plot]'), run.baseline, run);
   renderSweep(box.querySelector('.strat-sweep'), strategies.sweeps?.get(s.id));
   box.querySelector('[data-chart-add]').addEventListener('submit', e => {
     e.preventDefault();
@@ -5741,6 +5795,7 @@ function renderStrategyRun() {
     results.innerHTML = strategyResults(run);
     const again = results.querySelector('.strat-trades');
     if (again) [again.scrollTop, again.scrollLeft] = [top, left];
+    if (run.baseline?.curve) baselinePlot(box.querySelector('[data-baseline-plot]'), run.baseline, run);
   });
 }
 
@@ -5758,16 +5813,28 @@ function summariseTrades(trades) {
   };
 }
 
-async function runStrategy(s) {
+// Runs the strategy as it is here. With again, it is the run there was run again for a change of costs, on its dataset:
+// costs do not change which trades are made, so those left out stay left out, the order stays, and a baseline there was is
+// run again too.
+async function runStrategy(s, again = false) {
+  const before = again ? strategies.runs.get(s.id) : null;
   strategies.running = true;
   renderStrategyRun();
-  const response = await fetch('api/backtest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset: strategies.dataset, strategy: s }) }).catch(() => null);
+  const response = await fetch('api/backtest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset: before?.dataset ?? strategies.dataset, strategy: s }) }).catch(() => null);
   const result = response?.ok ? await response.json()
     : { error: response?.status === 404 || response?.status === 405 ? 'The local server was started before strategies could be run. Restart ./build-site.ps1 -Serve.'
       : `Not run: ${response ? await response.text() : 'the local server did not answer.'}` };
   strategies.running = false;
-  strategies.runs.set(s.id, result.error ? result : { saved: result.saved, ...result.run });
+  const run = result.error ? result : { saved: result.saved, ...result.run };
+  if (before?.trades && run.trades) Object.assign(run, { leftOut: before.leftOut, sort: before.sort });
+  strategies.runs.set(s.id, run);
   if (currentPage === 'Strategies' && selectedStrategy() === s) renderStrategyRun();
+  if (before?.baseline && run.trades) runBaseline(s, run);
+}
+
+// A strategy's costs changed: a run of it is run again, so its results and graph have them.
+function rerunForCosts(s) {
+  if (strategies.runs.get(s.id)?.trades && !strategies.running) runStrategy(s, true);
 }
 
 // The random-entry baseline of a run (POST api/backtest/baseline, see StrategyBaseline): the run's own strategy, as it was
@@ -5799,10 +5866,11 @@ function baselineResults(b) {
   return `<div class="strat-baseline">
     <p class="remarks">Against ${b.runs.toLocaleString()} runs entering at random candles, each tried by the chance the strategy's entry is met at
       (${b.signals.toLocaleString()} of ${b.candles.toLocaleString()} candles), with the strategy's exits. They made ${Math.round(b.averageTrades)} trades
-      on average to its ${b.trades}. Every trade is counted, whichever are left out below.${b.saved ? ` Saved to ${esc(b.saved)}.` : ''}</p>
+      on average to its ${b.trades}. The table counts every trade; the graph's strategy lines count only those not left out below.${b.saved ? ` Saved to ${esc(b.saved)}.` : ''}</p>
     <table><thead><tr><th></th><th class="num">Strategy</th><th class="num">Random median</th><th class="num">Random 5% to 95%</th><th class="num">Beats</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table>
-    ${b.curve ? `<p class="remarks">Profit over time, as the sum of each closed trade's %: the strategy against the band nine random runs in ten stay within.</p>
+    ${b.curve ? `<p class="remarks">Profit over time, as the sum of each closed trade's %: the strategy against the band nine random runs in ten stay within.
+      With costs, the dashed line is the strategy before its fees and slippage, the gap to the solid line what they cost; the random runs pay the same costs.</p>
       <div class="strat-baseline-plot" data-baseline-plot></div>` : ''}</div>`;
 }
 
@@ -5834,10 +5902,37 @@ function resultsLayout(xaxis, yaxis, extra = {}) {
 
 const RESULTS_CONFIG = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['select2d', 'lasso2d'] };
 
-// The baseline's curve: the strategy's profit over time on the band of the random runs', 5% to 95%, and their median.
-function baselinePlot(el, b) {
+// The strategy's profit before fees and slippage, dashed, for the gap to the solid line to show what they cost; none when
+// the strategy has no costs, or the baseline was run before there were any.
+const grossLine = (b, name = 'Before fees and slippage') => b.curve.some(p => p.gross != null && Math.abs(p.gross - p.strategy) > 1e-9)
+  ? [curveLine(b, name, 'gross', css('--accent'), { line: { color: css('--accent'), width: 2, dash: 'dash' } })] : [];
+
+// The baseline's curve with the strategy's lines from the run's trades still counted, when some are left out: each closed
+// trade's % added at its exit, after costs and before them. The random runs' band and median are theirs, and stay.
+function countedCurve(b, run) {
+  const off = run?.leftOut;
+  if (!off?.size) return b;
+  const closed = run.trades.filter(t => t.outcome !== 'Open' && !off.has(t.entryIndex))
+    .map(t => ({ at: Date.parse(t.exitTime), net: t.profitPercent, gross: 100 * (t.profit + (t.fees ?? 0) + (t.slippage ?? 0)) / t.entryPrice }))
+    .sort((a, c) => a.at - c.at);
+  let k = 0, net = 0, gross = 0;
+  const curve = b.curve.map(p => {
+    for (const at = Date.parse(p.time); k < closed.length && closed[k].at <= at; k++) {
+      net += closed[k].net;
+      gross += closed[k].gross;
+    }
+    return { ...p, strategy: net, gross };
+  });
+  return { ...b, curve, counted: closed.length, closed: run.trades.filter(t => t.outcome !== 'Open').length };
+}
+
+// The baseline's curve: the strategy's profit over time on the band of the random runs', 5% to 95%, and their median, and
+// what it would have been before fees and slippage; from the trades counted, when the run is given and some are left out.
+function baselinePlot(el, b, run) {
   if (!el) return;
-  Plotly.react(el, [...bandTraces(b), curveLine(b, 'Strategy', 'strategy', css('--accent'))],
+  b = countedCurve(b, run);
+  const name = `Strategy, after fees and slippage${b.counted != null ? ` (${b.counted} of ${b.closed} trades)` : ''}`;
+  Plotly.react(el, [...bandTraces(b), ...grossLine(b), curveLine(b, name, 'strategy', css('--accent'))],
     resultsLayout({ type: 'date' }, { ticksuffix: '%', zeroline: true, zerolinecolor: css('--muted') }, { hovermode: 'x unified' }), RESULTS_CONFIG);
 }
 
@@ -5990,6 +6085,7 @@ function sweepLinesPlot(el, sw, ran, pick) {
     ...bandTraces(selected),
     { type: 'scatter', mode: 'lines', name: 'Other variations', x: [null], y: [null], line: { color: withAlpha(accent, 0.4), width: 1.5 }, hoverinfo: 'skip' },
     ...lines,
+    ...grossLine(selected, 'Selected, before fees and slippage').map(t => ({ ...t, meta: sw.selected })),
     curveLine(selected, `Selected: ${sweepLabel(sw, sw.variations[sw.selected])}`, 'strategy', accent, { line: { color: accent, width: 3 }, meta: sw.selected }),
   ], resultsLayout({ type: 'date' }, { ticksuffix: '%', zeroline: true, zerolinecolor: css('--muted') }, { hovermode: 'closest' }), RESULTS_CONFIG);
   el.on('plotly_click', e => { const meta = e.points?.[0]?.data?.meta; if (meta != null) pick(meta, e.event); });

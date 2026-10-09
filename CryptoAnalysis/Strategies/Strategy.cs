@@ -73,6 +73,16 @@ public sealed class Strategy
     public double SlippagePercent { get; set; }
 
     /// <summary>
+    /// Whether the fee is counted; off, the strategy keeps its FeePercent but pays none.
+    /// </summary>
+    public bool CountFees { get; set; } = true;
+
+    /// <summary>
+    /// Whether slippage is counted; off, the strategy keeps its SlippagePercent but none is taken.
+    /// </summary>
+    public bool CountSlippage { get; set; } = true;
+
+    /// <summary>
     /// The numbers a sweep varies (see <see cref="StrategySweep"/>), each by its path in the strategy's JSON, as
     /// "stopLoss.ratio" or "after.0.length": from the value the strategy has, up to To in steps of Step. A run or a baseline
     /// takes the strategy as it is, with each number at its own value.
@@ -266,7 +276,17 @@ public sealed class StrategyRange
 }
 
 /// <summary>
-/// The strategies kept in strategies.json.
+/// The costs the Strategies page gives a strategy that has none of its own: a new one, or one kept before it had costs.
+/// </summary>
+public sealed class StrategyCosts
+{
+    public double FeePercent { get; set; }
+
+    public double SlippagePercent { get; set; }
+}
+
+/// <summary>
+/// The strategies kept in strategies.json, with the costs a strategy is given by default.
 /// </summary>
 public sealed class StrategyBook
 {
@@ -276,6 +296,9 @@ public sealed class StrategyBook
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Converters = { new JsonStringEnumConverter() },
     };
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public StrategyCosts? Defaults { get; set; }
 
     public List<Strategy> Strategies { get; set; } = [];
 
