@@ -9,7 +9,8 @@ namespace Gradient.CryptoAnalysis.Site;
 /// The Trade an analysis tells of: a strategy's trade entered at a candle, in three chapters. Entry: what the entry
 /// condition is and how this candle met it. Exits: the Take Profit and Stop Loss set at the entry, and how they were worked
 /// out. Outcome: the candle that ended the trade, which target it reached, and what it won or lost. Each is told at
-/// Education (what such a thing is) and at Summary (this one), as the other things are.
+/// Education (what such a thing is) and at Summary (this one), as the other things are. Risk, between the exits and the
+/// outcome, tells the trade's reward, risk and R by the Risk term's own block (see <see cref="RiskOf"/>).
 /// </summary>
 public static partial class Explain
 {
@@ -20,6 +21,7 @@ public static partial class Explain
     [
         ("Entry", "Entry", "What is an entry condition?", TradeEntry),
         ("Exits", "Exits", "What are the exits?", TradeExits),
+        ("Risk", "Risk", "What is risk?", TradeRisk),
         ("Outcome", "Outcome", "How does a trade end?", TradeOutcome),
     ];
 
@@ -28,7 +30,7 @@ public static partial class Explain
     {
         public bool Long => Trade.Direction == EnumTradeDirection.Long;
 
-        public int First => Strategy.Entry.Type == StrategyEntry.SuccessiveCandles ? Math.Max(0, Trade.EntryIndex - Strategy.Entry.Length + 1) : Trade.EntryIndex;
+        public int First => Trade.FirstRead(Strategy);
     }
 
     /// <summary>
@@ -63,10 +65,9 @@ public static partial class Explain
     private static StrategyTrade? TradeAt(List<Price> prices, Strategy strategy, int at)
     {
         var trades = StrategyBacktest.Run(prices, strategy).Trades;
-        var reads = strategy.Entry.Type == StrategyEntry.SuccessiveCandles ? strategy.Entry.Length - 1 : 0;
         return trades.FirstOrDefault(x => x.EntryIndex == at)
             ?? trades.FirstOrDefault(x => x.EntryIndex < at && at <= x.ExitIndex)
-            ?? trades.FirstOrDefault(x => x.EntryIndex - reads <= at && at < x.EntryIndex);
+            ?? trades.FirstOrDefault(x => x.FirstRead(strategy) <= at && at < x.EntryIndex);
     }
 
     // The chapters of a Trade entered at the candle: one section for each block, the strategy in each.
@@ -113,22 +114,57 @@ public static partial class Explain
         return Section(view, last > reached ? last : null, told);
     }
 
-    // What an entry condition is; then this one, and the candle that met it, where the trade is entered.
+    // What an entry condition is and this one; then each of its steps, told by its term's own block as it stood at the
+    // candle that met it, and what the strategy looks for next; then the candle that met the last, where the trade is entered.
     private static Block TradeEntry(TradeRead r)
     {
         var t = r.Trade;
-        var e = r.Strategy.Entry;
+        var steps = r.Strategy.Steps;
+        var met = t.Met.Select(x => x.Index).Append(t.EntryIndex).ToList();
         var length = Length(r.Prices);
         var buys = r.Long ? "buying" : "selling";
-        var colour = e.Colour == EnumCandleColour.Green ? "green" : "red";
-        var cues = new List<JsonObject>
+        var cues = new List<JsonObject> { Define(r.First, "Trade.entry") };
+        if (steps.Count > 1)
+            cues.Add(Define(r.First, "Trade.chain"));
+        cues.Add(Teach(r.First, ConditionText(r.Strategy)));
+        for (var k = 0; k < steps.Count; k++)
         {
-            Teach(r.First, "A strategy enters a trade when its entry condition is met. The condition is read at the close of each candle, from that candle and the ones before it alone, and the trade is entered at that close."),
-            Teach(r.First, $"This strategy's entry condition is {Words(e.Length)} {colour} candles in a row: each closes {(e.Colour == EnumCandleColour.Green ? "above" : "below")} its open. It enters on the {Ordinal(e.Length)} of them, once a run, so a longer run does not enter again."),
-            Say(r.First, $"The run begins with the candle at {Clock(r.Prices[r.First].DateTime, length)}."),
-            Say(t.EntryIndex, $"The candle at {Clock(t.EntryTime, length)} is the {Ordinal(e.Length)} {colour} candle in a row, so the entry condition is met. The trade is entered at its close, {buys} at {Money(t.EntryPrice)}."),
-        };
-        return new Block(cues, ["candles", "trade"]);
+            cues.AddRange(StepCues(r.Prices, steps[k], met[k]));
+            if (k < steps.Count - 1)
+                cues.Add(Say(met[k], $"That meets the {Ordinal(k + 1)} step, so the strategy now looks for {StepWords(steps[k + 1])}{WithinWords(steps[k + 1])}."));
+        }
+
+        cues.Add(Say(t.EntryIndex, $"That meets the entry condition, so the trade is entered at the close of the candle at {Clock(t.EntryTime, length)}, {buys} at {Money(t.EntryPrice)}."));
+        // A definition is taught once in the chapter, however many steps cite it.
+        var taught = new HashSet<string>();
+        return new Block(cues.Where(x => x["definition"] == null || taught.Add(x["texts"]!.ToJsonString())).ToList(), ["candles", "trade"]);
+    }
+
+    // A strategy's entry condition in words: its steps in order, each after the one before, and how a run is counted.
+    private static string ConditionText(Strategy strategy)
+    {
+        var steps = strategy.Steps;
+        if (steps.Count == 1)
+            return $"This strategy's entry condition is {StepWords(steps[0])}. It enters on the {Ordinal(steps[0].Length)} of them, once a run, so a longer run does not enter again.";
+        var chain = string.Join(", then ", steps.Select((x, k) => k == 0 ? StepWords(x) : StepWords(x) + WithinWords(x)));
+        return $"This strategy's entry condition is {chain}. A run counts on the candle that makes its count, once a run, so a longer run does not count again.";
+    }
+
+    // A step as the condition names it: "four Successive Green Candles".
+    private static string StepWords(StrategyEntry step) =>
+        $"{Words(step.Length)} Successive {(step.Colour == EnumCandleColour.Green ? "Green" : "Red")} Candles";
+
+    // How soon a step must follow the one before it, when the strategy says.
+    private static string WithinWords(StrategyEntry step) => step.Within is int within ? $" within {Words(within)} candles" : "";
+
+    // A step met at a candle, told by the blocks of the term it is made of, as the term stood at that candle: for a run,
+    // what makes a candle green or red, from the first candle the step reads, then the run's own block.
+    private static IEnumerable<JsonObject> StepCues(List<Price> prices, StrategyEntry step, int at)
+    {
+        yield return Define(Math.Max(0, at - step.Reads), "Candle.colour");
+        if (RunAt(prices.GetRange(0, at + 1), at, step.Length) is { } run)
+            foreach (var cue in RunOf(new RunRead(prices, run, step.Colour == EnumCandleColour.Green)).Cues)
+                yield return cue;
     }
 
     // What the exits are; then where this trade's are, and how they were worked out from the candles up to the entry.
@@ -138,10 +174,10 @@ public static partial class Explain
         var (above, below) = r.Long ? ("above", "below") : ("below", "above");
         var cues = new List<JsonObject>
         {
-            Teach(t.EntryIndex, $"A trade is given two exits as it is entered: a Take Profit {above} the entry, where it closes with a gain, and a Stop Loss {below} it, where it closes with a loss. Whichever the price reaches first ends the trade."),
+            Define(t.EntryIndex, "Trade.exits"),
         };
-        var profit = TargetText(r, r.Strategy.TakeProfit);
-        var loss = TargetText(r, r.Strategy.StopLoss);
+        var profit = TargetText(r, r.Strategy.TakeProfit, t.TakeProfit);
+        var loss = TargetText(r, r.Strategy.StopLoss, t.StopLoss);
         if (profit.Measure != null)
             cues.Add(Say(t.EntryIndex, profit.Measure));
         if (loss.Measure != null && loss.Measure != profit.Measure)
@@ -152,9 +188,23 @@ public static partial class Explain
     }
 
     // How far a target is from the entry, in words, and the measure it was worked out from when it has one.
-    private static (string Distance, string? Measure) TargetText(TradeRead r, StrategyTarget target)
+    private static (string Distance, string? Measure) TargetText(TradeRead r, StrategyTarget target, double price)
     {
         var t = r.Trade;
+        if (target.Type == StrategyTarget.RiskRatio)
+        {
+            var times = RText(target.Ratio);
+            return (Money(Math.Abs(price - t.EntryPrice)), target.Ratio == 1
+                ? "The Stop Loss is set for a 1R target: the risk is the same as the reward."
+                : $"The Stop Loss is set for a {times}R target: the risk is the reward divided by {times}.");
+        }
+
+        if (target.IsLevel)
+        {
+            var extreme = target.Type == StrategyTarget.HighestWick ? "highest high" : "lowest low";
+            return (Money(Math.Abs(price - t.EntryPrice)), $"Over the last {Words(target.Candles)} candles up to the entry, the {extreme} is {Money(price)}.");
+        }
+
         var amount = target.Distance(r.Prices, t.EntryIndex) ?? 0;
         var percent = target.Percentage.ToString("0.##", CultureInfo.InvariantCulture);
         if (target.Type == StrategyTarget.Percent)
@@ -174,7 +224,7 @@ public static partial class Explain
         var (high, low) = r.Long ? ("high", "low") : ("low", "high");
         var cues = new List<JsonObject>
         {
-            Teach(t.EntryIndex, $"From the next candle on, each candle is checked against the exits. When its {high} reaches the Take Profit, the trade closes there with a gain; when its {low} reaches the Stop Loss, it closes there with a loss. A candle that opens beyond an exit closes the trade at its open. A candle that reaches both cannot say which came first, so it counts as the Stop Loss."),
+            Define(t.EntryIndex, "Trade.outcome"),
         };
         var later = $"{Capital(Duration(t.Candles, length))} later, at {Clock(t.ExitTime, length)}";
         var result = t.Profit >= 0
@@ -193,6 +243,62 @@ public static partial class Explain
         cues.Add(Say(t.ExitIndex, said));
         return new Block(cues, ["candles", "trade"]);
     }
+
+    // The trade's reward, risk and R, told by the Risk term's block, with the R the strategy sets when its Stop Loss is one.
+    private static Block TradeRisk(TradeRead r)
+    {
+        var t = r.Trade;
+        var stop = r.Strategy.StopLoss;
+        return RiskOf(new RiskRead(t.EntryIndex, t.EntryPrice, t.TakeProfit, t.StopLoss, stop.Type == StrategyTarget.RiskRatio ? stop.Ratio : null));
+    }
+
+    // A trade's prices as the Risk term tells them: its entry, its Take Profit and its Stop Loss, at a candle; and the target
+    // in R a strategy sets, when it sets one.
+    private sealed record RiskRead(int At, double Entry, double TakeProfit, double StopLoss, double? Set = null);
+
+    /// <summary>
+    /// The written parts of a section that explains risk from its own inputs: { "entry", "takeProfit", "stopLoss", "ratio" }
+    /// (entry the close of the candle when not given; ratio the target in R a strategy set, when it did). With a strategy instead, the
+    /// risk of its trade at the candle (see <see cref="Trade"/>). Null, with the problem, when neither gives a trade.
+    /// </summary>
+    public static JsonObject? Risk(List<Price> prices, int at, int reached, JsonNode? inputs, JsonNode? strategy, out string problem)
+    {
+        if (inputs == null)
+            return Trade(prices, at, reached, strategy, ["Risk"], out problem);
+        problem = "";
+        double? Number(string key) => inputs[key] is JsonValue v && v.TryGetValue<double>(out var x) ? x : null;
+        var entry = Number("entry") ?? prices[at].Close;
+        if (Number("takeProfit") is not double takeProfit || Number("stopLoss") is not double stopLoss
+            || takeProfit == entry || stopLoss == entry || (takeProfit > entry) == (stopLoss > entry))
+        {
+            problem = "risk is { \"entry\", \"takeProfit\", \"stopLoss\" }, with the Take Profit and the Stop Loss on either side of the entry";
+            return null;
+        }
+
+        var block = RiskOf(new RiskRead(at, entry, takeProfit, stopLoss, Number("ratio"))) with { Name = "Risk" };
+        return Section([Math.Max(0, at - CandlesBefore), Math.Min(prices.Count - 1, at + CandlesAfter)], at > reached ? at : null, block);
+    }
+
+    // What risk, reward and R are; then this trade's, its target in R, and what share of trades it must win to break even.
+    private static Block RiskOf(RiskRead r)
+    {
+        var reward = Math.Abs(r.TakeProfit - r.Entry);
+        var risk = Math.Abs(r.Entry - r.StopLoss);
+        var target = r.Set ?? reward / risk;
+        var share = (100 / (1 + target)).ToString("0", CultureInfo.InvariantCulture);
+        return new Block(
+        [
+            Define(r.At, "Risk.what"),
+            Say(r.At, $"The reward is {Money(reward)}, from the entry at {Money(r.Entry)} to the Take Profit at {Money(r.TakeProfit)}. The risk is {Money(risk)}, to the Stop Loss at {Money(r.StopLoss)}."),
+            Define(r.At, "Risk.ratio"),
+            Say(r.At, $"The Take Profit is a {RText(target)}R target{(r.Set != null ? ", as the strategy sets it" : "")}."),
+            Define(r.At, "Risk.breakeven"),
+            Say(r.At, $"At {RText(target)}R, it breaks even over many trades when it wins {share}% of them."),
+        ], ["candles", "trade"]);
+    }
+
+    // A number of R as it is said: to two places at most, "1", "0.5", "1.25".
+    private static string RText(double ratio) => Math.Round(ratio, 2).ToString("0.##", CultureInfo.InvariantCulture);
 
     private static string Target(EnumTradeOutcome outcome) => outcome == EnumTradeOutcome.TakeProfit ? "Take Profit" : "Stop Loss";
 }

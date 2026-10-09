@@ -366,6 +366,8 @@
   /* The Strategies page has no chart, so no levels, layers or replay bar. */
   body.strategizing .layout, body.strategizing.side-open .layout, body.strategizing.side-open.editing .layout { grid-template-columns: minmax(0, 1fr); }
   body.strategizing #levels, body.strategizing #layers, body.strategizing #replaybar, body.strategizing #side { display: none; }
+  /* Wide enough for the whole trades table, with no sideways scroll on a usual screen. */
+  body.strategizing main { max-width: 1480px; }
   .strat { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; margin-top: 18px; align-items: start; }
   .strat-list { display: flex; flex-direction: column; gap: 4px; }
   .strat-list button, .strat-actions button, .strat-run button { font: inherit; font-size: 13px; color: var(--text); background: var(--panel);
@@ -386,6 +388,14 @@
     border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; }
   .strat-fields input[type="number"] { width: 80px; }
   .strat-fields input[data-field="name"] { width: 260px; }
+  .strat-steps { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; max-width: 640px; }
+  .strat-steps fieldset.step { position: relative; padding-right: 36px; }
+  .strat-steps .step-remove { position: absolute; top: 2px; right: 6px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: none;
+    color: var(--muted); font: inherit; font-size: 16px; line-height: 1; cursor: pointer; }
+  .strat-steps .step-remove:hover { color: var(--text); background: var(--border); }
+  .strat-steps .step-add { align-self: center; width: 24px; height: 24px; padding: 0; border: 1px dashed var(--border); border-radius: 50%; background: none;
+    color: var(--muted); font: inherit; font-size: 15px; line-height: 1; cursor: pointer; }
+  .strat-steps .step-add:hover { color: var(--accent); border-color: var(--accent); }
   .strat-says { margin: 12px 0 0; max-width: 80ch; font-size: 14px; }
   .strat-actions, .strat-run { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
   .strat-note.bad { color: var(--bad); }
@@ -398,6 +408,26 @@
   .strat-trades table { margin-top: 0; font-size: 13px; }
   .strat-trades th { position: sticky; top: 0; background: var(--panel); }
   .strat-trades td.num, .strat-trades th.num { text-align: right; padding-right: 14px; }
+  /* Each cell on one line, a date and "Stop Loss *" alike; the table scrolls sideways when it is wider than its box. */
+  .strat-trades th, .strat-trades td { white-space: nowrap; }
+  .strat-trades tr.current td { background: var(--chip); font-weight: 600; }
+  .strat-trades tr.current td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  .strat-trades tr.bad td { color: var(--bad); }
+  .strat-trades td.act { white-space: nowrap; text-align: right; }
+  .strat-trades tr.out td:not(.inc) { opacity: .4; }
+  .strat-trades th button.sort, #similar-trades .strat-trades th button.sort { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+  .strat-trades th button.sort:hover, #similar-trades .strat-trades th button.sort:hover { color: var(--accent); background: none; }
+  .strat-trades th[aria-sort] button.sort { color: var(--accent); }
+  .strat-trades .inc { width: 1.5em; padding-right: 6px; }
+  .strat-trades button.inc { padding: 0; border: 0; background: none; color: var(--accent); font-size: 15px; line-height: 1; cursor: pointer; }
+  .strat-trades tr.out button.inc { color: var(--muted); }
+  .strat-counted { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .strat-counted button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
+  .strat-counted button:hover { background: var(--chip); }
+  .strat-trades td.act button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; margin-left: 4px; cursor: pointer; }
+  .strat-trades td.act button:hover { background: var(--chip); }
+  #similar-trades { width: min(900px, calc(100vw - 32px)); }
+  #similar-trades .strat-trades { max-height: 50vh; }
   .won { color: var(--up); } .lost { color: var(--down); }
   @media (max-width: 760px) { .strat { grid-template-columns: 1fr; } }
   /* Strategies on charts: the section's add form, each strategy's remove button, and Find similar. */
@@ -416,10 +446,6 @@
   .candle-card .card-trade button { padding: 2px 8px; font: inherit; font-size: 12px; color: var(--accent); background: var(--panel); border: 1px solid var(--accent); border-radius: 5px; cursor: pointer; }
   #similar-trades .sim-verdict { margin: 0 0 10px; color: var(--text); }
   #similar-trades .sim-verdict.bad { color: var(--bad); }
-  #similar-trades li { display: grid; grid-template-columns: 5.5em 10.5em 1fr auto; gap: 10px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
-  #similar-trades li.current { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
-  #similar-trades li.bad { color: var(--bad); }
-  #similar-trades li button { padding: 1px 8px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -5255,14 +5281,15 @@ function renderInterims() {
 // Strategies: strategies.json edited on the Strategies page and saved through the local server as the tour is, each one run
 // over a whole dataset there (POST api/backtest), which keeps every trade in artifacts/backtests. A strategy is made of parts,
 // each of a type; STRATEGY_TYPES says what each type's fields are and how it reads, so a new type is added there and in
-// the server's Strategy.cs.
+// the server's Strategy.cs. The entry condition can be a chain: the steps of "after", in order, then "entry", each looked
+// for once the one before it is met, within its "within" candles of it when that is set.
 const STRATEGY_TYPES = {
   entry: {
     SuccessiveCandles: {
       label: 'Successive Candles',
       defaults: { colour: 'Green', length: 4 },
       fields: [{ key: 'colour', label: 'Colour', options: ['Green', 'Red'] }, { key: 'length', label: 'Length', number: true, min: 1, step: 1 }],
-      says: e => `at the close of the candle that makes ${e.length} Successive ${e.colour} Candles`,
+      says: e => `${e.length} Successive ${e.colour} Candles`,
     },
   },
   target: {
@@ -5279,6 +5306,30 @@ const STRATEGY_TYPES = {
       fields: [{ key: 'percent', label: '%', number: true, min: 0, step: 0.5 }],
       says: t => `${t.percent}% of the entry price`,
     },
+    // A level of its own rather than a distance from the entry: no trade where it is not beyond the entry on its side.
+    HighestWick: {
+      label: 'Highest wick',
+      level: true,
+      defaults: { candles: 10 },
+      fields: [{ key: 'candles', label: 'Of the last', number: true, min: 1, step: 1 }],
+      says: t => `the highest high of the last ${t.candles} candles`,
+    },
+    LowestWick: {
+      label: 'Lowest wick',
+      level: true,
+      defaults: { candles: 10 },
+      fields: [{ key: 'candles', label: 'Of the last', number: true, min: 1, step: 1 }],
+      says: t => `the lowest low of the last ${t.candles} candles`,
+    },
+    // Set from the Take Profit, so for the Stop Loss alone: the Take Profit is a target of so many R, and the Stop Loss is 1R,
+    // the reward divided by that, on the other side of the entry.
+    RiskRatio: {
+      label: 'For a target in R',
+      only: 'stopLoss',
+      defaults: { ratio: 1 },
+      fields: [{ key: 'ratio', label: 'Target (R)', number: true, min: 0, step: 0.5 }],
+      says: t => `${Number(t.ratio) === 1 ? 'as far as the Take Profit' : `the Take Profit's distance divided by ${t.ratio}`} (a ${t.ratio}R target)`,
+    },
   },
 };
 const STRATEGY_PARTS = [{ key: 'entry', title: 'Entry', kind: 'entry' }, { key: 'takeProfit', title: 'Take Profit', kind: 'target' }, { key: 'stopLoss', title: 'Stop Loss', kind: 'target' }];
@@ -5287,8 +5338,14 @@ let strategies = null;
 
 const strategyKey = book => JSON.stringify(book);
 const strategiesDirty = () => !!strategies && strategyKey(strategies.book) !== strategies.saved;
-const formatStrategies = book => `{\n  "strategies": [\n${book.strategies.map(s => `    {\n${Object.entries(s).map(([k, v]) =>
-  `      ${JSON.stringify(k)}: ${v && typeof v === 'object' ? `{ ${Object.entries(v).map(([a, b]) => `${JSON.stringify(a)}: ${JSON.stringify(b)}`).join(', ')} }` : JSON.stringify(v)}`).join(',\n')}\n    }`).join(',\n')}\n  ]\n}\n`;
+// A value on one line, as strategies.json keeps each part of a strategy: { "a": 1 } and [ { … }, { … } ].
+const inlineJson = v => Array.isArray(v) ? (v.length ? `[ ${v.map(inlineJson).join(', ')} ]` : '[]')
+  : v && typeof v === 'object' ? `{ ${Object.entries(v).map(([a, b]) => `${JSON.stringify(a)}: ${inlineJson(b)}`).join(', ')} }` : JSON.stringify(v);
+// The order a strategy's keys are saved in: the steps of a chain before its entry; any others after these.
+const STRATEGY_KEYS = ['id', 'name', 'direction', 'after', 'entry', 'takeProfit', 'stopLoss', 'onePositionAtATime'];
+const keyOrder = k => (i => i < 0 ? STRATEGY_KEYS.length : i)(STRATEGY_KEYS.indexOf(k));
+const formatStrategies = book => `{\n  "strategies": [\n${book.strategies.map(s => `    {\n${Object.entries(s).sort(([a], [b]) => keyOrder(a) - keyOrder(b)).map(([k, v]) =>
+  `      ${JSON.stringify(k)}: ${inlineJson(v)}`).join(',\n')}\n    }`).join(',\n')}\n  ]\n}\n`;
 window.addEventListener('beforeunload', e => { if (strategiesDirty()) e.preventDefault(); });
 
 async function loadStrategies() {
@@ -5299,11 +5356,22 @@ async function loadStrategies() {
   strategies = { book, base: text ? textKey(text) : '', saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false };
 }
 
+// The steps of a strategy's entry condition in order: those of "after", then "entry".
+const strategySteps = s => [...(s.after ?? []), s.entry];
+
+// A strategy's entry condition in words: "3 Successive Red Candles, then 4 Successive Green Candles within 10 candles".
+function conditionSays(s) {
+  const step = e => STRATEGY_TYPES.entry[e?.type]?.says(e) ?? `an unknown entry type "${e?.type}"`;
+  return strategySteps(s).map((e, k) => k ? `then ${step(e)}${e.within ? ` within ${e.within} candles` : ''}` : step(e)).join(', ');
+}
+
 // A strategy in words, as the trades will be read.
 function strategySays(s) {
   const part = (kind, p) => STRATEGY_TYPES[kind][p?.type]?.says(p) ?? `an unknown ${kind} type "${p?.type}"`;
   const long = s.direction !== 'Short';
-  return `${long ? 'Buy' : 'Sell'} ${part('entry', s.entry)}. Take Profit ${part('target', s.takeProfit)} ${long ? 'above' : 'below'} the entry; Stop Loss ${part('target', s.stopLoss)} ${long ? 'below' : 'above'} it.${s.onePositionAtATime ? ' One trade at a time.' : ''}`;
+  // A level is where the target is; a distance is how far it is from the entry, and on which side.
+  const where = (t, side) => STRATEGY_TYPES.target[t?.type]?.level ? `at ${part('target', t)}, when that is ${side} the entry` : `${part('target', t)} ${side} the entry`;
+  return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}. Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}`;
 }
 
 function newStrategyId(name) {
@@ -5364,12 +5432,19 @@ function renderStrategy() {
   const input = (path, f, value) => f.options
     ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => `<option ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`
     : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" step="${f.step}" value="${esc(value)}"></label>`;
+  const steps = strategySteps(s);
   const part = ({ key, title, kind }) => {
-    const p = s[key], type = STRATEGY_TYPES[kind][p.type];
-    return `<fieldset><legend>${title}</legend>
-      <label>Type<select data-type="${key}" data-kind="${kind}">${Object.entries(STRATEGY_TYPES[kind]).map(([id, t]) => `<option value="${id}" ${id === p.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
-      ${(type?.fields ?? []).map(f => input(`${key}.${f.key}`, f, p[f.key])).join('')}</fieldset>`;
+    const p = key.split('.').reduce((o, k) => o?.[k], s), type = STRATEGY_TYPES[kind][p.type], step = kind === 'entry' ? steps.indexOf(p) : -1;
+    return `<fieldset${step >= 0 ? ' class="step"' : ''}><legend>${title}</legend>
+      ${step >= 0 && steps.length > 1 ? `<button type="button" class="step-remove" data-step-remove="${step}" title="Take this step out of the chain" aria-label="Remove ${esc(title)}">×</button>` : ''}
+      <label>Type<select data-type="${key}" data-kind="${kind}">${Object.entries(STRATEGY_TYPES[kind]).filter(([, t]) => !t.only || t.only === key).map(([id, t]) => `<option value="${id}" ${id === p.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
+      ${(type?.fields ?? []).map(f => input(`${key}.${f.key}`, f, p[f.key])).join('')}
+      ${step > 0 ? `<label title="The most candles from the candle that met the step before to the one that meets this. Blank for no limit.">Within (candles)<input type="number" data-path="${key}.within" data-number data-blank min="1" step="1" value="${esc(p.within ?? '')}" placeholder="no limit"></label>` : ''}</fieldset>`;
   };
+  // The steps of the entry condition, top to bottom, with a + above, between and below them to add a step there.
+  const stepParts = steps.map((_, k) => ({ key: k < steps.length - 1 ? `after.${k}` : 'entry', title: steps.length > 1 ? `Step ${k + 1}${k === steps.length - 1 ? ': Entry' : ''}` : 'Entry', kind: 'entry' }));
+  const addAt = k => `<button type="button" class="step-add" data-step-insert="${k}" title="${k === 0 ? 'Add a step before the first' : k === steps.length ? 'Add a step after the entry: it becomes the entry' : `Add a step between steps ${k} and ${k + 1}`}" aria-label="Add a step here">+</button>`;
+  const stepsHtml = stepParts.map((x, k) => addAt(k) + part(x)).join('') + addAt(steps.length);
   box.innerHTML = `<div class="strat-card">
       <div class="strat-fields">
         <label>Name<input type="text" data-field="name" data-path="name" value="${esc(s.name)}"></label>
@@ -5377,31 +5452,49 @@ function renderStrategy() {
         <label>Direction<select data-path="direction">${['Long', 'Short'].map(o => `<option ${o === s.direction ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
         <label class="check"><input type="checkbox" data-path="onePositionAtATime" ${s.onePositionAtATime ? 'checked' : ''}>One trade at a time</label>
       </div>
-      <div class="strat-fields">${STRATEGY_PARTS.map(part).join('')}</div>
+      <div class="strat-fields strat-steps">${stepsHtml}</div>
+      <div class="strat-fields">${STRATEGY_PARTS.filter(x => x.kind !== 'entry').map(part).join('')}</div>
       <p class="strat-says">${esc(strategySays(s))}</p>
       ${strategyActions()}
     </div>
     <div class="strat-card"><h3>Run</h3><div class="strat-run-body"></div></div>`;
 
   box.querySelectorAll('[data-path]').forEach(el => el.addEventListener(el.dataset.path === 'name' ? 'input' : 'change', () => {
-    const [a, b] = el.dataset.path.split('.'), target = b ? s[a] : s, key = b ?? a;
-    const value = el.type === 'checkbox' ? el.checked : el.dataset.number !== undefined ? Number(el.value) : el.value;
+    const path = el.dataset.path.split('.'), key = path.pop(), target = path.reduce((o, k) => o[k], s);
+    const value = el.type === 'checkbox' ? el.checked : el.dataset.blank !== undefined && el.value === '' ? undefined : el.dataset.number !== undefined ? Number(el.value) : el.value;
     if (key === 'id') {
       const id = String(value).trim();
       if (!id || strategies.book.strategies.some(x => x !== s && x.id === id)) { el.setCustomValidity('Each strategy needs an id of its own.'); el.reportValidity(); return; }
       el.setCustomValidity('');
       strategies.runs.delete(s.id);
       s.id = strategies.selected = id;
-    } else target[key] = value;
+    } else if (value === undefined) delete target[key];
+    else target[key] = value;
     box.querySelector('.strat-says').textContent = strategySays(s);
     if (key === 'name' || key === 'id') renderStrategyList();
     updateStrategyStatus();
   }));
   box.querySelectorAll('[data-type]').forEach(el => el.addEventListener('change', () => {
-    s[el.dataset.type] = { type: el.value, ...STRATEGY_TYPES[el.dataset.kind][el.value].defaults };
+    const path = el.dataset.type.split('.'), key = path.pop(), target = path.reduce((o, k) => o[k], s), within = target[key]?.within;
+    target[key] = { type: el.value, ...STRATEGY_TYPES[el.dataset.kind][el.value].defaults, ...(within ? { within } : {}) };
     renderStrategy();
     updateStrategyStatus();
   }));
+  // Steps are added and removed as one list, whose last is the entry: a step added after the entry becomes it, and with the
+  // entry removed the step before it does. The first step of a chain has nothing before it to be within.
+  const changeSteps = change => {
+    const all = [...strategySteps(s)];
+    change(all);
+    s.entry = all.pop();
+    if (all.length) s.after = all;
+    else delete s.after;
+    delete strategySteps(s)[0].within;
+    renderStrategy();
+    updateStrategyStatus();
+  };
+  box.querySelectorAll('[data-step-insert]').forEach(b => b.addEventListener('click', () =>
+    changeSteps(all => all.splice(Number(b.dataset.stepInsert), 0, { type: 'SuccessiveCandles', ...STRATEGY_TYPES.entry.SuccessiveCandles.defaults }))));
+  box.querySelectorAll('[data-step-remove]').forEach(b => b.addEventListener('click', () => changeSteps(all => all.splice(Number(b.dataset.stepRemove), 1))));
   wireStrategyActions(box);
   renderStrategyRun();
 }
@@ -5471,7 +5564,7 @@ function renderStrategyRun() {
     </div>
     <form class="strat-run" data-chart-add><input class="strat-chart-name" data-chart-name aria-label="Name on the charts" value="${esc(chartStrategyName(s))}">
       <button type="submit">Add to strategies on charts</button><span class="strat-note" data-chart-note>Adds the strategy as it is here, under this name, to the Strategies section beside the charts.</span></form>
-    ${run?.trades ? strategyResults(run) : ''}`;
+    <div class="strat-results">${run?.trades ? strategyResults(run) : ''}</div>`;
   box.querySelector('[data-chart-add]').addEventListener('submit', e => {
     e.preventDefault();
     const label = box.querySelector('[data-chart-name]').value.trim() || chartStrategyName(s), like = chartStrategyLike(s, label);
@@ -5482,6 +5575,49 @@ function renderStrategyRun() {
   box.querySelector('[data-run-dataset]').addEventListener('change', e => { strategies.dataset = e.target.value; });
   box.querySelector('[data-run]').addEventListener('click', () => runStrategy(s));
   box.querySelector('[data-csv]')?.addEventListener('click', () => downloadTrades(run));
+  // The results' own clicks: Analyse a trade, count a trade in or out of the totals, or the * trades all at once. The
+  // results are drawn again in place, the table kept where it was scrolled to.
+  const results = box.querySelector('.strat-results');
+  results.addEventListener('click', e => {
+    const analyse = e.target.closest('[data-trade-row]'), one = e.target.closest('[data-include]'), both = e.target.closest('[data-include-both]'), all = e.target.closest('[data-include-all]');
+    const order = e.target.closest('[data-sort]');
+    if (order) {
+      run.sort = nextTradeSort(run.sort, order.dataset.sort);
+      results.innerHTML = strategyResults(run);
+      return;
+    }
+    if (analyse) {
+      const t = run.trades.find(x => x.entryIndex === Number(analyse.dataset.tradeRow));
+      if (t) window.open(`./${tradeAnalysisHash(run.dataset, run.strategy, t)}`, '_blank');
+      return;
+    }
+    if (!one && !both && !all) return;
+    const off = run.leftOut ??= new Set();
+    if (one) {
+      const i = Number(one.dataset.include);
+      if (!off.delete(i)) off.add(i);
+    } else if (both) {
+      const starred = run.trades.filter(t => t.bothTouched).map(t => t.entryIndex), anyIn = starred.some(i => !off.has(i));
+      starred.forEach(i => anyIn ? off.add(i) : off.delete(i));
+    } else off.clear();
+    const table = results.querySelector('.strat-trades'), top = table?.scrollTop ?? 0, left = table?.scrollLeft ?? 0;
+    results.innerHTML = strategyResults(run);
+    const again = results.querySelector('.strat-trades');
+    if (again) [again.scrollTop, again.scrollLeft] = [top, left];
+  });
+}
+
+// The totals of a list of trades, as the server's StrategyBacktest.Summarise makes them, for the trades left counted.
+function summariseTrades(trades) {
+  const closed = trades.filter(t => t.outcome !== 'Open'), wins = closed.filter(t => t.profit > 0), losses = closed.filter(t => t.profit < 0);
+  const sum = (list, key) => list.reduce((a, t) => a + t[key], 0), grossLoss = -sum(losses, 'profit');
+  return {
+    trades: closed.length, won: wins.length, lost: losses.length, stillOpen: trades.length - closed.length,
+    winRate: closed.length ? 100 * wins.length / closed.length : 0, totalProfit: sum(closed, 'profit'), totalProfitPercent: sum(closed, 'profitPercent'),
+    averageWin: wins.length ? sum(wins, 'profit') / wins.length : 0, averageLoss: losses.length ? sum(losses, 'profit') / losses.length : 0,
+    largestWin: wins.length ? Math.max(...wins.map(t => t.profit)) : 0, largestLoss: losses.length ? Math.min(...losses.map(t => t.profit)) : 0,
+    profitFactor: grossLoss > 0 ? sum(wins, 'profit') / grossLoss : null, bothTouched: closed.filter(t => t.bothTouched).length,
+  };
 }
 
 async function runStrategy(s) {
@@ -5502,11 +5638,15 @@ const fmtProfit = p => `${p > 0 ? '+' : ''}${Math.round(p)}`;
 const fmtPercent = p => `${p > 0 ? '+' : ''}${p.toFixed(2)}%`;
 const OUTCOMES = { TakeProfit: 'Take Profit', StopLoss: 'Stop Loss', Open: 'Open' };
 
+// A run's totals, its trades in the table, and which are counted: every trade until one is left out with its ● (an outlier,
+// say), or the * trades all at once, whose candle reached both exits and so are counted as stopped when they may have won.
 function strategyResults(run) {
-  const m = run.summary, data = datasetList?.find(d => d.id === run.dataset);
+  const off = run.leftOut ?? new Set(), counted = run.trades.filter(t => !off.has(t.entryIndex));
+  const m = off.size ? summariseTrades(counted) : run.summary, data = datasetList?.find(d => d.id === run.dataset);
+  const starred = run.trades.filter(t => t.bothTouched), starredIn = starred.filter(t => !off.has(t.entryIndex)).length;
   const stat = (label, value, cls = '') => `<div><span>${label}</span><b class="${cls}">${value}</b></div>`;
-  const sign = v => v > 0 ? 'won' : v < 0 ? 'lost' : '';
-  const shown = run.trades.slice(0, TRADE_SHOWN);
+  const sign = tradeSign;
+  const shown = sortTradeRows(run.trades.map(t => ({ ...tradeRow(t), out: off.has(t.entryIndex) })), run.sort).slice(0, TRADE_SHOWN);
   return `<p class="remarks">${esc(data?.name ?? run.dataset)}: ${run.candles.toLocaleString()} candles, ${esc(fmtTime(run.from))} to ${esc(fmtTime(run.to))} UTC.</p>
     <div class="strat-stats">
       ${stat('Trades', m.trades)}${stat('Won', m.won, 'won')}${stat('Lost', m.lost, 'lost')}${stat('Win rate', `${m.winRate.toFixed(1)}%`)}
@@ -5515,18 +5655,76 @@ function strategyResults(run) {
       ${stat('Largest win', fmtProfit(m.largestWin), 'won')}${stat('Largest loss', fmtProfit(m.largestLoss), 'lost')}
       ${stat('Profit factor', m.profitFactor == null ? '–' : m.profitFactor.toFixed(2))}${stat('Still open', m.stillOpen)}${stat('Reached both', m.bothTouched)}
     </div>
+    <div class="strat-counted">
+      <span>${off.size ? `Counting ${counted.length} of ${run.trades.length} trades: ${off.size} left out.` : `Counting all ${run.trades.length} trades. Click a ● to leave a trade out of the totals.`}</span>
+      ${starred.length ? `<button type="button" data-include-both title="Trades whose exit candle reached both the Take Profit and the Stop Loss: counted as stopped, though they may have won">${starredIn ? `Leave out the ${starredIn} * trades` : `Count the ${starred.length} * trades again`}</button>` : ''}
+      ${off.size ? '<button type="button" data-include-all>Count them all again</button>' : ''}
+    </div>
     ${run.trades.length > TRADE_SHOWN ? `<p class="remarks">The first ${TRADE_SHOWN} of ${run.trades.length} trades; the CSV has them all.</p>` : ''}
-    <div class="strat-trades"><table>
-      <thead><tr><th class="num">#</th><th>Entry</th><th class="num">Price</th><th class="num">Take Profit</th><th class="num">Stop Loss</th>
-        <th>Exit</th><th class="num">Price</th><th>Outcome</th><th class="num">Profit</th><th class="num">%</th><th class="num">Candles</th></tr></thead>
-      <tbody>${shown.map(t => `<tr>
-        <td class="num">${t.number}</td><td>${esc(fmtTime(t.entryTime))}</td><td class="num">${wholePrice(t.entryPrice)}</td>
-        <td class="num">${wholePrice(t.takeProfit)}</td><td class="num">${wholePrice(t.stopLoss)}</td>
-        <td>${esc(fmtTime(t.exitTime))}</td><td class="num">${wholePrice(t.exitPrice)}</td>
-        <td${t.bothTouched ? ' title="The exit candle reached the Take Profit and the Stop Loss alike, so it counts as the Stop Loss"' : ''}>${OUTCOMES[t.outcome] ?? t.outcome}${t.bothTouched ? ' *' : ''}</td>
-        <td class="num ${sign(t.profit)}">${fmtProfit(t.profit)}</td><td class="num ${sign(t.profit)}">${fmtPercent(t.profitPercent)}</td><td class="num">${t.candles}</td>
-      </tr>`).join('')}</tbody></table></div>`;
+    ${tradeTable(shown, { actions: ['analyse'], include: true, sort: run.sort })}`;
 }
+
+// ---- The trades table --------------------------------------------------------------------------------------------------
+// One table wherever trades are listed: a backtest's results on the Strategies page, and Find similar's candles set against
+// the trades. A row is { index, time, trade, status, bad, current }: a candle, the trade entered there when there is one,
+// and what Find similar makes of it. A row without a trade leaves the trade's own columns blank. Each place picks the
+// columns it shows (all of TRADE_COLUMNS but status by default) and the buttons a row has: 'show' (Show on chart) and
+// 'analyse' (Analyse, on a row with a trade other than the current one); their clicks are handled where the table is.
+// With include, each row with a trade starts with a ● that counts it in the totals or, clicked, leaves it out (the row's
+// "out", drawn greyed and ○).
+const tradeSign = v => v > 0 ? 'won' : v < 0 ? 'lost' : '';
+const TRADE_COLUMNS = {
+  number: { head: '#', num: true, cell: r => r.trade?.number ?? '', sort: r => r.trade?.number },
+  candle: { head: 'Candle', num: true, cell: r => `#${r.index}`, sort: r => r.index },
+  entry: { head: 'Entry', cell: r => esc(fmtTime(r.time)), sort: r => minuteOf(r.time) },
+  entryPrice: { head: 'Price', num: true, cell: r => r.trade ? wholePrice(r.trade.entryPrice) : '', sort: r => r.trade?.entryPrice },
+  takeProfit: { head: 'Take Profit', num: true, cell: r => r.trade ? wholePrice(r.trade.takeProfit) : '', sort: r => r.trade?.takeProfit },
+  stopLoss: { head: 'Stop Loss', num: true, cell: r => r.trade ? wholePrice(r.trade.stopLoss) : '', sort: r => r.trade?.stopLoss },
+  exit: { head: 'Exit', cell: r => r.trade ? esc(fmtTime(r.trade.exitTime)) : '', sort: r => r.trade && minuteOf(r.trade.exitTime) },
+  exitPrice: { head: 'Price', num: true, cell: r => r.trade ? wholePrice(r.trade.exitPrice) : '', sort: r => r.trade?.exitPrice },
+  outcome: { head: 'Outcome', cell: r => !r.trade ? '' : r.trade.bothTouched
+    ? `<span title="The exit candle reached the Take Profit and the Stop Loss alike, so it counts as the Stop Loss">${OUTCOMES[r.trade.outcome] ?? esc(r.trade.outcome)} *</span>`
+    : OUTCOMES[r.trade.outcome] ?? esc(r.trade.outcome),
+    sort: r => r.trade && `${OUTCOMES[r.trade.outcome] ?? r.trade.outcome}${r.trade.bothTouched ? ' *' : ''}` },
+  profit: { head: 'Profit', num: true, cls: r => tradeSign(r.trade?.profit), cell: r => r.trade ? fmtProfit(r.trade.profit) : '', sort: r => r.trade?.profit },
+  percent: { head: '%', num: true, cls: r => tradeSign(r.trade?.profit), cell: r => r.trade ? fmtPercent(r.trade.profitPercent) : '', sort: r => r.trade?.profitPercent },
+  candles: { head: 'Candles', num: true, cell: r => r.trade?.candles ?? '', sort: r => r.trade?.candles },
+  status: { head: 'Found', cell: r => esc(r.status ?? '') + (r.current ? ' · this one' : ''), sort: r => r.status },
+};
+const TRADE_DEFAULT = Object.keys(TRADE_COLUMNS).filter(k => k !== 'status');
+// A backtest's trade as a row of the table.
+const tradeRow = t => ({ index: t.entryIndex, time: t.entryTime, trade: t });
+
+// The table's order: { key, dir } by a column, or none for the order the rows came in. A header clicked orders by its
+// column, rising; again, falling; a third time, back to as they came. Rows with nothing in the column go last either way.
+const nextTradeSort = (sort, key) => sort?.key !== key ? { key, dir: 1 } : sort.dir > 0 ? { key, dir: -1 } : null;
+function sortTradeRows(rows, sort) {
+  const by = sort && TRADE_COLUMNS[sort.key]?.sort;
+  if (!by) return rows;
+  const blank = v => v == null || v === '';
+  return rows.map((r, i) => ({ r, i, v: by(r) })).sort((a, b) => blank(a.v) - blank(b.v)
+    || (blank(a.v) ? 0 : (a.v < b.v ? -1 : a.v > b.v ? 1 : 0) * sort.dir) || a.i - b.i).map(x => x.r);
+}
+
+function tradeTable(rows, { columns = TRADE_DEFAULT, actions = [], include = false, sort = null } = {}) {
+  const cols = columns.map(k => TRADE_COLUMNS[k]);
+  const toggle = r => !r.trade ? '' : `<button type="button" class="inc" data-include="${r.trade.entryIndex}" aria-pressed="${!r.out}"
+    title="${r.out ? 'Left out of the totals: click to count it again' : 'Counted in the totals: click to leave it out'}">${r.out ? '○' : '●'}</button>`;
+  const buttons = r => actions.map(a => a === 'show' ? `<button type="button" data-show="${r.index}">Show on chart</button>`
+    : a === 'analyse' && r.trade && !r.current ? `<button type="button" data-trade-row="${r.trade.entryIndex}" title="An analysis of this trade: its entry, its exits and its outcome">Analyse</button>` : '').join('');
+  return `<div class="strat-trades"><table>
+    <thead><tr>${include ? '<th class="inc" title="Counted in the totals"></th>' : ''}${columns.map(k => {
+      const c = TRADE_COLUMNS[k], on = sort?.key === k, arrow = on ? (sort.dir > 0 ? ' ▲' : ' ▼') : '';
+      return `<th${c.num ? ' class="num"' : ''}${on ? ` aria-sort="${sort.dir > 0 ? 'ascending' : 'descending'}"` : ''}><button type="button" class="sort" data-sort="${k}"
+        title="Order by ${esc(c.head)}${on ? (sort.dir > 0 ? ', falling' : ', or back to as listed') : ''}">${c.head}${arrow}</button></th>`;
+    }).join('')}${actions.length ? '<th></th>' : ''}</tr></thead>
+    <tbody>${rows.map(r => `<tr class="${r.bad ? 'bad' : ''}${r.current ? ' current' : ''}${r.out ? ' out' : ''}">${include ? `<td class="inc">${toggle(r)}</td>` : ''}${cols.map(c =>
+      `<td class="${c.num ? 'num ' : ''}${c.cls?.(r) ?? ''}">${c.cell(r)}</td>`).join('')}${actions.length ? `<td class="act">${buttons(r)}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+}
+
+// The address of an analysis of a backtest's trade: its chapters, seen from where it ends, with the page's run settings.
+const tradeAnalysisHash = (dataset, strategy, t) => analysisHash({ dataset, at: minuteOf(t.entryTime), seen: minuteOf(t.exitTime), things: ['Trade'],
+  greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles'), strategy: JSON.stringify(strategy), detail: detailOf('Analysis') });
 
 function downloadTrades(run) {
   const columns = ['number', 'direction', 'entryTime', 'entryPrice', 'takeProfit', 'stopLoss', 'exitTime', 'exitPrice', 'outcome', 'profit', 'profitPercent', 'candles', 'bothTouched'];
@@ -5550,7 +5748,7 @@ let similarMarks = null;
 let tradeSimilar = null;
 
 // What a strategy does, without its id or name: two on the charts that trade alike are the same.
-const strategyRules = s => JSON.stringify({ direction: s.direction, entry: s.entry, takeProfit: s.takeProfit, stopLoss: s.stopLoss, onePositionAtATime: !!s.onePositionAtATime });
+const strategyRules = s => JSON.stringify({ direction: s.direction, after: s.after ?? [], entry: s.entry, takeProfit: s.takeProfit, stopLoss: s.stopLoss, onePositionAtATime: !!s.onePositionAtATime });
 // The strategy on the charts that one being added would repeat: the same rules, or the same name.
 const chartStrategyLike = (strategy, label) =>
   (state.chartStrategies ?? []).find(c => strategyRules(c.strategy) === strategyRules(strategy) || c.label.trim().toLowerCase() === label.trim().toLowerCase());
@@ -5565,8 +5763,9 @@ syncStrategyLayers();
 
 // A short name for a strategy on the charts: its run, its direction and its targets, as "4 Green Long · ±100% body".
 function chartStrategyName(s) {
-  const target = t => t.type === 'Percent' ? `${t.percent}%` : `${t.percent}% ${String(t.measure ?? 'Body').toLowerCase()}${t.candles !== s.entry?.length ? ` of ${t.candles}` : ''}`;
-  const entry = s.entry?.type === 'SuccessiveCandles' ? `${s.entry.length} ${s.entry.colour}` : s.entry?.type ?? '';
+  const target = t => t.type === 'Percent' ? `${t.percent}%` : t.type === 'HighestWick' ? `high of ${t.candles}` : t.type === 'LowestWick' ? `low of ${t.candles}` : t.type === 'RiskRatio' ? `${t.ratio}R target`
+    : `${t.percent}% ${String(t.measure ?? 'Body').toLowerCase()}${t.candles !== s.entry?.length ? ` of ${t.candles}` : ''}`;
+  const entry = strategySteps(s).map(e => e?.type === 'SuccessiveCandles' ? `${e.length} ${e.colour}` : e?.type ?? '').join(' → ');
   const [tp, sl] = [target(s.takeProfit), target(s.stopLoss)];
   return `${entry} ${s.direction} · ${tp === sl ? `±${tp}` : `+${tp} / −${sl}`}`;
 }
@@ -5647,23 +5846,29 @@ function chartTrades(dataset, strategy) {
 const minuteOf = t => String(t).slice(0, 16);
 
 
+// How many candles before the candle that meets it a step reads (StrategyEntry.Reads): a run's candles before its last.
+const entryReads = e => e?.type === 'SuccessiveCandles' ? Math.max(0, e.length - 1) : 0;
+// How many candles before its entry a trade's entry condition read (StrategyTrade.FirstRead): from the first candle its first
+// step read, the candle that met that step being the first of the trade's "met" when the condition is a chain.
+const tradeReads = (strategy, t) => t.entryIndex - Math.max(0, (t.met?.[0]?.index ?? t.entryIndex) - entryReads(strategySteps(strategy)[0]));
+
 // The trades of the strategies on that a candle is part of: entered there, open there, or with the candle among those its
 // entry condition read. Those entered there come first.
 function tradesAround(dataset, index) {
   if (!dataset) return [];
   return STRATEGY_SECTION.layers.filter(l => on(l.id)).flatMap(layer => {
-    const e = layer.chartStrategy.strategy.entry, reads = e?.type === 'SuccessiveCandles' ? e.length - 1 : 0;
-    return (chartTrades(dataset, layer.chartStrategy.strategy)?.trades ?? []).filter(t => t.entryIndex - reads <= index && index <= t.exitIndex).map(trade => ({ layer, trade }));
+    const strategy = layer.chartStrategy.strategy;
+    return (chartTrades(dataset, strategy)?.trades ?? []).filter(t => t.entryIndex - tradeReads(strategy, t) <= index && index <= t.exitIndex).map(trade => ({ layer, trade }));
   }).sort((a, b) => (b.trade.entryIndex === index) - (a.trade.entryIndex === index));
 }
 
 // The trade a candle is part of, as the server reads it for an analysis (see Explain.TradeAt): the one entered there, else
 // the one open there, else the one whose entry condition the candle is part of.
 function tradeCovering(trades, strategy, time) {
-  const at = minuteOf(time), e = strategy.entry, reads = e?.type === 'SuccessiveCandles' ? e.length - 1 : 0, candle = candleHours(trades) * 3600000;
+  const at = minuteOf(time), candle = candleHours(trades) * 3600000;
   const before = t => Math.round((Date.parse(`${minuteOf(t.entryTime)}Z`) - Date.parse(`${at}Z`)) / candle);
   return trades.find(t => minuteOf(t.entryTime) === at) ?? trades.find(t => minuteOf(t.entryTime) < at && at <= minuteOf(t.exitTime))
-    ?? trades.find(t => minuteOf(t.entryTime) > at && before(t) <= reads);
+    ?? trades.find(t => minuteOf(t.entryTime) > at && before(t) <= tradeReads(strategy, t));
 }
 // How long a candle of a backtest's trades is, in hours, from a trade that spans more than one.
 const candleHours = trades => {
@@ -5697,17 +5902,21 @@ function drawStrategies(ex, traces) {
       .map(t => ({ t, done: t.outcome !== 'Open' && minuteOf(t.exitTime) <= last }));
     if (!shown.length) continue;
     const end = s => s.done ? s.t.exitTime : ahead;
-    // The run of candles that met a Successive Candles entry, boxed from its first candle's low to its highest high.
-    if (at && strategy.entry?.type === 'SuccessiveCandles') {
-      const i = whole.t.findIndex(x => minuteOf(x) === at), from = Math.max(0, i - strategy.entry.length + 1);
-      if (i >= 0) {
-        const hi = Math.max(...whole.h.slice(from, i + 1)), lo = Math.min(...whole.l.slice(from, i + 1)), half = (Date.parse(whole.t[1]) - Date.parse(whole.t[0])) / 2;
-        const [x0, x1] = [new Date(Date.parse(whole.t[from]) - half).toISOString(), new Date(Date.parse(whole.t[i]) + half).toISOString()];
-        traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', name: 'Entry condition', x: [x0, x1, x1, x0, x0], y: [lo, lo, hi, hi, lo],
-          line: { color: colour, width: 1, dash: 'dot' }, fillcolor: withAlpha(css(strategy.entry.colour === 'Red' ? '--down' : '--up'), 0.08),
-          hovertemplate: `Entry condition: ${strategy.entry.length} ${strategy.entry.colour.toLowerCase()} candles in a row<extra></extra>` });
-      }
-    }
+    // The run of candles that met each Successive Candles step of the entry condition, boxed from its first candle's low to
+    // its highest high: the entry's own run, and those of the steps before it, at the candles the trade says met them.
+    const trade = at && shown.find(x => minuteOf(x.t.entryTime) === at)?.t, steps = strategySteps(strategy);
+    const metAt = trade ? [...(trade.met ?? []).map(m => minuteOf(m.time)), at] : [];
+    steps.forEach((step, k) => {
+      if (step?.type !== 'SuccessiveCandles' || !metAt[k]) return;
+      const i = whole.t.findIndex(x => minuteOf(x) === metAt[k]), from = Math.max(0, i - step.length + 1);
+      if (i < 0) return;
+      const hi = Math.max(...whole.h.slice(from, i + 1)), lo = Math.min(...whole.l.slice(from, i + 1)), half = (Date.parse(whole.t[1]) - Date.parse(whole.t[0])) / 2;
+      const [x0, x1] = [new Date(Date.parse(whole.t[from]) - half).toISOString(), new Date(Date.parse(whole.t[i]) + half).toISOString()];
+      const label = steps.length > 1 ? `Entry condition, step ${k + 1}` : 'Entry condition';
+      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', name: label, x: [x0, x1, x1, x0, x0], y: [lo, lo, hi, hi, lo],
+        line: { color: colour, width: 1, dash: 'dot' }, fillcolor: withAlpha(css(step.colour === 'Red' ? '--down' : '--up'), 0.08),
+        hovertemplate: `${label}: ${step.length} ${step.colour.toLowerCase()} candles in a row<extra></extra>` });
+    });
     const level = (key, color) => traces.push({ type: 'scatter', mode: 'lines', name: `${name} ${key === 'takeProfit' ? 'Take Profit' : 'Stop Loss'}`, hoverinfo: 'skip',
       x: shown.flatMap(s => [s.t.entryTime, end(s), null]), y: shown.flatMap(s => [s.t[key], s.t[key], null]), line: { color, width: 1.25, dash: 'dash' } });
     level('takeProfit', up);
@@ -5751,14 +5960,14 @@ async function openTradeSimilar(layer, trade, ex) {
     return;
   }
   const found = (await r.json()).candles, byEntry = new Map(run.trades.map(t => [t.entryIndex, t])), seen = new Set(found.map(c => c.index));
-  const need = Math.max(...[s.takeProfit, s.stopLoss].map(t => t.type === 'AverageCandle' ? t.candles : 1)) - 1;
+  // A candle where the targets cannot be set (too early to measure them, or a level not beyond the entry) is passed over.
   const rows = found.map(c => {
     const traded = byEntry.get(c.index), open = !traded && run.trades.find(t => t.entryIndex < c.index && c.index < t.exitIndex);
-    return { ...c, traded, open, status: traded ? `Trade #${traded.number}` : open ? `skipped: Trade #${open.number} open` : c.index < need ? 'skipped: too early to measure' : 'not traded', bad: !traded && !open && c.index >= need };
+    return { ...c, trade: traded, traded, open, status: traded ? `Trade #${traded.number}` : open ? `skipped: Trade #${open.number} open` : !c.measurable ? 'skipped: no targets there' : 'not traded', bad: !traded && !open && c.measurable };
   });
   // A trade the candle runs do not have is a disagreement too.
   for (const t of run.trades.filter(t => !seen.has(t.entryIndex)))
-    rows.push({ index: t.entryIndex, time: t.entryTime, traded: t, status: `Trade #${t.number}, not found from the candle runs`, bad: true });
+    rows.push({ index: t.entryIndex, time: t.entryTime, trade: t, traded: t, status: `Trade #${t.number}, not found from the candle runs`, bad: true });
   rows.sort((a, b) => b.bad - a.bad || a.index - b.index);
   tradeSimilar = { layer, trade, ex, rows, found: found.length, traded: rows.filter(x => x.traded && !x.bad).length, open: rows.filter(x => x.open).length };
   showTradeSimilar();
@@ -5791,11 +6000,18 @@ function similarDialog() {
   document.body.append(dialog);
   dialog.addEventListener('click', e => {
     if (e.target === dialog || e.target.closest('[data-sim="close"]')) return dialog.close();
-    const analyse = e.target.closest('[data-sim-analyse]');
+    const order = e.target.closest('[data-sort]');
+    if (order) {
+      tradeSimilar.sort = nextTradeSort(tradeSimilar.sort, order.dataset.sort);
+      return showTradeSimilar();
+    }
+    const analyse = e.target.closest('[data-trade-row]');
     if (analyse) {
-      const t = tradeSimilar.rows.find(x => x.traded?.entryIndex === Number(analyse.dataset.simAnalyse))?.traded;
+      const t = tradeSimilar.rows.find(x => x.traded?.entryIndex === Number(analyse.dataset.tradeRow))?.traded;
       dialog.close();
-      if (!t || currentPage !== 'Analysis') return;
+      if (!t) return;
+      // Away from an analysis, it opens in a tab of its own, as the candle card's Analyse trade does.
+      if (currentPage !== 'Analysis') return window.open(`./${tradeAnalysisHash(tradeSimilar.ex.dataset, tradeSimilar.layer.chartStrategy.strategy, t)}`, '_blank');
       // The analysis of that trade, seen from where it ends, with the settings of this one.
       const { things, jump, changes, ...p } = tour.params;
       wantedAnalysis = { ...p, at: minuteOf(t.entryTime), seen: minuteOf(t.exitTime), things: ['Trade'], detail: detailOf('Analysis') };
@@ -5832,19 +6048,18 @@ function similarDialog() {
 
 function showTradeSimilar() {
   const dialog = similarDialog(), { layer, trade, rows, found, traded, open } = tradeSimilar, s = layer.chartStrategy.strategy;
-  const what = STRATEGY_TYPES.entry[s.entry.type]?.says(s.entry) ?? s.entry.type, bad = rows.filter(x => x.bad).length;
+  const what = conditionSays(s), bad = rows.filter(x => x.bad).length;
   const data = datasetList?.find(d => d.id === tradeSimilar.ex.dataset)?.name ?? tradeSimilar.ex.dataset;
   // From an analysis, each trade is analysed in its place rather than shown on a chart.
   const analysing = currentPage === 'Analysis';
   dialog.innerHTML = `<h4>Find similar: ${esc(layer.label)}</h4>
-    <p>Every candle in ${esc(data)} ${esc(what.replace(/^at the close of /, 'that is '))}, found from the candle runs rather than by the backtest, against the strategy's trades.</p>
-    <p class="sim-verdict${bad ? ' bad' : ''}">${bad ? `${bad} disagree: listed first.` : `All ${found} agree:`} ${traded} traded${open ? `, ${open} skipped while a trade was open` : ''}${found - traded - open - bad > 0 ? `, ${found - traded - open - bad} too early to measure` : ''}.</p>
+    <p>Every candle in ${esc(data)} that completes ${esc(what)}, found from the candle runs rather than by the backtest, against the strategy's trades.</p>
+    <p class="sim-verdict${bad ? ' bad' : ''}">${bad ? `${bad} disagree: listed first.` : `All ${found} agree:`} ${traded} traded${open ? `, ${open} skipped while a trade was open` : ''}${found - traded - open - bad > 0 ? `, ${found - traded - open - bad} with no targets there` : ''}.</p>
     <div class="sim-foot">${analysing ? '' : '<button type="button" class="go" data-sim="all">Show all on chart</button>'}<button type="button" data-sim="close">Close</button></div>
-    <ol>${rows.map(x => `<li class="${x.bad ? 'bad' : ''}${x.index === trade.entryIndex ? ' current' : ''}"><span>#${x.index}</span><span>${esc(fmtTime(x.time))}</span>
-      <span>${esc(x.status)}${x.index === trade.entryIndex ? ' · this one' : ''}</span>${!analysing ? `<button type="button" data-show="${x.index}">Show on chart</button>`
-        : x.traded && x.index !== trade.entryIndex ? `<button type="button" data-sim-analyse="${x.traded.entryIndex}">Analyse</button>` : '<span></span>'}</li>`).join('')}</ol>`;
+    ${tradeTable(sortTradeRows(rows.map(x => ({ ...x, current: x.index === trade.entryIndex })), tradeSimilar.sort),
+      { columns: ['candle', 'entry', 'outcome', 'profit', 'percent', 'status'], actions: analysing ? ['analyse'] : ['show', 'analyse'], sort: tradeSimilar.sort })}`;
   if (!dialog.open) dialog.showModal();
-  dialog.querySelector('li.current')?.scrollIntoView({ block: 'nearest' });
+  dialog.querySelector('tr.current')?.scrollIntoView({ block: 'nearest' });
 }
 
 function route() {

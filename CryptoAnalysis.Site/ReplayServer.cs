@@ -240,8 +240,8 @@ public static class ReplayServer
             var (strategy, data, _, error) = await BacktestRequest(request);
             if (error != null)
                 return Results.BadRequest(error);
-            var found = StrategyBacktest.Occurrences(data!.Prices, strategy!.Entry);
-            return Results.Json(new { Candles = found.Select(i => new { Index = i, Time = data.Prices[i].DateTime }) }, Json);
+            var found = StrategyBacktest.Occurrences(data!.Prices, strategy!);
+            return Results.Json(new { Candles = found.Select(i => new { Index = i, Time = data.Prices[i].DateTime, Measurable = StrategyBacktest.Measurable(data.Prices, i, strategy) }) }, Json);
         });
 
         // A backtest request, { dataset, strategy, save }: the strategy and the dataset, or what is wrong with them.

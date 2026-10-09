@@ -113,6 +113,7 @@ public static partial class Explain
         result.Remove("detail");
         result.Remove("edits");
         result.Remove("strategy");
+        result.Remove("risk");
         var term = node["explain"]?.GetValue<string>() ?? "";
         var detail = node["detail"]?.GetValue<string>();
         if (detail != null && Details.Parse(detail) == null)
@@ -127,9 +128,10 @@ public static partial class Explain
             return result;
         }
 
-        if (!Terms.Contains(term))
+        // Risk is told from inputs of the section's own, not found at a candle, so it is not one of the things at a candle.
+        if (!Terms.Contains(term) && term != "Risk")
         {
-            errors.Add($"{where}: explain names \"{term}\", which is not a thing the tour can explain: {string.Join(", ", Terms)}");
+            errors.Add($"{where}: explain names \"{term}\", which is not a thing the tour can explain: {string.Join(", ", Terms)}, Risk");
             return result;
         }
 
@@ -168,7 +170,9 @@ public static partial class Explain
         var level = node["level"] is JsonValue given && given.TryGetValue<int>(out var l) ? l : 1;
         var until = node["until"] is JsonValue end && end.TryGetValue<int>(out var u) ? u : (int?)null;
         var known = node["known"] is JsonValue read && read.TryGetValue<int>(out var k) ? k : (int?)null;
-        var written = Write(term, prices, at.Value, level, reached, until, known, ExplainOptions.From(node["runs"]), blocks, node["strategy"], out var problem);
+        var written = term == "Risk"
+            ? Risk(prices, at.Value, reached, node["risk"], node["strategy"], out var problem)
+            : Write(term, prices, at.Value, level, reached, until, known, ExplainOptions.From(node["runs"]), blocks, node["strategy"], out problem);
         if (written == null)
         {
             errors.Add($"{where}: {problem}");
@@ -623,10 +627,15 @@ public static partial class Explain
     private sealed record CandleRun(int Position, int Length, int First, int Last);
 
     // The run of one colour that has the candle, when it is as long as the page's setting for that colour.
-    private static CandleRun? RunAt(List<Price> prices, int at, ExplainOptions options)
+    private static CandleRun? RunAt(List<Price> prices, int at, ExplainOptions options) =>
+        RunAt(prices, at, prices[at].Close > prices[at].Open ? options.GreenRuns : options.RedRuns);
+
+    // The run of one colour that has the candle, when it has at least minimum candles: the page's setting for the colour, or
+    // the count a strategy's condition asks for. Only the prices given are read, so a run cut short there is told as it stood.
+    private static CandleRun? RunAt(List<Price> prices, int at, int minimum)
     {
         var run = CandleRuns.Runs(prices, minLength: 2).FirstOrDefault(x => x.Start.Time <= prices[at].DateTime && x.End.Time >= prices[at].DateTime);
-        if (run == null || run.Length < (run.Green ? options.GreenRuns : options.RedRuns))
+        if (run == null || run.Length < Math.Max(2, minimum))
             return null;
         var first = prices.FindIndex(x => x.DateTime == run.Start.Time);
         return new CandleRun(at - first + 1, run.Length, first, first + run.Length - 1);
