@@ -421,6 +421,10 @@
   .strat-trades .inc { width: 1.5em; padding-right: 6px; }
   .strat-trades button.inc { padding: 0; border: 0; background: none; color: var(--accent); font-size: 15px; line-height: 1; cursor: pointer; }
   .strat-trades tr.out button.inc { color: var(--muted); }
+  .strat-baseline { margin-top: 12px; }
+  .strat-baseline table { margin-top: 6px; font-size: 13px; }
+  .strat-baseline-plot { height: 300px; margin-top: 4px; }
+  .strat-baseline td.num, .strat-baseline th.num { text-align: right; padding-right: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .strat-counted { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font-size: 13px; color: var(--muted); }
   .strat-counted button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
   .strat-counted button:hover { background: var(--chip); }
@@ -5356,7 +5360,21 @@ async function loadStrategies() {
   const base = own ? textKey(own) : '';
   const book = text ? JSON.parse(text) : { strategies: [] };
   book.strategies ??= [];
-  strategies = { book, base, saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false };
+  strategies = { book, base, saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false,
+    dataset: strategies?.dataset };
+}
+
+// The page's address names the strategy shown and the dataset it runs on, #Strategies?id=green-run-4&dataset=btc-1h, so a
+// reload or a link opens the same. It is kept up to date in place as strategies are picked, without a page of history each.
+function strategiesHash() {
+  const q = new URLSearchParams(), id = strategies?.selected ?? strategies?.missing;
+  if (id) q.set('id', id);
+  if (strategies?.dataset) q.set('dataset', strategies.dataset);
+  return `#Strategies${q.size ? `?${q}` : ''}`;
+}
+
+function syncStrategiesHash() {
+  if (currentPage === 'Strategies' && location.hash !== strategiesHash()) history.replaceState(null, '', strategiesHash());
 }
 
 // The steps of a strategy's entry condition in order: those of "after", then "entry".
@@ -5385,7 +5403,7 @@ function newStrategyId(name) {
   return id;
 }
 
-async function renderStrategiesPage() {
+async function renderStrategiesPage(asked = new URLSearchParams()) {
   const main = document.getElementById('main');
   currentPage = 'Strategies';
   const head = `<section class="term-head"><h2>Strategies</h2>
@@ -5403,7 +5421,13 @@ async function renderStrategiesPage() {
   }
   const list = await loadDatasets();
   if (currentPage !== 'Strategies') return;
-  strategies.dataset = list.some(d => d.id === strategies.dataset) ? strategies.dataset : list.some(d => d.id === state.replayDataset) ? state.replayDataset : list[0]?.id;
+  // An id the address asks for that strategies.json does not have is said so, with none shown, rather than another put in its place.
+  const id = asked.get('id');
+  if (id) {
+    const found = strategies.book.strategies.some(s => s.id === id);
+    [strategies.selected, strategies.missing] = found ? [id, null] : [null, id];
+  }
+  strategies.dataset = [asked.get('dataset'), strategies.dataset, state.replayDataset].find(d => list.some(x => x.id === d)) ?? list[0]?.id;
   main.innerHTML = head + `<div class="strat"><nav class="strat-list" aria-label="Strategies"></nav><div class="strat-body"></div></div>`;
   renderStrategyList();
   renderStrategy();
@@ -5431,6 +5455,13 @@ const selectedStrategy = () => strategies.book.strategies.find(s => s.id === str
 function renderStrategy() {
   const box = document.querySelector('.strat-body'), s = selectedStrategy();
   if (!box) return;
+  if (s) strategies.missing = null;
+  syncStrategiesHash();
+  if (!s && strategies.missing) {
+    box.innerHTML = `<div class="strat-card">No strategy has the id "${esc(strategies.missing)}" in strategies.json. It may have been renamed or deleted,
+      or the link may come from another machine's strategies. Pick one from the list.</div>${strategyActions()}`;
+    return wireStrategyActions(box);
+  }
   if (!s) { box.innerHTML = `<div class="strat-card">No strategies yet: add one with New strategy.</div>${strategyActions()}`; return wireStrategyActions(box); }
   const input = (path, f, value) => f.options
     ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => `<option ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`
@@ -5475,6 +5506,7 @@ function renderStrategy() {
     else target[key] = value;
     box.querySelector('.strat-says').textContent = strategySays(s);
     if (key === 'name' || key === 'id') renderStrategyList();
+    if (key === 'id') syncStrategiesHash();
     updateStrategyStatus();
   }));
   box.querySelectorAll('[data-type]').forEach(el => el.addEventListener('change', () => {
@@ -5563,11 +5595,14 @@ function renderStrategyRun() {
       <select data-run-dataset aria-label="Dataset">${(datasetList ?? []).map(d => `<option value="${esc(d.id)}" ${d.id === strategies.dataset ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>
       <button type="button" data-run ${strategies.running ? 'disabled' : ''}>${strategies.running ? 'Running…' : 'Run'}</button>
       ${run?.trades ? '<button type="button" data-csv>Download CSV</button>' : ''}
+      ${run?.trades ? `<button type="button" data-baseline ${run.baselining ? 'disabled' : ''} title="Runs the same exits from random entries, as often as the strategy enters, to see what the entry adds">${run.baselining ? 'Running baseline…' : 'Random baseline'}</button>` : ''}
       <span class="strat-note${run?.error ? ' bad' : ''}">${esc(run?.error ?? (run ? `Saved to ${run.saved}` : 'Runs the strategy as it is here, saved or not.'))}</span>
     </div>
     <form class="strat-run" data-chart-add><input class="strat-chart-name" data-chart-name aria-label="Name on the charts" value="${esc(chartStrategyName(s))}">
       <button type="submit">Add to strategies on charts</button><span class="strat-note" data-chart-note>Adds the strategy as it is here, under this name, to the Strategies section beside the charts.</span></form>
+    ${run?.baseline ? baselineResults(run.baseline) : ''}
     <div class="strat-results">${run?.trades ? strategyResults(run) : ''}</div>`;
+  if (run?.baseline?.curve) baselinePlot(box.querySelector('[data-baseline-plot]'), run.baseline);
   box.querySelector('[data-chart-add]').addEventListener('submit', e => {
     e.preventDefault();
     const label = box.querySelector('[data-chart-name]').value.trim() || chartStrategyName(s), like = chartStrategyLike(s, label);
@@ -5575,9 +5610,10 @@ function renderStrategyRun() {
     box.querySelector('[data-chart-note]').textContent = c ? `Added as "${c.label}": turn it on in the Strategies section on the Chart, Replay, Tour or Analysis page.`
       : strategyRules(like.strategy) === strategyRules(s) ? `Not added: it is on the charts already, as "${like.label}".` : `Not added: "${like.label}" is already the name of another on the charts.`;
   });
-  box.querySelector('[data-run-dataset]').addEventListener('change', e => { strategies.dataset = e.target.value; });
+  box.querySelector('[data-run-dataset]').addEventListener('change', e => { strategies.dataset = e.target.value; syncStrategiesHash(); });
   box.querySelector('[data-run]').addEventListener('click', () => runStrategy(s));
   box.querySelector('[data-csv]')?.addEventListener('click', () => downloadTrades(run));
+  box.querySelector('[data-baseline]')?.addEventListener('click', () => runBaseline(s, run));
   // The results' own clicks: Analyse a trade, count a trade in or out of the totals, or the * trades all at once. The
   // results are drawn again in place, the table kept where it was scrolled to.
   const results = box.querySelector('.strat-results');
@@ -5633,6 +5669,63 @@ async function runStrategy(s) {
   strategies.running = false;
   strategies.runs.set(s.id, result.error ? result : { saved: result.saved, ...result.run });
   if (currentPage === 'Strategies' && selectedStrategy() === s) renderStrategyRun();
+}
+
+// The random-entry baseline of a run (POST api/backtest/baseline, see StrategyBaseline): the run's own strategy, as it was
+// when run, with its entry swapped for random candles many times over. It is kept on the run, so running again clears it.
+async function runBaseline(s, run) {
+  run.baselining = true;
+  renderStrategyRun();
+  const response = await fetch('api/backtest/baseline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset: run.dataset, strategy: run.strategy }) }).catch(() => null);
+  const result = response?.ok ? await response.json()
+    : { error: response?.status === 404 || response?.status === 405 ? 'The local server was started before baselines could be run. Restart ./build-site.ps1 -Serve.'
+      : `Not run: ${response ? await response.text() : 'the local server did not answer.'}` };
+  run.baselining = false;
+  run.baseline = result.error ? result : { saved: result.saved, ...result.baseline };
+  if (currentPage === 'Strategies' && selectedStrategy() === s && strategies.runs.get(s.id) === run) renderStrategyRun();
+}
+
+// Where the strategy's totals sit among the random runs': a row a total, with the share of runs it beat. Beating 95% or
+// more, or fewer than 5%, is outside what random entries with the same exits make nine times in ten.
+function baselineResults(b) {
+  if (b.error) return `<p class="remarks strat-note bad">${esc(b.error)}</p>`;
+  const fmt = { 'Win rate': v => `${v.toFixed(1)}%`, 'Profit factor': v => v.toFixed(2), 'Average %': fmtPercent, 'Total %': fmtPercent };
+  const show = (name, v) => v == null ? '–' : (fmt[name] ?? (x => x.toFixed(2)))(v);
+  const verdict = p => p == null ? ['–', ''] : p >= 95 ? ['above random', 'won'] : p <= 5 ? ['below random', 'lost'] : ['within random', ''];
+  const rows = b.measures.map(m => {
+    const [says, cls] = verdict(m.percentile);
+    return `<tr><td>${esc(m.name)}</td><td class="num">${show(m.name, m.strategy)}</td><td class="num">${show(m.name, m.median)}</td>
+      <td class="num">${show(m.name, m.low)} to ${show(m.name, m.high)}</td><td class="num">${m.percentile == null ? '–' : `${Math.round(m.percentile)}%`}</td><td class="${cls}">${says}</td></tr>`;
+  }).join('');
+  return `<div class="strat-baseline">
+    <p class="remarks">Against ${b.runs.toLocaleString()} runs entering at random candles, each tried by the chance the strategy's entry is met at
+      (${b.signals.toLocaleString()} of ${b.candles.toLocaleString()} candles), with the strategy's exits. They made ${Math.round(b.averageTrades)} trades
+      on average to its ${b.trades}. Every trade is counted, whichever are left out below.${b.saved ? ` Saved to ${esc(b.saved)}.` : ''}</p>
+    <table><thead><tr><th></th><th class="num">Strategy</th><th class="num">Random median</th><th class="num">Random 5% to 95%</th><th class="num">Beats</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    ${b.curve ? `<p class="remarks">Profit over time, as the sum of each closed trade's %: the strategy against the band nine random runs in ten stay within.</p>
+      <div class="strat-baseline-plot" data-baseline-plot></div>` : ''}</div>`;
+}
+
+// The baseline's curve: the strategy's profit over time on the band of the random runs', 5% to 95%, and their median.
+function baselinePlot(el, b) {
+  if (!el) return;
+  const muted = css('--muted'), grid = css('--grid') || css('--border'), x = b.curve.map(p => p.time);
+  const line = (name, key, color, extra = {}) => ({ type: 'scatter', mode: 'lines', name, x, y: b.curve.map(p => p[key]),
+    line: { color, width: 2 }, hovertemplate: `${name}: %{y:+.1f}%<extra></extra>`, ...extra });
+  Plotly.react(el, [
+    line('Random 5%', 'low', 'rgba(0,0,0,0)', { showlegend: false }),
+    line('Random 95%', 'high', 'rgba(0,0,0,0)', { fill: 'tonexty', fillcolor: withAlpha(muted, 0.2), showlegend: false }),
+    { type: 'scatter', mode: 'lines', name: 'Random 5% to 95%', x: [null], y: [null], line: { color: withAlpha(muted, 0.35), width: 10 }, hoverinfo: 'skip' },
+    line('Random median', 'median', muted, { line: { color: muted, width: 2, dash: 'dash' } }),
+    line('Strategy', 'strategy', css('--accent')),
+  ], {
+    margin: { t: 10, r: 56, b: 36, l: 10 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
+    xaxis: { type: 'date', gridcolor: grid, linecolor: grid },
+    yaxis: { gridcolor: grid, linecolor: grid, ticksuffix: '%', side: 'right', zeroline: true, zerolinecolor: muted },
+    hovermode: 'x unified', showlegend: true, legend: { orientation: 'h', x: 0, y: 1.02, yanchor: 'bottom' },
+  }, { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['select2d', 'lasso2d'] });
 }
 
 // Prices as the chart is read: whole numbers, rounded down. Profits are rounded, as they can be small and either side of 0.
@@ -6075,7 +6168,7 @@ function route() {
   if (first === 'Strategies') {
     ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
     renderNav('Strategies');
-    renderStrategiesPage();
+    renderStrategiesPage(new URLSearchParams(asked ?? ''));
     window.scrollTo(0, 0);
     return;
   }

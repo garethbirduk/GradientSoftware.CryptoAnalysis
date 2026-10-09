@@ -64,9 +64,20 @@ public static class StrategyBacktest
         if (errors.Count > 0)
             throw new ArgumentException(string.Join(" ", errors), nameof(strategy));
 
+        var trades = Trades(prices, strategy, Signals(prices, strategy));
+        return new BacktestRun(strategy, dataset, prices.Count > 0 ? prices[0].DateTime : default, prices.Count > 0 ? prices[^1].DateTime : default,
+            prices.Count, DateTime.UtcNow, Summarise(trades), trades);
+    }
+
+    /// <summary>
+    /// The trades the strategy's exits make from the given entry candles, in order, each with the candles that met the steps
+    /// before it: one at each that its targets can be set at, except while another is open when OnePositionAtATime is set.
+    /// </summary>
+    public static List<StrategyTrade> Trades(IReadOnlyList<Price> prices, Strategy strategy, IEnumerable<(int Index, IReadOnlyList<int> Met)> signals)
+    {
         var trades = new List<StrategyTrade>();
         var free = 0;
-        foreach (var (i, met) in Signals(prices, strategy))
+        foreach (var (i, met) in signals)
         {
             if (strategy.OnePositionAtATime && i < free)
                 continue;
@@ -78,8 +89,7 @@ public static class StrategyBacktest
             free = trade.Outcome == EnumTradeOutcome.Open ? prices.Count : trade.ExitIndex;
         }
 
-        return new BacktestRun(strategy, dataset, prices.Count > 0 ? prices[0].DateTime : default, prices.Count > 0 ? prices[^1].DateTime : default,
-            prices.Count, DateTime.UtcNow, Summarise(trades), trades);
+        return trades;
     }
 
     /// <summary>

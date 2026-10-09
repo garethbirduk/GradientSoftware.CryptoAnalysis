@@ -217,7 +217,7 @@ public static class ReplayServer
         var backtestsDir = Path.GetFullPath(Path.Combine(siteDir, "..", "backtests"));
         app.MapPost("/api/backtest", async (HttpRequest request) =>
         {
-            var (strategy, data, save, error) = await BacktestRequest(request);
+            var (strategy, data, save, _, error) = await BacktestRequest(request);
             if (error != null)
                 return Results.BadRequest(error);
 
@@ -225,8 +225,7 @@ public static class ReplayServer
             // The charts ask for a strategy's trades to draw them, and those are not kept.
             if (!save)
                 return Results.Text($"{{\"run\":{JsonSerializer.Serialize(run, StrategyBook.JsonOptions)}}}", "application/json");
-            Directory.CreateDirectory(backtestsDir);
-            var name = Path.Combine(backtestsDir, $"{string.Concat(strategy.Id.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '-' : c))}@{data.Id}");
+            var name = RunPath(strategy!, data);
             var json = JsonSerializer.Serialize(run, StrategyBook.JsonOptions);
             await File.WriteAllTextAsync($"{name}.json", json);
             await File.WriteAllTextAsync($"{name}.csv", StrategyBacktest.ToCsv(run.Trades));
@@ -237,15 +236,49 @@ public static class ReplayServer
         // than the backtest does (see StrategyBacktest.Occurrences), for the page to check the trades against.
         app.MapPost("/api/backtest/similar", async (HttpRequest request) =>
         {
-            var (strategy, data, _, error) = await BacktestRequest(request);
+            var (strategy, data, _, _, error) = await BacktestRequest(request);
             if (error != null)
                 return Results.BadRequest(error);
             var found = StrategyBacktest.Occurrences(data!.Prices, strategy!);
             return Results.Json(new { Candles = found.Select(i => new { Index = i, Time = data.Prices[i].DateTime, Measurable = StrategyBacktest.Measurable(data.Prices, i, strategy) }) }, Json);
         });
 
-        // A backtest request, { dataset, strategy, save }: the strategy and the dataset, or what is wrong with them.
-        async Task<(Strategy? Strategy, Dataset? Data, bool Save, string? Error)> BacktestRequest(HttpRequest request)
+        // The random-entry baseline of a strategy (see StrategyBaseline): { dataset, strategy, runs, seed, save }, runs and
+        // seed optional. It is saved beside the strategy's run in artifacts/backtests, as JSON ending .baseline.json.
+        app.MapPost("/api/backtest/baseline", async (HttpRequest request) =>
+        {
+            var (strategy, data, save, body, error) = await BacktestRequest(request);
+            if (error != null)
+                return Results.BadRequest(error);
+            BaselineRun baseline;
+            try
+            {
+                baseline = StrategyBaseline.Run(data!.Prices, strategy!, data.Id, body?["runs"]?.GetValue<int>() ?? StrategyBaseline.DefaultRuns,
+                    body?["seed"]?.GetValue<int>() ?? 1);
+            }
+            catch (Exception e) when (e is ArgumentException or InvalidOperationException)
+            {
+                return Results.BadRequest(e.Message);
+            }
+
+            var json = JsonSerializer.Serialize(baseline, StrategyBook.JsonOptions);
+            if (!save)
+                return Results.Text($"{{\"baseline\":{json}}}", "application/json");
+            var name = $"{RunPath(strategy!, data)}.baseline.json";
+            await File.WriteAllTextAsync(name, json);
+            return Results.Text($"{{\"saved\":{JsonSerializer.Serialize(name)},\"baseline\":{json}}}", "application/json");
+        });
+
+        // Where a strategy's runs over a dataset are written, without the extension: named by the strategy and the dataset.
+        string RunPath(Strategy strategy, Dataset data)
+        {
+            Directory.CreateDirectory(backtestsDir);
+            return Path.Combine(backtestsDir, $"{string.Concat(strategy.Id.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '-' : c))}@{data.Id}");
+        }
+
+        // A backtest request, { dataset, strategy, save }: the strategy and the dataset, or what is wrong with them, and the
+        // request's body for whatever else it carries.
+        async Task<(Strategy? Strategy, Dataset? Data, bool Save, JsonNode? Body, string? Error)> BacktestRequest(HttpRequest request)
         {
             try
             {
@@ -253,13 +286,13 @@ public static class ReplayServer
                 var strategy = body?["strategy"]?.Deserialize<Strategy>(StrategyBook.JsonOptions);
                 var dataset = body?["dataset"]?.GetValue<string>();
                 if (strategy == null || dataset == null || !byId.TryGetValue(dataset, out var data))
-                    return (null, null, false, "The request is { dataset, strategy }, with a dataset the server has.");
+                    return (null, null, false, null, "The request is { dataset, strategy }, with a dataset the server has.");
                 var errors = strategy.Validate();
-                return errors.Count > 0 ? (null, null, false, string.Join(" ", errors)) : (strategy, data, body?["save"]?.GetValue<bool>() ?? true, null);
+                return errors.Count > 0 ? (null, null, false, null, string.Join(" ", errors)) : (strategy, data, body?["save"]?.GetValue<bool>() ?? true, body, null);
             }
             catch (Exception e) when (e is JsonException or InvalidOperationException)
             {
-                return (null, null, false, $"The request is not a backtest: {e.Message}");
+                return (null, null, false, null, $"The request is not a backtest: {e.Message}");
             }
         }
 
