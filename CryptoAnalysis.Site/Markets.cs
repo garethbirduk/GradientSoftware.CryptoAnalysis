@@ -12,10 +12,10 @@ public sealed record MarketSource(string Path, DateTime? From = null, DateTime? 
 
 /// <summary>
 /// A market the Strategies page tests on: an instrument on an exchange at a candle length, its candles from one or more files
-/// joined in time. Group is the instrument on its exchange, so the same market at another candle length shares the roles of
-/// its periods.
+/// joined in time, or made by Generate for a synthetic market. Group is the instrument on its exchange, so the same market at
+/// another candle length shares the roles of its periods.
 /// </summary>
-public sealed record Market(string Id, string Name, string Group, int Hours, IReadOnlyList<MarketSource> Sources);
+public sealed record Market(string Id, string Name, string Group, int Hours, IReadOnlyList<MarketSource> Sources, Func<List<Price>>? Generate = null);
 
 /// <summary>
 /// What a period of a market may be used for. A strategy is searched for on Search periods, as sweeps do; checked on Test
@@ -33,7 +33,11 @@ public enum EnumPeriodRole
 /// </summary>
 public static class Markets
 {
+    private static readonly DateTime Y2020 = new(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime Y2023 = new(2023, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    // The synthetic markets' hours, 2020 to the end of 2024.
+    private static readonly int SyntheticCandles = (int)(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) - Y2020).TotalHours;
     private static readonly TimeZoneInfo London = TimeZoneInfo.FindSystemTimeZoneById("Europe/London");
 
     // Coinbase's BTC from 2020 is a file of London times up to 2023, then one of UTC times on, as each was exported.
@@ -49,6 +53,12 @@ public static class Markets
         new("btc-coinbase-4h", "BTC/USD · Coinbase · 4h", "btc-coinbase", 4, BtcCoinbase),
         new("eth-coinbase-1h", "ETH/USD · Coinbase · 1h", "eth-coinbase", 1, [new(System.IO.Path.Combine("Data", "COINBASE_ETHUSD, 60", "COINBASE_ETHUSD, 60.csv"))]),
         new("btc-bitstamp-1h", "BTC/USD · Bitstamp · 1h", "btc-bitstamp", 1, [new(System.IO.Path.Combine("Data", "BITSTAMP_BTCUSD, 60", "BITSTAMP_BTCUSD, 60 (1).csv"))]),
+        // Markets where the truth is known (see Synthetic): nothing to find in the one, and one edge, after 3 green candles,
+        // in the other.
+        new("synthetic-random-1h", "Synthetic · random walk · 1h", "synthetic-random", 1, [],
+            () => Research.Synthetic.Walk(1, Y2020, SyntheticCandles)),
+        new("synthetic-edge-1h", "Synthetic · edge after 3 green · 1h", "synthetic-edge", 1, [],
+            () => Research.Synthetic.PlantedEdge(2, Y2020, SyntheticCandles)),
     ];
 
     /// <summary>
@@ -72,6 +82,8 @@ public static class Markets
     /// </summary>
     public static List<Price> Load(Market market, string repoRoot)
     {
+        if (market.Generate != null)
+            return market.Generate();
         var prices = market.Sources.SelectMany(source =>
             new Csv.CsvReaderHelper().ReadData<Price, global::CryptoAnalysis.Csv.ClassMaps.PriceClassMap>(System.IO.Path.Combine(repoRoot, source.Path))
                 .Select(x =>
@@ -157,7 +169,8 @@ public sealed class PeriodRoles(string path, string logPath)
 
     /// <summary>
     /// What stops a run on a window of a dataset's prices, or null when it may run: nothing runs on a Locked year, and a
-    /// sweep, which searches, runs only on Search years. A run that may go ahead on a Test year is logged.
+    /// sweep or an exploring of conditions, which search, run only on Search years. A run that may go ahead on a Test year
+    /// is logged.
     /// </summary>
     public string? Check(string dataset, IReadOnlyList<Price> prices, (int First, int End) window, string kind, string strategy)
     {
@@ -166,8 +179,8 @@ public sealed class PeriodRoles(string path, string logPath)
         var years = Markets.Years(prices, window).Select(year => (Year: year, Role: Role(group, year))).ToList();
         if (years.FirstOrDefault(x => x.Role == EnumPeriodRole.Locked) is { Year: > 0 } locked)
             return $"{locked.Year} of {group} is Locked, kept back for a final check. Unlock it on the Strategies page to run on it.";
-        if (kind == "sweep" && years.FirstOrDefault(x => x.Role != EnumPeriodRole.Search) is { Year: > 0 } test)
-            return $"Sweeps search, so they run only on Search periods, and {test.Year} of {group} is {test.Role}.";
+        if (kind is "sweep" or "explore" && years.FirstOrDefault(x => x.Role != EnumPeriodRole.Search) is { Year: > 0 } test)
+            return $"{(kind == "sweep" ? "Sweeps" : "Exploring conditions")} searches, so it runs only on Search periods, and {test.Year} of {group} is {test.Role}.";
 
         var tested = years.Where(x => x.Role == EnumPeriodRole.Test).Select(x => x.Year).ToList();
         if (tested.Count > 0)

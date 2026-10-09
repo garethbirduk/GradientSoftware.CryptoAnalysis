@@ -344,6 +344,71 @@ public static class ReplayServer
             return Results.Text($"{{\"saved\":{JsonSerializer.Serialize(name)},\"sweep\":{json}}}", "application/json");
         });
 
+        // Conditions measured directly (see Explorer): { cells: [{ dataset, from, to }], sizes, horizon }. For every condition
+        // and size, after it, how often the price went up by the size before down by it, against every candle, in each period
+        // and all of them pooled. It searches, so it runs on Search periods only.
+        app.MapPost("/api/explore", async (HttpRequest request) =>
+        {
+            JsonNode? body;
+            try
+            {
+                body = await JsonNode.ParseAsync(request.Body);
+            }
+            catch (JsonException e)
+            {
+                return Results.BadRequest($"The request is not an exploring of conditions: {e.Message}");
+            }
+
+            var sizes = body?["sizes"]?.AsArray().Select(x => x!.GetValue<double>()).Distinct().Order().ToList() ?? [];
+            var horizon = body?["horizon"]?.GetValue<int>() ?? 48;
+            if (sizes.Count is 0 or > 10 || sizes.Any(x => x is < 0.05 or > 50) || horizon is < 1 or > 2000)
+                return Results.BadRequest("The sizes are 1 to 10 percentages from 0.05 to 50, and the horizon 1 to 2,000 candles.");
+
+            var cells = new List<(Dataset Data, (int First, int End) Window)>();
+            foreach (var cell in body?["cells"]?.AsArray() ?? [])
+            {
+                if (!byId.TryGetValue(cell?["dataset"]?.GetValue<string>() ?? "", out var data))
+                    return Results.BadRequest("Each cell is { dataset, from, to }, with a dataset the server has.");
+                DateTime? Date(string key) => cell?[key]?.GetValue<string>() is { Length: > 0 } text
+                    ? DateTime.Parse(text, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal)
+                    : null;
+                var window = StrategyBacktest.Window(data.Prices, Date("from"), Date("to"));
+                if (window.End <= window.First)
+                    continue;
+                if (roles?.Check(data.Id, data.Prices, window, "explore", "") is { } refused)
+                    return Results.BadRequest(refused);
+                cells.Add((data, window));
+            }
+
+            if (cells.Count is 0 or > 60)
+                return Results.BadRequest("Explore 1 to 60 periods that have candles.");
+
+            // Each dataset's conditions and outcomes once, measured in each of its periods.
+            var conditions = Research.ExploreConditions.All;
+            var met = cells.Select(x => x.Data).Distinct().ToDictionary(x => x.Id, x => conditions.Select(c => c.Test(x.Prices)).ToList());
+            var touches = cells.Select(x => x.Data).Distinct().ToDictionary(x => x.Id, x => sizes.Select(s => Research.Explorer.FirstTouch(x.Prices, s, horizon)).ToList());
+            var tests = conditions.Count * sizes.Count;
+            return Results.Json(new
+            {
+                Tests = tests,
+                Sizes = sizes,
+                Horizon = horizon,
+                Cells = cells.Select(x => new { Dataset = x.Data.Id, x.Data.Name, From = x.Data.Prices[x.Window.First].DateTime, To = x.Data.Prices[x.Window.End - 1].DateTime, Candles = x.Window.End - x.Window.First }),
+                Conditions = conditions.Select((c, k) => new
+                {
+                    c.Id,
+                    c.Name,
+                    c.Group,
+                    Sizes = sizes.Select((s, n) =>
+                    {
+                        var each = cells.Select(x => Research.Explorer.Measure(met[x.Data.Id][k], touches[x.Data.Id][n], x.Window)).ToList();
+                        var pooled = Research.ConditionStat.Pool(each);
+                        return new { Size = s, Pooled = pooled, Corrected = Research.Explorer.Corrected(pooled.Score, tests), Cells = each };
+                    }),
+                }),
+            }, Json);
+        });
+
         // Where a strategy's runs over a dataset are written, without the extension: named by the strategy and the dataset,
         // and the dates of the window when it is not the whole dataset, so each period's runs are kept.
         string RunPath(Strategy strategy, Dataset data, (int First, int End) window)

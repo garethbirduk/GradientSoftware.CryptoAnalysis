@@ -71,6 +71,7 @@ public class MarketsTests
 
             roles.Set("btc-coinbase", 2024, EnumPeriodRole.Test);
             StringAssert.Contains(roles.Check("btc-coinbase-4h", prices, both, "sweep", "s"), "Search");
+            StringAssert.Contains(roles.Check("btc-coinbase-1h", prices, both, "explore", "s"), "Search");
             Assert.IsNull(roles.Check("btc-coinbase-1h", prices, both, "baseline", "s"));
             Assert.IsNull(roles.Check("btc-1h", prices, both, "baseline", "s"));
             Assert.IsNull(roles.Check("eth-coinbase-1h", prices, both, "sweep", "s"));

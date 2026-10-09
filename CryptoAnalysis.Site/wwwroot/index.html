@@ -421,6 +421,19 @@
   .strat-cell-result { margin-top: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 1.3em; }
   .strat-cell-note { font-size: 11px; color: var(--muted); }
   .strat-cell-head { margin: 18px 0 0; font-size: 15px; }
+  /* Explore: a condition's lean, tinted green when up first more often than after any candle, red when down first. */
+  .explore { margin-top: 18px; }
+  .explore .strat-card + .strat-card { margin-top: 14px; }
+  .strat-trades.explore-table { max-height: none; }
+  .explore-table tbody tr[data-explore-condition] { cursor: pointer; }
+  .explore-table tbody tr.sel th { color: var(--accent); }
+  .explore-table tr.explore-group th { padding-top: 10px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .explore-table th { text-align: left; font-weight: 500; }
+  .explore-cell small { color: var(--muted); }
+  .explore-cell.up1 { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .explore-cell.up2 { background: color-mix(in srgb, var(--ok) 26%, transparent); }
+  .explore-cell.down1 { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+  .explore-cell.down2 { background: color-mix(in srgb, var(--bad) 22%, transparent); }
   /* Fees and Slippage a line each, their checkboxes one width so the numbers beside them line up. */
   .strat-fields.strat-cost + .strat-fields { margin-top: 6px; }
   .strat-cost label.check { width: 80px; align-self: center; }
@@ -638,7 +651,7 @@ function renderNav(active) {
   const nav = document.getElementById('nav');
   // The term pages and their examples are no longer in the bar; their addresses still open them.
   nav.innerHTML = `<h1>Market structure</h1>
-    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}
+    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}${link('Explore')}
     <span class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC</span>`;
   document.documentElement.style.setProperty('--nav-h', `${nav.offsetHeight}px`);
 }
@@ -5435,8 +5448,10 @@ function strategyCells(s) {
   return strategies.runs.get(s.id);
 }
 
+const fetchMarkets = () => fetch('api/markets', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).catch(() => []);
+
 async function loadMarkets() {
-  strategies.markets = await fetch('api/markets', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).catch(() => []);
+  strategies.markets = await fetchMarkets();
 }
 
 function syncStrategiesHash() {
@@ -6668,13 +6683,169 @@ function showTradeSimilar() {
   dialog.querySelector('tr.current')?.scrollIntoView({ block: 'nearest' });
 }
 
+// ---- Explore ----------------------------------------------------------------------------------------------------------
+// Conditions measured directly, before a strategy is built on one (POST api/explore, see Explorer): for each condition and
+// size, after it, how often the price went up by the size before down by it, against after any candle, in each period ticked
+// and pooled. Exploring searches, so only Search periods can be ticked; roles are set on the Strategies page.
+let explore = null;
+const EXPLORE_DEFAULTS = { sizes: '0.5, 1, 2, 3', horizon: '48', cost: '0.3' };
+const exploreYear = key => { const { market, year } = cellOf(key); return explore.markets?.find(m => m.id === market)?.years.find(y => y.year === year); };
+const explorePct = x => `${(100 * x).toFixed(1)}%`;
+
+async function renderExplorePage(asked = new URLSearchParams()) {
+  const main = document.getElementById('main');
+  currentPage = 'Explore';
+  const head = `<section class="term-head"><h2>Explore</h2>
+    <p>Measure conditions directly, before building a strategy on one: after each, how often the price went up by a size before it went down by it, against after any candle.</p>
+    <p class="remarks">The score is the share of random samples of candles a condition beats: near 100, up first more often than after any candle; near 0, down first
+    more often. Exploring searches, so it runs on Search periods only, and every condition at every size is a test: a * marks a result beyond chance once all of
+    them are allowed for. Each condition reads only the candle it is met at and those before it.</p></section>`;
+  if (!serverOn) {
+    main.innerHTML = head + `<div class="empty" data-server-check>Checking for the local server…</div>`;
+    return checkLocalServer();
+  }
+  explore ??= { ...EXPLORE_DEFAULTS, cells: new Set(), result: null, running: false, condition: null };
+  explore.markets = await fetchMarkets();
+  if (currentPage !== 'Explore') return;
+  const cells = asked.get('cells')?.split(',').filter(k => exploreYear(k)?.role === 'search');
+  if (cells?.length) explore.cells = new Set(cells);
+  [...explore.cells].filter(k => exploreYear(k)?.role !== 'search').forEach(k => explore.cells.delete(k));
+  if (!explore.cells.size) {
+    const m = explore.markets[0];
+    (m?.years ?? []).filter(y => y.role === 'search').forEach(y => explore.cells.add(cellKey(m.id, y.year)));
+  }
+  for (const k of Object.keys(EXPLORE_DEFAULTS)) if (asked.get(k)) explore[k] = asked.get(k);
+  if (asked.get('condition')) explore.condition = asked.get('condition');
+  main.innerHTML = head + '<div class="explore"></div>';
+  renderExplore();
+}
+
+// The page's address keeps the periods ticked, the settings and the condition shown, as the Strategies page's does.
+function exploreHash() {
+  const q = new URLSearchParams();
+  if (explore.cells.size) q.set('cells', [...explore.cells].join(','));
+  for (const [k, v] of Object.entries(EXPLORE_DEFAULTS)) if (String(explore[k]) !== v) q.set(k, explore[k]);
+  if (explore.condition) q.set('condition', explore.condition);
+  return `#Explore${q.size ? `?${q}` : ''}`;
+}
+
+function syncExploreHash() {
+  if (currentPage === 'Explore' && location.hash !== exploreHash()) history.replaceState(null, '', exploreHash());
+}
+
+function renderExplore() {
+  const box = document.querySelector('.explore');
+  if (!box) return;
+  syncExploreHash();
+  const markets = explore.markets ?? [];
+  const years = [...new Set(markets.flatMap(m => m.years.map(y => y.year)))].sort((a, b) => a - b);
+  const cell = (m, year) => {
+    const y = m.years.find(x => x.year === year);
+    if (!y) return '<td class="strat-cell none"></td>';
+    const key = cellKey(m.id, year), search = y.role === 'search';
+    return `<td class="strat-cell role-${y.role}" title="${esc(`${m.name}, ${year}: ${fmtTime(y.first)} to ${fmtTime(y.last)} UTC, ${y.candles.toLocaleString()} candles`)}">
+      <label class="strat-cell-top"><input type="checkbox" data-explore-tick="${key}" ${search && explore.cells.has(key) ? 'checked' : ''} ${search ? '' : 'disabled'}>${ROLE_NAMES[y.role]}</label></td>`;
+  };
+  const r = explore.result;
+  box.innerHTML = `<div class="strat-card">
+      ${markets.length ? `<div class="strat-grid-wrap"><table class="strat-grid">
+        <thead><tr><th></th>${markets.map(m => `<th><button type="button" data-explore-market="${m.id}" title="Tick or untick all of this market's Search periods">${esc(m.name)}</button></th>`).join('')}</tr></thead>
+        <tbody>${years.map(year => `<tr><th><button type="button" data-explore-year="${year}" title="Tick or untick this year in every market">${year}</button></th>${markets.map(m => cell(m, year)).join('')}</tr>`).join('')}</tbody>
+      </table></div>` : '<p class="remarks strat-note bad">The local server has no markets: restart ./build-site.ps1 -Serve.</p>'}
+      <p class="remarks">Only Search periods can be explored. Roles are set on the <a href="#Strategies">Strategies</a> page.</p>
+      <div class="strat-fields">
+        <label title="How far the price must go either way, as percentages of the close: 0.5, 1, 2, 3">Sizes, % either way<input type="text" data-explore="sizes" value="${esc(explore.sizes)}"></label>
+        <label title="The candles after a condition the price has to go a size either way; neither, if it does not">Within (candles)<input type="number" data-explore="horizon" min="1" step="1" value="${esc(explore.horizon)}"></label>
+        <label title="Fees and slippage of a trade, in and out, as a percentage: what a lean must clear to pay, marked ▲ (long) or ▼ (short)">Costs, % a round trip<input type="number" data-explore="cost" min="0" step="0.05" value="${esc(explore.cost)}"></label>
+      </div>
+      <div class="strat-run">
+        <button type="button" data-explore-run ${explore.running || !explore.cells.size ? 'disabled' : ''}>${explore.running ? 'Exploring…' : `Explore ${explore.cells.size} period${explore.cells.size === 1 ? '' : 's'}`}</button>
+        <span class="strat-note${r?.error ? ' bad' : ''}">${esc(r?.error ?? '')}</span>
+      </div>
+    </div>
+    ${r && !r.error ? exploreResults(r) : ''}`;
+
+  const toggle = keys => {
+    keys = keys.filter(k => exploreYear(k)?.role === 'search');
+    const on = keys.some(k => !explore.cells.has(k));
+    keys.forEach(k => on ? explore.cells.add(k) : explore.cells.delete(k));
+    renderExplore();
+  };
+  box.querySelectorAll('[data-explore-tick]').forEach(el => el.addEventListener('change', () => toggle([el.dataset.exploreTick])));
+  box.querySelectorAll('[data-explore-market]').forEach(el => el.addEventListener('click', () =>
+    toggle(markets.find(m => m.id === el.dataset.exploreMarket).years.map(y => cellKey(el.dataset.exploreMarket, y.year)))));
+  box.querySelectorAll('[data-explore-year]').forEach(el => el.addEventListener('click', () =>
+    toggle(markets.map(m => cellKey(m.id, Number(el.dataset.exploreYear))).filter(exploreYear))));
+  box.querySelectorAll('[data-explore]').forEach(el => el.addEventListener('change', () => {
+    explore[el.dataset.explore] = el.value.trim() || EXPLORE_DEFAULTS[el.dataset.explore];
+    if (el.dataset.explore === 'cost') renderExplore();
+    else syncExploreHash();
+  }));
+  box.querySelector('[data-explore-run]').addEventListener('click', runExplore);
+  box.querySelectorAll('[data-explore-condition]').forEach(el => el.addEventListener('click', () => {
+    explore.condition = explore.condition === el.dataset.exploreCondition ? null : el.dataset.exploreCondition;
+    renderExplore();
+  }));
+}
+
+async function runExplore() {
+  const sizes = String(explore.sizes).split(/[\s,]+/).map(Number).filter(x => x > 0);
+  explore.running = true;
+  renderExplore();
+  const cells = [...explore.cells].map(k => ({ dataset: cellOf(k).market, ...cellWindow(k) }));
+  explore.result = await postBacktest('api/explore', { cells, sizes, horizon: Number(explore.horizon) }, 'explorations');
+  explore.running = false;
+  if (currentPage === 'Explore') renderExplore();
+}
+
+// The results: a row a condition, a column a size. A cell is the share that went up first after the condition, its lean
+// from after any candle in points, tinted by its score (green up first, red down first); * when beyond chance allowing for
+// every test, ▲ or ▼ when the lean would pay its costs long or short. A row's click shows it period by period below.
+function exploreResults(r) {
+  const cost = Number(explore.cost) || 0;
+  const tone = score => score >= 97.5 ? ' up2' : score >= 90 ? ' up1' : score <= 2.5 ? ' down2' : score <= 10 ? ' down1' : '';
+  const pays = (stat, size) => {
+    const hurdle = 0.5 + cost / (2 * size);
+    return stat.up + stat.down === 0 ? '' : stat.upRate > hurdle ? ' ▲' : 1 - stat.upRate > hurdle ? ' ▼' : '';
+  };
+  const lean = stat => `${stat.edge >= 0 ? '+' : ''}${(100 * stat.edge).toFixed(1)}`;
+  const tip = (z, stat) => `${stat.events.toLocaleString()} times; up first ${stat.up}, down first ${stat.down}, neither ${stat.neither}, both in a candle ${stat.both}.
+Up first ${explorePct(stat.upRate)} against ${explorePct(stat.baseRate)} after any candle: score ${stat.score.toFixed(1)}${z ? `, chance allowing for all ${r.tests} tests ${(100 * z.corrected).toFixed(1)}%` : ''}.`;
+  const base = r.conditions[0]?.sizes.map(z => z.pooled) ?? [];
+  const rows = [...new Set(r.conditions.map(c => c.group))].map(group => `<tr class="explore-group"><th colspan="${r.sizes.length + 1}">${esc(group)}</th></tr>` +
+    r.conditions.filter(c => c.group === group).map(c => `<tr class="${c.id === explore.condition ? 'sel' : ''}" data-explore-condition="${c.id}">
+      <th>${esc(c.name)}</th>
+      ${c.sizes.map(z => `<td class="num explore-cell${tone(z.pooled.score)}" title="${esc(tip(z, z.pooled))}">${z.pooled.up + z.pooled.down
+        ? `${explorePct(z.pooled.upRate)} <small>${lean(z.pooled)}</small>${z.corrected < 0.05 ? ' *' : ''}${pays(z.pooled, z.size)}` : '–'}</td>`).join('')}
+    </tr>`).join('')).join('');
+  const shown = r.conditions.find(c => c.id === explore.condition);
+  const detail = shown ? `<h3 class="strat-cell-head">${esc(shown.name)}, period by period</h3>
+    <div class="strat-trades"><table><thead><tr><th>Period</th>${r.sizes.map(s => `<th class="num">${s}%</th>`).join('')}</tr></thead><tbody>
+      ${r.cells.map((cell, k) => `<tr><th>${esc(cell.name)}, ${esc(fmtTime(cell.from).slice(0, 4))}</th>
+        ${shown.sizes.map(z => { const s = z.cells[k]; return `<td class="num explore-cell${tone(s.score)}" title="${esc(tip(null, s))}">${s.up + s.down ? `${explorePct(s.upRate)} <small>${lean(s)}</small>` : '–'}</td>`; }).join('')}</tr>`).join('')}
+    </tbody></table></div>` : '';
+  return `<div class="strat-card">
+    <p class="remarks">${r.cells.length} period${r.cells.length === 1 ? '' : 's'} pooled, ${r.tests} tests (${r.conditions.length} conditions × ${r.sizes.length} sizes), within ${r.horizon} candles.
+      After any candle the price went up first ${base.map((b, k) => `${explorePct(b.baseRate)} of the time at ${r.sizes[k]}%`).join(', ')}.
+      A cell is the share up first after the condition, then its lean from that in points. Hover for the counts; click a row for its periods.</p>
+    <div class="strat-trades explore-table"><table><thead><tr><th>Condition</th>${r.sizes.map(s => `<th class="num">${s}%</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+    ${detail}</div>`;
+}
+
 function route() {
   document.body.classList.remove('analysing');
   stopPlaying();
   pauseTour();
   // An analysis has an address of its own: #Analysis?explain=Swing&dataset=...
   const [first, asked] = location.hash.slice(1).split('?');
-  document.body.classList.toggle('strategizing', first === 'Strategies');
+  document.body.classList.toggle('strategizing', first === 'Strategies' || first === 'Explore');
+  if (first === 'Explore') {
+    ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
+    renderNav('Explore');
+    renderExplorePage(new URLSearchParams(asked ?? ''));
+    window.scrollTo(0, 0);
+    return;
+  }
   if (first === 'Strategies') {
     ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
     renderNav('Strategies');

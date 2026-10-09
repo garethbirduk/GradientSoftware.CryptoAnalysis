@@ -45,14 +45,14 @@ public static class StrategySweep
         {
             var errors = v.Strategy.Validate();
             if (errors.Count > 0)
-                return (v.Values, Result: ((BaselineRun Baseline, BacktestSummary Actual, BacktestSummary[] Random)?)null, Error: string.Join(" ", errors));
+                return (v.Values, Result: ((BaselineRun Baseline, BacktestSummary Actual, BacktestSummary[] Random)?)null, Error: (string?)string.Join(" ", errors));
             try
             {
                 return (v.Values, Result: StrategyBaseline.Measured(prices, v.Strategy, dataset, runs, seed, window), Error: (string?)null);
             }
             catch (ArgumentException e)
             {
-                return (v.Values, Result: null, Error: e.Message);
+                return (v.Values, Result: null, Error: (string?)e.Message);
             }
         }).ToList();
 
