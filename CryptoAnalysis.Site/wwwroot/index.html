@@ -2099,8 +2099,10 @@ function shownRanges(zoom, view) {
 
 // Records a chart's zoom (none for the default view) and shows it on the next frame, so a run of wheel or drag events
 // costs one redraw. A move that would leave no candles in view keeps the time range as it was.
-function moveView(el, zoom) {
+function moveView(el, zoom, { gliding = false } = {}) {
   const id = el.dataset.id, view = views.get(id);
+  // Any other move stops a glide (see glideView).
+  if (!gliding) glides.delete(id);
   if (zoom?.x && view && !fitPrices(view, zoom.x)) zoom = { ...zoom, x: zooms.get(id)?.x };
   if (zoom?.x || zoom?.y) zooms.set(id, zoom); else zooms.delete(id);
   if (viewsToMove.has(el)) return;
@@ -2115,6 +2117,25 @@ function moveView(el, zoom) {
     finally { movingViews--; }
     refitBoxesSoon(el);
   });
+}
+
+// Moves a chart that is not a tour's from the time range it shows to another, the one way views move (see viewPath),
+// fitting the prices to each frame. It ends zoomed to the new range, as a pan by hand would leave it; a zoom or pan by
+// hand on the way stops it there.
+const glides = new Map();
+function glideView(el, to) {
+  if (!el?._fullLayout) return;
+  const id = el.dataset.id, from = el._fullLayout.xaxis.range.map(axisTime), target = to.map(v => typeof v === 'number' ? v : axisTime(v));
+  const path = viewPath(from, target), start = performance.now(), mine = {};
+  glides.set(id, mine);
+  const iso = ms => new Date(ms).toISOString();
+  const step = () => {
+    if (glides.get(id) !== mine || !el.isConnected) return;
+    const elapsed = performance.now() - start, [a, b] = path.at(elapsed);
+    moveView(el, { x: [iso(a), iso(b)] }, { gliding: true });
+    if (elapsed < path.ms) requestAnimationFrame(step); else glides.delete(id);
+  };
+  requestAnimationFrame(step);
 }
 
 // Where a mouse event is on a chart, in pixels from the top left of the plot area, with the plot area's place and size.
@@ -2388,9 +2409,13 @@ async function renderChartPage() {
   main.querySelector('[data-dataset]').addEventListener('change', e => { state.chartDataset = e.target.value; save(state); renderChartPage(); });
   main.querySelector('[data-span]').addEventListener('change', e => {
     state.chartSpan = Number(e.target.value); save(state);
-    // A new span is a new default view, so a zoom or pan made before it is dropped.
+    // A new span is a new default view, so a zoom or pan made before it is dropped; the view moves there as views do.
+    const el = main.querySelector('.chart'), was = el?._fullLayout?.xaxis.range.slice();
     zooms.delete(ex.id);
     redrawExample(ex);
+    if (!was || !el._fullLayout) return;
+    const to = el._fullLayout.xaxis.range.slice();
+    Plotly.relayout(el, { 'xaxis.range': was }).then(() => glideView(el, to));
   });
 }
 
@@ -2536,6 +2561,7 @@ function playerPanel(page) {
         <a class="button" data-tour="analysis-download" href="api/video/analysis/file" download="analysis.mp4" hidden>Download video</a>
         <span data-tour="video" aria-live="polite"></span>
         <button type="button" data-tour-go="similar" title="Find the other Trends like this one: the same level, direction, count of Swings and Strength, or any of those" hidden>Find similar</button>
+        <button type="button" data-tour-go="tradeSimilar" title="Every candle with what this strategy's entry looks for, against the strategy's trades, each traded one to analyse" hidden>Find similar trades</button>
         <button type="button" class="edit" data-tour-go="close" title="Close the analysis and its tab">Close</button>`}
     </div>
     <div class="player-scrub" data-tour="scrub-row">
@@ -2559,6 +2585,7 @@ function wirePlayerPanel(root) {
     else if (go === 'glossary') toggleTourGlossary();
     else if (go === 'video') generateTour();
     else if (go === 'similar') { pauseTour(); openSimilar(); }
+    else if (go === 'tradeSimilar') { pauseTour(); openAnalysisTradeSimilar(); }
     else if (go === 'analysisVideo') makeAnalysisVideo();
     // Close closes the tab the Replay page opened; a tab opened by hand cannot be closed from within, and goes to Replay.
     else if (go === 'close') { pauseTour(); window.close(); setTimeout(() => { location.hash = '#Replay'; }, 300); }
@@ -3555,11 +3582,31 @@ const TOUR_ZOOM_MS = 1500;
 // Candles a tour's chart has either side of its view, to pan to.
 const TOUR_CONTEXT = 48;
 
+// The one way a view is moved for the reader, on every chart: out to hold both where it is and where it goes, then in to
+// where it goes, each leg eased over TOUR_ZOOM_MS. From 500–550 to 100–140, it goes out to 100–550, then in to 100–140.
+// A view that holds the new one only goes in; one held by the new one only goes out. A journey (see journeyTick) runs or
+// erases the replay between the two legs. Only a zoom or pan made by hand moves a view otherwise, at once.
+// Views are pairs of numbers, candles or times alike; the path gives the view at a time since it set off, and how long.
+function viewPath(from, to) {
+  const wide = [Math.min(from[0], to[0]), Math.max(from[1], to[1])], same = (a, b) => a[0] === b[0] && a[1] === b[1];
+  const legs = [...(same(wide, from) ? [] : [[from, wide]]), ...(same(wide, to) ? [] : [[wide, to]])];
+  const ease = k => k < 0.5 ? 2 * k * k : 1 - (2 - 2 * k) ** 2 / 2;
+  return {
+    ms: legs.length * TOUR_ZOOM_MS,
+    at: elapsed => {
+      if (!legs.length) return to;
+      const n = Math.min(legs.length - 1, Math.floor(Math.max(0, elapsed) / TOUR_ZOOM_MS)), k = Math.min(1, (elapsed - n * TOUR_ZOOM_MS) / TOUR_ZOOM_MS);
+      const [a, b] = legs[n];
+      return a.map((v, i) => v + (b[i] - v) * ease(k));
+    },
+  };
+}
+
+// The view a tour's chart shows: its section's, or on the way there from the one shown before.
 function tourView(t) {
   const view = sectionView(t), zoom = tour.zoom;
   if (!zoom) return view;
-  const k = Math.min(1, (performance.now() - zoom.start) / TOUR_ZOOM_MS), eased = k < 0.5 ? 2 * k * k : 1 - (2 - 2 * k) ** 2 / 2;
-  return view.map((v, i) => Math.round(zoom.from[i] + (v - zoom.from[i]) * eased));
+  return viewPath(zoom.from, view).at(performance.now() - zoom.start).map(Math.round);
 }
 
 function tourWindow(ex, t) {
@@ -3567,14 +3614,16 @@ function tourWindow(ex, t) {
   return { from: Math.min(from, last), to: Math.min(Math.max(to, from), last) };
 }
 
+// Sets a tour's view moving from the one shown to its section's (see viewPath).
 function zoomTour(from) {
   tour.zoom = { from, start: performance.now() };
   if (tour.zooming) return;
   // The next frame is asked for before this one is drawn, so a frame that fails does not leave the view part way.
   const step = () => {
-    tour.zooming = !!tour.zoom && performance.now() - tour.zoom.start < TOUR_ZOOM_MS;
+    const zoom = tour.zoom;
+    tour.zooming = !!zoom && performance.now() - zoom.start < viewPath(zoom.from, sectionView(cursorOf(tour.ex))).ms;
     if (tour.zooming) requestAnimationFrame(step); else tour.zoom = null;
-    if (currentPage === 'Tour') redrawExample(tour.ex);
+    if (playerHere(currentPage)) redrawExample(tour.ex);
   };
   tour.zooming = true;
   requestAnimationFrame(step);
@@ -3867,6 +3916,7 @@ function updateTourPanel() {
 
   go('glossary')?.setAttribute('aria-pressed', glossaryOn());
   if (go('similar')) go('similar').hidden = !trendLevel(tour);
+  if (go('tradeSimilar')) go('tradeSimilar').hidden = !(tour.page === 'Analysis' && tour.params?.strategy);
   const voice = go('voice'), clips = Object.keys(tour.audio ?? {}).length;
   voice.setAttribute('aria-pressed', voiceOn());
   if (!clips) voice.title = 'No clips yet: the local server reads the texts aloud when Voice is on';
@@ -3908,8 +3958,9 @@ function tourTick() {
   }
   if (tour.journey) return journeyTick(s, ex, now, reading);
   if (t < s.until) {
-    // The replay waits at a cue that has a candle; text with no candle is read while the replay runs.
-    const waiting = (reading && tour.active.at != null) || tour.queue.some(c => c.at != null);
+    // The replay waits at a cue that has a candle; text with no candle is read while the replay runs. It also waits for the
+    // view to arrive at the section's, so the candles run where they are seen.
+    const waiting = (reading && tour.active.at != null) || tour.queue.some(c => c.at != null) || !!tour.zoom;
     if (waiting || !timelineAt(ex, t + 1)) tour.nextCandle = 0;
     if (waiting || now < tour.nextCandle) return;
     if (!timelineAt(ex, t + 1)) return prefetch(ex, t + 1);
@@ -5692,7 +5743,7 @@ async function openTradeSimilar(layer, trade, ex) {
   const dialog = similarDialog(), s = layer.chartStrategy.strategy;
   dialog.innerHTML = `<h4>Find similar</h4><p>Finding the candles…</p>`;
   dialog.showModal();
-  const run = chartTrades(ex.dataset, s);
+  const run = await chartTradesLoaded(ex.dataset, s);
   const r = await fetch('api/backtest/similar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset: ex.dataset, strategy: s }) }).catch(() => null);
   if (!r?.ok || !run) {
     dialog.innerHTML = `<h4>Find similar</h4><p class="warn">${esc(r?.status === 404 || r?.status === 405 ? 'The local server is older than this page: restart ./build-site.ps1 -Serve.' : r ? await r.text() : 'The local server did not answer.')}</p>
@@ -5713,6 +5764,24 @@ async function openTradeSimilar(layer, trade, ex) {
   showTradeSimilar();
 }
 
+// The trades of a strategy over a dataset, waiting for them when they are still to come.
+async function chartTradesLoaded(dataset, strategy) {
+  chartTrades(dataset, strategy);
+  const got = chartRuns.get(`${dataset}|${JSON.stringify(strategy)}`);
+  if (got instanceof Promise) await got;
+  return chartTrades(dataset, strategy);
+}
+
+// Find similar from an analysis of a trade: the same list, each trade in it a link to an analysis of its own, which opens
+// here in place of this one.
+async function openAnalysisTradeSimilar() {
+  if (tour?.page !== 'Analysis' || !tour.params?.strategy) return;
+  const strategy = JSON.parse(tour.params.strategy), dataset = tour.params.dataset;
+  const run = await chartTradesLoaded(dataset, strategy), trade = run && tradeCovering(run.trades, strategy, tour.params.at);
+  const layer = { id: null, label: strategy.name || chartStrategyName(strategy), chartStrategy: { strategy } };
+  return openTradeSimilar(layer, trade ?? { entryIndex: -1 }, { dataset });
+}
+
 function similarDialog() {
   let dialog = document.getElementById('similar-trades');
   if (dialog) return dialog;
@@ -5722,6 +5791,17 @@ function similarDialog() {
   document.body.append(dialog);
   dialog.addEventListener('click', e => {
     if (e.target === dialog || e.target.closest('[data-sim="close"]')) return dialog.close();
+    const analyse = e.target.closest('[data-sim-analyse]');
+    if (analyse) {
+      const t = tradeSimilar.rows.find(x => x.traded?.entryIndex === Number(analyse.dataset.simAnalyse))?.traded;
+      dialog.close();
+      if (!t || currentPage !== 'Analysis') return;
+      // The analysis of that trade, seen from where it ends, with the settings of this one.
+      const { things, jump, changes, ...p } = tour.params;
+      wantedAnalysis = { ...p, at: minuteOf(t.entryTime), seen: minuteOf(t.exitTime), things: ['Trade'], detail: detailOf('Analysis') };
+      history.replaceState(null, '', analysisHash(wantedAnalysis));
+      return renderAnalysisPage();
+    }
     const one = e.target.closest('[data-show]'), all = e.target.closest('[data-sim="all"]');
     if (!one && !all) return;
     const { ex, rows } = tradeSimilar;
@@ -5737,7 +5817,7 @@ function similarDialog() {
       const el = document.querySelector(`.chart[data-id="${CSS.escape(ex.id)}"]`);
       if (!one || !el?._fullLayout) return;
       const [from, to] = el._fullLayout.xaxis.range.map(axisTime), width = to - from || 2 * 86400000, at = axisTime(ex.prices.t[index]);
-      moveView(el, { x: [new Date(at - width / 2).toISOString(), new Date(at + width / 2).toISOString()] });
+      glideView(el, [at - width / 2, at + width / 2]);
       return;
     }
     if (currentPage !== 'Replay') return;
@@ -5754,12 +5834,15 @@ function showTradeSimilar() {
   const dialog = similarDialog(), { layer, trade, rows, found, traded, open } = tradeSimilar, s = layer.chartStrategy.strategy;
   const what = STRATEGY_TYPES.entry[s.entry.type]?.says(s.entry) ?? s.entry.type, bad = rows.filter(x => x.bad).length;
   const data = datasetList?.find(d => d.id === tradeSimilar.ex.dataset)?.name ?? tradeSimilar.ex.dataset;
+  // From an analysis, each trade is analysed in its place rather than shown on a chart.
+  const analysing = currentPage === 'Analysis';
   dialog.innerHTML = `<h4>Find similar: ${esc(layer.label)}</h4>
     <p>Every candle in ${esc(data)} ${esc(what.replace(/^at the close of /, 'that is '))}, found from the candle runs rather than by the backtest, against the strategy's trades.</p>
     <p class="sim-verdict${bad ? ' bad' : ''}">${bad ? `${bad} disagree: listed first.` : `All ${found} agree:`} ${traded} traded${open ? `, ${open} skipped while a trade was open` : ''}${found - traded - open - bad > 0 ? `, ${found - traded - open - bad} too early to measure` : ''}.</p>
-    <div class="sim-foot"><button type="button" class="go" data-sim="all">Show all on chart</button><button type="button" data-sim="close">Close</button></div>
+    <div class="sim-foot">${analysing ? '' : '<button type="button" class="go" data-sim="all">Show all on chart</button>'}<button type="button" data-sim="close">Close</button></div>
     <ol>${rows.map(x => `<li class="${x.bad ? 'bad' : ''}${x.index === trade.entryIndex ? ' current' : ''}"><span>#${x.index}</span><span>${esc(fmtTime(x.time))}</span>
-      <span>${esc(x.status)}${x.index === trade.entryIndex ? ' · this one' : ''}</span><button type="button" data-show="${x.index}">Show on chart</button></li>`).join('')}</ol>`;
+      <span>${esc(x.status)}${x.index === trade.entryIndex ? ' · this one' : ''}</span>${!analysing ? `<button type="button" data-show="${x.index}">Show on chart</button>`
+        : x.traded && x.index !== trade.entryIndex ? `<button type="button" data-sim-analyse="${x.traded.entryIndex}">Analyse</button>` : '<span></span>'}</li>`).join('')}</ol>`;
   if (!dialog.open) dialog.showModal();
   dialog.querySelector('li.current')?.scrollIntoView({ block: 'nearest' });
 }
