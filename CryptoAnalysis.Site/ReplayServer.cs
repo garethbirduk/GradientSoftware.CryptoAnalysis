@@ -269,6 +269,32 @@ public static class ReplayServer
             return Results.Text($"{{\"saved\":{JsonSerializer.Serialize(name)},\"baseline\":{json}}}", "application/json");
         });
 
+        // A strategy swept over the numbers it varies (see StrategySweep): { dataset, strategy, runs, seed, save }, as for a
+        // baseline, each variation with a baseline of its own. It is saved beside the strategy's runs, ending .sweep.json.
+        app.MapPost("/api/backtest/sweep", async (HttpRequest request) =>
+        {
+            var (strategy, data, save, body, error) = await BacktestRequest(request);
+            if (error != null)
+                return Results.BadRequest(error);
+            SweepRun sweep;
+            try
+            {
+                sweep = StrategySweep.Run(data!.Prices, strategy!, data.Id, body?["runs"]?.GetValue<int>() ?? StrategyBaseline.DefaultRuns,
+                    body?["seed"]?.GetValue<int>() ?? 1);
+            }
+            catch (Exception e) when (e is ArgumentException or InvalidOperationException)
+            {
+                return Results.BadRequest(e.Message);
+            }
+
+            var json = JsonSerializer.Serialize(sweep, StrategyBook.JsonOptions);
+            if (!save)
+                return Results.Text($"{{\"sweep\":{json}}}", "application/json");
+            var name = $"{RunPath(strategy!, data)}.sweep.json";
+            await File.WriteAllTextAsync(name, json);
+            return Results.Text($"{{\"saved\":{JsonSerializer.Serialize(name)},\"sweep\":{json}}}", "application/json");
+        });
+
         // Where a strategy's runs over a dataset are written, without the extension: named by the strategy and the dataset.
         string RunPath(Strategy strategy, Dataset data)
         {

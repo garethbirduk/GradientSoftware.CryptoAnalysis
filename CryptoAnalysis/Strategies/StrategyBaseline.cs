@@ -37,10 +37,29 @@ public static class StrategyBaseline
     public const string TotalProfitPercent = "Total %";
 
     /// <summary>
+    /// The totals a baseline sets the strategy against the random runs by, in order, each read from a run's summary; null
+    /// where a run has none (a win rate with no trades closed, a profit factor with no losses).
+    /// </summary>
+    public static readonly IReadOnlyList<(string Name, Func<BacktestSummary, double?> Of)> Totals =
+    [
+        (WinRate, x => x.Trades > 0 ? x.WinRate : null),
+        (ProfitFactor, x => x.ProfitFactor),
+        (AverageProfitPercent, x => x.Trades > 0 ? x.TotalProfitPercent / x.Trades : null),
+        (TotalProfitPercent, x => x.TotalProfitPercent),
+    ];
+
+    /// <summary>
     /// Runs the strategy and the given number of random-entry runs over the prices and sets each total of the strategy
     /// against theirs. The same seed gives the same runs.
     /// </summary>
-    public static BaselineRun Run(IReadOnlyList<Price> prices, Strategy strategy, string dataset = "", int runs = DefaultRuns, int seed = 1)
+    public static BaselineRun Run(IReadOnlyList<Price> prices, Strategy strategy, string dataset = "", int runs = DefaultRuns, int seed = 1) =>
+        Measured(prices, strategy, dataset, runs, seed).Baseline;
+
+    /// <summary>
+    /// The baseline, with the strategy's own totals and those of each random run, in the order of their seeds.
+    /// </summary>
+    internal static (BaselineRun Baseline, BacktestSummary Actual, BacktestSummary[] Random) Measured(IReadOnlyList<Price> prices, Strategy strategy,
+        string dataset, int runs, int seed)
     {
         if (runs < 1 || runs > MaxRuns)
             throw new ArgumentOutOfRangeException(nameof(runs), $"The runs must be from 1 to {MaxRuns}.");
@@ -66,15 +85,9 @@ public static class StrategyBaseline
             return new BaselinePoint(prices[at].DateTime, own[k], Quantile(sorted, 5), Quantile(sorted, 50), Quantile(sorted, 95));
         }).ToList();
 
-        var measures = new List<BaselineMeasure>
-        {
-            Measure(WinRate, actual.Summary.Trades > 0 ? actual.Summary.WinRate : null, random.Where(x => x.Trades > 0).Select(x => x.WinRate)),
-            Measure(ProfitFactor, actual.Summary.ProfitFactor, random.Select(x => x.ProfitFactor).OfType<double>()),
-            Measure(AverageProfitPercent, Average(actual.Summary), random.Select(Average).OfType<double>()),
-            Measure(TotalProfitPercent, actual.Summary.TotalProfitPercent, random.Select(x => x.TotalProfitPercent)),
-        };
-        return new BaselineRun(strategy, dataset, prices.Count, runs, seed, signals, chance, actual.Summary.Trades,
-            random.Average(x => x.Trades), DateTime.UtcNow, measures, curve);
+        var measures = Totals.Select(t => Measure(t.Name, t.Of(actual.Summary), random.Select(t.Of).OfType<double>())).ToList();
+        return (new BaselineRun(strategy, dataset, prices.Count, runs, seed, signals, chance, actual.Summary.Trades,
+            random.Average(x => x.Trades), DateTime.UtcNow, measures, curve), actual.Summary, random);
     }
 
     /// <summary>
@@ -133,9 +146,7 @@ public static class StrategyBaseline
         return sorted[below] + (sorted[above] - sorted[below]) * (at - below);
     }
 
-    private static double? Average(BacktestSummary summary) => summary.Trades > 0 ? summary.TotalProfitPercent / summary.Trades : null;
-
-    private static BaselineMeasure Measure(string name, double? strategy, IEnumerable<double> runs)
+    internal static BaselineMeasure Measure(string name, double? strategy, IEnumerable<double> runs)
     {
         var sorted = runs.Order().ToList();
         double? percentile = strategy is double value && sorted.Count > 0

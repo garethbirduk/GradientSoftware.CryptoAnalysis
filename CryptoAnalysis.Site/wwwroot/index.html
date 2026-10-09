@@ -397,6 +397,19 @@
     color: var(--muted); font: inherit; font-size: 15px; line-height: 1; cursor: pointer; }
   .strat-steps .step-add:hover { color: var(--accent); border-color: var(--accent); }
   .strat-says { margin: 12px 0 0; max-width: 80ch; font-size: 14px; }
+  /* A number's sweep, To and Step, sits beside it, smaller, as it is optional. */
+  .strat-fields label.strat-vary { margin-left: -6px; }
+  .strat-fields label.strat-vary input[type="number"] { width: 56px; font-size: 12px; }
+  .strat-sweep-beats { height: 260px; margin-top: 4px; }
+  .strat-sweep { position: relative; }
+  .strat-sweep-card { position: absolute; z-index: 5; width: 260px; transform: translate(12px, 12px); padding: 10px 12px; font-size: 13px; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+  .strat-sweep-card b { display: block; padding-right: 18px; }
+  .strat-sweep-card .rank { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 2px 0; }
+  .strat-sweep-card div { margin-bottom: 8px; }
+  .strat-sweep-card button[data-extract] { font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+  .strat-sweep-card .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
+  .strat-vary-says { margin: 4px 0 0; max-width: 80ch; font-size: 13px; color: var(--muted); }
   .strat-actions, .strat-run { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
   .strat-note.bad { color: var(--bad); }
   .strat-chart-name { width: 260px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; }
@@ -5346,7 +5359,7 @@ const strategiesDirty = () => !!strategies && strategyKey(strategies.book) !== s
 const inlineJson = v => Array.isArray(v) ? (v.length ? `[ ${v.map(inlineJson).join(', ')} ]` : '[]')
   : v && typeof v === 'object' ? `{ ${Object.entries(v).map(([a, b]) => `${JSON.stringify(a)}: ${inlineJson(b)}`).join(', ')} }` : JSON.stringify(v);
 // The order a strategy's keys are saved in: the steps of a chain before its entry; any others after these.
-const STRATEGY_KEYS = ['id', 'name', 'direction', 'after', 'entry', 'takeProfit', 'stopLoss', 'onePositionAtATime'];
+const STRATEGY_KEYS = ['id', 'name', 'direction', 'after', 'entry', 'takeProfit', 'stopLoss', 'onePositionAtATime', 'vary'];
 const keyOrder = k => (i => i < 0 ? STRATEGY_KEYS.length : i)(STRATEGY_KEYS.indexOf(k));
 const formatStrategies = book => `{\n  "strategies": [\n${book.strategies.map(s => `    {\n${Object.entries(s).sort(([a], [b]) => keyOrder(a) - keyOrder(b)).map(([k, v]) =>
   `      ${JSON.stringify(k)}: ${inlineJson(v)}`).join(',\n')}\n    }`).join(',\n')}\n  ]\n}\n`;
@@ -5361,7 +5374,7 @@ async function loadStrategies() {
   const book = text ? JSON.parse(text) : { strategies: [] };
   book.strategies ??= [];
   strategies = { book, base, saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false,
-    dataset: strategies?.dataset };
+    dataset: strategies?.dataset, sweeps: strategies?.sweeps };
 }
 
 // The page's address names the strategy shown and the dataset it runs on, #Strategies?id=green-run-4&dataset=btc-1h, so a
@@ -5452,6 +5465,62 @@ function renderStrategyList() {
 
 const selectedStrategy = () => strategies.book.strategies.find(s => s.id === strategies.selected);
 
+// A number's variations in a sweep, beside it: up To, in steps of Step, from the number's own value. Both blank, it is not
+// varied. They are kept in the strategy's "vary", by the number's path, as the server's StrategySweep reads them.
+function varyInputs(s, path, step) {
+  const v = s.vary?.[path] ?? {};
+  const tip = 'title="Sweeps this from the value beside it up to To in steps of Step. Leave both blank for no variations."';
+  return `<label class="strat-vary" ${tip}>to<input type="number" data-vary="${path}" data-vary-key="to" step="${step}" value="${esc(v.to ?? '')}" placeholder="–"></label>
+    <label class="strat-vary" ${tip}>step<input type="number" data-vary="${path}" data-vary-key="step" min="0" step="${step}" value="${esc(v.step ?? '')}" placeholder="–"></label>`;
+}
+
+function setVary(s, path, to, step) {
+  if (to === undefined && step === undefined) delete s.vary?.[path];
+  else (s.vary ??= {})[path] = { ...(to !== undefined ? { to } : {}), ...(step !== undefined ? { step } : {}) };
+  if (s.vary && !Object.keys(s.vary).length) delete s.vary;
+}
+
+// Drops the variations of the numbers whose paths pass the test, as when the part they are in changes type or the steps move.
+function dropVary(s, test) {
+  Object.keys(s.vary ?? {}).filter(test).forEach(k => delete s.vary[k]);
+  if (s.vary && !Object.keys(s.vary).length) delete s.vary;
+}
+
+// A varied number as the editor names it: "Stop Loss Target (R)", "Step 2 Length".
+function varyLabel(s, path) {
+  const parts = path.split('.'), key = parts.pop(), at = parts.join('.'), p = parts.reduce((o, k) => o?.[k], s);
+  const steps = strategySteps(s), k = steps.indexOf(p);
+  const part = k >= 0 ? (steps.length > 1 ? `Step ${k + 1}` : 'Entry') : at === 'takeProfit' ? 'Take Profit' : at === 'stopLoss' ? 'Stop Loss' : at;
+  const field = key === 'within' ? 'Within' : STRATEGY_TYPES[k >= 0 ? 'entry' : 'target'][p?.type]?.fields?.find(f => f.key === key)?.label ?? key;
+  return `${part} ${field}`;
+}
+
+// What a sweep of the strategy varies and how many variations that makes, counted as the server's StrategySweep counts them:
+// { parts, count }, or { error } when it cannot be run.
+const SWEEP_MOST = 1000;
+function varyPlan(s) {
+  const entries = Object.entries(s.vary ?? {});
+  if (!entries.length) return { error: 'Nothing varied: give a number a To and a Step to sweep it.' };
+  let count = 1;
+  const parts = [];
+  for (const [path, r] of entries) {
+    const from = path.split('.').reduce((o, k) => o?.[k], s), label = varyLabel(s, path);
+    if (r.to === undefined || r.step === undefined) return { error: `${label}: give both a To and a Step, or neither.` };
+    if (typeof from !== 'number') return { error: `${label} has no value to vary from.` };
+    if (!(r.step > 0)) return { error: `${label}: the Step must be more than 0.` };
+    if (r.to < from) return { error: `${label}: To must be at least ${from}.` };
+    const n = Math.floor((r.to - from) / r.step + 1e-9) + 1;
+    count *= n;
+    parts.push(`${label} from ${from} to ${r.to} in steps of ${r.step} (${n})`);
+  }
+  return count > SWEEP_MOST ? { error: `${count.toLocaleString()} variations: more than the ${SWEEP_MOST.toLocaleString()} a sweep can run.` } : { parts, count };
+}
+
+function varySays(s) {
+  const plan = varyPlan(s);
+  return plan.error ?? `Varies ${plan.parts.join('; ')}: ${plan.count.toLocaleString()} variation${plan.count === 1 ? '' : 's'}.`;
+}
+
 function renderStrategy() {
   const box = document.querySelector('.strat-body'), s = selectedStrategy();
   if (!box) return;
@@ -5465,7 +5534,7 @@ function renderStrategy() {
   if (!s) { box.innerHTML = `<div class="strat-card">No strategies yet: add one with New strategy.</div>${strategyActions()}`; return wireStrategyActions(box); }
   const input = (path, f, value) => f.options
     ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => `<option ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`
-    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" step="${f.step}" value="${esc(value)}"></label>`;
+    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" step="${f.step}" value="${esc(value)}"></label>${varyInputs(s, path, f.step)}`;
   const steps = strategySteps(s);
   const part = ({ key, title, kind }) => {
     const p = key.split('.').reduce((o, k) => o?.[k], s), type = STRATEGY_TYPES[kind][p.type], step = kind === 'entry' ? steps.indexOf(p) : -1;
@@ -5473,7 +5542,7 @@ function renderStrategy() {
       ${step >= 0 && steps.length > 1 ? `<button type="button" class="step-remove" data-step-remove="${step}" title="Take this step out of the chain" aria-label="Remove ${esc(title)}">×</button>` : ''}
       <label>Type<select data-type="${key}" data-kind="${kind}">${Object.entries(STRATEGY_TYPES[kind]).filter(([, t]) => !t.only || t.only === key).map(([id, t]) => `<option value="${id}" ${id === p.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
       ${(type?.fields ?? []).map(f => input(`${key}.${f.key}`, f, p[f.key])).join('')}
-      ${step > 0 ? `<label title="The most candles from the candle that met the step before to the one that meets this. Blank for no limit.">Within (candles)<input type="number" data-path="${key}.within" data-number data-blank min="1" step="1" value="${esc(p.within ?? '')}" placeholder="no limit"></label>` : ''}</fieldset>`;
+      ${step > 0 ? `<label title="The most candles from the candle that met the step before to the one that meets this. Blank for no limit.">Within (candles)<input type="number" data-path="${key}.within" data-number data-blank min="1" step="1" value="${esc(p.within ?? '')}" placeholder="no limit"></label>${varyInputs(s, `${key}.within`, 1)}` : ''}</fieldset>`;
   };
   // The steps of the entry condition, top to bottom, with a + above, between and below them to add a step there.
   const stepParts = steps.map((_, k) => ({ key: k < steps.length - 1 ? `after.${k}` : 'entry', title: steps.length > 1 ? `Step ${k + 1}${k === steps.length - 1 ? ': Entry' : ''}` : 'Entry', kind: 'entry' }));
@@ -5489,6 +5558,7 @@ function renderStrategy() {
       <div class="strat-fields strat-steps">${stepsHtml}</div>
       <div class="strat-fields">${STRATEGY_PARTS.filter(x => x.kind !== 'entry').map(part).join('')}</div>
       <p class="strat-says">${esc(strategySays(s))}</p>
+      <p class="strat-vary-says">${esc(varySays(s))}</p>
       ${strategyActions()}
     </div>
     <div class="strat-card"><h3>Run</h3><div class="strat-run-body"></div></div>`;
@@ -5505,13 +5575,22 @@ function renderStrategy() {
     } else if (value === undefined) delete target[key];
     else target[key] = value;
     box.querySelector('.strat-says').textContent = strategySays(s);
+    box.querySelector('.strat-vary-says').textContent = varySays(s);
     if (key === 'name' || key === 'id') renderStrategyList();
     if (key === 'id') syncStrategiesHash();
+    updateStrategyStatus();
+  }));
+  box.querySelectorAll('[data-vary]').forEach(el => el.addEventListener('change', () => {
+    const path = el.dataset.vary, [to, step] = ['to', 'step'].map(k => box.querySelector(`[data-vary="${path}"][data-vary-key="${k}"]`).value);
+    setVary(s, path, to === '' ? undefined : Number(to), step === '' ? undefined : Number(step));
+    box.querySelector('.strat-vary-says').textContent = varySays(s);
     updateStrategyStatus();
   }));
   box.querySelectorAll('[data-type]').forEach(el => el.addEventListener('change', () => {
     const path = el.dataset.type.split('.'), key = path.pop(), target = path.reduce((o, k) => o[k], s), within = target[key]?.within;
     target[key] = { type: el.value, ...STRATEGY_TYPES[el.dataset.kind][el.value].defaults, ...(within ? { within } : {}) };
+    // The new type's numbers are not the old one's, all but Within.
+    dropVary(s, k => k.startsWith(`${el.dataset.type}.`) && k !== `${el.dataset.type}.within`);
     renderStrategy();
     updateStrategyStatus();
   }));
@@ -5520,6 +5599,8 @@ function renderStrategy() {
   const changeSteps = change => {
     const all = [...strategySteps(s)];
     change(all);
+    // A step's numbers are varied by its place in the chain, which this changes.
+    dropVary(s, k => k.startsWith('after.') || k.startsWith('entry.'));
     s.entry = all.pop();
     if (all.length) s.after = all;
     else delete s.after;
@@ -5596,13 +5677,16 @@ function renderStrategyRun() {
       <button type="button" data-run ${strategies.running ? 'disabled' : ''}>${strategies.running ? 'Running…' : 'Run'}</button>
       ${run?.trades ? '<button type="button" data-csv>Download CSV</button>' : ''}
       ${run?.trades ? `<button type="button" data-baseline ${run.baselining ? 'disabled' : ''} title="Runs the same exits from random entries, as often as the strategy enters, to see what the entry adds">${run.baselining ? 'Running baseline…' : 'Random baseline'}</button>` : ''}
+      <button type="button" data-sweep ${strategies.sweeping ? 'disabled' : ''} title="Runs every variation of the numbers given a To and a Step, each against its own random baseline">${strategies.sweeping ? 'Sweeping…' : 'Run sweep'}</button>
       <span class="strat-note${run?.error ? ' bad' : ''}">${esc(run?.error ?? (run ? `Saved to ${run.saved}` : 'Runs the strategy as it is here, saved or not.'))}</span>
     </div>
     <form class="strat-run" data-chart-add><input class="strat-chart-name" data-chart-name aria-label="Name on the charts" value="${esc(chartStrategyName(s))}">
       <button type="submit">Add to strategies on charts</button><span class="strat-note" data-chart-note>Adds the strategy as it is here, under this name, to the Strategies section beside the charts.</span></form>
+    <div class="strat-sweep"></div>
     ${run?.baseline ? baselineResults(run.baseline) : ''}
     <div class="strat-results">${run?.trades ? strategyResults(run) : ''}</div>`;
   if (run?.baseline?.curve) baselinePlot(box.querySelector('[data-baseline-plot]'), run.baseline);
+  renderSweep(box.querySelector('.strat-sweep'), strategies.sweeps?.get(s.id));
   box.querySelector('[data-chart-add]').addEventListener('submit', e => {
     e.preventDefault();
     const label = box.querySelector('[data-chart-name]').value.trim() || chartStrategyName(s), like = chartStrategyLike(s, label);
@@ -5614,6 +5698,7 @@ function renderStrategyRun() {
   box.querySelector('[data-run]').addEventListener('click', () => runStrategy(s));
   box.querySelector('[data-csv]')?.addEventListener('click', () => downloadTrades(run));
   box.querySelector('[data-baseline]')?.addEventListener('click', () => runBaseline(s, run));
+  box.querySelector('[data-sweep]').addEventListener('click', () => runSweep(s));
   // The results' own clicks: Analyse a trade, count a trade in or out of the totals, or the * trades all at once. The
   // results are drawn again in place, the table kept where it was scrolled to.
   const results = box.querySelector('.strat-results');
@@ -5707,25 +5792,193 @@ function baselineResults(b) {
       <div class="strat-baseline-plot" data-baseline-plot></div>` : ''}</div>`;
 }
 
+// A line of a baseline's curve: one of its values at each point, as a % of profit.
+const curveLine = (b, name, key, color, extra = {}) => ({ type: 'scatter', mode: 'lines', name, x: b.curve.map(p => p.time), y: b.curve.map(p => p[key]),
+  line: { color, width: 2 }, hovertemplate: `${name}: %{y:+.1f}%<extra></extra>`, ...extra });
+
+// The random runs of a baseline's curve: their band, 5% to 95%, with a legend entry of its own, and their median.
+function bandTraces(b) {
+  const muted = css('--muted');
+  return [
+    curveLine(b, 'Random 5%', 'low', 'rgba(0,0,0,0)', { showlegend: false }),
+    curveLine(b, 'Random 95%', 'high', 'rgba(0,0,0,0)', { fill: 'tonexty', fillcolor: withAlpha(muted, 0.2), showlegend: false }),
+    { type: 'scatter', mode: 'lines', name: 'Random 5% to 95%', x: [null], y: [null], line: { color: withAlpha(muted, 0.35), width: 10 }, hoverinfo: 'skip' },
+    curveLine(b, 'Random median', 'median', muted, { line: { color: muted, width: 2, dash: 'dash' } }),
+  ];
+}
+
+// The layout the baseline and sweep charts share, with the axes given.
+function resultsLayout(xaxis, yaxis, extra = {}) {
+  const muted = css('--muted'), grid = css('--grid') || css('--border');
+  return {
+    margin: { t: 10, r: 56, b: 36, l: 10 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
+    xaxis: { gridcolor: grid, linecolor: grid, ...xaxis }, yaxis: { gridcolor: grid, linecolor: grid, side: 'right', ...yaxis },
+    showlegend: true, legend: { orientation: 'h', x: 0, y: 1.02, yanchor: 'bottom' }, ...extra,
+  };
+}
+
+const RESULTS_CONFIG = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['select2d', 'lasso2d'] };
+
 // The baseline's curve: the strategy's profit over time on the band of the random runs', 5% to 95%, and their median.
 function baselinePlot(el, b) {
   if (!el) return;
-  const muted = css('--muted'), grid = css('--grid') || css('--border'), x = b.curve.map(p => p.time);
-  const line = (name, key, color, extra = {}) => ({ type: 'scatter', mode: 'lines', name, x, y: b.curve.map(p => p[key]),
-    line: { color, width: 2 }, hovertemplate: `${name}: %{y:+.1f}%<extra></extra>`, ...extra });
+  Plotly.react(el, [...bandTraces(b), curveLine(b, 'Strategy', 'strategy', css('--accent'))],
+    resultsLayout({ type: 'date' }, { ticksuffix: '%', zeroline: true, zerolinecolor: css('--muted') }, { hovermode: 'x unified' }), RESULTS_CONFIG);
+}
+
+// ---- Sweeps ----------------------------------------------------------------------------------------------------------
+// A sweep (POST api/backtest/sweep, see StrategySweep) runs the strategy as it is here once for each combination of the
+// numbers given a To and a Step, each against its own random baseline. It is kept by strategy until the next sweep.
+async function runSweep(s) {
+  strategies.sweeps ??= new Map();
+  const plan = varyPlan(s);
+  if (plan.error) {
+    strategies.sweeps.set(s.id, { error: `Not swept: ${plan.error}` });
+    return renderStrategyRun();
+  }
+  strategies.sweeping = true;
+  renderStrategyRun();
+  // The strategy as it was swept, as the page keeps it, for a variation to be extracted from.
+  const sent = structuredClone(s);
+  const response = await fetch('api/backtest/sweep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset: strategies.dataset, strategy: sent }) }).catch(() => null);
+  const result = response?.ok ? await response.json()
+    : { error: response?.status === 404 || response?.status === 405 ? 'The local server was started before sweeps could be run. Restart ./build-site.ps1 -Serve.'
+      : `Not swept: ${response ? await response.text() : 'the local server did not answer.'}` };
+  strategies.sweeping = false;
+  strategies.sweeps.set(s.id, result.error ? result : { saved: result.saved, ...result.sweep, sent });
+  if (currentPage === 'Strategies' && selectedStrategy() === s) renderStrategyRun();
+}
+
+// A variation as its values: "Stop Loss Target (R) 1.5", or each of them for more than one varied.
+const sweepLabel = (sw, v) => Object.entries(v.values).map(([path, value]) => `${varyLabel(sw.strategy, path)} ${value}`).join(' · ') || 'As it is';
+
+// A total as the baseline's table shows it.
+const showTotal = (name, v) => v == null ? '–' : name === 'Win rate' ? `${v.toFixed(1)}%` : name === 'Profit factor' ? v.toFixed(2) : fmtPercent(v);
+
+// The sweep's results: where each variation's total beats its own random runs, by the value varied, and every variation's
+// profit over time with the selected one on its band. The selected variation starts as the best by the measure shown, and
+// a click on a dot or a line selects another; both charts are drawn again for it.
+function renderSweep(el, sw) {
+  if (!el || !sw) return;
+  if (sw.error) { el.innerHTML = `<p class="remarks strat-note bad">${esc(sw.error)}</p>`; return; }
+  const ran = sw.variations.map((v, i) => i).filter(i => sw.variations[i].baseline);
+  if (!ran.length) { el.innerHTML = `<p class="remarks strat-note bad">No variation could be run: ${esc(sw.variations[0]?.error ?? '')}</p>`; return; }
+  const measure = sw.measure ??= 'Total %', best = sw.best.find(b => b.against.name === measure);
+  if (!ran.includes(sw.selected)) sw.selected = best?.variation ?? ran[0];
+  const failed = sw.variations.filter(v => !v.baseline), data = datasetList?.find(d => d.id === sw.dataset);
+  const own = i => sw.variations[i].baseline.measures.find(m => m.name === measure);
+  const top = best?.variation != null ? `Best by ${measure}: ${sweepLabel(sw, sw.variations[best.variation])}, at ${showTotal(measure, best.against.strategy)}. It beats
+    ${Math.round(own(best.variation).percentile ?? 0)}% of its own random runs, and ${Math.round(best.against.percentile ?? 0)}% of the best of ${ran.length} random runs,
+    one from each variation, which is the fair test of a best picked from ${ran.length}.` : '';
+  el.innerHTML = `<div class="strat-baseline">
+    <p class="remarks">A sweep over ${esc(data?.name ?? sw.dataset)} of ${sw.variations.length} variations, each against its own ${sw.runs.toLocaleString()} random runs:
+      ${esc(sw.varied.map(p => varyLabel(sw.strategy, p)).join(', '))}.${failed.length ? ` ${failed.length} could not be run: ${esc(sweepLabel(sw, failed[0]))}, ${esc(failed[0].error)}${failed.length > 1 ? ' and others' : ''}.` : ''}${sw.saved ? ` Saved to ${esc(sw.saved)}.` : ''}</p>
+    <div class="strat-run"><label>Measure <select data-sweep-measure>${sw.best.map(b => `<option ${b.against.name === measure ? 'selected' : ''}>${esc(b.against.name)}</option>`).join('')}</select></label></div>
+    <p class="remarks">${esc(top)}</p>
+    <div class="strat-sweep-beats" data-sweep-beats></div>
+    <p class="remarks">Profit over time of every variation, lighter to darker in the order of the values; the selected one bold, on its own random runs' band.
+      Click a dot above or a line here to select another.</p>
+    <div class="strat-baseline-plot" data-sweep-lines></div></div>
+    ${sw.card ? sweepCard(sw, ran, measure) : ''}`;
+  // A click on a dot or a line selects its variation and opens its card where the click was.
+  const pick = (i, event) => {
+    const box = el.getBoundingClientRect();
+    sw.selected = i;
+    // Kept inside the charts' width; the card is 260px wide and set 12px off the click.
+    sw.card = event ? { x: Math.max(0, Math.min(event.clientX - box.left, box.width - 290)), y: event.clientY - box.top } : null;
+    renderSweep(el, sw);
+  };
+  el.querySelector('[data-card-close]')?.addEventListener('click', () => { sw.card = null; renderSweep(el, sw); });
+  el.querySelector('[data-extract]')?.addEventListener('click', () => extractVariation(sw, sw.selected));
+  el.querySelector('[data-sweep-measure]').addEventListener('change', e => { sw.measure = e.target.value; sw.selected = null; sw.card = null; renderSweep(el, sw); });
+  sweepBeatsPlot(el.querySelector('[data-sweep-beats]'), sw, ran, measure, best, pick);
+  sweepLinesPlot(el.querySelector('[data-sweep-lines]'), sw, ran, pick);
+}
+
+// Each variation's share of its own random runs it beats on the measure, by the value varied (or by the variation, when
+// more than one number is varied), with the lines a variation must clear to be promising (90%) or above random (95%), and
+// the best variation against the best of the random runs.
+function sweepBeatsPlot(el, sw, ran, measure, best, pick) {
+  const muted = css('--muted'), accent = css('--accent'), single = sw.varied.length === 1;
+  const xOf = i => single ? sw.variations[i].values[sw.varied[0]] : sweepLabel(sw, sw.variations[i]);
+  const m = i => sw.variations[i].baseline.measures.find(x => x.name === measure);
+  const x = ran.map(xOf), y = ran.map(i => m(i).percentile);
+  const text = ran.map(i => `${sweepLabel(sw, sw.variations[i])}<br>${measure} ${showTotal(measure, m(i).strategy)}, random median ${showTotal(measure, m(i).median)}<br>Beats ${Math.round(m(i).percentile ?? 0)}% of its random runs`);
+  // The two lines are close, so one's label sits below it on the left and the other's above it on the right.
+  const guide = (y, dash, label, side) => ({ shape: { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color: muted, width: 1, dash } },
+    note: { xref: 'paper', x: side === 'left' ? 0 : 1, y, yanchor: side === 'left' ? 'top' : 'bottom', xanchor: side, showarrow: false, text: label, font: { size: 11, color: muted } } });
+  const guides = [guide(90, 'dot', 'Promising, 90%', 'left'), guide(95, 'dash', 'Above random, 95%', 'right')];
+  const traces = [
+    { type: 'scatter', mode: 'lines+markers', name: 'Beats % of its own random runs', x, y, text, customdata: ran, hovertemplate: '%{text}<extra></extra>',
+      line: { color: accent, width: 2 }, marker: { size: 9, color: accent, line: { color: css('--panel'), width: 2 } } },
+    { type: 'scatter', mode: 'markers', name: 'Selected', x: [xOf(sw.selected)], y: [m(sw.selected).percentile], hoverinfo: 'skip',
+      marker: { size: 17, color: 'rgba(0,0,0,0)', line: { color: css('--text'), width: 2 } } },
+  ];
+  if (best?.variation != null) traces.push({ type: 'scatter', mode: 'markers', name: `Best against the best of ${ran.length} random`, x: [xOf(best.variation)], y: [best.against.percentile],
+    hovertemplate: `Best, ${sweepLabel(sw, sw.variations[best.variation])}: beats ${Math.round(best.against.percentile ?? 0)}% of the best of ${ran.length} random runs<extra></extra>`,
+    marker: { symbol: 'diamond-open', size: 13, color: muted, line: { width: 2 } } });
+  Plotly.react(el, traces, resultsLayout(
+    single ? { title: { text: varyLabel(sw.strategy, sw.varied[0]), font: { size: 12 } } } : { type: 'category', tickangle: -30 },
+    { range: [-2, 102], ticksuffix: '%', title: { text: 'Beats', font: { size: 12 } } },
+    { hovermode: 'closest', shapes: guides.map(g => g.shape), annotations: guides.map(g => g.note) }), RESULTS_CONFIG);
+  el.on('plotly_click', e => { const p = e.points?.[0]; if (p?.curveNumber === 0) pick(p.customdata, e.event); });
+}
+
+// Where a variation ranks among those run, by how much of its own random runs it beats on the measure: 1 for the best, a
+// tie sharing the better rank, and one with no value for the measure after all that have one.
+function sweepRank(sw, ran, measure, i) {
+  const beats = j => sw.variations[j].baseline.measures.find(m => m.name === measure)?.percentile ?? -1;
+  return 1 + ran.filter(j => beats(j) > beats(i)).length;
+}
+
+// The selected variation's card, where it was clicked: its rank of all run, its total and how much of its random runs it
+// beats, and Extract, to make it a strategy of its own.
+function sweepCard(sw, ran, measure) {
+  const v = sw.variations[sw.selected], m = v.baseline.measures.find(x => x.name === measure);
+  return `<div class="strat-sweep-card" style="left:${Math.round(sw.card.x)}px;top:${Math.round(sw.card.y)}px" role="dialog" aria-label="${esc(sweepLabel(sw, v))}">
+    <button type="button" class="close" data-card-close aria-label="Close">×</button>
+    <b>${esc(sweepLabel(sw, v))}</b>
+    <div class="rank">${sweepRank(sw, ran, measure, sw.selected)} / ${ran.length}</div>
+    <div>Ranked by the share of its random runs it beats on ${esc(measure)}. ${esc(measure)} ${showTotal(measure, m.strategy)}, beating ${Math.round(m.percentile ?? 0)}%.</div>
+    <button type="button" data-extract>Extract as a strategy</button>
+  </div>`;
+}
+
+// Makes a variation a strategy of its own: the strategy as it was swept, with the variation's values and nothing varied,
+// added after the one swept and opened, unsaved, as Duplicate does.
+function extractVariation(sw, i) {
+  const v = sw.variations[i], s = structuredClone(sw.sent);
+  delete s.vary;
+  for (const [path, value] of Object.entries(v.values)) {
+    const parts = path.split('.'), key = parts.pop();
+    parts.reduce((o, k) => o[k], s)[key] = value;
+  }
+  s.name = `${sw.sent.name || sw.sent.id} (${sweepLabel(sw, v)})`;
+  // The id names the saved runs' files, so it is the swept one's with the variation's number rather than all its values.
+  s.id = newStrategyId(`${sw.sent.id} variation ${i + 1}`);
+  const list = strategies.book.strategies, from = list.findIndex(x => x.id === sw.sent.id);
+  list.splice(from < 0 ? list.length : from + 1, 0, s);
+  strategies.selected = s.id;
+  renderStrategyList();
+  renderStrategy();
+  window.scrollTo(0, 0);
+}
+
+// Every variation's profit over time, lighter to darker in order, and the selected one bold on its own band and median.
+function sweepLinesPlot(el, sw, ran, pick) {
+  const accent = css('--accent'), selected = sw.variations[sw.selected].baseline;
+  const lines = ran.filter(i => i !== sw.selected).map(i => {
+    const color = withAlpha(accent, 0.15 + 0.5 * (ran.length > 1 ? ran.indexOf(i) / (ran.length - 1) : 1));
+    return curveLine(sw.variations[i].baseline, sweepLabel(sw, sw.variations[i]), 'strategy', color, { showlegend: false, meta: i, line: { color, width: 1.5 } });
+  });
   Plotly.react(el, [
-    line('Random 5%', 'low', 'rgba(0,0,0,0)', { showlegend: false }),
-    line('Random 95%', 'high', 'rgba(0,0,0,0)', { fill: 'tonexty', fillcolor: withAlpha(muted, 0.2), showlegend: false }),
-    { type: 'scatter', mode: 'lines', name: 'Random 5% to 95%', x: [null], y: [null], line: { color: withAlpha(muted, 0.35), width: 10 }, hoverinfo: 'skip' },
-    line('Random median', 'median', muted, { line: { color: muted, width: 2, dash: 'dash' } }),
-    line('Strategy', 'strategy', css('--accent')),
-  ], {
-    margin: { t: 10, r: 56, b: 36, l: 10 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-    font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
-    xaxis: { type: 'date', gridcolor: grid, linecolor: grid },
-    yaxis: { gridcolor: grid, linecolor: grid, ticksuffix: '%', side: 'right', zeroline: true, zerolinecolor: muted },
-    hovermode: 'x unified', showlegend: true, legend: { orientation: 'h', x: 0, y: 1.02, yanchor: 'bottom' },
-  }, { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['select2d', 'lasso2d'] });
+    ...bandTraces(selected),
+    { type: 'scatter', mode: 'lines', name: 'Other variations', x: [null], y: [null], line: { color: withAlpha(accent, 0.4), width: 1.5 }, hoverinfo: 'skip' },
+    ...lines,
+    curveLine(selected, `Selected: ${sweepLabel(sw, sw.variations[sw.selected])}`, 'strategy', accent, { line: { color: accent, width: 3 }, meta: sw.selected }),
+  ], resultsLayout({ type: 'date' }, { ticksuffix: '%', zeroline: true, zerolinecolor: css('--muted') }, { hovermode: 'closest' }), RESULTS_CONFIG);
+  el.on('plotly_click', e => { const meta = e.points?.[0]?.data?.meta; if (meta != null) pick(meta, e.event); });
 }
 
 // Prices as the chart is read: whole numbers, rounded down. Profits are rounded, as they can be small and either side of 0.

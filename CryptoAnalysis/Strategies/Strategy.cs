@@ -61,6 +61,14 @@ public sealed class Strategy
     public bool OnePositionAtATime { get; set; } = true;
 
     /// <summary>
+    /// The numbers a sweep varies (see <see cref="StrategySweep"/>), each by its path in the strategy's JSON, as
+    /// "stopLoss.ratio" or "after.0.length": from the value the strategy has, up to To in steps of Step. A run or a baseline
+    /// takes the strategy as it is, with each number at its own value.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, StrategyRange>? Vary { get; set; }
+
+    /// <summary>
     /// What is wrong with the strategy, as messages; empty when it can be run.
     /// </summary>
     public List<string> Validate()
@@ -229,6 +237,16 @@ public sealed class StrategyTarget
             : prices[i].High - prices[i].Low);
         return sizes.Average() * Percentage / 100;
     }
+}
+
+/// <summary>
+/// How a sweep varies one number of a strategy: from the strategy's own value up to To, in steps of Step.
+/// </summary>
+public sealed class StrategyRange
+{
+    public double To { get; set; }
+
+    public double Step { get; set; }
 }
 
 /// <summary>

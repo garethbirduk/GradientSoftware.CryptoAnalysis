@@ -7,7 +7,7 @@ public class StrategyBaselineTests
 {
     private static readonly DateTime Start = new(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-    private static readonly Strategy GreenRun = new()
+    internal static readonly Strategy GreenRun = new()
     {
         Id = "test",
         Entry = new StrategyEntry { Colour = EnumCandleColour.Green, Length = 4 },
@@ -17,7 +17,7 @@ public class StrategyBaselineTests
 
     // A random walk of candles, each moving up to 1.5% either way. With edge set, the candle after each run of four green
     // candles rises 2% from its open, so the strategy's Take Profit, 1% above, is always reached first.
-    private static List<Price> Walk(int count, bool edge, int seed = 7)
+    internal static List<Price> Walk(int count, bool edge, int seed = 7)
     {
         var random = new Random(seed);
         var prices = new List<Price>();
