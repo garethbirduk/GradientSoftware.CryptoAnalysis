@@ -20,14 +20,16 @@ public enum EnumTradeOutcome
 public sealed record StrategyStep(int Index, DateTime Time);
 
 /// <summary>
-/// One trade of a backtest. Profit is in price units per unit traded, signed the trade's way (a Short gains as the price
-/// falls); ProfitPercent is that as a percentage of the entry price. BothTouched marks a candle that reached the take
-/// profit and the stop loss alike, which is counted as the stop loss since the candle does not say which came first. Met is
-/// the candles that met the steps of the strategy's After, in order; empty for an entry of one step.
+/// One trade of a backtest. EntryPrice and ExitPrice are the market's, where the orders were: the entry candle's close, and
+/// the target or the open the trade left at. Profit is in price units per unit traded, signed the trade's way (a Short
+/// gains as the price falls), less its Fees and Slippage, each a cost in price units; ProfitPercent is that as a percentage
+/// of the entry price. BothTouched marks a candle that reached the take profit and the stop loss alike, which is counted as
+/// the stop loss since the candle does not say which came first. Met is the candles that met the steps of the strategy's
+/// After, in order; empty for an entry of one step.
 /// </summary>
 public sealed record StrategyTrade(int Number, EnumTradeDirection Direction, int EntryIndex, DateTime EntryTime, double EntryPrice,
     double TakeProfit, double StopLoss, int ExitIndex, DateTime ExitTime, double ExitPrice, EnumTradeOutcome Outcome,
-    double Profit, double ProfitPercent, int Candles, bool BothTouched, IReadOnlyList<StrategyStep> Met)
+    double Profit, double ProfitPercent, int Candles, bool BothTouched, IReadOnlyList<StrategyStep> Met, double Fees = 0, double Slippage = 0)
 {
     /// <summary>
     /// The first candle the entry condition read: the first its first step read.
@@ -36,11 +38,12 @@ public sealed record StrategyTrade(int Number, EnumTradeDirection Direction, int
 }
 
 /// <summary>
-/// The totals of a backtest, over the trades that closed; trades still open at the end are only counted in StillOpen.
+/// The totals of a backtest, over the trades that closed; trades still open at the end are only counted in StillOpen. The
+/// profits are after fees and slippage, which Fees and Slippage total.
 /// </summary>
 public sealed record BacktestSummary(int Trades, int Won, int Lost, int StillOpen, double WinRate, double TotalProfit,
     double TotalProfitPercent, double AverageWin, double AverageLoss, double LargestWin, double LargestLoss, double? ProfitFactor,
-    int BothTouched);
+    int BothTouched, double Fees = 0, double Slippage = 0);
 
 /// <summary>
 /// A strategy run over a dataset: what was run, on what, and every trade it made.
@@ -51,7 +54,8 @@ public sealed record BacktestRun(Strategy Strategy, string Dataset, DateTime Fro
 /// <summary>
 /// Runs a strategy over prices candle by candle, seeing only the candles up to each one. A trade is entered at the close of
 /// the candle that calls for it, with its targets set there, and is watched from the next candle on: a candle that opens
-/// beyond a target fills at its open, otherwise one whose high or low reaches a target fills at the target.
+/// beyond a target fills at its open, otherwise one whose high or low reaches a target fills at the target. Each trade's
+/// profit is after the strategy's fees and slippage (see <see cref="Strategy.FeePercent"/>, <see cref="Strategy.SlippagePercent"/>).
 /// </summary>
 public static class StrategyBacktest
 {
@@ -238,7 +242,9 @@ public static class StrategyBacktest
             wins.Count > 0 ? wins.Max(x => x.Profit) : 0,
             losses.Count > 0 ? losses.Min(x => x.Profit) : 0,
             grossLoss > 0 ? wins.Sum(x => x.Profit) / grossLoss : null,
-            closed.Count(x => x.BothTouched));
+            closed.Count(x => x.BothTouched),
+            closed.Sum(x => x.Fees),
+            closed.Sum(x => x.Slippage));
     }
 
     /// <summary>
@@ -246,11 +252,12 @@ public static class StrategyBacktest
     /// </summary>
     public static string ToCsv(IEnumerable<StrategyTrade> trades)
     {
-        var csv = new StringBuilder("Number,Direction,EntryTime,EntryPrice,TakeProfit,StopLoss,ExitTime,ExitPrice,Outcome,Profit,ProfitPercent,Candles,BothTouched\n");
+        var csv = new StringBuilder("Number,Direction,EntryTime,EntryPrice,TakeProfit,StopLoss,ExitTime,ExitPrice,Outcome,Profit,ProfitPercent,Candles,BothTouched,Fees,Slippage\n");
         foreach (var t in trades)
         {
             csv.AppendLine(string.Join(",", t.Number, t.Direction, Time(t.EntryTime), Number(t.EntryPrice), Number(t.TakeProfit), Number(t.StopLoss),
-                Time(t.ExitTime), Number(t.ExitPrice), t.Outcome, Number(t.Profit), Number(t.ProfitPercent), t.Candles, t.BothTouched));
+                Time(t.ExitTime), Number(t.ExitPrice), t.Outcome, Number(t.Profit), Number(t.ProfitPercent), t.Candles, t.BothTouched,
+                Number(t.Fees), Number(t.Slippage)));
         }
 
         return csv.ToString();
@@ -298,11 +305,15 @@ public static class StrategyBacktest
 
         return Made(prices.Count - 1, prices[^1].Close, EnumTradeOutcome.Open, false);
 
+        // The costs: a fee on each side, and slippage on the market orders, the entry and a Stop Loss. A trade still open at
+        // the end is valued as if closed at the last close, paying the fee to close but not slipping.
         StrategyTrade Made(int exitIndex, double exitPrice, EnumTradeOutcome outcome, bool both)
         {
-            var profit = sign * (exitPrice - entry);
+            var fees = strategy.FeePercent / 100 * (entry + exitPrice);
+            var slippage = strategy.SlippagePercent / 100 * (entry + (outcome == EnumTradeOutcome.StopLoss ? exitPrice : 0));
+            var profit = sign * (exitPrice - entry) - fees - slippage;
             return new StrategyTrade(number, strategy.Direction, index, prices[index].DateTime, entry, takeProfit, stopLoss,
-                exitIndex, prices[exitIndex].DateTime, exitPrice, outcome, profit, 100 * profit / entry, exitIndex - index, both, met);
+                exitIndex, prices[exitIndex].DateTime, exitPrice, outcome, profit, 100 * profit / entry, exitIndex - index, both, met, fees, slippage);
         }
     }
 

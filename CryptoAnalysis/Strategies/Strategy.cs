@@ -61,6 +61,18 @@ public sealed class Strategy
     public bool OnePositionAtATime { get; set; } = true;
 
     /// <summary>
+    /// The fee on each side of a trade, entry and exit, as a percentage of its value there; none when not set.
+    /// </summary>
+    public double FeePercent { get; set; }
+
+    /// <summary>
+    /// How far a market order fills against the trade, as a percentage of its price: the entry, at the close, and a Stop
+    /// Loss, which becomes a market order once reached. A Take Profit is a limit order, so it fills at its price. None when
+    /// not set.
+    /// </summary>
+    public double SlippagePercent { get; set; }
+
+    /// <summary>
     /// The numbers a sweep varies (see <see cref="StrategySweep"/>), each by its path in the strategy's JSON, as
     /// "stopLoss.ratio" or "after.0.length": from the value the strategy has, up to To in steps of Step. A run or a baseline
     /// takes the strategy as it is, with each number at its own value.
@@ -84,6 +96,10 @@ public sealed class Strategy
         if (TakeProfit.Type == StrategyTarget.RiskRatio)
             errors.Add("Take Profit: a target in R sets the Stop Loss from the Take Profit, so only the Stop Loss can be one.");
         errors.AddRange(StopLoss.Validate().Select(x => $"Stop Loss: {x}"));
+        if (FeePercent < 0)
+            errors.Add("The fee cannot be less than 0.");
+        if (SlippagePercent < 0)
+            errors.Add("The slippage cannot be less than 0.");
         return errors;
     }
 }

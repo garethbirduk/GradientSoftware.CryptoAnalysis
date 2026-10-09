@@ -5359,7 +5359,7 @@ const strategiesDirty = () => !!strategies && strategyKey(strategies.book) !== s
 const inlineJson = v => Array.isArray(v) ? (v.length ? `[ ${v.map(inlineJson).join(', ')} ]` : '[]')
   : v && typeof v === 'object' ? `{ ${Object.entries(v).map(([a, b]) => `${JSON.stringify(a)}: ${inlineJson(b)}`).join(', ')} }` : JSON.stringify(v);
 // The order a strategy's keys are saved in: the steps of a chain before its entry; any others after these.
-const STRATEGY_KEYS = ['id', 'name', 'direction', 'after', 'entry', 'takeProfit', 'stopLoss', 'onePositionAtATime', 'vary'];
+const STRATEGY_KEYS = ['id', 'name', 'direction', 'after', 'entry', 'takeProfit', 'stopLoss', 'onePositionAtATime', 'feePercent', 'slippagePercent', 'vary'];
 const keyOrder = k => (i => i < 0 ? STRATEGY_KEYS.length : i)(STRATEGY_KEYS.indexOf(k));
 const formatStrategies = book => `{\n  "strategies": [\n${book.strategies.map(s => `    {\n${Object.entries(s).sort(([a], [b]) => keyOrder(a) - keyOrder(b)).map(([k, v]) =>
   `      ${JSON.stringify(k)}: ${inlineJson(v)}`).join(',\n')}\n    }`).join(',\n')}\n  ]\n}\n`;
@@ -5405,8 +5405,14 @@ function strategySays(s) {
   const long = s.direction !== 'Short';
   // A level is where the target is; a distance is how far it is from the entry, and on which side.
   const where = (t, side) => STRATEGY_TYPES.target[t?.type]?.level ? `at ${part('target', t)}, when that is ${side} the entry` : `${part('target', t)} ${side} the entry`;
-  return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}. Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}`;
+  const fee = s.feePercent || 0, slip = s.slippagePercent || 0;
+  const costs = fee || slip ? ` Costs: ${fee}% fee a side and ${slip}% slippage on the entry and a Stop Loss.` : ' No fees or slippage are counted.';
+  return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}. Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}${costs}`;
 }
+
+// The costs a new strategy starts with, as a guide to an exchange's taker fee and a liquid market's slippage; a strategy
+// without them counts none.
+const NEW_STRATEGY_COSTS = { feePercent: 0.1, slippagePercent: 0.05 };
 
 function newStrategyId(name) {
   const base = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'strategy';
@@ -5423,7 +5429,7 @@ async function renderStrategiesPage(asked = new URLSearchParams()) {
     <p>Build a strategy from an entry, a take profit and a stop loss, then run it over a whole dataset for every trade it would have made.</p>
     <p class="remarks">A trade is entered at the close of the candle that calls for it and watched from the next candle: a candle that opens
     beyond a target fills at its open, otherwise one whose high or low reaches it fills at the target. A candle that reaches both counts as
-    the Stop Loss. Profits are per unit traded. Each run is saved, with all its trades, to artifacts/backtests.</p></section>`;
+    the Stop Loss. Profits are per unit traded, after the strategy's fees and slippage. Each run is saved, with all its trades, to artifacts/backtests.</p></section>`;
   if (!serverOn) {
     main.innerHTML = head + `<div class="empty" data-server-check>Checking for the local server…</div>`;
     return checkLocalServer();
@@ -5454,7 +5460,8 @@ function renderStrategyList() {
   box.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => { strategies.selected = b.dataset.pick; renderStrategyList(); renderStrategy(); }));
   box.querySelector('[data-add]').addEventListener('click', () => {
     const name = 'New strategy', s = { id: newStrategyId(name), name, direction: 'Long', entry: { type: 'SuccessiveCandles', ...STRATEGY_TYPES.entry.SuccessiveCandles.defaults },
-      takeProfit: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, stopLoss: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, onePositionAtATime: true };
+      takeProfit: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, stopLoss: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, onePositionAtATime: true,
+      ...NEW_STRATEGY_COSTS };
     strategies.book.strategies.push(s);
     strategies.selected = s.id;
     renderStrategyList();
@@ -5488,6 +5495,8 @@ function dropVary(s, test) {
 
 // A varied number as the editor names it: "Stop Loss Target (R)", "Step 2 Length".
 function varyLabel(s, path) {
+  if (path === 'feePercent') return 'Fee %';
+  if (path === 'slippagePercent') return 'Slippage %';
   const parts = path.split('.'), key = parts.pop(), at = parts.join('.'), p = parts.reduce((o, k) => o?.[k], s);
   const steps = strategySteps(s), k = steps.indexOf(p);
   const part = k >= 0 ? (steps.length > 1 ? `Step ${k + 1}` : 'Entry') : at === 'takeProfit' ? 'Take Profit' : at === 'stopLoss' ? 'Stop Loss' : at;
@@ -5554,6 +5563,10 @@ function renderStrategy() {
         <label>Id (names the saved trades)<input type="text" data-path="id" value="${esc(s.id)}"></label>
         <label>Direction<select data-path="direction">${['Long', 'Short'].map(o => `<option ${o === s.direction ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
         <label class="check"><input type="checkbox" data-path="onePositionAtATime" ${s.onePositionAtATime ? 'checked' : ''}>One trade at a time</label>
+      </div>
+      <div class="strat-fields">
+        <label title="The fee on each side of a trade, entry and exit, as a percentage of its value">Fee % a side<input type="number" data-path="feePercent" data-number min="0" step="0.01" value="${esc(s.feePercent ?? 0)}"></label>${varyInputs(s, 'feePercent', 0.01)}
+        <label title="How far a market order fills against the trade: the entry and a Stop Loss. A Take Profit is a limit order and does not slip.">Slippage %<input type="number" data-path="slippagePercent" data-number min="0" step="0.01" value="${esc(s.slippagePercent ?? 0)}"></label>${varyInputs(s, 'slippagePercent', 0.01)}
       </div>
       <div class="strat-fields strat-steps">${stepsHtml}</div>
       <div class="strat-fields">${STRATEGY_PARTS.filter(x => x.kind !== 'entry').map(part).join('')}</div>
@@ -5741,6 +5754,7 @@ function summariseTrades(trades) {
     averageWin: wins.length ? sum(wins, 'profit') / wins.length : 0, averageLoss: losses.length ? sum(losses, 'profit') / losses.length : 0,
     largestWin: wins.length ? Math.max(...wins.map(t => t.profit)) : 0, largestLoss: losses.length ? Math.min(...losses.map(t => t.profit)) : 0,
     profitFactor: grossLoss > 0 ? sum(wins, 'profit') / grossLoss : null, bothTouched: closed.filter(t => t.bothTouched).length,
+    fees: sum(closed, 'fees'), slippage: sum(closed, 'slippage'),
   };
 }
 
@@ -6003,6 +6017,7 @@ function strategyResults(run) {
       ${stat('Average win', fmtProfit(m.averageWin), 'won')}${stat('Average loss', fmtProfit(m.averageLoss), 'lost')}
       ${stat('Largest win', fmtProfit(m.largestWin), 'won')}${stat('Largest loss', fmtProfit(m.largestLoss), 'lost')}
       ${stat('Profit factor', m.profitFactor == null ? '–' : m.profitFactor.toFixed(2))}${stat('Still open', m.stillOpen)}${stat('Reached both', m.bothTouched)}
+      ${stat('Fees and slippage', (m.fees ?? 0) + (m.slippage ?? 0) > 0 ? fmtProfit(-(m.fees + m.slippage)) : 'none', (m.fees ?? 0) + (m.slippage ?? 0) > 0 ? 'lost' : '')}
     </div>
     <div class="strat-counted">
       <span>${off.size ? `Counting ${counted.length} of ${run.trades.length} trades: ${off.size} left out.` : `Counting all ${run.trades.length} trades. Click a ● to leave a trade out of the totals.`}</span>
@@ -6037,6 +6052,7 @@ const TRADE_COLUMNS = {
     sort: r => r.trade && `${OUTCOMES[r.trade.outcome] ?? r.trade.outcome}${r.trade.bothTouched ? ' *' : ''}` },
   profit: { head: 'Profit', num: true, cls: r => tradeSign(r.trade?.profit), cell: r => r.trade ? fmtProfit(r.trade.profit) : '', sort: r => r.trade?.profit },
   percent: { head: '%', num: true, cls: r => tradeSign(r.trade?.profit), cell: r => r.trade ? fmtPercent(r.trade.profitPercent) : '', sort: r => r.trade?.profitPercent },
+  costs: { head: 'Costs', num: true, cell: r => r.trade && (r.trade.fees || r.trade.slippage) ? fmtProfit(-(r.trade.fees + r.trade.slippage)) : '', sort: r => r.trade && -(r.trade.fees + r.trade.slippage) },
   candles: { head: 'Candles', num: true, cell: r => r.trade?.candles ?? '', sort: r => r.trade?.candles },
   status: { head: 'Found', cell: r => esc(r.status ?? '') + (r.current ? ' · this one' : ''), sort: r => r.status },
 };

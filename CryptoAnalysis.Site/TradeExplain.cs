@@ -232,9 +232,10 @@ public static partial class Explain
             Define(t.EntryIndex, "Trade.outcome"),
         };
         var later = $"{Capital(Duration(t.Candles, length))} later, at {Clock(t.ExitTime, length)}";
+        var costs = t.Fees + t.Slippage > 0 ? $", after {Money(t.Fees + t.Slippage)} in fees and slippage" : "";
         var result = t.Profit >= 0
-            ? $"it won {Money(Math.Abs(t.Profit))}, {Math.Abs(t.ProfitPercent).ToString("0.00", CultureInfo.InvariantCulture)}%"
-            : $"it lost {Money(Math.Abs(t.Profit))}, {Math.Abs(t.ProfitPercent).ToString("0.00", CultureInfo.InvariantCulture)}%";
+            ? $"it won {Money(Math.Abs(t.Profit))}, {Math.Abs(t.ProfitPercent).ToString("0.00", CultureInfo.InvariantCulture)}%{costs}"
+            : $"it lost {Money(Math.Abs(t.Profit))}, {Math.Abs(t.ProfitPercent).ToString("0.00", CultureInfo.InvariantCulture)}%{costs}";
         var gapped = t.ExitPrice == exit.Open && t.Outcome != EnumTradeOutcome.Open && t.ExitPrice != (t.Outcome == EnumTradeOutcome.TakeProfit ? t.TakeProfit : t.StopLoss);
         var reached = r.Long ? (exit.High, exit.Low) : (exit.Low, exit.High);
         var said = t.Outcome switch
