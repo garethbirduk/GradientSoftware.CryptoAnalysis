@@ -1,7 +1,8 @@
 // Plays the tour in a headless browser against the local server, records it, then lays the narration clips over the
 // recording at the moments each text appeared and writes an MP4 with a chapter for each of the tour's chapters.
 // Needs the local server (./build-site.ps1 -Serve), the clips from narrate.mjs, and ffmpeg on the path.
-// Usage: node record.mjs [--url http://localhost:5178] [--width 1600] [--height 900] [--out artifacts/tour-video/tour.mp4]
+// Usage: node record.mjs [--url http://localhost:5178] [--page '#Tour'] [--width 1600] [--height 900] [--out artifacts/tour-video/tour.mp4]
+// --page is the page to play: the tour, or an analysis by its address (#Analysis?...), which plays its chapters that are on.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,7 +10,7 @@ import { chromium } from 'playwright';
 import { arg, audioDir, outDir, readTour } from './shared.mjs';
 
 const url = arg('url', 'http://localhost:5178'), width = Number(arg('width', 1600)), height = Number(arg('height', 900));
-const out = arg('out', join(outDir, 'tour.mp4'));
+const out = arg('out', join(outDir, 'tour.mp4')), pageAddress = arg('page', '#Tour');
 mkdirSync(outDir, { recursive: true });
 
 const indexPath = join(audioDir, 'index.json');
@@ -21,9 +22,9 @@ const context = await browser.newContext({ viewport: { width, height }, recordVi
 const page = await context.newPage();
 // The recording starts with the page, so the moments the page reports are measured from here.
 const started = Date.now();
-await page.goto(`${url}/?video#Tour`);
+await page.goto(`${url}/?video${pageAddress}`);
 await page.waitForFunction(() => window.tourVideo?.ready(), null, { timeout: 60000 });
-console.log(`Playing the tour (${(await readTour(url)).sections?.length ?? 0} sections)…`);
+console.log(pageAddress === '#Tour' ? `Playing the tour (${(await readTour(url)).sections?.length ?? 0} sections)…` : `Playing ${pageAddress.split('?')[0].slice(1)}…`);
 const played = await page.evaluate(() => window.tourVideo.play());
 const video = page.video();
 await context.close();

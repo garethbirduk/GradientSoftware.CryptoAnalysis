@@ -8,7 +8,7 @@ namespace Gradient.CryptoAnalysis.Site;
 /// Where the making of the tour's audio or video has got to, and the video there is: when it was made, and whether the tour
 /// has been saved since. AudioOnly says the run under way, or the last one, read the texts aloud without recording.
 /// </summary>
-public sealed record TourVideoStatus(bool Running, bool AudioOnly, string Stage, int Seconds, string? Error, DateTime? Made, long Size, bool Stale);
+public sealed record TourVideoStatus(bool Running, bool AudioOnly, string Stage, int Seconds, string? Error, DateTime? Made, long Size, bool Stale, bool Analysis = false, DateTime? AnalysisMade = null, string? AnalysisAddress = null);
 
 /// <summary>
 /// Makes the tour's audio and video for the page's Update audio and Generate video buttons by running tools/tour-video: the
@@ -24,6 +24,9 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
     private readonly List<string> lines = [];
     private Process? worker;
     private string? pending;
+    private string? pendingAnalysis;
+    private string? analysisAddress;
+    private bool analysis;
     private bool running;
     private bool audioOnly;
     private string stage = "";
@@ -31,6 +34,11 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
     private DateTime started;
 
     public string VideoPath => videoPath;
+
+    /// <summary>
+    /// Where the last analysis recorded is written, beside the tour's video.
+    /// </summary>
+    public string AnalysisVideoPath => Path.Combine(Path.GetDirectoryName(videoPath)!, "analysis.mp4");
 
     /// <summary>
     /// The tour as the page plays it, with every section that explains something written out, as JSON: what the texts are
@@ -85,6 +93,46 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
     }
 
     /// <summary>
+    /// Records an analysis, by its address on the page (#Analysis?...), into <see cref="AnalysisVideoPath"/>: the page plays
+    /// its chapters that are on, and the clips of its texts are laid over the recording. The texts are read aloud when the
+    /// analysis is written, so while that reading or another run is under way, the recording waits for it.
+    /// </summary>
+    public void RecordAnalysis(string address)
+    {
+        lock (gate)
+        {
+            analysisAddress = address;
+            if (running)
+            {
+                pendingAnalysis = address;
+                return;
+            }
+        }
+
+        if (!Begin(onlyAudio: false))
+            return;
+        lock (gate)
+            analysis = true;
+        _ = Task.Run(async () =>
+        {
+            string? failure = null;
+            try
+            {
+                if (!Directory.Exists(Path.Combine(toolDir, "node_modules")))
+                    failure = "tools/tour-video is not set up: run npm install there, then npx playwright install chromium";
+                else if (await Node("Recording the analysis", "record.mjs", "--url", siteUrl, "--page", address, "--out", AnalysisVideoPath) != 0)
+                    failure = Failure();
+            }
+            catch (Exception e)
+            {
+                failure = $"node could not be run: {e.Message}";
+            }
+
+            End(failure);
+        });
+    }
+
+    /// <summary>
     /// How the making is going, and the video there is.
     /// </summary>
     public TourVideoStatus Status()
@@ -94,8 +142,12 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
         {
             // A video being written over is not there to download yet.
             DateTime? made = file.Exists && (!running || audioOnly) ? file.LastWriteTimeUtc : null;
-            return new TourVideoStatus(running, audioOnly, stage, running ? (int)(DateTime.UtcNow - started).TotalSeconds : 0, error, made,
-                made != null ? file.Length : 0, made != null && File.GetLastWriteTimeUtc(tourPath) > made);
+            // An analysis waiting for the reading before it is under way too.
+            var recorded = new FileInfo(AnalysisVideoPath);
+            DateTime? analysisMade = recorded.Exists && !(running && analysis) ? recorded.LastWriteTimeUtc : null;
+            var waiting = pendingAnalysis != null;
+            return new TourVideoStatus(running || waiting, audioOnly && !waiting, waiting && !running ? "Waiting" : stage, running ? (int)(DateTime.UtcNow - started).TotalSeconds : 0, error, made,
+                made != null ? file.Length : 0, made != null && File.GetLastWriteTimeUtc(tourPath) > made, analysis || waiting, analysisMade, analysisAddress);
         }
     }
 
@@ -127,6 +179,7 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
                 return false;
             running = true;
             audioOnly = onlyAudio;
+            analysis = false;
             error = null;
             stage = "Starting";
             started = DateTime.UtcNow;
@@ -146,8 +199,11 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
             pending = null;
         }
 
+        // The reading asked for while busy goes first, as an analysis waiting to be recorded needs its clips.
         if (next != null)
             Narrate(next);
+        else if (Interlocked.Exchange(ref pendingAnalysis, null) is { } address)
+            RecordAnalysis(address);
     }
 
     private async Task Make()

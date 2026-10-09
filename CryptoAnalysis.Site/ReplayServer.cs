@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Gradient.CryptoAnalysis.Strategies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -94,6 +95,19 @@ public static class ReplayServer
             return Results.Text(json, "application/json");
         });
 
+        // The whole dataset as known at its last candle, everything in it kept: what the Chart page shows.
+        // Kept as UTF-8, as a long dataset's comes to tens of megabytes.
+        var completes = new ConcurrentDictionary<(string Dataset, (double Retracement, double Band) Settings), Lazy<byte[]>>();
+        app.MapGet("/api/complete", (string dataset, double? retracement, double? band) =>
+        {
+            if (!byId.TryGetValue(dataset, out var data))
+                return Results.NotFound();
+
+            var settings = (Retracement: retracement ?? Ranges.DefaultMinRetracement, Band: band ?? Ranges.DefaultBand);
+            var json = completes.GetOrAdd((dataset, settings), key => new Lazy<byte[]>(() => Complete(data, key.Settings))).Value;
+            return Results.Bytes(json, "application/json");
+        });
+
         // A tour can wait for an event rather than a candle number: the nth time something becomes known at a level, looking
         // from a candle on, with only the prices up to each candle.
         var events = new ConcurrentDictionary<(string, int, int, EnumAnnotationType, int, int), Lazy<int?>>();
@@ -156,7 +170,7 @@ public static class ReplayServer
 
         // things lists what to explain, by id as /api/explain/at gives them ("Candle,SuccessiveCandles,Swing:1"), a chapter
         // each; explain and level name one thing the old way. A thing not at the candle is left out and named in missing.
-        app.MapGet("/api/explain/tour", (string dataset, string at, string? things, string? explain, int? level, string? seen, bool? expanded, bool? inPlace, int? greenRuns, int? redRuns) =>
+        app.MapGet("/api/explain/tour", (string dataset, string at, string? things, string? explain, int? level, string? seen, bool? expanded, bool? inPlace, int? greenRuns, int? redRuns, string? strategy) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
@@ -165,7 +179,11 @@ public static class ReplayServer
             if (unknown.Count > 0)
                 return Results.BadRequest($"\"{string.Join(", ", unknown)}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.");
             var options = new ExplainOptions(greenRuns ?? ExplainOptions.Default.GreenRuns, redRuns ?? ExplainOptions.Default.RedRuns);
-            var def = Explain.Tour(ids.Select(x => Explain.Thing.Parse(x)!).ToList(), data.Id, data.Prices, at, seen, out var missing, inPlace ?? expanded == true, options);
+            // A Trade is a strategy's, which the address gives as JSON.
+            Strategy? traded = null;
+            if (strategy != null && (traded = Explain.StrategyOf(JsonNode.Parse(strategy), out var wrong)) == null)
+                return Results.BadRequest(wrong);
+            var def = Explain.Tour(ids.Select(x => Explain.Thing.Parse(x)!).ToList(), data.Id, data.Prices, at, seen, out var missing, inPlace ?? expanded == true, options, traded);
             if (def == null)
                 return Results.BadRequest($"Nothing of that is at the candle at {at}: {string.Join(", ", missing)}.");
             if (missing.Count > 0)
@@ -192,6 +210,58 @@ public static class ReplayServer
             var trends = allTrends.GetOrAdd(data.Id, _ => new Lazy<string>(() => Explain.AllTrends(data.Prices, MaxLevel).ToJsonString())).Value;
             return Results.Text($"{{\"shown\":{shown.ToJsonString()},\"trends\":{trends}}}", "application/json");
         });
+
+        // A strategy run over a whole dataset, as the Strategies page sends it with the dataset's id: every trade it made and
+        // their totals. Each run is also written to artifacts/backtests as JSON (the strategy, the totals and the trades) and
+        // as CSV (the trades), named by the strategy and the dataset, so the trades of each variation are kept to compare.
+        var backtestsDir = Path.GetFullPath(Path.Combine(siteDir, "..", "backtests"));
+        app.MapPost("/api/backtest", async (HttpRequest request) =>
+        {
+            var (strategy, data, save, error) = await BacktestRequest(request);
+            if (error != null)
+                return Results.BadRequest(error);
+
+            var run = StrategyBacktest.Run(data!.Prices, strategy!, data.Id);
+            // The charts ask for a strategy's trades to draw them, and those are not kept.
+            if (!save)
+                return Results.Text($"{{\"run\":{JsonSerializer.Serialize(run, StrategyBook.JsonOptions)}}}", "application/json");
+            Directory.CreateDirectory(backtestsDir);
+            var name = Path.Combine(backtestsDir, $"{string.Concat(strategy.Id.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '-' : c))}@{data.Id}");
+            var json = JsonSerializer.Serialize(run, StrategyBook.JsonOptions);
+            await File.WriteAllTextAsync($"{name}.json", json);
+            await File.WriteAllTextAsync($"{name}.csv", StrategyBacktest.ToCsv(run.Trades));
+            return Results.Text($"{{\"saved\":{JsonSerializer.Serialize($"{name}.json")},\"run\":{json}}}", "application/json");
+        });
+
+        // Find similar on a trade: every candle of the dataset with what the strategy's entry looks for, found another way
+        // than the backtest does (see StrategyBacktest.Occurrences), for the page to check the trades against.
+        app.MapPost("/api/backtest/similar", async (HttpRequest request) =>
+        {
+            var (strategy, data, _, error) = await BacktestRequest(request);
+            if (error != null)
+                return Results.BadRequest(error);
+            var found = StrategyBacktest.Occurrences(data!.Prices, strategy!.Entry);
+            return Results.Json(new { Candles = found.Select(i => new { Index = i, Time = data.Prices[i].DateTime }) }, Json);
+        });
+
+        // A backtest request, { dataset, strategy, save }: the strategy and the dataset, or what is wrong with them.
+        async Task<(Strategy? Strategy, Dataset? Data, bool Save, string? Error)> BacktestRequest(HttpRequest request)
+        {
+            try
+            {
+                var body = await JsonNode.ParseAsync(request.Body);
+                var strategy = body?["strategy"]?.Deserialize<Strategy>(StrategyBook.JsonOptions);
+                var dataset = body?["dataset"]?.GetValue<string>();
+                if (strategy == null || dataset == null || !byId.TryGetValue(dataset, out var data))
+                    return (null, null, false, "The request is { dataset, strategy }, with a dataset the server has.");
+                var errors = strategy.Validate();
+                return errors.Count > 0 ? (null, null, false, string.Join(" ", errors)) : (strategy, data, body?["save"]?.GetValue<bool>() ?? true, null);
+            }
+            catch (Exception e) when (e is JsonException or InvalidOperationException)
+            {
+                return (null, null, false, $"The request is not a backtest: {e.Message}");
+            }
+        }
 
         // The tour's editor on the page saves the tour back to its source file. The page says which version of the file it
         // started from, so a file that has changed since, as when it is edited by hand, is not written over.
@@ -257,6 +327,29 @@ public static class ReplayServer
                 await File.WriteAllTextAsync(tourPath, text);
                 // The texts that changed are read aloud at once, so Voice has their clips by the time they are played.
                 ReadAloud();
+                return Results.NoContent();
+            });
+
+            // The Strategies page saves strategies.json as the tour's editor saves tour.json, refused when the file has
+            // changed on disk since the page loaded it.
+            var strategiesPath = Path.Combine(sourceDir, "strategies.json");
+            app.MapPut("/api/strategies", async (HttpRequest request) =>
+            {
+                using var reader = new StreamReader(request.Body);
+                var text = await reader.ReadToEndAsync();
+                try
+                {
+                    StrategyBook.Parse(text);
+                }
+                catch (JsonException e)
+                {
+                    return Results.BadRequest($"The strategies are not valid: {e.Message}");
+                }
+
+                if (File.Exists(strategiesPath) && request.Headers["X-Strategies-Base"].ToString() != TextKey(await File.ReadAllTextAsync(strategiesPath)))
+                    return Results.Conflict("strategies.json has changed on disk since the page loaded it.");
+
+                await File.WriteAllTextAsync(strategiesPath, text);
                 return Results.NoContent();
             });
 
@@ -330,6 +423,19 @@ public static class ReplayServer
             app.MapGet("/api/video/file", () => File.Exists(video.VideoPath)
                 ? Results.File(video.VideoPath, "video/mp4", "tour.mp4")
                 : Results.NotFound());
+
+            // An analysis's Make video records it by its address on the page, and Download video fetches the last one made.
+            app.MapPost("/api/video/analysis", async (HttpRequest request) =>
+            {
+                var address = (await JsonNode.ParseAsync(request.Body))?["address"]?.GetValue<string>();
+                if (address == null || !address.StartsWith("#Analysis?"))
+                    return Results.BadRequest("The request is { address }, an analysis's address on the page (#Analysis?...).");
+                video.RecordAnalysis(address);
+                return Results.Json(video.Status(), Json);
+            });
+            app.MapGet("/api/video/analysis/file", () => File.Exists(video.AnalysisVideoPath)
+                ? Results.File(video.AnalysisVideoPath, "video/mp4", "analysis.mp4")
+                : Results.NotFound());
         }
 
         if (video != null)
@@ -360,5 +466,16 @@ public static class ReplayServer
         var timeline = MarketStructure.Timeline(prices, EnumPriceBasis.Close, MaxLevel, from: Math.Max(0, start - 1), to: to,
             keepFrom: Math.Max(0, start - Window), minRetracement: settings.Retracement, band: settings.Band);
         return JsonSerializer.Serialize(new { Anchor = anchor, From = start, To = to, Timeline = timeline }, Json);
+    }
+
+    /// <summary>
+    /// The timeline of the last candle alone, keeping everything from the first: the structure of the whole dataset in hindsight.
+    /// </summary>
+    private static byte[] Complete(Dataset data, (double Retracement, double Band) settings)
+    {
+        var last = data.Prices.Count - 1;
+        var timeline = MarketStructure.Timeline(data.Prices, EnumPriceBasis.Close, MaxLevel, from: last, to: last + 1, keepFrom: 0,
+            minRetracement: settings.Retracement, band: settings.Band);
+        return JsonSerializer.SerializeToUtf8Bytes(new { Anchor = 0, From = last, To = last + 1, Timeline = timeline }, Json);
     }
 }

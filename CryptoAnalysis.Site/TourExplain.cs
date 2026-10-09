@@ -35,12 +35,12 @@ public sealed record ExplainOptions(int GreenRuns = 5, int RedRuns = 5)
 /// where the section ends. What the section says for itself wins: a view, until or layers it gives are kept, and texts of
 /// its own follow the written ones.
 /// </summary>
-public static class Explain
+public static partial class Explain
 {
     /// <summary>
     /// The things a section can explain.
     /// </summary>
-    public static readonly IReadOnlyList<string> Terms = ["Candle", "SuccessiveCandles", "Point", "Swing", "Trend"];
+    public static readonly IReadOnlyList<string> Terms = ["Candle", "SuccessiveCandles", "Point", "Swing", "Trend", "Trade"];
 
     /// <summary>
     /// A thing at a candle that can be explained: its kind (one of <see cref="Terms"/>), the sawtooth level it is at when
@@ -87,6 +87,7 @@ public static class Explain
         "Point" => PointBlocks.Select(x => x.Name).ToList(),
         "Swing" => SwingBlocks.Select(x => x.Name).ToList(),
         "Trend" => TrendBlocks.Select(x => x.Name).ToList(),
+        "Trade" => TradeBlocks.Select(x => x.Name).ToList(),
         _ => [],
     };
 
@@ -111,6 +112,7 @@ public static class Explain
         result.Remove("blocks");
         result.Remove("detail");
         result.Remove("edits");
+        result.Remove("strategy");
         var term = node["explain"]?.GetValue<string>() ?? "";
         var detail = node["detail"]?.GetValue<string>();
         if (detail != null && Details.Parse(detail) == null)
@@ -166,7 +168,7 @@ public static class Explain
         var level = node["level"] is JsonValue given && given.TryGetValue<int>(out var l) ? l : 1;
         var until = node["until"] is JsonValue end && end.TryGetValue<int>(out var u) ? u : (int?)null;
         var known = node["known"] is JsonValue read && read.TryGetValue<int>(out var k) ? k : (int?)null;
-        var written = Write(term, prices, at.Value, level, reached, until, known, ExplainOptions.From(node["runs"]), blocks, out var problem);
+        var written = Write(term, prices, at.Value, level, reached, until, known, ExplainOptions.From(node["runs"]), blocks, node["strategy"], out var problem);
         if (written == null)
         {
             errors.Add($"{where}: {problem}");
@@ -258,7 +260,7 @@ public static class Explain
     /// a Swing or Trend runs to its own end when the chart had it there too, else on to the cursor. A thing not at the
     /// candle is left out and named in missing. Null when nothing is left.
     /// </summary>
-    public static JsonObject? Tour(IReadOnlyList<Thing> things, string dataset, List<Price> prices, string time, string? seen, out List<string> missing, bool inPlace = true, ExplainOptions? options = null)
+    public static JsonObject? Tour(IReadOnlyList<Thing> things, string dataset, List<Price> prices, string time, string? seen, out List<string> missing, bool inPlace = true, ExplainOptions? options = null, Strategies.Strategy? strategy = null)
     {
         options ??= ExplainOptions.Default;
         missing = [];
@@ -270,9 +272,24 @@ public static class Explain
         var sections = new List<JsonObject>();
         int? context = null;
         // From the candle outwards: the Candle, its run, then the finest level's things first.
-        static int Rank(Thing thing) => thing.Kind switch { "Candle" => 0, "SuccessiveCandles" => 1, _ => 2 };
+        static int Rank(Thing thing) => thing.Kind switch { "Trade" => -1, "Candle" => 0, "SuccessiveCandles" => 1, _ => 2 };
         foreach (var thing in things.OrderBy(Rank).ThenByDescending(x => x.Level ?? 0).ThenBy(x => Terms.ToList().IndexOf(x.Kind)))
         {
+            // A Trade is told in chapters of its own: its entry, its exits and its outcome.
+            if (thing.Kind == "Trade")
+            {
+                var told = TradeChapters(thing, prices, index, cursor, strategy);
+                if (told == null)
+                    missing.Add(thing.Name);
+                foreach (var section in told ?? [])
+                {
+                    section["thing"] = thing.Id;
+                    sections.Add(section);
+                }
+
+                continue;
+            }
+
             var chapter = Chapter(thing, prices, known, index, cursor, inPlace, options, out var keeps);
             if (chapter == null)
             {
@@ -351,30 +368,13 @@ public static class Explain
         keeps = null;
         // The chart's own layers mark what the texts speak of: the sawtooth, and for a Trend the points that make it.
         var layers = new List<string> { $"level{level}", "close", "sawtooth" };
-        int first, until, last;
-        string name;
-        if (term == "Swing")
-        {
-            if (SwingAt(known, index, level) is not { } swing)
-                return null;
-            first = swing.Span.First;
-            last = swing.Span.Last;
-            until = SwingAt(prices.GetRange(0, last + 1), index, level)?.Span.First == first ? last : cursor;
-            name = SwingName(swing.Swing.Direction);
-            layers.AddRange(["HigherHigh", "HigherLow", "LowerLow", "LowerHigh"]);
-        }
-        else
-        {
-            if (TrendAt(known, index, level) is not { } trend)
-                return null;
-            first = trend.Start;
-            var made = Math.Max(index, trend.Index[trend.Trend.Confirmed.Time]);
-            until = TrendAt(prices.GetRange(0, made + 1), index, level)?.Start == first ? made : cursor;
-            // Its own last candle: where it ended, or the cursor while it still runs.
-            last = trend.Span.Last;
-            name = TrendName(trend.Trend.Direction);
-            layers.AddRange(trend.Trend.Direction == EnumSwingDirection.Up ? ["HigherHigh", "HigherLow"] : ["LowerLow", "LowerHigh"]);
-        }
+        if (Locate(term, known, index, level) is not { } found)
+            return null;
+        var (first, last) = (found.First, found.Last);
+        var until = RunsTo(term, prices, found, index, level, cursor);
+        var up = found.Direction == EnumSwingDirection.Up;
+        var name = term == "Swing" ? SwingName(found.Direction) : TrendName(found.Direction);
+        layers.AddRange(term == "Swing" ? ["HigherHigh", "HigherLow", "LowerLow", "LowerHigh"] : up ? ["HigherHigh", "HigherLow"] : ["LowerLow", "LowerHigh"]);
 
         var readAt = until;
         if (inPlace)
@@ -419,8 +419,7 @@ public static class Explain
         // Played in place, the tour shows the Trend as it is known at the cursor.
         if (inPlace)
             return TrendRow(trend.Trend, level, trend.Index);
-        var made = Math.Max(index, trend.Index[trend.Trend.Confirmed.Time]);
-        var until = TrendAt(prices.GetRange(0, made + 1), index, level)?.Start == trend.Start ? made : cursor;
+        var until = RunsTo("Trend", prices, Found.Of(trend, index), index, level, cursor);
         var shown = TrendAt(prices.GetRange(0, until + 1), index, level) ?? trend;
         return TrendRow(shown.Trend, level, shown.Index);
     }
@@ -492,7 +491,7 @@ public static class Explain
     // Candles a second for a section that runs a stretch: about twenty seconds of replay, between a brisk walk and a sprint.
     private static double Pace(int candles) => Math.Clamp(Math.Round(candles / 20.0), 10, 200);
 
-    private static JsonObject? Write(string term, List<Price> prices, int at, int level, int reached, int? until, int? known, ExplainOptions options, IReadOnlyCollection<string>? blocks, out string problem)
+    private static JsonObject? Write(string term, List<Price> prices, int at, int level, int reached, int? until, int? known, ExplainOptions options, IReadOnlyCollection<string>? blocks, JsonNode? strategy, out string problem)
     {
         problem = "";
         switch (term)
@@ -503,6 +502,8 @@ public static class Explain
                 return Run(prices, at, reached, options, known, out problem, blocks);
             case "Point":
                 return Point(prices, at, level, reached, known, out problem, blocks);
+            case "Trade":
+                return Trade(prices, at, reached, strategy, blocks, out problem);
             case "Swing":
                 return Swing(prices, at, level, reached, out problem, until, known, blocks);
             default:
@@ -710,36 +711,8 @@ public static class Explain
     /// </summary>
     public static JsonObject? Swing(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null, int? known = null, IReadOnlyCollection<string>? blocks = null)
     {
-        FoundSwing? seen;
-        int end;
-        if (runsTo is int given)
-        {
-            end = Math.Max(reached, given);
-            seen = SwingAt(prices.GetRange(0, Math.Max(end, known ?? end) + 1), at, level);
-            if (seen == null)
-            {
-                problem = $"no {Order(level)} Swing on the chart at #{end} has #{at} in it";
-                return null;
-            }
-        }
-        else
-        {
-            var found = SwingAt(prices, at, level);
-            if (found == null)
-            {
-                problem = $"no {Order(level)} Swing has #{at} in it";
-                return null;
-            }
-
-            end = Math.Max(reached, found.Span.Last);
-            seen = SwingAt(prices.GetRange(0, end + 1), found.Span.First, level, found.Swing.Direction);
-            if (seen == null)
-            {
-                problem = $"the {Order(level)} Swing that begins at #{found.Span.First} is not on the chart at #{end}";
-                return null;
-            }
-        }
-
+        if (Seen("Swing", prices, at, level, reached, runsTo, known, (p, a, d) => SwingAt(p, a, level, d), out var end, out problem) is not { } seen)
+            return null;
         var (swing, span, index) = (seen.Swing, seen.Span, seen.Index);
         var against = swing.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
         var msb = seen.Breaks.FirstOrDefault(b => b.Type == against && b.Break.Time > swing.Start.Time && b.Break.Time < swing.BreakOfStructure!.Time);
@@ -837,36 +810,8 @@ public static class Explain
     /// </summary>
     public static JsonObject? Trend(List<Price> prices, int at, int level, int reached, out string problem, int? runsTo = null, int? known = null, IReadOnlyCollection<string>? blocks = null)
     {
-        FoundTrend? seen;
-        int end;
-        if (runsTo is int given)
-        {
-            end = Math.Max(reached, given);
-            seen = TrendAt(prices.GetRange(0, Math.Max(end, known ?? end) + 1), at, level);
-            if (seen == null)
-            {
-                problem = $"no {Order(level)} Trend on the chart at #{end} has #{at} in it";
-                return null;
-            }
-        }
-        else
-        {
-            var found = TrendAt(prices, at, level);
-            if (found == null)
-            {
-                problem = $"no {Order(level)} Trend has #{at} in it";
-                return null;
-            }
-
-            end = Math.Max(Math.Max(reached, at), found.Index[found.Trend.Confirmed.Time]);
-            seen = TrendAt(prices.GetRange(0, end + 1), found.Start, level, found.Trend.Direction);
-            if (seen == null)
-            {
-                problem = $"the {Order(level)} Trend that begins at #{found.Start} is not on the chart at #{end}";
-                return null;
-            }
-        }
-
+        if (Seen("Trend", prices, at, level, reached, runsTo, known, (p, a, d) => TrendAt(p, a, level, d), out var end, out problem) is not { } seen)
+            return null;
         var (trend, index) = (seen.Trend, seen.Index);
         var weak = trend.Parts.Select((part, i) => (part, i)).Where(x => !x.part.Strong).Select(x => Ordinal(x.i + 1)).ToList();
         var endedAt = trend.End != null && index.TryGetValue(trend.End.Time, out var e) && e <= end ? e : (int?)null;
@@ -1025,6 +970,55 @@ public static class Explain
         var start = s.Index[trend.Start.Time];
         var last = trend.End != null && s.Index.TryGetValue(trend.End.Time, out var end) ? end : Math.Max(s.Index[trend.Confirmed.Time], prices.Count - 1);
         return new FoundTrend(trend, start, (start, last), s.Index);
+    }
+
+    // A Swing or Trend found at a candle, as one: where it begins, where it is made (a Swing's BoS; a Trend's second BoS,
+    // or the candle when that is later), its own last candle and the way it runs.
+    private sealed record Found(int First, int Made, int Last, EnumSwingDirection Direction)
+    {
+        public static Found Of(FoundSwing swing) => new(swing.Span.First, swing.Span.Last, swing.Span.Last, swing.Swing.Direction);
+
+        public static Found Of(FoundTrend trend, int at) => new(trend.Start, Math.Max(at, trend.Index[trend.Trend.Confirmed.Time]), trend.Span.Last, trend.Trend.Direction);
+    }
+
+    // The one step that finds the Swing or Trend at a level that has the candle, in these prices alone.
+    private static Found? Locate(string term, List<Price> prices, int at, int level) => term == "Swing"
+        ? SwingAt(prices, at, level) is { } swing ? Found.Of(swing) : null
+        : TrendAt(prices, at, level) is { } trend ? Found.Of(trend, at) : null;
+
+    // Where a section about the thing found runs to: where it is made, when the chart there has the same one, else on to
+    // the cursor, as the finer levels can be anchored afresh by the candles between.
+    private static int RunsTo(string term, List<Price> prices, Found found, int at, int level, int cursor) =>
+        Locate(term, prices.GetRange(0, found.Made + 1), at, level)?.First == found.First ? found.Made : cursor;
+
+    // The Swing or Trend a section tells of, as the chart has it where the section ends (end): with runsTo, the one the
+    // chart has there that has the candle; else the one the prices have, read again once it is made. Null, with the
+    // problem, when there is none.
+    private static T? Seen<T>(string term, List<Price> prices, int at, int level, int reached, int? runsTo, int? known, Func<List<Price>, int, EnumSwingDirection?, T?> read, out int end, out string problem)
+        where T : class
+    {
+        problem = "";
+        if (runsTo is int given)
+        {
+            end = Math.Max(reached, given);
+            var there = read(prices.GetRange(0, Math.Max(end, known ?? end) + 1), at, null);
+            if (there == null)
+                problem = $"no {Order(level)} {term} on the chart at #{end} has #{at} in it";
+            return there;
+        }
+
+        if (Locate(term, prices, at, level) is not { } found)
+        {
+            end = reached;
+            problem = $"no {Order(level)} {term} has #{at} in it";
+            return null;
+        }
+
+        end = Math.Max(reached, found.Made);
+        var seen = read(prices.GetRange(0, end + 1), found.First, found.Direction);
+        if (seen == null)
+            problem = $"the {Order(level)} {term} that begins at #{found.First} is not on the chart at #{end}";
+        return seen;
     }
 
     // A section that runs through what it explains lists its texts in the order they are shown: by their candle, and as
