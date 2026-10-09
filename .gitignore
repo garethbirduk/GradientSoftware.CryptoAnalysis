@@ -12,6 +12,8 @@ Combined/CryptoAnalysis_Combined.cs
 artifacts/
 
 CryptoAnalysis.Site/wwwroot/tour-audio/
+# Strategies are saved locally while they change a lot; strategies.example.json is the one shipped
+CryptoAnalysis.Site/wwwroot/strategies.json
 tools/tour-video/node_modules/
 
 temp/

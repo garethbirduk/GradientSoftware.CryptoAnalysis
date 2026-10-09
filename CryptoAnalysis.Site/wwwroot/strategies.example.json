@@ -1,0 +1,13 @@
+{
+  "strategies": [
+    {
+      "id": "green-run-4",
+      "name": "After 4 green candles",
+      "direction": "Long",
+      "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 4 },
+      "takeProfit": { "type": "HighestWick", "candles": 6 },
+      "stopLoss": { "type": "RiskRatio", "ratio": 1 },
+      "onePositionAtATime": true
+    }
+  ]
+}

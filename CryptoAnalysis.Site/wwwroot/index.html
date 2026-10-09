@@ -5348,12 +5348,15 @@ const formatStrategies = book => `{\n  "strategies": [\n${book.strategies.map(s 
   `      ${JSON.stringify(k)}: ${inlineJson(v)}`).join(',\n')}\n    }`).join(',\n')}\n  ]\n}\n`;
 window.addEventListener('beforeunload', e => { if (strategiesDirty()) e.preventDefault(); });
 
+// strategies.json is kept locally, not in git; without one, the page starts from strategies.example.json, and the first
+// save writes strategies.json (base '' as there is no file yet to have changed).
 async function loadStrategies() {
-  const response = await fetch('strategies.json', { cache: 'no-cache' }).catch(() => null);
-  const text = response?.ok ? await response.text() : '';
+  const read = async name => { const r = await fetch(name, { cache: 'no-cache' }).catch(() => null); return r?.ok ? r.text() : ''; };
+  const own = await read('strategies.json'), text = own || await read('strategies.example.json');
+  const base = own ? textKey(own) : '';
   const book = text ? JSON.parse(text) : { strategies: [] };
   book.strategies ??= [];
-  strategies = { book, base: text ? textKey(text) : '', saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false };
+  strategies = { book, base, saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false };
 }
 
 // The steps of a strategy's entry condition in order: those of "after", then "entry".
