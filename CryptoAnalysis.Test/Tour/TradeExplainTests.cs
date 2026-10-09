@@ -41,10 +41,8 @@ public class TradeExplainTests
             "That meets the entry condition, so the trade is entered at the close of the candle at 04:00, buying at 160.",
             "Over the last four candles up to the entry, the average body, open to close, is 15.",
             "The Take Profit is that average, 15, above the entry, at 175.",
-            "The Stop Loss is that average, 15, below it, at 145.",
-            "The reward is 15, from the entry at 160 to the Take Profit at 175. The risk is 15, to the Stop Loss at 145.",
-            "The Take Profit is a 1R target.",
-            "At 1R, it breaks even over many trades when it wins 50% of them.",
+            "The Stop Loss is that average, 15, below the entry, at 145.",
+            "With 15 to win and 15 to lose, the Take Profit is a 1R target.",
             "Two hours later, at 06:00, the high of 176 reaches the Take Profit, so the trade closes at 175: it won 15, 9.38%.",
         }, Texts(section, "summary"));
         Assert.AreEqual(6, section["until"]!.GetValue<int>(), "The replay runs on to the exit.");
@@ -100,7 +98,7 @@ public class TradeExplainTests
     }
 
     [TestMethod]
-    public void Trade_Exits_TellAWickLevel()
+    public void Trade_Exits_TellAWickLevelThenTheirOwnMeasure()
     {
         var strategy = JsonNode.Parse("""
             { "id": "w", "name": "w", "direction": "Long", "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 4 },
@@ -108,20 +106,20 @@ public class TradeExplainTests
               "stopLoss": { "type": "AverageCandle", "percent": 100, "candles": 4, "measure": "Body" } }
             """)!;
 
-        var section = Explain.Trade(Prices, 4, reached: 0, strategy, ["Exits"], out var problem);
+        var section = Explain.Trade(Prices, 4, reached: 0, strategy, ["TakeProfit", "StopLoss"], out var problem);
 
         Assert.IsNotNull(section, problem);
         CollectionAssert.AreEqual(new[]
         {
             "Over the last four candles up to the entry, the highest high is 161.",
-            "Over the last four candles up to the entry, the average body, open to close, is 15.",
             "The Take Profit is 1 above the entry, at 161.",
-            "The Stop Loss is that average, 15, below it, at 145.",
+            "Over the last four candles up to the entry, the average body, open to close, is 15.",
+            "The Stop Loss is that average, 15, below the entry, at 145.",
         }, Texts(section, "summary"));
     }
 
     [TestMethod]
-    public void Trade_StopLossAtARatioOfTheReward_IsToldWithTheStrategysR()
+    public void Trade_StopLossSetFromTheRisk_IsToldAfterTheRiskThatSetsIt()
     {
         var strategy = JsonNode.Parse("""
             { "id": "r", "name": "r", "direction": "Long", "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 4 },
@@ -129,19 +127,20 @@ public class TradeExplainTests
               "stopLoss": { "type": "RiskRatio", "ratio": 2 } }
             """)!;
 
-        var section = Explain.Trade(Prices, 4, reached: 0, strategy, ["Exits", "Risk"], out var problem);
+        var section = Explain.Trade(Prices, 4, reached: 0, strategy, ["TakeProfit", "StopLoss", "Risk"], out var problem);
 
         Assert.IsNotNull(section, problem);
         CollectionAssert.AreEqual(new[]
         {
             "Over the last four candles up to the entry, the average body, open to close, is 15.",
-            "The Stop Loss is set for a 2R target: the risk is the reward divided by 2.",
             "The Take Profit is that average, 15, above the entry, at 175.",
-            "The Stop Loss is 7 below it, at 152.",
-            "The reward is 15, from the entry at 160 to the Take Profit at 175. The risk is 7, to the Stop Loss at 152.",
-            "The Take Profit is a 2R target, as the strategy sets it.",
-            "At 2R, it breaks even over many trades when it wins 33% of them.",
+            "The Stop Loss is set for a 2R target: with 15 to win, the risk is 15 divided by 2, 7.",
+            "The Stop Loss is 7 below the entry, at 152.",
         }, Texts(section, "summary"));
+        var tour = Explain.Tour([new Explain.Thing("Trade", null, "Trade")], "test", Prices, Prices[4].DateTime.ToString("yyyy-MM-ddTHH:mm"), null, out _,
+            strategy: Explain.StrategyOf(strategy, out _));
+        CollectionAssert.AreEqual(new[] { "Entry", "Take Profit", "Risk", "Stop Loss", "Outcome" }, tour!["sections"]!.AsArray().Select(x => x!["chapter"]!.GetValue<string>()).ToArray(),
+            "Risk that sets the Stop Loss is a condition of it, so it comes before it.");
     }
 
     [TestMethod]
@@ -155,10 +154,10 @@ public class TradeExplainTests
         {
             "The reward is 20, from the entry at 130 to the Take Profit at 150. The risk is 10, to the Stop Loss at 120.",
             "The Take Profit is a 2R target.",
-            "At 2R, it breaks even over many trades when it wins 33% of them.",
         }, Texts(section, "summary"));
         var cited = (section["cues"]?.AsArray() ?? []).Select(x => x!["definition"]?.GetValue<string>()).Where(x => x != null).ToList();
         CollectionAssert.AreEqual(new[] { "Risk.what", "Risk.ratio", "Risk.breakeven" }, cited);
+        Assert.AreEqual("At 2R, it breaks even over many trades when it wins 33% of them.", Texts(section, "education")[^1], "The share to break even is taught, not told as a fact of the trade.");
     }
 
     [TestMethod]
@@ -208,7 +207,10 @@ public class TradeExplainTests
         var tour = Explain.Tour([new Explain.Thing("Trade", null, "Trade")], "test", Prices, Prices[4].DateTime.ToString("yyyy-MM-ddTHH:mm"), null, out var missing, strategy: strategy);
 
         Assert.AreEqual(0, missing.Count);
-        CollectionAssert.AreEqual(new[] { "Entry", "Exits", "Risk", "Outcome" }, tour!["sections"]!.AsArray().Select(x => x!["chapter"]!.GetValue<string>()).ToArray());
+        CollectionAssert.AreEqual(new[] { "Entry", "Take Profit", "Stop Loss", "Risk", "Outcome" }, tour!["sections"]!.AsArray().Select(x => x!["chapter"]!.GetValue<string>()).ToArray(),
+            "Risk that sets neither exit is an observation of what they make, after both.");
+        CollectionAssert.AreEqual(new[] { "What is an entry condition?", "What is a Take Profit?", "What is a Stop Loss?", "What is risk?", "How does a trade end?" },
+            tour["sections"]!.AsArray().Select(x => x!["explainChapter"]!.GetValue<string>()).ToArray());
         var compiled = Tours.Compile(tour, Prices);
         Assert.AreEqual(0, compiled.Errors.Count, string.Join("\n", compiled.Errors));
     }

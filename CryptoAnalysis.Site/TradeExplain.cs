@@ -6,11 +6,12 @@ using Gradient.CryptoAnalysis.Strategies;
 namespace Gradient.CryptoAnalysis.Site;
 
 /// <summary>
-/// The Trade an analysis tells of: a strategy's trade entered at a candle, in three chapters. Entry: what the entry
-/// condition is and how this candle met it. Exits: the Take Profit and Stop Loss set at the entry, and how they were worked
-/// out. Outcome: the candle that ended the trade, which target it reached, and what it won or lost. Each is told at
-/// Education (what such a thing is) and at Summary (this one), as the other things are. Risk, between the exits and the
-/// outcome, tells the trade's reward, risk and R by the Risk term's own block (see <see cref="RiskOf"/>).
+/// The Trade an analysis tells of: a strategy's trade entered at a candle, in chapters. Entry: what the entry condition is
+/// and how this candle met it. Take Profit and Stop Loss: where each exit was set at the entry, and how it was worked out.
+/// Risk: what the two exits make of the trade, by the Risk term's own block (see <see cref="RiskOf"/>). Outcome: the candle
+/// that ended the trade, which exit it reached, and what it won or lost. Each is told at Education (what such a thing is)
+/// and at Summary (this one), as the other things are. Risk is told where its role puts it (see <see cref="TradeOrder"/>):
+/// just before the exit it sets, as a condition of that exit, or after both, as an observation of what they make.
 /// </summary>
 public static partial class Explain
 {
@@ -20,10 +21,21 @@ public static partial class Explain
     private static readonly (string Name, string Chapter, string Explains, Func<TradeRead, Block> Tell)[] TradeBlocks =
     [
         ("Entry", "Entry", "What is an entry condition?", TradeEntry),
-        ("Exits", "Exits", "What are the exits?", TradeExits),
+        ("TakeProfit", "Take Profit", "What is a Take Profit?", r => TradeExit(r, profit: true)),
+        ("StopLoss", "Stop Loss", "What is a Stop Loss?", r => TradeExit(r, profit: false)),
         ("Risk", "Risk", "What is risk?", TradeRisk),
         ("Outcome", "Outcome", "How does a trade end?", TradeOutcome),
     ];
+
+    // The order a strategy's trade is told in. Risk that sets an exit is a condition of it, so it comes just before that
+    // exit, after the one it is worked out from; otherwise it is an observation of what both exits make, after them.
+    private static IEnumerable<(string Name, string Chapter, string Explains, Func<TradeRead, Block> Tell)> TradeOrder(Strategy strategy)
+    {
+        string[] order = strategy.StopLoss.IsRiskCondition ? ["Entry", "TakeProfit", "Risk", "StopLoss", "Outcome"]
+            : strategy.TakeProfit.IsRiskCondition ? ["Entry", "StopLoss", "Risk", "TakeProfit", "Outcome"]
+            : ["Entry", "TakeProfit", "StopLoss", "Risk", "Outcome"];
+        return order.Select(name => TradeBlocks.First(x => x.Name == name));
+    }
 
     // A trade as its chapters tell it: the prices, the strategy and the trade the backtest made.
     private sealed record TradeRead(List<Price> Prices, Strategy Strategy, StrategyTrade Trade)
@@ -77,7 +89,7 @@ public static partial class Explain
             return null;
         var read = new TradeRead(prices, strategy, trade);
         var strategyJson = JsonSerializer.SerializeToNode(strategy, StrategyBook.JsonOptions);
-        return TradeBlocks.Select(b => new JsonObject
+        return TradeOrder(strategy).Select(b => new JsonObject
         {
             ["chapter"] = b.Chapter,
             ["explainChapter"] = b.Explains,
@@ -107,7 +119,7 @@ public static partial class Explain
         }
 
         var read = new TradeRead(prices, strategy, trade);
-        var told = TradeBlocks.Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(read) with { Name = x.Name }).ToArray();
+        var told = TradeOrder(strategy).Where(x => blocks == null || blocks.Contains(x.Name)).Select(x => x.Tell(read) with { Name = x.Name }).ToArray();
         var last = told.SelectMany(x => x.Cues).Max(x => x["at"]!.GetValue<int>());
         // Every chapter frames the whole trade, from the first candle the entry condition reads to the one that ends it.
         var view = new[] { read.First, trade.ExitIndex };
@@ -167,23 +179,20 @@ public static partial class Explain
                 yield return cue;
     }
 
-    // What the exits are; then where this trade's are, and how they were worked out from the candles up to the entry.
-    private static Block TradeExits(TradeRead r)
+    // What a Take Profit or a Stop Loss is; then where this trade's is, and how it was worked out from the candles up to the
+    // entry. A Stop Loss worked out from the same measure as the Take Profit does not tell the measure again, and one set
+    // from the risk leaves the rule to the Risk chapter before it.
+    private static Block TradeExit(TradeRead r, bool profit)
     {
         var t = r.Trade;
-        var (above, below) = r.Long ? ("above", "below") : ("below", "above");
-        var cues = new List<JsonObject>
-        {
-            Define(t.EntryIndex, "Trade.exits"),
-        };
-        var profit = TargetText(r, r.Strategy.TakeProfit, t.TakeProfit);
-        var loss = TargetText(r, r.Strategy.StopLoss, t.StopLoss);
-        if (profit.Measure != null)
-            cues.Add(Say(t.EntryIndex, profit.Measure));
-        if (loss.Measure != null && loss.Measure != profit.Measure)
-            cues.Add(Say(t.EntryIndex, loss.Measure));
-        cues.Add(Say(t.EntryIndex, $"The Take Profit is {profit.Distance} {above} the entry, at {Money(t.TakeProfit)}."));
-        cues.Add(Say(t.EntryIndex, $"The Stop Loss is {loss.Distance} {below} it, at {Money(t.StopLoss)}."));
+        var (target, price) = profit ? (r.Strategy.TakeProfit, t.TakeProfit) : (r.Strategy.StopLoss, t.StopLoss);
+        var side = r.Long == profit ? "above" : "below";
+        var cues = new List<JsonObject> { Define(t.EntryIndex, profit ? "Trade.takeProfit" : "Trade.stopLoss") };
+        var (distance, measure) = TargetText(r, target, price);
+        var told = profit ? null : TargetText(r, r.Strategy.TakeProfit, t.TakeProfit).Measure;
+        if (measure != null && measure != told)
+            cues.Add(Say(t.EntryIndex, measure));
+        cues.Add(Say(t.EntryIndex, $"The {(profit ? "Take Profit" : "Stop Loss")} is {distance} {side} the entry, at {Money(price)}."));
         return new Block(cues, ["candles", "trade"]);
     }
 
@@ -191,13 +200,9 @@ public static partial class Explain
     private static (string Distance, string? Measure) TargetText(TradeRead r, StrategyTarget target, double price)
     {
         var t = r.Trade;
+        // Set from the risk: the rule is the Risk chapter's, told before this one.
         if (target.Type == StrategyTarget.RiskRatio)
-        {
-            var times = RText(target.Ratio);
-            return (Money(Math.Abs(price - t.EntryPrice)), target.Ratio == 1
-                ? "The Stop Loss is set for a 1R target: the risk is the same as the reward."
-                : $"The Stop Loss is set for a {times}R target: the risk is the reward divided by {times}.");
-        }
+            return (Money(Math.Abs(price - t.EntryPrice)), null);
 
         if (target.IsLevel)
         {
@@ -244,22 +249,33 @@ public static partial class Explain
         return new Block(cues, ["candles", "trade"]);
     }
 
-    // The trade's reward, risk and R, told by the Risk term's block, with the R the strategy sets when its Stop Loss is one.
+    // The trade's risk, by the Risk term's block, in the role the strategy gives it: the condition its Stop Loss is set by,
+    // or an observation of what its two exits make.
     private static Block TradeRisk(TradeRead r)
     {
         var t = r.Trade;
         var stop = r.Strategy.StopLoss;
-        return RiskOf(new RiskRead(t.EntryIndex, t.EntryPrice, t.TakeProfit, t.StopLoss, stop.Type == StrategyTarget.RiskRatio ? stop.Ratio : null));
+        var role = stop.IsRiskCondition ? EnumRiskRole.SetsStopLoss : EnumRiskRole.Observed;
+        return RiskOf(new RiskRead(t.EntryIndex, t.EntryPrice, t.TakeProfit, t.StopLoss, stop.IsRiskCondition ? stop.Ratio : null, role, r.Long));
     }
 
-    // A trade's prices as the Risk term tells them: its entry, its Take Profit and its Stop Loss, at a candle; and the target
-    // in R a strategy sets, when it sets one.
-    private sealed record RiskRead(int At, double Entry, double TakeProfit, double StopLoss, double? Set = null);
+    // What Risk is told as: on its own, with the amounts it is worked out from; the condition a trade's Stop Loss is set by,
+    // told before the Stop Loss; or an observation of a trade's two exits, told after them.
+    private enum EnumRiskRole
+    {
+        OnItsOwn,
+        SetsStopLoss,
+        Observed,
+    }
+
+    // A trade's prices as the Risk term tells them: its entry, its Take Profit and its Stop Loss, at a candle; the target in
+    // R a strategy sets, when it sets one; the role it is told in; and whether the trade is long.
+    private sealed record RiskRead(int At, double Entry, double TakeProfit, double StopLoss, double? Set = null, EnumRiskRole Role = EnumRiskRole.OnItsOwn, bool Long = true);
 
     /// <summary>
     /// The written parts of a section that explains risk from its own inputs: { "entry", "takeProfit", "stopLoss", "ratio" }
-    /// (entry the close of the candle when not given; ratio the target in R a strategy set, when it did). With a strategy instead, the
-    /// risk of its trade at the candle (see <see cref="Trade"/>). Null, with the problem, when neither gives a trade.
+    /// (entry the close of the candle when not given; ratio the target in R a strategy set, when it did). With a strategy
+    /// instead, the risk of its trade at the candle (see <see cref="Trade"/>). Null, with the problem, when neither gives a trade.
     /// </summary>
     public static JsonObject? Risk(List<Price> prices, int at, int reached, JsonNode? inputs, JsonNode? strategy, out string problem)
     {
@@ -275,26 +291,34 @@ public static partial class Explain
             return null;
         }
 
-        var block = RiskOf(new RiskRead(at, entry, takeProfit, stopLoss, Number("ratio"))) with { Name = "Risk" };
+        var block = RiskOf(new RiskRead(at, entry, takeProfit, stopLoss, Number("ratio"), EnumRiskRole.OnItsOwn, takeProfit > entry)) with { Name = "Risk" };
         return Section([Math.Max(0, at - CandlesBefore), Math.Min(prices.Count - 1, at + CandlesAfter)], at > reached ? at : null, block);
     }
 
-    // What risk, reward and R are; then this trade's, its target in R, and what share of trades it must win to break even.
+    // What risk, reward and R are; then this trade's, as its role tells it; and, with the break-even rule, the share of trades
+    // a strategy at that target must win, which teaches the rule and is not a fact of this trade.
     private static Block RiskOf(RiskRead r)
     {
         var reward = Math.Abs(r.TakeProfit - r.Entry);
         var risk = Math.Abs(r.Entry - r.StopLoss);
         var target = r.Set ?? reward / risk;
+        var times = RText(target);
         var share = (100 / (1 + target)).ToString("0", CultureInfo.InvariantCulture);
-        return new Block(
-        [
-            Define(r.At, "Risk.what"),
-            Say(r.At, $"The reward is {Money(reward)}, from the entry at {Money(r.Entry)} to the Take Profit at {Money(r.TakeProfit)}. The risk is {Money(risk)}, to the Stop Loss at {Money(r.StopLoss)}."),
-            Define(r.At, "Risk.ratio"),
-            Say(r.At, $"The Take Profit is a {RText(target)}R target{(r.Set != null ? ", as the strategy sets it" : "")}."),
-            Define(r.At, "Risk.breakeven"),
-            Say(r.At, $"At {RText(target)}R, it breaks even over many trades when it wins {share}% of them."),
-        ], ["candles", "trade"]);
+        var (above, below) = r.Long ? ("above", "below") : ("below", "above");
+        var cues = new List<JsonObject> { Define(r.At, "Risk.what") };
+        if (r.Role == EnumRiskRole.OnItsOwn)
+            cues.Add(Say(r.At, $"The reward is {Money(reward)}, from the entry at {Money(r.Entry)} to the Take Profit at {Money(r.TakeProfit)}. The risk is {Money(risk)}, to the Stop Loss at {Money(r.StopLoss)}."));
+        cues.Add(Define(r.At, "Risk.ratio"));
+        cues.Add(Say(r.At, r.Role switch
+        {
+            EnumRiskRole.SetsStopLoss when target == 1 => $"The Stop Loss is set for a 1R target: as far {below} the entry as the Take Profit is {above} it, {Money(reward)}.",
+            EnumRiskRole.SetsStopLoss => $"The Stop Loss is set for a {times}R target: with {Money(reward)} to win, the risk is {Money(reward)} divided by {times}, {Money(risk)}.",
+            EnumRiskRole.Observed => $"With {Money(reward)} to win and {Money(risk)} to lose, the Take Profit is a {times}R target.",
+            _ => $"The Take Profit is a {times}R target{(r.Set != null ? ", as the strategy sets it" : "")}.",
+        }));
+        cues.Add(Define(r.At, "Risk.breakeven"));
+        cues.Add(Teach(r.At, $"At {times}R, it breaks even over many trades when it wins {share}% of them."));
+        return new Block(cues, ["candles", "trade"]);
     }
 
     // A number of R as it is said: to two places at most, "1", "0.5", "1.25".

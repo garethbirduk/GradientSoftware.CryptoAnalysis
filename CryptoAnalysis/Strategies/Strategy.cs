@@ -145,6 +145,12 @@ public sealed class StrategyTarget
     [JsonIgnore]
     public bool IsLevel => Type is HighestWick or LowestWick;
 
+    /// <summary>
+    /// Whether the target is set from the risk, so the risk is a condition of it rather than an observation of the exits.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsRiskCondition => Type == RiskRatio;
+
     public string Type { get; set; } = AverageCandle;
 
     [JsonPropertyName("percent")]
