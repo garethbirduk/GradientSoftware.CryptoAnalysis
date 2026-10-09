@@ -215,17 +215,60 @@ public static class ReplayServer
         // their totals. Each run is also written to artifacts/backtests as JSON (the strategy, the totals and the trades) and
         // as CSV (the trades), named by the strategy and the dataset, so the trades of each variation are kept to compare.
         var backtestsDir = Path.GetFullPath(Path.Combine(siteDir, "..", "backtests"));
+        // The roles of the markets' periods, kept beside strategies.json, with their log beside the runs; none without the
+        // source folder, so nothing is held back.
+        var roles = Directory.Exists(sourceDir) ? new PeriodRoles(Path.Combine(sourceDir, "periods.json"), Path.Combine(backtestsDir, "periods.log.jsonl")) : null;
+
+        // The markets strategies are tested on, each with its years: their candles, and their roles with the baselines run
+        // on each Test year so far.
+        app.MapGet("/api/markets", () =>
+        {
+            var counts = roles?.TestRuns() ?? [];
+            return Results.Json(Markets.All.Where(x => byId.ContainsKey(x.Id)).Select(market =>
+            {
+                var prices = byId[market.Id].Prices;
+                var years = Enumerable.Range(prices[0].DateTime.Year, prices[^1].DateTime.Year - prices[0].DateTime.Year + 1).Select(year =>
+                {
+                    var (first, end) = StrategyBacktest.Window(prices, new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc), new DateTime(year + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+                    return new
+                    {
+                        Year = year, Candles = end - first, First = prices[first].DateTime, Last = prices[end - 1].DateTime,
+                        Role = (roles?.Role(market.Group, year) ?? EnumPeriodRole.Search).ToString().ToLowerInvariant(),
+                        TestRuns = counts.GetValueOrDefault((market.Group, year)),
+                    };
+                }).Where(x => x.Candles > 0);
+                return new { market.Id, market.Name, market.Group, market.Hours, Years = years };
+            }), Json);
+        });
+
+        // A period's role changed, { group, year, role }, kept and logged at once.
+        app.MapPut("/api/periods", async (HttpRequest request) =>
+        {
+            if (roles == null)
+                return Results.NotFound("The server has no source folder to keep the roles in.");
+            var body = await JsonNode.ParseAsync(request.Body);
+            var group = body?["group"]?.GetValue<string>();
+            var year = body?["year"]?.GetValue<int>();
+            if (group == null || year == null || Markets.All.All(x => x.Group != group)
+                || !Enum.TryParse<EnumPeriodRole>(body?["role"]?.GetValue<string>(), true, out var role))
+                return Results.BadRequest("The request is { group, year, role }, with a market group and a role of search, test or locked.");
+            roles.Set(group, year.Value, role);
+            return Results.Ok();
+        });
+
         app.MapPost("/api/backtest", async (HttpRequest request) =>
         {
-            var (strategy, data, save, _, error) = await BacktestRequest(request);
+            var (strategy, data, save, _, window, error) = await BacktestRequest(request);
             if (error != null)
                 return Results.BadRequest(error);
+            // The charts ask for a strategy's trades to draw them, and those are not kept, nor held to the periods' roles.
+            if (save && roles?.Check(data!.Id, data.Prices, window, "run", strategy!.Id) is { } refused)
+                return Results.BadRequest(refused);
 
-            var run = StrategyBacktest.Run(data!.Prices, strategy!, data.Id);
-            // The charts ask for a strategy's trades to draw them, and those are not kept.
+            var run = StrategyBacktest.Run(data!.Prices, strategy!, data.Id, window);
             if (!save)
                 return Results.Text($"{{\"run\":{JsonSerializer.Serialize(run, StrategyBook.JsonOptions)}}}", "application/json");
-            var name = RunPath(strategy!, data);
+            var name = RunPath(strategy!, data, window);
             var json = JsonSerializer.Serialize(run, StrategyBook.JsonOptions);
             await File.WriteAllTextAsync($"{name}.json", json);
             await File.WriteAllTextAsync($"{name}.csv", StrategyBacktest.ToCsv(run.Trades));
@@ -236,25 +279,28 @@ public static class ReplayServer
         // than the backtest does (see StrategyBacktest.Occurrences), for the page to check the trades against.
         app.MapPost("/api/backtest/similar", async (HttpRequest request) =>
         {
-            var (strategy, data, _, _, error) = await BacktestRequest(request);
+            var (strategy, data, _, _, _, error) = await BacktestRequest(request);
             if (error != null)
                 return Results.BadRequest(error);
             var found = StrategyBacktest.Occurrences(data!.Prices, strategy!);
             return Results.Json(new { Candles = found.Select(i => new { Index = i, Time = data.Prices[i].DateTime, Measurable = StrategyBacktest.Measurable(data.Prices, i, strategy) }) }, Json);
         });
 
-        // The random-entry baseline of a strategy (see StrategyBaseline): { dataset, strategy, runs, seed, save }, runs and
-        // seed optional. It is saved beside the strategy's run in artifacts/backtests, as JSON ending .baseline.json.
+        // The random-entry baseline of a strategy (see StrategyBaseline): { dataset, strategy, from, to, runs, seed, save },
+        // all but the dataset and strategy optional. It is saved beside the strategy's run in artifacts/backtests, as JSON
+        // ending .baseline.json.
         app.MapPost("/api/backtest/baseline", async (HttpRequest request) =>
         {
-            var (strategy, data, save, body, error) = await BacktestRequest(request);
+            var (strategy, data, save, body, window, error) = await BacktestRequest(request);
             if (error != null)
                 return Results.BadRequest(error);
+            if (roles?.Check(data!.Id, data.Prices, window, "baseline", strategy!.Id) is { } refused)
+                return Results.BadRequest(refused);
             BaselineRun baseline;
             try
             {
                 baseline = StrategyBaseline.Run(data!.Prices, strategy!, data.Id, body?["runs"]?.GetValue<int>() ?? StrategyBaseline.DefaultRuns,
-                    body?["seed"]?.GetValue<int>() ?? 1);
+                    body?["seed"]?.GetValue<int>() ?? 1, window);
             }
             catch (Exception e) when (e is ArgumentException or InvalidOperationException)
             {
@@ -264,23 +310,26 @@ public static class ReplayServer
             var json = JsonSerializer.Serialize(baseline, StrategyBook.JsonOptions);
             if (!save)
                 return Results.Text($"{{\"baseline\":{json}}}", "application/json");
-            var name = $"{RunPath(strategy!, data)}.baseline.json";
+            var name = $"{RunPath(strategy!, data!, window)}.baseline.json";
             await File.WriteAllTextAsync(name, json);
             return Results.Text($"{{\"saved\":{JsonSerializer.Serialize(name)},\"baseline\":{json}}}", "application/json");
         });
 
-        // A strategy swept over the numbers it varies (see StrategySweep): { dataset, strategy, runs, seed, save }, as for a
-        // baseline, each variation with a baseline of its own. It is saved beside the strategy's runs, ending .sweep.json.
+        // A strategy swept over the numbers it varies (see StrategySweep): { dataset, strategy, from, to, runs, seed, save }, as
+        // for a baseline, each variation with a baseline of its own; on Search periods only. It is saved beside the strategy's
+        // runs, ending .sweep.json.
         app.MapPost("/api/backtest/sweep", async (HttpRequest request) =>
         {
-            var (strategy, data, save, body, error) = await BacktestRequest(request);
+            var (strategy, data, save, body, window, error) = await BacktestRequest(request);
             if (error != null)
                 return Results.BadRequest(error);
+            if (roles?.Check(data!.Id, data.Prices, window, "sweep", strategy!.Id) is { } refused)
+                return Results.BadRequest(refused);
             SweepRun sweep;
             try
             {
                 sweep = StrategySweep.Run(data!.Prices, strategy!, data.Id, body?["runs"]?.GetValue<int>() ?? StrategyBaseline.DefaultRuns,
-                    body?["seed"]?.GetValue<int>() ?? 1);
+                    body?["seed"]?.GetValue<int>() ?? 1, window);
             }
             catch (Exception e) when (e is ArgumentException or InvalidOperationException)
             {
@@ -290,21 +339,25 @@ public static class ReplayServer
             var json = JsonSerializer.Serialize(sweep, StrategyBook.JsonOptions);
             if (!save)
                 return Results.Text($"{{\"sweep\":{json}}}", "application/json");
-            var name = $"{RunPath(strategy!, data)}.sweep.json";
+            var name = $"{RunPath(strategy!, data!, window)}.sweep.json";
             await File.WriteAllTextAsync(name, json);
             return Results.Text($"{{\"saved\":{JsonSerializer.Serialize(name)},\"sweep\":{json}}}", "application/json");
         });
 
-        // Where a strategy's runs over a dataset are written, without the extension: named by the strategy and the dataset.
-        string RunPath(Strategy strategy, Dataset data)
+        // Where a strategy's runs over a dataset are written, without the extension: named by the strategy and the dataset,
+        // and the dates of the window when it is not the whole dataset, so each period's runs are kept.
+        string RunPath(Strategy strategy, Dataset data, (int First, int End) window)
         {
             Directory.CreateDirectory(backtestsDir);
-            return Path.Combine(backtestsDir, $"{string.Concat(strategy.Id.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '-' : c))}@{data.Id}");
+            var dates = window == (0, data.Prices.Count) || window.End <= window.First ? ""
+                : $"_{data.Prices[window.First].DateTime:yyyyMMdd}-{data.Prices[window.End - 1].DateTime:yyyyMMdd}";
+            return Path.Combine(backtestsDir, $"{string.Concat(strategy.Id.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '-' : c))}@{data.Id}{dates}");
         }
 
-        // A backtest request, { dataset, strategy, save }: the strategy and the dataset, or what is wrong with them, and the
+        // A backtest request, { dataset, strategy, from, to, save }: the strategy, the dataset and the window of it from the
+        // date from up to but not including the date to (all of it without them), or what is wrong with them, and the
         // request's body for whatever else it carries.
-        async Task<(Strategy? Strategy, Dataset? Data, bool Save, JsonNode? Body, string? Error)> BacktestRequest(HttpRequest request)
+        async Task<(Strategy? Strategy, Dataset? Data, bool Save, JsonNode? Body, (int First, int End) Window, string? Error)> BacktestRequest(HttpRequest request)
         {
             try
             {
@@ -312,13 +365,21 @@ public static class ReplayServer
                 var strategy = body?["strategy"]?.Deserialize<Strategy>(StrategyBook.JsonOptions);
                 var dataset = body?["dataset"]?.GetValue<string>();
                 if (strategy == null || dataset == null || !byId.TryGetValue(dataset, out var data))
-                    return (null, null, false, null, "The request is { dataset, strategy }, with a dataset the server has.");
+                    return (null, null, false, null, default, "The request is { dataset, strategy }, with a dataset the server has.");
                 var errors = strategy.Validate();
-                return errors.Count > 0 ? (null, null, false, null, string.Join(" ", errors)) : (strategy, data, body?["save"]?.GetValue<bool>() ?? true, body, null);
+                if (errors.Count > 0)
+                    return (null, null, false, null, default, string.Join(" ", errors));
+                DateTime? Date(string key) => body?[key]?.GetValue<string>() is { Length: > 0 } text
+                    ? DateTime.Parse(text, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal)
+                    : null;
+                var window = StrategyBacktest.Window(data.Prices, Date("from"), Date("to"));
+                if (window.End <= window.First)
+                    return (null, null, false, null, default, "The dataset has no candles from the date from up to the date to.");
+                return (strategy, data, body?["save"]?.GetValue<bool>() ?? true, body, window, null);
             }
-            catch (Exception e) when (e is JsonException or InvalidOperationException)
+            catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException)
             {
-                return (null, null, false, null, $"The request is not a backtest: {e.Message}");
+                return (null, null, false, null, default, $"The request is not a backtest: {e.Message}");
             }
         }
 

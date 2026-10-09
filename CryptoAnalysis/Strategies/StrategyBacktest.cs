@@ -60,17 +60,47 @@ public sealed record BacktestRun(Strategy Strategy, string Dataset, DateTime Fro
 public static class StrategyBacktest
 {
     /// <summary>
-    /// Runs the strategy over the prices and returns its trades with their totals.
+    /// Runs the strategy over the prices and returns its trades with their totals. With a window, trades are entered only at
+    /// the candles in it, first up to but not including end, though the strategy reads the candles before it and a trade can
+    /// close after it; the run's dates and candles are the window's.
     /// </summary>
-    public static BacktestRun Run(IReadOnlyList<Price> prices, Strategy strategy, string dataset = "")
+    public static BacktestRun Run(IReadOnlyList<Price> prices, Strategy strategy, string dataset = "", (int First, int End)? window = null)
     {
         var errors = strategy.Validate();
         if (errors.Count > 0)
             throw new ArgumentException(string.Join(" ", errors), nameof(strategy));
 
-        var trades = Trades(prices, strategy, Signals(prices, strategy));
-        return new BacktestRun(strategy, dataset, prices.Count > 0 ? prices[0].DateTime : default, prices.Count > 0 ? prices[^1].DateTime : default,
-            prices.Count, DateTime.UtcNow, Summarise(trades), trades);
+        var (first, end) = window ?? (0, prices.Count);
+        var trades = Trades(prices, strategy, Signals(prices, strategy).Where(x => x.Index >= first && x.Index < end));
+        return new BacktestRun(strategy, dataset, end > first ? prices[first].DateTime : default, end > first ? prices[end - 1].DateTime : default,
+            end - first, DateTime.UtcNow, Summarise(trades), trades);
+    }
+
+    /// <summary>
+    /// The candles of the prices from a date up to but not including another, as a window for <see cref="Run"/>: all of
+    /// them when neither is given.
+    /// </summary>
+    public static (int First, int End) Window(IReadOnlyList<Price> prices, DateTime? from, DateTime? to)
+    {
+        var first = from is { } f ? FirstAtOrAfter(prices, f) : 0;
+        var end = to is { } t ? FirstAtOrAfter(prices, t) : prices.Count;
+        return (first, Math.Max(first, end));
+    }
+
+    // The first candle at or after the time; the number of candles when none is.
+    private static int FirstAtOrAfter(IReadOnlyList<Price> prices, DateTime time)
+    {
+        var (lo, hi) = (0, prices.Count);
+        while (lo < hi)
+        {
+            var mid = (lo + hi) / 2;
+            if (prices[mid].DateTime < time)
+                lo = mid + 1;
+            else
+                hi = mid;
+        }
+
+        return lo;
     }
 
     /// <summary>

@@ -35,8 +35,10 @@ public static class StrategySweep
 
     /// <summary>
     /// Runs every variation of the strategy, each with the given number of random runs, and finds the best by each total.
+    /// With a window, every variation enters only in it, as <see cref="StrategyBacktest.Run"/> does.
     /// </summary>
-    public static SweepRun Run(IReadOnlyList<Price> prices, Strategy strategy, string dataset = "", int runs = StrategyBaseline.DefaultRuns, int seed = 1)
+    public static SweepRun Run(IReadOnlyList<Price> prices, Strategy strategy, string dataset = "", int runs = StrategyBaseline.DefaultRuns, int seed = 1,
+        (int First, int End)? window = null)
     {
         var variations = Variations(strategy);
         var measured = variations.Select(v =>
@@ -46,7 +48,7 @@ public static class StrategySweep
                 return (v.Values, Result: ((BaselineRun Baseline, BacktestSummary Actual, BacktestSummary[] Random)?)null, Error: string.Join(" ", errors));
             try
             {
-                return (v.Values, Result: StrategyBaseline.Measured(prices, v.Strategy, dataset, runs, seed), Error: (string?)null);
+                return (v.Values, Result: StrategyBaseline.Measured(prices, v.Strategy, dataset, runs, seed, window), Error: (string?)null);
             }
             catch (ArgumentException e)
             {

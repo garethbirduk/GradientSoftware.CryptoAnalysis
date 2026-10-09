@@ -401,6 +401,26 @@
   .strat-fields label.strat-vary { margin-left: -6px; }
   .strat-fields label.strat-vary input[type="number"] { width: 56px; font-size: 12px; }
   .strat-sweep-beats { height: 260px; margin-top: 4px; }
+  /* The periods grid: a row a year, a column a market. A cell's tint is its score once run; its left edge its role. */
+  .strat-grid-wrap { overflow-x: auto; margin-top: 12px; }
+  .strat-grid { border-collapse: separate; border-spacing: 4px; font-size: 13px; margin: 0; }
+  .strat-grid th { font-weight: 600; color: var(--muted); text-align: left; padding: 2px 4px; white-space: nowrap; }
+  .strat-grid th button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  .strat-grid th button:hover { color: var(--accent); }
+  .strat-cell { min-width: 150px; border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; padding: 4px 8px 6px; vertical-align: top; cursor: pointer; background: var(--panel); }
+  .strat-cell.none { border: 0; background: none; cursor: default; }
+  .strat-cell.role-search { border-left-color: var(--border); }
+  .strat-cell.role-test { border-left-color: var(--warn); }
+  .strat-cell.role-locked { border-left-color: var(--muted); background: var(--chip); color: var(--muted); }
+  .strat-cell.sel { box-shadow: 0 0 0 2px var(--accent); }
+  .strat-cell.good { background: color-mix(in srgb, var(--ok) 22%, var(--panel)); }
+  .strat-cell.fair { background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
+  .strat-cell.poor { background: color-mix(in srgb, var(--bad) 12%, var(--panel)); }
+  .strat-cell-top { display: flex; align-items: center; gap: 6px; }
+  .strat-cell-top select { font: inherit; font-size: 12px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 0 2px; }
+  .strat-cell-result { margin-top: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 1.3em; }
+  .strat-cell-note { font-size: 11px; color: var(--muted); }
+  .strat-cell-head { margin: 18px 0 0; font-size: 15px; }
   /* Fees and Slippage a line each, their checkboxes one width so the numbers beside them line up. */
   .strat-fields.strat-cost + .strat-fields { margin-top: 6px; }
   .strat-cost label.check { width: 80px; align-self: center; }
@@ -5382,16 +5402,41 @@ async function loadStrategies() {
   book.defaults ??= { ...FIRST_DEFAULT_COSTS };
   book.strategies.forEach(s => { s.feePercent ??= book.defaults.feePercent; s.slippagePercent ??= book.defaults.slippagePercent; });
   strategies = { book, base, saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false,
-    dataset: strategies?.dataset, sweeps: strategies?.sweeps };
+    sweeps: strategies?.sweeps, markets: strategies?.markets, included: strategies?.included, cell: strategies?.cell ?? new Map() };
 }
 
-// The page's address names the strategy shown and the dataset it runs on, #Strategies?id=green-run-4&dataset=btc-1h, so a
-// reload or a link opens the same. It is kept up to date in place as strategies are picked, without a page of history each.
+// The page's address names the strategy shown, the periods ticked and the one whose results are shown,
+// #Strategies?id=green-run-4&cells=btc-coinbase-1h:2021,btc-coinbase-1h:2022&cell=btc-coinbase-1h:2021, so a reload or a
+// link opens the same. It is kept up to date in place as they change, without a page of history each.
 function strategiesHash() {
-  const q = new URLSearchParams(), id = strategies?.selected ?? strategies?.missing;
+  const q = new URLSearchParams(), id = strategies?.selected ?? strategies?.missing, cell = strategies?.selected && strategies.cell?.get(strategies.selected);
   if (id) q.set('id', id);
-  if (strategies?.dataset) q.set('dataset', strategies.dataset);
+  if (strategies?.included?.size) q.set('cells', [...strategies.included].join(','));
+  if (cell) q.set('cell', cell);
   return `#Strategies${q.size ? `?${q}` : ''}`;
+}
+
+// ---- Markets and periods -------------------------------------------------------------------------------------------
+// The markets strategies are tested on (GET api/markets, see Markets), each with its years: their candles, their role
+// (search, test or locked) and how often a Test year has been looked at. A cell is a market's year, keyed "market:year";
+// a strategy's runs are kept by cell, and the cells ticked are run together.
+const cellKey = (market, year) => `${market}:${year}`;
+const cellOf = key => { const [market, year] = String(key).split(':'); return { market, year: Number(year) }; };
+const cellWindow = key => { const { year } = cellOf(key); return { from: `${year}-01-01T00:00:00Z`, to: `${year + 1}-01-01T00:00:00Z` }; };
+const marketOf = id => strategies.markets?.find(m => m.id === id);
+const yearOf = key => { const { market, year } = cellOf(key); return marketOf(market)?.years.find(y => y.year === year); };
+const cellName = key => { const { market, year } = cellOf(key); return `${marketOf(market)?.name ?? market}, ${year}`; };
+const runnable = key => yearOf(key) && yearOf(key).role !== 'locked';
+const ROLE_NAMES = { search: 'Search', test: 'Test', locked: 'Locked' };
+
+// A strategy's runs, by cell.
+function strategyCells(s) {
+  if (!strategies.runs.has(s.id)) strategies.runs.set(s.id, new Map());
+  return strategies.runs.get(s.id);
+}
+
+async function loadMarkets() {
+  strategies.markets = await fetch('api/markets', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).catch(() => []);
 }
 
 function syncStrategiesHash() {
@@ -5437,7 +5482,7 @@ async function renderStrategiesPage(asked = new URLSearchParams()) {
   const main = document.getElementById('main');
   currentPage = 'Strategies';
   const head = `<section class="term-head"><h2>Strategies</h2>
-    <p>Build a strategy from an entry, a take profit and a stop loss, then run it over a whole dataset for every trade it would have made.</p>
+    <p>Build a strategy from an entry, a take profit and a stop loss, then run it on years of markets for every trade it would have made.</p>
     <p class="remarks">A trade is entered at the close of the candle that calls for it and watched from the next candle: a candle that opens
     beyond a target fills at its open, otherwise one whose high or low reaches it fills at the target. A candle that reaches both counts as
     the Stop Loss. Profits are per unit traded, after the strategy's fees and slippage. Each run is saved, with all its trades, to artifacts/backtests.</p></section>`;
@@ -5449,7 +5494,8 @@ async function renderStrategiesPage(asked = new URLSearchParams()) {
     main.innerHTML = head + '<div class="empty">Loading strategies…</div>';
     try { await loadStrategies(); } catch (e) { main.innerHTML = head + `<div class="empty">strategies.json could not be read: ${esc(e.message)}.</div>`; return; }
   }
-  const list = await loadDatasets();
+  await loadDatasets();
+  if (!strategies.markets?.length) await loadMarkets();
   if (currentPage !== 'Strategies') return;
   // An id the address asks for that strategies.json does not have is said so, with none shown, rather than another put in its place.
   const id = asked.get('id');
@@ -5457,7 +5503,12 @@ async function renderStrategiesPage(asked = new URLSearchParams()) {
     const found = strategies.book.strategies.some(s => s.id === id);
     [strategies.selected, strategies.missing] = found ? [id, null] : [null, id];
   }
-  strategies.dataset = [asked.get('dataset'), strategies.dataset, state.replayDataset].find(d => list.some(x => x.id === d)) ?? list[0]?.id;
+  // The periods ticked: the address's, else those ticked before, else the first market's Search years.
+  const cells = asked.get('cells')?.split(',').filter(k => yearOf(k));
+  const first = strategies.markets?.[0];
+  strategies.included = new Set(cells?.length ? cells : strategies.included?.size ? strategies.included
+    : (first?.years ?? []).filter(y => y.role === 'search').map(y => cellKey(first.id, y.year)));
+  if (asked.get('cell') && yearOf(asked.get('cell')) && strategies.selected) strategies.cell.set(strategies.selected, asked.get('cell'));
   main.innerHTML = head + `<div class="strat"><nav class="strat-list" aria-label="Strategies"></nav><div class="strat-body"></div></div>`;
   renderStrategyList();
   renderStrategy();
@@ -5738,17 +5789,22 @@ async function strategyAction(act) {
 function renderStrategyRun() {
   const box = document.querySelector('.strat-run-body'), s = selectedStrategy();
   if (!box || !s) return;
-  const run = strategies.runs.get(s.id);
+  const key = strategies.cell.get(s.id), run = strategyCells(s).get(key);
+  const ticked = [...strategies.included].filter(runnable);
   box.innerHTML = `<div class="strat-run">
-      <select data-run-dataset aria-label="Dataset">${(datasetList ?? []).map(d => `<option value="${esc(d.id)}" ${d.id === strategies.dataset ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>
-      <button type="button" data-run ${strategies.running ? 'disabled' : ''}>${strategies.running ? 'Running…' : 'Run'}</button>
-      ${run?.trades ? '<button type="button" data-csv>Download CSV</button>' : ''}
-      ${run?.trades ? `<button type="button" data-baseline ${run.baselining ? 'disabled' : ''} title="Runs the same exits from random entries, as often as the strategy enters, to see what the entry adds">${run.baselining ? 'Running baseline…' : 'Random baseline'}</button>` : ''}
-      <button type="button" data-sweep ${strategies.sweeping ? 'disabled' : ''} title="Runs every variation of the numbers given a To and a Step, each against its own random baseline">${strategies.sweeping ? 'Sweeping…' : 'Run sweep'}</button>
-      <span class="strat-note${run?.error ? ' bad' : ''}">${esc(run?.error ?? (run ? `Saved to ${run.saved}` : 'Runs the strategy as it is here, saved or not.'))}</span>
+      <button type="button" data-run ${strategies.running || !ticked.length ? 'disabled' : ''}>${strategies.running ? esc(strategies.running) : `Run on ${ticked.length} period${ticked.length === 1 ? '' : 's'}`}</button>
+      <button type="button" data-sweep ${strategies.sweeping ? 'disabled' : ''} title="Runs every variation of the numbers given a To and a Step on the period shown, each against its own random baseline; on a Search period only">${strategies.sweeping ? 'Sweeping…' : 'Run sweep'}</button>
+      <span class="strat-note">Runs the strategy as it is here, saved or not, with a random baseline, on each period ticked below. Its trades open in the period, reading the candles before it, and may close after it.</span>
     </div>
+    ${strategyGrid(s)}
     <form class="strat-run" data-chart-add><input class="strat-chart-name" data-chart-name aria-label="Name on the charts" value="${esc(chartStrategyName(s))}">
       <button type="submit">Add to strategies on charts</button><span class="strat-note" data-chart-note>Adds the strategy as it is here, under this name, to the Strategies section beside the charts.</span></form>
+    ${key ? `<h3 class="strat-cell-head">${esc(cellName(key))}</h3>` : ''}
+    <div class="strat-run">
+      ${run?.trades ? '<button type="button" data-csv>Download CSV</button>' : ''}
+      ${run?.trades && (!run.baseline || run.baseline.error) ? `<button type="button" data-baseline ${run.baselining ? 'disabled' : ''} title="Runs the same exits from random entries, as often as the strategy enters, to see what the entry adds">${run.baselining ? 'Running baseline…' : 'Random baseline'}</button>` : ''}
+      <span class="strat-note${run?.error ? ' bad' : ''}">${esc(run?.error ?? (run?.saved ? `Saved to ${run.saved}` : key ? 'Not run on this period yet.' : 'Click a period to see its results.'))}</span>
+    </div>
     <div class="strat-sweep"></div>
     ${run?.baseline ? baselineResults(run.baseline) : ''}
     <div class="strat-results">${run?.trades ? strategyResults(run) : ''}</div>`;
@@ -5761,7 +5817,7 @@ function renderStrategyRun() {
     box.querySelector('[data-chart-note]').textContent = c ? `Added as "${c.label}": turn it on in the Strategies section on the Chart, Replay, Tour or Analysis page.`
       : strategyRules(like.strategy) === strategyRules(s) ? `Not added: it is on the charts already, as "${like.label}".` : `Not added: "${like.label}" is already the name of another on the charts.`;
   });
-  box.querySelector('[data-run-dataset]').addEventListener('change', e => { strategies.dataset = e.target.value; syncStrategiesHash(); });
+  wireStrategyGrid(box, s);
   box.querySelector('[data-run]').addEventListener('click', () => runStrategy(s));
   box.querySelector('[data-csv]')?.addEventListener('click', () => downloadTrades(run));
   box.querySelector('[data-baseline]')?.addEventListener('click', () => runBaseline(s, run));
@@ -5813,42 +5869,131 @@ function summariseTrades(trades) {
   };
 }
 
-// Runs the strategy as it is here. With again, it is the run there was run again for a change of costs, on its dataset:
-// costs do not change which trades are made, so those left out stay left out, the order stays, and a baseline there was is
-// run again too.
-async function runStrategy(s, again = false) {
-  const before = again ? strategies.runs.get(s.id) : null;
-  strategies.running = true;
-  renderStrategyRun();
-  const response = await fetch('api/backtest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset: before?.dataset ?? strategies.dataset, strategy: s }) }).catch(() => null);
-  const result = response?.ok ? await response.json()
-    : { error: response?.status === 404 || response?.status === 405 ? 'The local server was started before strategies could be run. Restart ./build-site.ps1 -Serve.'
+// A POST to one of the backtest endpoints, its answer as JSON, or { error } saying why there is none.
+async function postBacktest(path, body, what) {
+  const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+  return response?.ok ? response.json()
+    : { error: response?.status === 404 || response?.status === 405 ? `The local server was started before ${what} could be run. Restart ./build-site.ps1 -Serve.`
       : `Not run: ${response ? await response.text() : 'the local server did not answer.'}` };
+}
+
+// Runs the strategy as it is here on each period ticked, one after another, each with its random baseline, and shows the
+// first of them when none is shown. With again, it is run again for a change of costs: costs do not change which trades
+// are made, so a period's trades left out stay left out, and its order stays.
+async function runStrategy(s, again = false) {
+  const cells = strategyCells(s), keys = [...strategies.included].filter(runnable);
+  if (!keys.length) return;
+  if (!keys.includes(strategies.cell.get(s.id)) && !cells.has(strategies.cell.get(s.id))) strategies.cell.set(s.id, keys[0]);
+  syncStrategiesHash();
+  const shown = () => currentPage === 'Strategies' && selectedStrategy() === s;
+  for (const [n, key] of keys.entries()) {
+    strategies.running = `Running ${n + 1} of ${keys.length}…`;
+    const before = cells.get(key), { market } = cellOf(key), window = cellWindow(key);
+    cells.set(key, { running: true });
+    if (shown()) renderStrategyRun();
+    const result = await postBacktest('api/backtest', { dataset: market, ...window, strategy: s }, 'strategies');
+    const run = result.error ? result : { saved: result.saved, ...result.run, window };
+    if (again && before?.trades && run.trades) Object.assign(run, { leftOut: before.leftOut, sort: before.sort });
+    if (run.trades) {
+      const b = await postBacktest('api/backtest/baseline', { dataset: market, ...window, strategy: run.strategy }, 'baselines');
+      run.baseline = b.error ? b : { saved: b.saved, ...b.baseline };
+    }
+    cells.set(key, run);
+  }
   strategies.running = false;
-  const run = result.error ? result : { saved: result.saved, ...result.run };
-  if (before?.trades && run.trades) Object.assign(run, { leftOut: before.leftOut, sort: before.sort });
-  strategies.runs.set(s.id, run);
-  if (currentPage === 'Strategies' && selectedStrategy() === s) renderStrategyRun();
-  if (before?.baseline && run.trades) runBaseline(s, run);
+  // A run on a Test period is counted, so the counts are fetched again.
+  await loadMarkets();
+  if (shown()) renderStrategyRun();
 }
 
-// A strategy's costs changed: a run of it is run again, so its results and graph have them.
+// A strategy's costs changed: a strategy run on any period is run again on those ticked, so their results and graphs have them.
 function rerunForCosts(s) {
-  if (strategies.runs.get(s.id)?.trades && !strategies.running) runStrategy(s, true);
+  if (strategyCells(s).size && !strategies.running) runStrategy(s, true);
 }
 
-// The random-entry baseline of a run (POST api/backtest/baseline, see StrategyBaseline): the run's own strategy, as it was
-// when run, with its entry swapped for random candles many times over. It is kept on the run, so running again clears it.
+// The random-entry baseline of a run (POST api/backtest/baseline, see StrategyBaseline) when it has none, as when it
+// failed: the run's own strategy, as it was when run, on its period, with its entry swapped for random candles.
 async function runBaseline(s, run) {
   run.baselining = true;
   renderStrategyRun();
-  const response = await fetch('api/backtest/baseline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset: run.dataset, strategy: run.strategy }) }).catch(() => null);
-  const result = response?.ok ? await response.json()
-    : { error: response?.status === 404 || response?.status === 405 ? 'The local server was started before baselines could be run. Restart ./build-site.ps1 -Serve.'
-      : `Not run: ${response ? await response.text() : 'the local server did not answer.'}` };
+  const result = await postBacktest('api/backtest/baseline', { dataset: run.dataset, ...run.window, strategy: run.strategy }, 'baselines');
   run.baselining = false;
   run.baseline = result.error ? result : { saved: result.saved, ...result.baseline };
-  if (currentPage === 'Strategies' && selectedStrategy() === s && strategies.runs.get(s.id) === run) renderStrategyRun();
+  if (currentPage === 'Strategies' && selectedStrategy() === s && strategyCells(s).get(strategies.cell.get(s.id)) === run) renderStrategyRun();
+}
+
+// The periods to run on: a row a year, a column a market, each cell with a tick to run on it, its role, and the strategy's
+// result there once run: its score (how much of its random runs it beats on Total %), its total after costs and its trades.
+// A year's role is its market group's, shared by its candle lengths.
+function strategyGrid(s) {
+  const markets = strategies.markets ?? [];
+  if (!markets.length) return '<p class="remarks strat-note bad">The local server has no markets: restart ./build-site.ps1 -Serve.</p>';
+  const years = [...new Set(markets.flatMap(m => m.years.map(y => y.year)))].sort((a, b) => a - b);
+  const cells = strategyCells(s), selected = strategies.cell.get(s.id);
+  const cell = (m, year) => {
+    const y = m.years.find(x => x.year === year);
+    if (!y) return '<td class="strat-cell none"></td>';
+    const key = cellKey(m.id, year), run = cells.get(key), total = run?.baseline?.measures?.find(x => x.name === 'Total %');
+    const result = y.role === 'locked' ? 'Kept back'
+      : run?.running ? 'Running…'
+      : run?.error ? `<span class="bad" title="${esc(run.error)}">Not run</span>`
+      : total ? `<b>${Math.round(total.percentile ?? 0)}%</b> · ${fmtPercent(total.strategy)} · ${run.baseline.trades}`
+      : run?.trades ? `${fmtPercent(run.summary.totalProfitPercent)} · ${run.summary.trades}` : '';
+    const tone = total?.percentile == null ? '' : total.percentile >= 95 ? ' good' : total.percentile >= 90 ? ' fair' : total.percentile <= 5 ? ' poor' : '';
+    return `<td class="strat-cell role-${y.role}${tone}${key === selected ? ' sel' : ''}" data-cell="${key}" title="${esc(`${cellName(key)}: ${fmtTime(y.first)} to ${fmtTime(y.last)} UTC, ${y.candles.toLocaleString()} candles`)}">
+      <div class="strat-cell-top"><input type="checkbox" data-cell-tick="${key}" ${strategies.included.has(key) && y.role !== 'locked' ? 'checked' : ''} ${y.role === 'locked' ? 'disabled' : ''} aria-label="Run on ${esc(cellName(key))}">
+        <select data-cell-role="${m.group}:${year}" aria-label="Role of ${year}">${Object.entries(ROLE_NAMES).map(([r, name]) => `<option value="${r}" ${r === y.role ? 'selected' : ''}>${name}</option>`).join('')}</select></div>
+      <div class="strat-cell-result">${result}</div>
+      ${y.role === 'test' ? `<div class="strat-cell-note">Looked at ${y.testRuns}×</div>` : ''}</td>`;
+  };
+  return `<div class="strat-grid-wrap"><table class="strat-grid">
+      <thead><tr><th></th>${markets.map(m => `<th><button type="button" data-tick-market="${m.id}" title="Tick or untick all of this market's periods">${esc(m.name)}</button></th>`).join('')}</tr></thead>
+      <tbody>${years.map(year => `<tr><th><button type="button" data-tick-year="${year}" title="Tick or untick this year in every market">${year}</button></th>${markets.map(m => cell(m, year)).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+    <p class="remarks">A cell is a year of a market: once run, <b>its score</b> (the share of its random runs it beats on Total %) · its total after costs · its trades;
+      click one for its results below. Strategies are searched for on <b>Search</b> years, where sweeps run. <b>Test</b> years check what was found: each look is
+      counted, as every look makes a good result there a little more likely by luck. <b>Locked</b> years are kept back for a final check, and run on nothing
+      until unlocked. Roles are kept at once, and every change is logged.</p>`;
+}
+
+// The grid's ticks, roles and clicks: a tick runs on a period, a heading's on all of its row or column, a role is kept at
+// once (unlocking only once confirmed, as it spends the period), and a click elsewhere in a cell shows its results.
+function wireStrategyGrid(box, s) {
+  const grid = box.querySelector('.strat-grid');
+  if (!grid) return;
+  const toggle = keys => {
+    keys = keys.filter(runnable);
+    const on = keys.some(k => !strategies.included.has(k));
+    keys.forEach(k => on ? strategies.included.add(k) : strategies.included.delete(k));
+    syncStrategiesHash();
+    renderStrategyRun();
+  };
+  grid.querySelectorAll('[data-cell-tick]').forEach(el => el.addEventListener('change', () => toggle([el.dataset.cellTick])));
+  grid.querySelectorAll('[data-tick-market]').forEach(el => el.addEventListener('click', () =>
+    toggle(marketOf(el.dataset.tickMarket).years.map(y => cellKey(el.dataset.tickMarket, y.year)))));
+  grid.querySelectorAll('[data-tick-year]').forEach(el => el.addEventListener('click', () =>
+    toggle(strategies.markets.map(m => cellKey(m.id, Number(el.dataset.tickYear))).filter(yearOf))));
+  grid.querySelectorAll('[data-cell-role]').forEach(el => el.addEventListener('change', async () => {
+    const [group, year] = el.dataset.cellRole.split(':'), role = el.value;
+    const was = strategies.markets.find(m => m.group === group)?.years.find(y => y.year === Number(year))?.role;
+    if (was === 'locked' && !confirm(`Unlock ${year} of ${group}? It was kept back for a final check: once looked at, it can no longer give one. The unlocking is logged.`)) {
+      el.value = was;
+      return;
+    }
+    const response = await fetch('api/periods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group, year: Number(year), role }) }).catch(() => null);
+    if (!response?.ok) alert(`The role was not kept: ${response ? await response.text() : 'the local server did not answer.'}`);
+    await loadMarkets();
+    [...strategies.included].filter(k => !runnable(k)).forEach(k => strategies.included.delete(k));
+    syncStrategiesHash();
+    renderStrategyRun();
+  }));
+  grid.addEventListener('click', e => {
+    const td = e.target.closest('[data-cell]');
+    if (!td || e.target.closest('input, select, button')) return;
+    strategies.cell.set(s.id, td.dataset.cell);
+    syncStrategiesHash();
+    renderStrategyRun();
+  });
 }
 
 // Where the strategy's totals sit among the random runs': a row a total, with the share of runs it beat. Beating 95% or
@@ -5938,24 +6083,24 @@ function baselinePlot(el, b, run) {
 
 // ---- Sweeps ----------------------------------------------------------------------------------------------------------
 // A sweep (POST api/backtest/sweep, see StrategySweep) runs the strategy as it is here once for each combination of the
-// numbers given a To and a Step, each against its own random baseline. It is kept by strategy until the next sweep.
+// numbers given a To and a Step, each against its own random baseline, on the period shown, which must be a Search one. It
+// is kept by strategy until the next sweep.
 async function runSweep(s) {
   strategies.sweeps ??= new Map();
-  const plan = varyPlan(s);
-  if (plan.error) {
-    strategies.sweeps.set(s.id, { error: `Not swept: ${plan.error}` });
+  const plan = varyPlan(s), key = strategies.cell.get(s.id) ?? [...strategies.included].find(runnable);
+  const refused = plan.error ?? (!key ? 'pick a period to sweep on, by clicking it in the grid.'
+    : yearOf(key)?.role !== 'search' ? `${cellName(key)} is a ${ROLE_NAMES[yearOf(key)?.role] ?? ''} period, and sweeps search, so they run only on Search periods.` : null);
+  if (refused) {
+    strategies.sweeps.set(s.id, { error: `Not swept: ${refused}` });
     return renderStrategyRun();
   }
   strategies.sweeping = true;
   renderStrategyRun();
   // The strategy as it was swept, as the page keeps it, for a variation to be extracted from.
   const sent = structuredClone(s);
-  const response = await fetch('api/backtest/sweep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset: strategies.dataset, strategy: sent }) }).catch(() => null);
-  const result = response?.ok ? await response.json()
-    : { error: response?.status === 404 || response?.status === 405 ? 'The local server was started before sweeps could be run. Restart ./build-site.ps1 -Serve.'
-      : `Not swept: ${response ? await response.text() : 'the local server did not answer.'}` };
+  const result = await postBacktest('api/backtest/sweep', { dataset: cellOf(key).market, ...cellWindow(key), strategy: sent }, 'sweeps');
   strategies.sweeping = false;
-  strategies.sweeps.set(s.id, result.error ? result : { saved: result.saved, ...result.sweep, sent });
+  strategies.sweeps.set(s.id, result.error ? { error: result.error.replace(/^Not run/, 'Not swept') } : { saved: result.saved, ...result.sweep, sent, cell: key });
   if (currentPage === 'Strategies' && selectedStrategy() === s) renderStrategyRun();
 }
 
@@ -5981,7 +6126,7 @@ function renderSweep(el, sw) {
     ${Math.round(own(best.variation).percentile ?? 0)}% of its own random runs, and ${Math.round(best.against.percentile ?? 0)}% of the best of ${ran.length} random runs,
     one from each variation, which is the fair test of a best picked from ${ran.length}.` : '';
   el.innerHTML = `<div class="strat-baseline">
-    <p class="remarks">A sweep over ${esc(data?.name ?? sw.dataset)} of ${sw.variations.length} variations, each against its own ${sw.runs.toLocaleString()} random runs:
+    <p class="remarks">A sweep over ${esc(sw.cell ? cellName(sw.cell) : data?.name ?? sw.dataset)} of ${sw.variations.length} variations, each against its own ${sw.runs.toLocaleString()} random runs:
       ${esc(sw.varied.map(p => varyLabel(sw.strategy, p)).join(', '))}.${failed.length ? ` ${failed.length} could not be run: ${esc(sweepLabel(sw, failed[0]))}, ${esc(failed[0].error)}${failed.length > 1 ? ' and others' : ''}.` : ''}${sw.saved ? ` Saved to ${esc(sw.saved)}.` : ''}</p>
     <div class="strat-run"><label>Measure <select data-sweep-measure>${sw.best.map(b => `<option ${b.against.name === measure ? 'selected' : ''}>${esc(b.against.name)}</option>`).join('')}</select></label></div>
     <p class="remarks">${esc(top)}</p>

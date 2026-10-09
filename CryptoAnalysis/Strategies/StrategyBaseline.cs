@@ -51,31 +51,34 @@ public static class StrategyBaseline
 
     /// <summary>
     /// Runs the strategy and the given number of random-entry runs over the prices and sets each total of the strategy
-    /// against theirs. The same seed gives the same runs.
+    /// against theirs. The same seed gives the same runs. With a window, the strategy and the random runs enter only in it,
+    /// as <see cref="StrategyBacktest.Run"/> does.
     /// </summary>
-    public static BaselineRun Run(IReadOnlyList<Price> prices, Strategy strategy, string dataset = "", int runs = DefaultRuns, int seed = 1) =>
-        Measured(prices, strategy, dataset, runs, seed).Baseline;
+    public static BaselineRun Run(IReadOnlyList<Price> prices, Strategy strategy, string dataset = "", int runs = DefaultRuns, int seed = 1,
+        (int First, int End)? window = null) =>
+        Measured(prices, strategy, dataset, runs, seed, window).Baseline;
 
     /// <summary>
     /// The baseline, with the strategy's own totals and those of each random run, in the order of their seeds.
     /// </summary>
     internal static (BaselineRun Baseline, BacktestSummary Actual, BacktestSummary[] Random) Measured(IReadOnlyList<Price> prices, Strategy strategy,
-        string dataset, int runs, int seed)
+        string dataset, int runs, int seed, (int First, int End)? window = null)
     {
         if (runs < 1 || runs > MaxRuns)
             throw new ArgumentOutOfRangeException(nameof(runs), $"The runs must be from 1 to {MaxRuns}.");
-        var actual = StrategyBacktest.Run(prices, strategy, dataset);
-        var signals = StrategyBacktest.Signals(prices, strategy).Count;
+        var (first, end) = window ?? (0, prices.Count);
+        var actual = StrategyBacktest.Run(prices, strategy, dataset, (first, end));
+        var signals = StrategyBacktest.Signals(prices, strategy).Count(x => x.Index >= first && x.Index < end);
         if (signals == 0)
             throw new ArgumentException("The strategy's entry condition is not met anywhere in the prices, so there is no rate to match.", nameof(strategy));
 
-        var chance = (double)signals / prices.Count;
-        var points = CurvePoints(prices.Count);
+        var chance = (double)signals / (end - first);
+        var points = CurvePoints(end - first).Select(x => x + first).ToList();
         var random = new BacktestSummary[runs];
         var curves = new double[runs][];
         Parallel.For(0, runs, r =>
         {
-            var trades = StrategyBacktest.Trades(prices, strategy, Entries(prices.Count, chance, seed + r));
+            var trades = StrategyBacktest.Trades(prices, strategy, Entries(first, end, chance, seed + r));
             random[r] = StrategyBacktest.Summarise(trades);
             curves[r] = Cumulative(trades, points);
         });
@@ -88,7 +91,7 @@ public static class StrategyBaseline
         }).ToList();
 
         var measures = Totals.Select(t => Measure(t.Name, t.Of(actual.Summary), random.Select(t.Of).OfType<double>())).ToList();
-        return (new BaselineRun(strategy, dataset, prices.Count, runs, seed, signals, chance, actual.Summary.Trades,
+        return (new BaselineRun(strategy, dataset, end - first, runs, seed, signals, chance, actual.Summary.Trades,
             random.Average(x => x.Trades), DateTime.UtcNow, measures, curve), actual.Summary, random);
     }
 
@@ -105,7 +108,8 @@ public static class StrategyBaseline
 
     /// <summary>
     /// The profit at each of the candles, as the sum of each trade's percentage closed by it: its ProfitPercent, or what
-    /// percent gives. A trade still open at the end is not counted, as in the totals.
+    /// percent gives. A trade that closes after the last candle, as one entered near the end of a window can, is counted at
+    /// the last, so the curve ends at the totals; a trade still open at the end is not counted, as in the totals.
     /// </summary>
     public static double[] Cumulative(IReadOnlyList<StrategyTrade> trades, IReadOnlyList<int> points, Func<StrategyTrade, double>? percent = null)
     {
@@ -115,7 +119,7 @@ public static class StrategyBaseline
         var (next, total) = (0, 0.0);
         for (var k = 0; k < points.Count; k++)
         {
-            for (; next < closed.Count && closed[next].ExitIndex <= points[k]; next++)
+            for (; next < closed.Count && (closed[next].ExitIndex <= points[k] || k == points.Count - 1); next++)
                 total += percent(closed[next]);
             sums[k] = total;
         }
@@ -126,10 +130,16 @@ public static class StrategyBaseline
     /// <summary>
     /// The candles a random run tries to enter at: each of the candles by the chance, from the seed.
     /// </summary>
-    public static IEnumerable<(int Index, IReadOnlyList<int> Met)> Entries(int candles, double chance, int seed)
+    public static IEnumerable<(int Index, IReadOnlyList<int> Met)> Entries(int candles, double chance, int seed) => Entries(0, candles, chance, seed);
+
+    /// <summary>
+    /// The candles of a window, first up to but not including end, a random run tries to enter at: each by the chance, from
+    /// the seed.
+    /// </summary>
+    public static IEnumerable<(int Index, IReadOnlyList<int> Met)> Entries(int first, int end, double chance, int seed)
     {
         var random = new Random(seed);
-        for (var i = 0; i < candles; i++)
+        for (var i = first; i < end; i++)
         {
             if (random.NextDouble() < chance)
                 yield return (i, []);

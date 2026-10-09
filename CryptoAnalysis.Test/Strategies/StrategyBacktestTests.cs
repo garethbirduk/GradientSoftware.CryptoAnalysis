@@ -184,6 +184,32 @@ public class StrategyBacktestTests
     }
 
     [TestMethod]
+    public void Window_IsTheCandlesFromOneDateUpToAnother()
+    {
+        var prices = Candles([.. FourGreen, .. FourGreen]);
+
+        Assert.AreEqual((0, 8), StrategyBacktest.Window(prices, null, null));
+        Assert.AreEqual((2, 5), StrategyBacktest.Window(prices, Start.AddHours(2), Start.AddHours(5)));
+        Assert.AreEqual((2, 8), StrategyBacktest.Window(prices, Start.AddHours(1.5), Start.AddDays(1)));
+        Assert.AreEqual((8, 8), StrategyBacktest.Window(prices, Start.AddDays(1), null));
+    }
+
+    [TestMethod]
+    public void Run_InAWindowEntersOnlyThereButReadsBeforeItAndClosesAfterIt()
+    {
+        // The run's fourth green candle closes at 3, the first of the window, so it is met there from candles before it;
+        // the trade closes at 4, after the window's end.
+        var prices = Candles([.. FourGreen, (160, 176, 158, 170), .. FourGreen]);
+
+        var run = StrategyBacktest.Run(prices, RunOf(), window: (3, 4));
+        var outside = StrategyBacktest.Run(prices, RunOf(), window: (4, 9));
+
+        Assert.AreEqual((3, 4, EnumTradeOutcome.TakeProfit), (run.Trades.Single().EntryIndex, run.Trades.Single().ExitIndex, run.Trades.Single().Outcome));
+        Assert.AreEqual((1, Start.AddHours(3), Start.AddHours(3)), (run.Candles, run.From, run.To));
+        Assert.IsTrue(outside.Trades.All(x => x.EntryIndex >= 4));
+    }
+
+    [TestMethod]
     public void Validate_CostsCannotBeNegative()
     {
         Assert.AreEqual(2, WithCosts(RunOf(), fee: -0.1, slippage: -0.1).Validate().Count);

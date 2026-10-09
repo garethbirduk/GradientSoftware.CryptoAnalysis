@@ -165,6 +165,23 @@ public class StrategyBaselineTests
     }
 
     [TestMethod]
+    public void Run_InAWindowEntersOnlyThereAndEndsAtItsTotals()
+    {
+        var prices = Walk(6000, edge: false);
+        var window = (2000, 4000);
+
+        var run = StrategyBaseline.Run(prices, GreenRun, runs: 50, window: window);
+        var whole = StrategyBaseline.Run(prices, GreenRun, runs: 50);
+
+        Assert.AreEqual(2000, run.Candles);
+        Assert.AreEqual(StrategyBacktest.Signals(prices, GreenRun).Count(x => x.Index >= 2000 && x.Index < 4000), run.Signals);
+        Assert.AreEqual((prices[2000].DateTime, prices[3999].DateTime), (run.Curve[0].Time, run.Curve[^1].Time));
+        Assert.AreEqual(StrategyBacktest.Run(prices, GreenRun, window: window).Summary.TotalProfitPercent, run.Curve[^1].Strategy, 1e-9);
+        Assert.IsTrue(run.Trades < whole.Trades / 2);
+        Assert.IsTrue(StrategyBaseline.Entries(2000, 4000, 0.5, 1).All(x => x.Index >= 2000 && x.Index < 4000));
+    }
+
+    [TestMethod]
     public void Run_StrategyThatNeverEntersHasNoRateToMatch()
     {
         var prices = Walk(3, edge: false);
