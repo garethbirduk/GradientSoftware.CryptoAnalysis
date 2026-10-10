@@ -90,13 +90,13 @@
     },
     {
       "chapter": "Upswing",
-      "explain": "Swing",
-      "at": 12,
-      "blocks": ["Begins", "Turn", "Bos", "Legs"],
       "add": ["HigherHigh"],
       "cues": [
         { "at": 16, "texts": { "education": "The Upleg of the Upswing will always finish at its BoS; the Upleg of the underlying Sawtooth may continue if the BoS itself does not form an HH." } }
-      ]
+      ],
+      "explain": "Swing",
+      "at": 12,
+      "blocks": ["Begins", "Turn", "Bos", "Legs"]
     },
     {
       "chapter": "Upswings in real time",
@@ -133,12 +133,12 @@
       ]
     },
     {
+      "add": ["Downswing"],
+      "remove": ["bosLevelDown"],
+      "until": 67,
       "explain": "Swing",
       "at": 47,
-      "until": 67,
-      "blocks": ["Begins", "Turn", "Bos", "Legs"],
-      "add": ["Downswing"],
-      "remove": ["bosLevelDown"]
+      "blocks": ["Begins", "Turn", "Bos", "Legs"]
     },
     {
       "remove": ["LowerLow", "LowerHigh", "BearishBreakOfStructure"],
@@ -361,9 +361,9 @@
       ]
     },
     {
+      "view": [44, 51],
       "explain": "Candle",
-      "at": 48,
-      "view": [44, 51]
+      "at": 48
     },
     {
       "chapter": "Wicks and breaks",
@@ -452,14 +452,14 @@
       ]
     },
     {
-      "explain": "Trend",
-      "at": 1,
       "until": 90,
-      "blocks": ["Begins", "Confirmed", "Swings"],
       "cues": [
         { "texts": { "education": "The band along the top of the chart marks the Uptrend, with a segment for each Upswing. Some segments are paler, and we will come to why." } },
         { "define": "Trend.count" }
-      ]
+      ],
+      "explain": "Trend",
+      "at": 1,
+      "blocks": ["Begins", "Confirmed", "Swings"]
     },
     {
       "chapter": "Strength",
@@ -482,11 +482,11 @@
       ]
     },
     {
+      "until": 90,
+      "view": [74, 92],
       "explain": "Swing",
       "at": 78,
-      "until": 90,
-      "blocks": ["Strength"],
-      "view": [74, 92]
+      "blocks": ["Strength"]
     },
     {
       "cues": [
@@ -498,32 +498,32 @@
     {
       "add": ["HigherLow"],
       "remove": ["BullishBreakOfStructure", "msbLevelDown"],
-      "view": [0, 92],
-      "explain": "Trend",
-      "at": 1,
       "until": 90,
-      "blocks": ["Weak"],
+      "view": [0, 92],
       "cues": [
         { "at": 90, "texts": { "education": "Each has an MSB inside it and an LL as its Swing Low." } },
         { "at": 90, "texts": { "education": "On the band along the top, the Weak Upswings are the paler segments." } }
-      ]
+      ],
+      "explain": "Trend",
+      "at": 1,
+      "blocks": ["Weak"]
     },
     {
       "add": ["trendArrows"],
-      "explain": "Trend",
-      "at": 1,
       "until": 90,
-      "blocks": ["Strength"],
       "view": [0, 92],
       "cues": [
         { "at": 90, "texts": { "education": "The arrow runs from where the Uptrend begins to its latest BoS, and its box shows the count and the Strength." } },
         { "at": 90, "texts": { "education": "An Uptrend with a Strength of 100% has no Weak Upswing: Higher Highs and Higher Lows throughout." } }
-      ]
+      ],
+      "explain": "Trend",
+      "at": 1,
+      "blocks": ["Strength"]
     },
     {
       "cues": [
-        { "texts": { "education": "Strength does not say where the Weak Upswings fall. So we also count the Upswings since the last Weak one, starting with it." } },
-        { "texts": { "education": "This Uptrend has had stretches of three, three, three and two Upswings. The twelfth is Weak, so the latest stretch is one Upswing so far." } },
+        { "texts": { "education": "Strength does not say where the Weak Upswings fall, so we also look at the order they come in." } },
+        { "texts": { "education": "In order, this Uptrend has three Strong Upswings, then a Weak one, two Strong, a Weak one, two Strong, a Weak one, one Strong, and now the twelfth, which is Weak." } },
         { "texts": { "education": "The same holds for Downswings." } },
         { "define": "Swing.weak", "direction": "Down" },
         { "texts": { "education": "Strong, Weak and Strength describe what has happened. They are not a forecast." } }
@@ -556,18 +556,18 @@
       ]
     },
     {
+      "until": 62,
+      "view": [40, 77],
       "explain": "Trend",
       "at": 1,
-      "until": 62,
-      "blocks": ["Ends"],
-      "view": [40, 77]
+      "blocks": ["Ends"]
     },
     {
+      "until": 64,
+      "view": [40, 77],
       "explain": "Trend",
       "at": 47,
-      "until": 64,
-      "blocks": ["Begins", "Confirmed"],
-      "view": [40, 77]
+      "blocks": ["Begins", "Confirmed"]
     },
     {
       "chapter": "Ghost Trends",
@@ -592,15 +592,15 @@
       ]
     },
     {
-      "explain": "Trend",
-      "at": 64,
-      "level": 2,
       "until": 75,
-      "blocks": ["Confirmed", "Ends"],
       "view": [45, 77],
       "cues": [
         { "at": 75, "texts": { "education": "A second Upswing then Confirms a 2nd order Uptrend. Trends, like Swings, exist at every resolution." } }
-      ]
+      ],
+      "explain": "Trend",
+      "at": 64,
+      "level": 2,
+      "blocks": ["Confirmed", "Ends"]
     },
     {
       "chapter": "Orders and timescale",
@@ -619,14 +619,14 @@
       ]
     },
     {
-      "explain": "Swing",
-      "at": 768,
       "until": 1103,
-      "blocks": ["Begins", "Turn", "Bos", "Legs"],
       "view": [740, 1110],
       "cues": [
         { "at": 1103, "texts": { "education": "Nothing new has been defined. A high, a Swing Low, a close above the high: the same Upswing as the ones that took an hour or two." } }
-      ]
+      ],
+      "explain": "Swing",
+      "at": 768,
+      "blocks": ["Begins", "Turn", "Bos", "Legs"]
     },
     {
       "add": ["level2", "Uptrend", "Downtrend", "trendArrows"],
@@ -639,7 +639,8 @@
     {
       "cues": [
         { "texts": { "education": "The orders are counted from the first close the Sawtooth is given. Start the history somewhere else, and the same weeks divide into different Swings, of different orders." } },
-        { "texts": { "education": "So an order has no timescale of its own. With a few hours of history a 1st order Swing lasts an hour or two; with six weeks, a fortnight. Later in this data, with a year and a half behind it, one 1st order Downswing lasts two months." } },
+        { "texts": { "education": "So an order has no timescale of its own. With a few hours of history a 1st order Swing lasts an hour or two; with six weeks, a fortnight." } },
+        { "texts": { "education": "Later in this data, with a year and a half behind it, one 1st order Downswing lasts two months." } },
         { "texts": { "education": "Swings within Swings over a couple of hours are hard to act on. A Swing that plays out over weeks is not." } },
         { "texts": { "education": "Which order to work at, and from how much history, is a choice. Choices are strategy, which comes later." } }
       ]
@@ -721,8 +722,122 @@
     },
     {
       "cues": [
-        { "texts": { "education": "On hourly candles the same week reads differently. Between the Swing High and the LL the price made three Lower Lows, each a Downswing with a Swing High of its own, so the tools measured the Retracement against the last of those Swing Highs, and read it as a Bullish MSB. Same rules; the candle size changes what they see." } },
+        { "texts": { "education": "On hourly candles the same week reads differently." } },
+        { "texts": { "education": "Between the Swing High and the LL the price made three Lower Lows, each a Downswing with a Swing High of its own, so the tools measured the Retracement against the last of those Swing Highs, and read it as a Bullish MSB." } },
+        { "texts": { "education": "Same rules; the candle size changes what they see." } },
         { "texts": { "education": "Which candle size to read a Range at is a choice. Choices are strategy." } }
+      ]
+    },
+    {
+      "chapter": "Trading",
+      "scene": { "dataset": "btc-1h", "time": "2023-02-14T07:00" },
+      "layers": ["price"],
+      "until": 9,
+      "view": [0, 30],
+      "speed": 4,
+      "cues": [
+        { "define": "Trade.what" },
+        { "texts": { "education": "The example is of a long trade, which buys and later sells. Short trades will be covered later." } }
+      ]
+    },
+    {
+      "layers": ["price", "trade"],
+      "cues": [
+        { "at": 28, "texts": { "education": "Here is another trade, entered the same way a day later." } }
+      ],
+      "explain": "Trade",
+      "at": 12,
+      "strategy": "three-green",
+      "blocks": ["Entry", "TakeProfit", "StopLoss", "Outcome"],
+      "omit": ["Entry.4", "Entry.5", "TakeProfit.2", "StopLoss.2", "Outcome.5"],
+      "edits": { "Entry.1": { "education": "A trade is entered when a condition set beforehand is met by the close of a candle." }, "Entry.2": { "education": "Here the entry condition is three Successive Green Candles." }, "Outcome.2": { "summary": "Sixteen hours later, the price reaches the Take Profit first, so the trade closes there with a gain." } }
+    },
+    {
+      "layers": ["price", "trade"],
+      "fastForward": { "to": 40, "speed": 8 },
+      "explain": "Trade",
+      "at": 42,
+      "strategy": "three-green",
+      "blocks": ["Outcome"],
+      "omit": ["Outcome.5"],
+      "edits": { "Outcome.2": { "summary": "This time the price reaches the Stop Loss first, so the trade closes there with a loss." } }
+    },
+    {
+      "chapter": "What is a strategy?",
+      "page": "Strategies",
+      "cues": [
+        { "define": "Strategy.what" },
+        { "texts": { "education": "Strategies are kept on the Strategies page. This is that page as it is, and nothing done here is saved." }, "highlight": "list" }
+      ]
+    },
+    {
+      "chapter": "An example strategy",
+      "page": "Strategies",
+      "cues": [
+        { "texts": { "education": "Our previous example is called 3 green candles. Picking it from the list shows its settings." }, "highlight": "strategy:three-green", "do": [{ "select": "three-green" }] },
+        { "texts": { "education": "It is a Long strategy, so it buys, and it holds one trade at a time." }, "highlight": "settings" },
+        { "texts": { "education": "Its entry condition is 3 Successive Green Candles." }, "highlight": "entry" },
+        { "texts": { "education": "Its Take Profit is 1% of the entry price, above the entry." }, "highlight": "takeProfit" },
+        { "texts": { "education": "Its Stop Loss is 1% of the entry price, below the entry." }, "highlight": "stopLoss" }
+      ]
+    },
+    {
+      "chapter": "Running a strategy",
+      "page": "Strategies",
+      "cues": [
+        { "texts": { "education": "A strategy is run on periods. Each period is a year of a market." }, "highlight": "grid", "do": [{ "click": "periods" }] },
+        { "texts": { "education": "Here it is run on one: 2023 of BTC/USD on Coinbase, in hourly candles." }, "highlight": "period:btc-coinbase-1h:2023", "do": [{ "periods": ["btc-coinbase-1h:2023"] }] },
+        { "texts": { "education": "Run goes through the period candle by candle, and enters a trade wherever the entry condition is met." }, "highlight": "run", "do": [{ "click": "done" }] },
+        { "texts": { "education": "The results count the trades up: how many won and how many lost, and what they made." }, "highlight": "stats", "do": [{ "click": "run" }] },
+        { "texts": { "education": "Below them is every trade: where it was entered, where its Take Profit and Stop Loss were, and how it ended." }, "highlight": "trades" }
+      ]
+    },
+    {
+      "chapter": "One trade",
+      "page": "Strategies",
+      "cues": [
+        { "texts": { "education": "Take one of them: the trade entered at 19:00 on the 14th of February." }, "highlight": "trade:2023-02-14 19:00" },
+        { "texts": { "education": "Analyse opens an analysis of a trade, on the chart. This is that analysis." }, "highlight": "analyse:2023-02-14 19:00" }
+      ]
+    },
+    {
+      "scene": { "dataset": "btc-1h", "time": "2023-02-14T07:00" },
+      "layers": ["price", "trade"],
+      "explain": "Trade",
+      "at": 12,
+      "strategy": "three-green"
+    },
+    {
+      "chapter": "Against random entries",
+      "page": "Strategies",
+      "cues": [
+        { "texts": { "education": "Back on the Strategies page. Rules can win or lose by luck, so a run comes with a random baseline: the same exits, entered at random candles as often as the strategy enters, a thousand times over." }, "highlight": "baseline" },
+        { "texts": { "education": "The table sets each of the strategy's totals among those of the random runs, and says how many of them it beats." }, "highlight": "baseline" },
+        { "texts": { "education": "The graph is the strategy's profit over the year, against the band that nine random runs in ten stay within." }, "highlight": "baselinePlot" }
+      ]
+    },
+    {
+      "chapter": "Sweeps",
+      "page": "Strategies",
+      "cues": [
+        { "texts": { "education": "A number of the strategy can be varied. Given a To and a Step, it is tried at each value from its own up to the To." }, "highlight": "vary:takeProfit.percent", "do": [{ "vary": "takeProfit.percent", "to": 3, "step": 0.5 }] },
+        { "texts": { "education": "Here the Take Profit is varied from 1% to 3% in steps of 0.5%, and the page says what that makes." }, "highlight": "varySays" },
+        { "texts": { "education": "Run sweep runs every variation on the period shown, each against random runs of its own." }, "highlight": "sweepButton" },
+        { "texts": { "education": "The first graph shows how many of its own random runs each variation beats." }, "highlight": "sweepBeats", "do": [{ "click": "sweep" }] },
+        { "texts": { "education": "The best variation is named. The best of several is bound to look good, so it is also set against the best of as many random runs." }, "highlight": "sweepBest" },
+        { "texts": { "education": "The second graph is every variation's profit over time, with the selected one on the band of its own random runs." }, "highlight": "sweepLines" }
+      ]
+    },
+    {
+      "chapter": "Periods, fees and slippage",
+      "page": "Strategies",
+      "cues": [
+        { "texts": { "education": "One year can flatter a strategy or wrong it. The periods are a grid: a column for each market and a row for each year." }, "highlight": "grid", "do": [{ "click": "periods" }] },
+        { "texts": { "education": "Each year has a role. Strategies are searched for on Search years. Test years check what was found, and every look at one is counted. Locked years are kept back for a final check." }, "highlight": "roles" },
+        { "texts": { "education": "Ticking more years runs the strategy on each of them." }, "highlight": "grid", "do": [{ "periods": ["btc-coinbase-1h:2020", "btc-coinbase-1h:2021", "btc-coinbase-1h:2022", "btc-coinbase-1h:2023", "btc-coinbase-1h:2024"] }] },
+        { "texts": { "education": "Each period then shows its own result: how many of its random runs the strategy beats, its total and its trades." }, "highlight": "chips", "do": [{ "click": "done" }, { "click": "run" }] },
+        { "texts": { "education": "So far the trades have been counted without their costs. Every trade pays to be made: a fee is taken on each side of it, and slippage is how far a market order fills against it." }, "highlight": "costs" },
+        { "texts": { "education": "With both turned on, the same trades are counted with their costs, and each period's total shows the difference." }, "highlight": "chips", "do": [{ "count": "countFees", "on": true }, { "count": "countSlippage", "on": true }] }
       ]
     }
   ]

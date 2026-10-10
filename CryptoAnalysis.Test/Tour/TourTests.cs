@@ -1,7 +1,9 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using CryptoAnalysis.Csv.ClassMaps;
 using Gradient.CryptoAnalysis.Csv;
 using Gradient.CryptoAnalysis.Site;
+using Gradient.CryptoAnalysis.Strategies;
 
 namespace Gradient.CryptoAnalysis.Test.Tour;
 
@@ -25,10 +27,15 @@ public class TourTests
     private static readonly Lazy<IReadOnlyDictionary<string, IReadOnlyList<Price>>> Datasets = new(() =>
         Tours.Datasets.ToDictionary(x => x.Id, x => (IReadOnlyList<Price>)Tours.Load(x, RepoRoot)));
 
+    // The Strategies page's strategies as the repository has them, in strategies.example.json: strategies.json is local.
+    private static readonly Lazy<Dictionary<string, JsonNode>> Strategies = new(() =>
+        JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot, "CryptoAnalysis.Site", "wwwroot", "strategies.example.json")))!["strategies"]!.AsArray()
+            .ToDictionary(x => x!["id"]!.GetValue<string>(), x => x!));
+
     private static TourScript Compile()
     {
         var def = JsonNode.Parse(File.ReadAllText(TourPath)) ?? throw new InvalidOperationException("tour.json is empty");
-        return Tours.Compile(def, Datasets.Value, teachOnce: true);
+        return Tours.Compile(def, Datasets.Value, teachOnce: true, Strategies.Value);
     }
 
     [TestMethod]
@@ -38,6 +45,34 @@ public class TourTests
 
         Assert.IsTrue(tour.Sections.Count > 0, "The tour has no sections.");
         Assert.AreEqual(0, tour.Errors.Count, $"tour.json has problems:\n{string.Join("\n", tour.Errors.Select(x => "  " + x))}");
+    }
+
+    [TestMethod]
+    public void PageTexts_ProblemsListed()
+    {
+        var strategies = new Dictionary<string, JsonNode> { ["three-green"] = JsonNode.Parse("""{ "id": "three-green" }""")! };
+        List<string> Problems(string json, bool onPage = true) => Tours.PageProblems(JsonNode.Parse(json)!.AsObject(), onPage, strategies);
+
+        Assert.AreEqual(0, Problems("""{ "highlight": "entry", "do": [{ "select": "three-green" }, { "click": "run" }, { "vary": "takeProfit.percent", "to": 3, "step": 0.5 }] }""").Count);
+        Assert.AreEqual(0, Problems("""{ "texts": { "education": "No page needed." } }""", onPage: false).Count);
+        Assert.IsTrue(Problems("""{ "do": [{ "select": "none" }] }""").Single().StartsWith("no strategy \"none\""));
+        Assert.IsTrue(Problems("""{ "do": [{ "press": "run" }] }""").Single().StartsWith("each thing done is one of"));
+        Assert.IsTrue(Problems("""{ "do": { "click": "run" } }""").Single().StartsWith("do is a list"));
+        Assert.IsTrue(Problems("""{ "highlight": "entry" }""", onPage: false).Single().StartsWith("highlight and do are for a section that shows a page"));
+    }
+
+    [TestMethod]
+    public void Tour_StrategyChapterTradeIsWhereTheTourAnalysesIt()
+    {
+        var strategy = Strategies.Value["three-green"].Deserialize<Strategy>(StrategyBook.JsonOptions)!;
+        var prices = Datasets.Value["btc-1h"];
+        var anchor = prices.ToList().FindIndex(x => x.DateTime == new DateTime(2023, 2, 14, 7, 0, 0, DateTimeKind.Utc));
+
+        var trades = StrategyBacktest.Run(prices.ToList().GetRange(anchor, prices.Count - anchor), strategy).Trades
+            .Where(x => x.EntryIndex <= 30)
+            .Select(x => $"{x.EntryIndex}-{x.ExitIndex} {x.Outcome}");
+
+        Assert.AreEqual("12-28 TakeProfit, 28-29 TakeProfit", string.Join(", ", trades));
     }
 
     [TestMethod]

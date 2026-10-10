@@ -217,7 +217,7 @@
   .tour-controls .edit { margin-left: auto; }
   .tour-warning { color: var(--warn); font-size: 13px; }
   .player { margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
-  .player .tour-caption { min-height: 2.9em; max-width: 80ch; margin-top: 4px; cursor: pointer; }
+  .player .tour-caption { min-height: 2.9em; max-width: 100ch; margin-top: 4px; cursor: pointer; }
   .tour-caption .unread { color: var(--muted); opacity: .7; }
   .player-scrub { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 13px; color: var(--muted); }
   .player-scrub input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); }
@@ -397,6 +397,74 @@
     color: var(--muted); font: inherit; font-size: 15px; line-height: 1; cursor: pointer; }
   .strat-steps .step-add:hover { color: var(--accent); border-color: var(--accent); }
   .strat-says { margin: 12px 0 0; max-width: 80ch; font-size: 14px; }
+  /* A number's sweep, To and Step, sits beside it, smaller, as it is optional. */
+  .strat-fields label.strat-vary { margin-left: -6px; }
+  .strat-fields label.strat-vary input[type="number"] { width: 56px; font-size: 12px; }
+  .strat-sweep-beats { height: 260px; margin-top: 4px; }
+  /* The periods grid: a row a year, a column a market. A cell's tint is its score once run; its left edge its role. */
+  .strat-grid-wrap { overflow-x: auto; margin-top: 12px; }
+  .strat-grid { border-collapse: separate; border-spacing: 4px; font-size: 13px; margin: 0; }
+  .strat-grid th { font-weight: 600; color: var(--muted); text-align: left; padding: 2px 4px; white-space: nowrap; }
+  .strat-grid th button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  .strat-grid th button:hover { color: var(--accent); }
+  .strat-cell { min-width: 150px; border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; padding: 4px 8px 6px; vertical-align: top; cursor: pointer; background: var(--panel); }
+  .strat-cell.none { border: 0; background: none; cursor: default; }
+  .strat-cell.role-search { border-left-color: var(--border); }
+  .strat-cell.role-test { border-left-color: var(--warn); }
+  .strat-cell.role-locked { border-left-color: var(--muted); background: var(--chip); color: var(--muted); }
+  .strat-cell.sel { box-shadow: 0 0 0 2px var(--accent); }
+  .strat-cell.good { background: color-mix(in srgb, var(--ok) 22%, var(--panel)); }
+  .strat-cell.fair { background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
+  .strat-cell.poor { background: color-mix(in srgb, var(--bad) 12%, var(--panel)); }
+  .strat-cell-top { display: flex; align-items: center; gap: 6px; }
+  .strat-cell-top select { font: inherit; font-size: 12px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 0 2px; }
+  .strat-cell-result { margin-top: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 1.3em; }
+  .strat-cell-note { font-size: 11px; color: var(--muted); }
+  .strat-cell-head { margin: 18px 0 0; font-size: 15px; }
+  .strat-chips { display: grid; gap: 6px; margin-top: 10px; font-size: 13px; }
+  .strat-chip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .strat-chip-market { color: var(--muted); min-width: 170px; }
+  .strat-chip { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-left-width: 4px;
+    border-radius: 6px; padding: 2px 8px; cursor: pointer; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .strat-chip.role-test { border-left-color: var(--warn); }
+  .strat-chip.good { background: color-mix(in srgb, var(--ok) 22%, var(--panel)); }
+  .strat-chip.fair { background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
+  .strat-chip.poor { background: color-mix(in srgb, var(--bad) 12%, var(--panel)); }
+  .strat-chip.sel { box-shadow: 0 0 0 2px var(--accent); }
+  .strat-chip.off { opacity: .6; }
+  #strat-periods { width: min(1180px, calc(100vw - 32px)); max-height: 86vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
+  #strat-periods::backdrop { background: rgba(0, 0, 0, .35); }
+  #strat-periods h4 { margin: 0 0 4px; font-size: 15px; }
+  #strat-periods > p { margin: 0 0 6px; color: var(--muted); }
+  #strat-periods .sim-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+  #strat-periods .sim-foot button { font: inherit; border-radius: 6px; padding: 4px 16px; cursor: pointer; background: var(--accent); border: 1px solid var(--accent); color: #fff; }
+  /* Explore: a condition's lean, tinted green when up first more often than after any candle, red when down first. */
+  .explore { margin-top: 18px; }
+  .explore .strat-card + .strat-card { margin-top: 14px; }
+  .strat-trades.explore-table { max-height: none; }
+  .explore-table tbody tr[data-explore-condition] { cursor: pointer; }
+  .explore-table tbody tr.sel th { color: var(--accent); }
+  .explore-table tr.explore-group th { padding-top: 10px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .explore-table th { text-align: left; font-weight: 500; }
+  .explore-cell small { color: var(--muted); }
+  .explore-cell.up1 { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .explore-cell.up2 { background: color-mix(in srgb, var(--ok) 26%, transparent); }
+  .explore-cell.down1 { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+  .explore-cell.down2 { background: color-mix(in srgb, var(--bad) 22%, transparent); }
+  /* Fees and Slippage a line each, their checkboxes one width so the numbers beside them line up. */
+  .strat-fields.strat-cost + .strat-fields { margin-top: 6px; }
+  .strat-cost label.check { width: 80px; align-self: center; }
+  .strat-cost input:disabled { opacity: .45; }
+  .strat-costs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 13px; color: var(--muted); }
+  .strat-sweep { position: relative; }
+  .strat-sweep-card { position: absolute; z-index: 5; width: 260px; transform: translate(12px, 12px); padding: 10px 12px; font-size: 13px; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+  .strat-sweep-card b { display: block; padding-right: 18px; }
+  .strat-sweep-card .rank { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 2px 0; }
+  .strat-sweep-card div { margin-bottom: 8px; }
+  .strat-sweep-card button[data-extract] { font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+  .strat-sweep-card .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
+  .strat-vary-says { margin: 4px 0 0; max-width: 80ch; font-size: 13px; color: var(--muted); }
   .strat-actions, .strat-run { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
   .strat-note.bad { color: var(--bad); }
   .strat-chart-name { width: 260px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; }
@@ -421,6 +489,16 @@
   .strat-trades .inc { width: 1.5em; padding-right: 6px; }
   .strat-trades button.inc { padding: 0; border: 0; background: none; color: var(--accent); font-size: 15px; line-height: 1; cursor: pointer; }
   .strat-trades tr.out button.inc { color: var(--muted); }
+  .strat-baseline { margin-top: 12px; }
+  .strat-baseline table { margin-top: 6px; font-size: 13px; }
+  .strat-baseline-plot { height: 300px; margin-top: 4px; }
+  /* A page a tour section shows, in a frame over the chart it stands in for; the page itself is read-only there, with its
+     own chrome left off, and the part a text points at outlined. */
+  .tour-stage { position: relative; }
+  .tour-page { position: absolute; inset: 0; width: 100%; height: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); z-index: 2; pointer-events: none; }
+  body.embed #nav { display: none; }
+  body.embed .tour-hl { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: 6px; box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .strat-baseline td.num, .strat-baseline th.num { text-align: right; padding-right: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .strat-counted { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font-size: 13px; color: var(--muted); }
   .strat-counted button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
   .strat-counted button:hover { background: var(--chip); }
@@ -543,7 +621,10 @@ const REPLAY_DEFAULTS = ['candidates', ...GHOST_IDS, 'eventlog'];
 const defaultsFor = page => [...(PAGE_DEFAULTS[page] ?? ['price', page]), ...REPLAY_DEFAULTS];
 
 function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } }
-function save(state) { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { } }
+// Opened with ?embed, the page is shown inside a tour, as it is but read-only: it keeps nothing, in the browser or on the
+// server, and the tour does on it what its texts tell of (see "A page shown in the tour").
+const embedMode = new URLSearchParams(location.search).has('embed');
+function save(state) { if (embedMode) return; try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { } }
 const state = Object.assign({ pages: {} }, load());
 // Ghosts was one layer before it was a section: a page remembered with it on has every kind of ghost on.
 for (const [page, layers] of Object.entries(state.pages)) if (layers.includes('ghosts')) state.pages[page] = layers.flatMap(id => id === 'ghosts' ? GHOST_IDS : [id]);
@@ -596,7 +677,7 @@ function renderNav(active) {
   const nav = document.getElementById('nav');
   // The term pages and their examples are no longer in the bar; their addresses still open them.
   nav.innerHTML = `<h1>Market structure</h1>
-    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}
+    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}${link('Explore')}
     <span class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC</span>`;
   document.documentElement.style.setProperty('--nav-h', `${nav.offsetHeight}px`);
 }
@@ -687,8 +768,7 @@ function layerSection(s, i, foldable = true) {
   const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>`;
   const items = s => s.levels
     ? `<div class="items levels"><button class="layer text" data-levels="none">None</button>${s.layers.map(button).join('')}<button class="layer text" data-levels="all">All</button></div>`
-    : s.strategies ? `<div class="items">${s.layers.map(l => `<div class="item">${button(l)}<button type="button" class="strat-remove" data-strategy-remove="${esc(l.chartStrategy.id)}"
-        title="Take ${esc(l.label)} off the charts" aria-label="Take ${esc(l.label)} off the charts">✕</button></div>`).join('')}${strategyLayerExtras()}</div>`
+    : s.strategies ? `<div class="items">${s.layers.map(l => `<div class="item">${button(l)}<button type="button" class="strat-remove" data-strategy-remove="${esc(l.chartStrategy.id)}" title="Take ${esc(l.label)} off the charts" aria-label="Take ${esc(l.label)} off the charts">✕</button></div>`).join('')}${strategyLayerExtras()}</div>`
     : `<div class="items">${s.layers.map(l => `<div class="item">${button(l)}${runInput(l)}</div>`).join('')}</div>`;
   const lead = `<button type="button" class="lead" data-section="${i}" title="Show all or none of ${esc(s.name.toLowerCase())}">${esc(s.name)}<span class="state"></span></button>`;
   if (!foldable) return `<div class="section" role="group" aria-label="${esc(s.name)}">${lead}${items(s)}</div>`;
@@ -3270,7 +3350,7 @@ const eventName = (spec, from) => `${{ 1: 'the first', 2: 'the second', 3: 'the 
 
 // A text stays for its narration clip's length when there is one (plus a breath), else for the time it takes to read.
 // With teachOnce, as the tour is played start to end, what a written section teaches is not taught again by the next.
-function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'education', { teachOnce = true } = {}) {
+function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'education', { teachOnce = true, strategies: strategyById = new Map() } = {}) {
   const errors = [], known = new Set([...LAYERS.map(l => l.id), 'trade']), chapters = [], wanted = [];
   // The definitions told so far, cited or taught by a written section: a section that explains something does not teach
   // them again.
@@ -3318,6 +3398,15 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
     // only that one again. A written text that teaches what the tour has told already, cited or taught by a written section
     // before, is left out here. Its written texts changed by its "edits" are laid over them here too, so a change to one
     // is not written out again.
+    // A Trade's strategy is one of the Strategies page's, named by its id, and the trade is drawn on the "trade" layer.
+    let trade = null;
+    if (s.explain === 'Trade' && typeof s.strategy === 'string') {
+      if (!strategyById.has(s.strategy)) errors.push(`${where}: no strategy "${s.strategy}" on the Strategies page`);
+      else s = { ...s, strategy: strategyById.get(s.strategy) };
+    }
+    if (s.explain === 'Trade' && Number.isInteger(s.at) && typeof s.strategy === 'object') trade = { strategy: s.strategy, at: s.at };
+    // A section can show a page in place of the chart, as it is (see "A page shown in the tour").
+    const page = given.page == null ? null : TOUR_PAGES.includes(given.page) ? given.page : (errors.push(`${where}: page is a page shown in place of the chart: ${TOUR_PAGES.join(', ')}`), null);
     if (s.explain != null) {
       const { edits = {}, ...asked } = s;
       const from = Number.isInteger(s.from) ? s.from : at, key = `explain|${scene}|${from}|${JSON.stringify(asked)}`;
@@ -3373,7 +3462,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       if (c.text != null) errors.push(`${what}: "text" is now "texts", a text for each level of detail: { "summary", "education" }`);
       else if (!Object.values(texts).some(Boolean)) errors.push(`${what}: no text`);
       for (const level of Object.keys(texts)) if (!DETAILS.includes(level)) errors.push(`${what}: unknown detail "${level}": ${DETAILS.join(', ')}`);
-      const atGiven = candle(c.at, from, what, 'at');
+      const atGiven = candle(c.at, from, what, 'at'), onPage = pageCue(c, page != null, strategyById, what, errors);
       if (atGiven.index != null && (atGiven.index < 0 || atGiven.index > at)) errors.push(`${what}: at #${atGiven.index} is not reached, as the section ends at #${at}`);
       if (c.on != null && c.at == null) errors.push(`${what}: a pin needs a candle`);
       if (c.on != null && typeof c.on !== 'number' && !PIN_PRICES[c.on]) errors.push(`${what}: unknown "on" "${c.on}"`);
@@ -3393,12 +3482,12 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
       // A text with "voice": false is shown but not read aloud, so it stays for the time it takes to read. A cue with no
       // text at the page's detail is skipped: kept in its place for the editor, never queued.
       const silent = c.voice === false, clip = silent || !text ? null : audio[textKey(text)];
-      return { id: c.id ?? null, written: c.written ?? null, definition: c.definition ?? null, direction: c.direction ?? null, texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
+      return { id: c.id ?? null, highlight: onPage.highlight, do: onPage.do, written: c.written ?? null, definition: c.definition ?? null, direction: c.direction ?? null, texts, text, skipped: !text, at: atGiven.index, atSpec: atGiven.spec, on: c.on ?? null, place: c.place ?? null, keep: c.keep ?? 'section', silent,
         to, heads: { start: c.heads?.start === true, end: c.heads?.end !== false }, color: c.color ?? null,
         clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0, given: c.hold >= 0 ? c.hold : null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
     });
-    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, detail: given.detail ?? null, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, detail: given.detail ?? null, trade, page, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
@@ -3406,7 +3495,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
 // A player's definition compiled again, as its page plays it: the tour teaches each definition once from start to end,
 // and an analysis, which shows no pins, leaves its pinned texts out, so they do not hold the run for their seconds either.
 function recompile(t = tour) {
-  Object.assign(t, compileTour(t.def, t.scenes, t.resolved, t.audio, t.detail, { teachOnce: t.page === 'Tour' }));
+  Object.assign(t, compileTour(t.def, t.scenes, t.resolved, t.audio, t.detail, { teachOnce: t.page === 'Tour', strategies: t.strategies }));
   if (t.pins === false) for (const s of t.sections) for (const c of s.cues) if (c.on != null) c.skipped = true; else timeCue(c, t.audio, false);
   return t;
 }
@@ -3540,7 +3629,9 @@ async function loadTour() {
   if (!list.length) throw new Error('the server has no datasets');
   const audio = await fetch('tour-audio/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
   await loadDefinitions();
-  const loaded = newPlayer(def, audio, { base });
+  // A section names a strategy of the Strategies page by its id.
+  const { book } = await readStrategyBook();
+  const loaded = newPlayer(def, audio, { base, strategies: new Map(book.strategies.map(s => [s.id, s])) });
   await loadTourDatasets(loaded);
   anchorTour(loaded);
   return recompile(loaded);
@@ -3908,6 +3999,7 @@ function refreshTour() {
   if (editorSection !== tour.index && (tour.page === 'Tour' || analysisEditing)) renderContents();
   drawAll(tour.page);
   updateTourPanel();
+  syncTourPage();
 }
 
 function updateTourPanel() {
@@ -3921,9 +4013,11 @@ function updateTourPanel() {
   // An analysis counts its chapters, a section each; a tour its sections, several to a chapter.
   const where = tour.page === 'Analysis' ? `${tour.def.title} · chapter ${(s?.chapter ?? 0) + 1} of ${tour.chapters.length}`
     : `section ${(s?.index ?? 0) + 1} of ${tour.sections.length} · #${s?.from}${s?.until > s?.from ? ` to #${s.until}` : ''}`;
-  part('where').textContent = s ? `${where}${tour.ended ? ' · ended' : ''}${scene}` : 'no sections yet';
+  // A section that shows a page is of no candle or scene.
+  part('where').textContent = !s ? 'no sections yet' : s.page ? `section ${s.index + 1} of ${tour.sections.length} · the ${s.page} page${tour.ended ? ' · ended' : ''}`
+    : `${where}${tour.ended ? ' · ended' : ''}${scene}`;
   showCaption();
-  part('readout').textContent = `#${t} · ${fmtTime(ex.prices.t[t])} UTC`;
+  part('readout').textContent = s?.page ? `The ${s.page} page` : `#${t} · ${fmtTime(ex.prices.t[t])} UTC`;
   const warning = part('warning');
   if (warning) {
     warning.hidden = !ex.unanchored;
@@ -3968,6 +4062,8 @@ function tourTick() {
   showScrub();
   showCaption();
   const s = tourSection(), ex = tour.ex, now = performance.now(), t = cursorOf(ex);
+  // A section that shows a page reads on once the page is where the tour is.
+  if (tourPage.pending) return;
   // A text still waiting for the voice has not begun its time on show.
   const reading = tour.active && (now < tour.activeUntil || tour.voice.waiting.includes(tour.active));
   if (!reading && tour.queue.length) {
@@ -4273,7 +4369,7 @@ async function renderTourPage(chapter) {
     <article class="example replay-big" id="ex-${esc(ex.id)}">
       <header><h3 data-tour="chapter"></h3><span class="id" data-tour="where"></span></header>
       ${playerPanel('Tour')}
-      ${chartRow(ex)}
+      <div class="tour-stage">${chartRow(ex)}<iframe class="tour-page" data-tour="page" title="The page the tour shows, as it is" hidden></iframe></div>
       <div class="tour-warning" data-tour="warning" hidden></div>
     </article>`);
   wirePlayerPanel(main);
@@ -4506,7 +4602,7 @@ const definitionsOpen = new Set();
 const editorOn = () => state.tourEditor !== false && !videoMode;
 const tourDirty = () => !!tours.Tour && (JSON.stringify(tours.Tour.def) !== tours.Tour.saved || definitionsDirty());
 const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
-  section: ['chapter', 'scene', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'to', 'heads', 'color', 'define', 'direction', 'texts', 'hold', 'keep', 'voice'] };
+  section: ['chapter', 'scene', 'page', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'to', 'heads', 'color', 'define', 'direction', 'texts', 'highlight', 'do', 'hold', 'keep', 'voice'] };
 
 // tour.json as text: a line for each text and for each of a section's settings, so a change shows as a small diff.
 function formatTour(def) {
@@ -4559,7 +4655,7 @@ function editorCards() {
   // The first and last candle shown. Left empty, the view is as before, which the boxes then say.
   const viewBoxes = (scope, view, before, otherwise = 'as before') => [['View from candle', 0], ['View to candle', 1]].map(([label, k]) =>
     `<label>${label}<input type="number" min="0" step="1" data-scope="${scope}" data-field="view${k}" placeholder="#${before[k]}, ${otherwise}" value="${value(view?.[k])}"></label>`).join('');
-  const ops = (kind, what) => `<span class="ed-ops">${kind === 'cue' ? `<button type="button" data-ed="cue-copy" title="Add a copy of this text after it">Copy</button>` : ''}` +
+  const ops = (kind, what, own = true) => `<span class="ed-ops">${kind === 'cue' ? `${!own ? '' : `<button type="button" data-ed="cue-halve" title="Split this text in two: a second text with the same words is added after it, at the same candle, for each to be cut down to its part">Split text</button>`}<button type="button" data-ed="cue-copy" title="Add a copy of this text after it">Copy</button>` : ''}` +
     `<button type="button" data-ed="${kind}-up" title="Move this ${what} up" aria-label="Move this ${what} up">↑</button>` +
     `<button type="button" data-ed="${kind}-down" title="Move this ${what} down" aria-label="Move this ${what} down">↓</button>` +
     `<button type="button" data-ed="${kind}-delete" title="Delete this ${what}" aria-label="Delete this ${what}">✕</button></span>`;
@@ -4594,7 +4690,7 @@ function editorCards() {
         <label class="ed-check" title="An arrow head where the line starts"><input type="checkbox" data-scope="cue" data-field="headStart" ${c.to ? '' : 'disabled'} ${c.heads?.start === true ? 'checked' : ''}>Head at start</label>
         <label class="ed-check" title="An arrow head where the line ends"><input type="checkbox" data-scope="cue" data-field="headEnd" ${c.to ? '' : 'disabled'} ${c.heads?.end !== false ? 'checked' : ''}>Head at end</label>
         <label title="The line's colour: up (green), down (red), accent, or any CSS colour">Line colour<input data-scope="cue" data-field="color" ${c.to ? '' : 'disabled'} placeholder="accent" value="${value(c.color)}"></label>
-        ${ops('cue', 'text')}
+        ${ops('cue', 'text', c.define == null)}
         ${j && !fixed ? `<span class="ed-split"><button type="button" data-ed="cue-split" title="Start a new section with this text and those after it, so it can have layers of its own">Split the section here</button></span>` : ''}
       </div>
     </div>`;
@@ -5112,6 +5208,15 @@ function tourAction(action, el) {
       applyTour({ render: true, start: true });
       return focusCue(0);
     }
+    case 'cue-halve': {
+      // The text is split in two by hand: a second text with the same words comes after it, at the same candle, as a
+      // text of its own with no pin, line or seconds, since those are the first one's.
+      rememberTour();
+      const { texts, at, voice } = JSON.parse(JSON.stringify(d.cues[j]));
+      d.cues.splice(j + 1, 0, { ...(at != null ? { at } : {}), texts: texts ?? {}, ...(voice === false ? { voice } : {}) });
+      applyTour({ render: true, cue: writtenCount(i) + j + 1 });
+      return focusCue(j + 1);
+    }
     case 'cue-copy':
       rememberTour();
       d.cues.splice(j + 1, 0, JSON.parse(JSON.stringify(d.cues[j])));
@@ -5342,18 +5447,70 @@ const strategiesDirty = () => !!strategies && strategyKey(strategies.book) !== s
 const inlineJson = v => Array.isArray(v) ? (v.length ? `[ ${v.map(inlineJson).join(', ')} ]` : '[]')
   : v && typeof v === 'object' ? `{ ${Object.entries(v).map(([a, b]) => `${JSON.stringify(a)}: ${inlineJson(b)}`).join(', ')} }` : JSON.stringify(v);
 // The order a strategy's keys are saved in: the steps of a chain before its entry; any others after these.
-const STRATEGY_KEYS = ['id', 'name', 'direction', 'after', 'entry', 'takeProfit', 'stopLoss', 'onePositionAtATime'];
+const STRATEGY_KEYS = ['id', 'name', 'direction', 'after', 'entry', 'takeProfit', 'stopLoss', 'onePositionAtATime', 'countFees', 'feePercent', 'countSlippage', 'slippagePercent', 'vary'];
 const keyOrder = k => (i => i < 0 ? STRATEGY_KEYS.length : i)(STRATEGY_KEYS.indexOf(k));
-const formatStrategies = book => `{\n  "strategies": [\n${book.strategies.map(s => `    {\n${Object.entries(s).sort(([a], [b]) => keyOrder(a) - keyOrder(b)).map(([k, v]) =>
+const formatStrategies = book => `{\n${book.defaults ? `  "defaults": ${inlineJson(book.defaults)},\n` : ''}  "strategies": [\n${book.strategies.map(s => `    {\n${Object.entries(s).sort(([a], [b]) => keyOrder(a) - keyOrder(b)).map(([k, v]) =>
   `      ${JSON.stringify(k)}: ${inlineJson(v)}`).join(',\n')}\n    }`).join(',\n')}\n  ]\n}\n`;
 window.addEventListener('beforeunload', e => { if (strategiesDirty()) e.preventDefault(); });
 
-async function loadStrategies() {
-  const response = await fetch('strategies.json', { cache: 'no-cache' }).catch(() => null);
-  const text = response?.ok ? await response.text() : '';
+// strategies.json is kept locally, not in git; without one, the page starts from strategies.example.json, and the first
+// save writes strategies.json (base '' as there is no file yet to have changed).
+async function readStrategyBook() {
+  const read = async name => { const r = await fetch(name, { cache: 'no-cache' }).catch(() => null); return r?.ok ? r.text() : ''; };
+  const own = await read('strategies.json'), text = own || await read('strategies.example.json');
+  const base = own ? textKey(own) : '';
   const book = text ? JSON.parse(text) : { strategies: [] };
   book.strategies ??= [];
-  strategies = { book, base: text ? textKey(text) : '', saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false };
+  // The costs a strategy is given when it has none of its own, as one kept before strategies had costs.
+  book.defaults ??= { ...FIRST_DEFAULT_COSTS };
+  book.strategies.forEach(s => { s.feePercent ??= book.defaults.feePercent; s.slippagePercent ??= book.defaults.slippagePercent; });
+  return { book, base };
+}
+
+async function loadStrategies() {
+  const { book, base } = await readStrategyBook();
+  strategies = { book, base, saved: strategyKey(book), selected: strategies?.selected ?? book.strategies[0]?.id, note: '', runs: strategies?.runs ?? new Map(), running: false,
+    sweeps: strategies?.sweeps, markets: strategies?.markets, included: strategies?.included, cell: strategies?.cell ?? new Map() };
+}
+
+// The page's address names the strategy shown, the periods ticked and the one whose results are shown,
+// #Strategies?id=green-run-4&cells=btc-coinbase-1h:2021,btc-coinbase-1h:2022&cell=btc-coinbase-1h:2021, so a reload or a
+// link opens the same. It is kept up to date in place as they change, without a page of history each.
+function strategiesHash() {
+  const q = new URLSearchParams(), id = strategies?.selected ?? strategies?.missing, cell = strategies?.selected && strategies.cell?.get(strategies.selected);
+  if (id) q.set('id', id);
+  if (strategies?.included?.size) q.set('cells', [...strategies.included].join(','));
+  if (cell) q.set('cell', cell);
+  return `#Strategies${q.size ? `?${q}` : ''}`;
+}
+
+// ---- Markets and periods -------------------------------------------------------------------------------------------
+// The markets strategies are tested on (GET api/markets, see Markets), each with its years: their candles, their role
+// (search, test or locked) and how often a Test year has been looked at. A cell is a market's year, keyed "market:year";
+// a strategy's runs are kept by cell, and the cells ticked are run together.
+const cellKey = (market, year) => `${market}:${year}`;
+const cellOf = key => { const [market, year] = String(key).split(':'); return { market, year: Number(year) }; };
+const cellWindow = key => { const { year } = cellOf(key); return { from: `${year}-01-01T00:00:00Z`, to: `${year + 1}-01-01T00:00:00Z` }; };
+const marketOf = id => strategies.markets?.find(m => m.id === id);
+const yearOf = key => { const { market, year } = cellOf(key); return marketOf(market)?.years.find(y => y.year === year); };
+const cellName = key => { const { market, year } = cellOf(key); return `${marketOf(market)?.name ?? market}, ${year}`; };
+const runnable = key => yearOf(key) && yearOf(key).role !== 'locked';
+const ROLE_NAMES = { search: 'Search', test: 'Test', locked: 'Locked' };
+
+// A strategy's runs, by cell.
+function strategyCells(s) {
+  if (!strategies.runs.has(s.id)) strategies.runs.set(s.id, new Map());
+  return strategies.runs.get(s.id);
+}
+
+const fetchMarkets = () => fetch('api/markets', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).catch(() => []);
+
+async function loadMarkets() {
+  strategies.markets = await fetchMarkets();
+}
+
+function syncStrategiesHash() {
+  if (currentPage === 'Strategies' && location.hash !== strategiesHash()) history.replaceState(null, '', strategiesHash());
 }
 
 // The steps of a strategy's entry condition in order: those of "after", then "entry".
@@ -5371,8 +5528,17 @@ function strategySays(s) {
   const long = s.direction !== 'Short';
   // A level is where the target is; a distance is how far it is from the entry, and on which side.
   const where = (t, side) => STRATEGY_TYPES.target[t?.type]?.level ? `at ${part('target', t)}, when that is ${side} the entry` : `${part('target', t)} ${side} the entry`;
-  return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}. Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}`;
+  const fee = s.countFees !== false ? s.feePercent || 0 : 0, slip = s.countSlippage !== false ? s.slippagePercent || 0 : 0;
+  const costs = fee && slip ? ` Costs: ${fee}% fee a side and ${slip}% slippage on the entry and a Stop Loss.`
+    : fee ? ` Costs: ${fee}% fee a side; no slippage is counted.`
+    : slip ? ` Costs: ${slip}% slippage on the entry and a Stop Loss; no fees are counted.` : ' No fees or slippage are counted.';
+  return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}. Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}${costs}`;
 }
+
+// The default costs strategies.json starts with when it has none: about an exchange's taker fee and a liquid market's
+// slippage. Set as default on a strategy changes them, kept in strategies.json's "defaults".
+const FIRST_DEFAULT_COSTS = { feePercent: 0.1, slippagePercent: 0.05 };
+const defaultCosts = () => ({ feePercent: strategies.book.defaults.feePercent, slippagePercent: strategies.book.defaults.slippagePercent });
 
 function newStrategyId(name) {
   const base = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'strategy';
@@ -5382,14 +5548,14 @@ function newStrategyId(name) {
   return id;
 }
 
-async function renderStrategiesPage() {
+async function renderStrategiesPage(asked = new URLSearchParams()) {
   const main = document.getElementById('main');
   currentPage = 'Strategies';
   const head = `<section class="term-head"><h2>Strategies</h2>
-    <p>Build a strategy from an entry, a take profit and a stop loss, then run it over a whole dataset for every trade it would have made.</p>
+    <p>Build a strategy from an entry, a take profit and a stop loss, then run it on years of markets for every trade it would have made.</p>
     <p class="remarks">A trade is entered at the close of the candle that calls for it and watched from the next candle: a candle that opens
     beyond a target fills at its open, otherwise one whose high or low reaches it fills at the target. A candle that reaches both counts as
-    the Stop Loss. Profits are per unit traded. Each run is saved, with all its trades, to artifacts/backtests.</p></section>`;
+    the Stop Loss. Profits are per unit traded, after the strategy's fees and slippage. Each run is saved, with all its trades, to artifacts/backtests.</p></section>`;
   if (!serverOn) {
     main.innerHTML = head + `<div class="empty" data-server-check>Checking for the local server…</div>`;
     return checkLocalServer();
@@ -5398,9 +5564,21 @@ async function renderStrategiesPage() {
     main.innerHTML = head + '<div class="empty">Loading strategies…</div>';
     try { await loadStrategies(); } catch (e) { main.innerHTML = head + `<div class="empty">strategies.json could not be read: ${esc(e.message)}.</div>`; return; }
   }
-  const list = await loadDatasets();
+  await loadDatasets();
+  if (!strategies.markets?.length) await loadMarkets();
   if (currentPage !== 'Strategies') return;
-  strategies.dataset = list.some(d => d.id === strategies.dataset) ? strategies.dataset : list.some(d => d.id === state.replayDataset) ? state.replayDataset : list[0]?.id;
+  // An id the address asks for that strategies.json does not have is said so, with none shown, rather than another put in its place.
+  const id = asked.get('id');
+  if (id) {
+    const found = strategies.book.strategies.some(s => s.id === id);
+    [strategies.selected, strategies.missing] = found ? [id, null] : [null, id];
+  }
+  // The periods ticked: the address's, else those ticked before, else the first market's Search years.
+  const cells = asked.get('cells')?.split(',').filter(k => yearOf(k));
+  const first = strategies.markets?.[0];
+  strategies.included = new Set(cells?.length ? cells : strategies.included?.size ? strategies.included
+    : (first?.years ?? []).filter(y => y.role === 'search').map(y => cellKey(first.id, y.year)));
+  if (asked.get('cell') && yearOf(asked.get('cell')) && strategies.selected) strategies.cell.set(strategies.selected, asked.get('cell'));
   main.innerHTML = head + `<div class="strat"><nav class="strat-list" aria-label="Strategies"></nav><div class="strat-body"></div></div>`;
   renderStrategyList();
   renderStrategy();
@@ -5414,7 +5592,8 @@ function renderStrategyList() {
   box.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => { strategies.selected = b.dataset.pick; renderStrategyList(); renderStrategy(); }));
   box.querySelector('[data-add]').addEventListener('click', () => {
     const name = 'New strategy', s = { id: newStrategyId(name), name, direction: 'Long', entry: { type: 'SuccessiveCandles', ...STRATEGY_TYPES.entry.SuccessiveCandles.defaults },
-      takeProfit: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, stopLoss: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, onePositionAtATime: true };
+      takeProfit: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, stopLoss: { type: 'AverageCandle', ...STRATEGY_TYPES.target.AverageCandle.defaults }, onePositionAtATime: true,
+      ...defaultCosts() };
     strategies.book.strategies.push(s);
     strategies.selected = s.id;
     renderStrategyList();
@@ -5425,13 +5604,101 @@ function renderStrategyList() {
 
 const selectedStrategy = () => strategies.book.strategies.find(s => s.id === strategies.selected);
 
+// A number's variations in a sweep, beside it: up To, in steps of Step, from the number's own value. Both blank, it is not
+// varied. They are kept in the strategy's "vary", by the number's path, as the server's StrategySweep reads them.
+function varyInputs(s, path, step, off = false) {
+  const v = s.vary?.[path] ?? {}, dis = off ? 'disabled' : '';
+  const tip = 'title="Sweeps this from the value beside it up to To in steps of Step. Leave both blank for no variations."';
+  return `<label class="strat-vary" ${tip}>to<input type="number" data-vary="${path}" data-vary-key="to" step="${step}" value="${esc(v.to ?? '')}" placeholder="–" ${dis}></label>
+    <label class="strat-vary" ${tip}>step<input type="number" data-vary="${path}" data-vary-key="step" min="0" step="${step}" value="${esc(v.step ?? '')}" placeholder="–" ${dis}></label>`;
+}
+
+function setVary(s, path, to, step) {
+  if (to === undefined && step === undefined) delete s.vary?.[path];
+  else (s.vary ??= {})[path] = { ...(to !== undefined ? { to } : {}), ...(step !== undefined ? { step } : {}) };
+  if (s.vary && !Object.keys(s.vary).length) delete s.vary;
+}
+
+// Beside a strategy's costs: Clear (none), Defaults (the book's) and Set as default (the book's become these), each
+// unavailable when it would change nothing, with the defaults as they are. Set as default is saved with Save.
+function costButtons(s) {
+  const d = strategies.book.defaults, fee = s.feePercent ?? 0, slip = s.slippagePercent ?? 0;
+  const isDefault = fee === d.feePercent && slip === d.slippagePercent;
+  return `<div class="strat-costs">
+    <button type="button" data-costs="clear" ${!fee && !slip ? 'disabled' : ''} title="No fees or slippage for this strategy">Clear</button>
+    <button type="button" data-costs="defaults" ${isDefault ? 'disabled' : ''} title="This strategy takes the default costs">Defaults</button>
+    <button type="button" data-costs="set" ${isDefault ? 'disabled' : ''} title="This strategy's costs become the defaults, for new strategies and those without costs of their own">Set as default</button>
+    <span class="strat-note">Default: ${d.feePercent}% fee a side, ${d.slippagePercent}% slippage.</span></div>`;
+}
+
+function wireCostButtons(box, s) {
+  box.querySelectorAll('[data-costs]').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.costs === 'clear') Object.assign(s, { feePercent: 0, slippagePercent: 0 });
+    else if (b.dataset.costs === 'defaults') Object.assign(s, defaultCosts());
+    else strategies.book.defaults = { feePercent: s.feePercent ?? 0, slippagePercent: s.slippagePercent ?? 0 };
+    renderStrategy();
+    updateStrategyStatus();
+    if (b.dataset.costs !== 'set') rerunForCosts(s);
+  }));
+}
+
+// Drops the variations of the numbers whose paths pass the test, as when the part they are in changes type or the steps move.
+function dropVary(s, test) {
+  Object.keys(s.vary ?? {}).filter(test).forEach(k => delete s.vary[k]);
+  if (s.vary && !Object.keys(s.vary).length) delete s.vary;
+}
+
+// A varied number as the editor names it: "Stop Loss Target (R)", "Step 2 Length".
+function varyLabel(s, path) {
+  if (path === 'feePercent') return 'Fee %';
+  if (path === 'slippagePercent') return 'Slippage %';
+  const parts = path.split('.'), key = parts.pop(), at = parts.join('.'), p = parts.reduce((o, k) => o?.[k], s);
+  const steps = strategySteps(s), k = steps.indexOf(p);
+  const part = k >= 0 ? (steps.length > 1 ? `Step ${k + 1}` : 'Entry') : at === 'takeProfit' ? 'Take Profit' : at === 'stopLoss' ? 'Stop Loss' : at;
+  const field = key === 'within' ? 'Within' : STRATEGY_TYPES[k >= 0 ? 'entry' : 'target'][p?.type]?.fields?.find(f => f.key === key)?.label ?? key;
+  return `${part} ${field}`;
+}
+
+// What a sweep of the strategy varies and how many variations that makes, counted as the server's StrategySweep counts them:
+// { parts, count }, or { error } when it cannot be run.
+const SWEEP_MOST = 1000;
+function varyPlan(s) {
+  const entries = Object.entries(s.vary ?? {});
+  if (!entries.length) return { error: 'Nothing varied: give a number a To and a Step to sweep it.' };
+  let count = 1;
+  const parts = [];
+  for (const [path, r] of entries) {
+    const from = path.split('.').reduce((o, k) => o?.[k], s), label = varyLabel(s, path);
+    if (r.to === undefined || r.step === undefined) return { error: `${label}: give both a To and a Step, or neither.` };
+    if (typeof from !== 'number') return { error: `${label} has no value to vary from.` };
+    if (!(r.step > 0)) return { error: `${label}: the Step must be more than 0.` };
+    if (r.to < from) return { error: `${label}: To must be at least ${from}.` };
+    const n = Math.floor((r.to - from) / r.step + 1e-9) + 1;
+    count *= n;
+    parts.push(`${label} from ${from} to ${r.to} in steps of ${r.step} (${n})`);
+  }
+  return count > SWEEP_MOST ? { error: `${count.toLocaleString()} variations: more than the ${SWEEP_MOST.toLocaleString()} a sweep can run.` } : { parts, count };
+}
+
+function varySays(s) {
+  const plan = varyPlan(s);
+  return plan.error ?? `Varies ${plan.parts.join('; ')}: ${plan.count.toLocaleString()} variation${plan.count === 1 ? '' : 's'}.`;
+}
+
 function renderStrategy() {
   const box = document.querySelector('.strat-body'), s = selectedStrategy();
   if (!box) return;
+  if (s) strategies.missing = null;
+  syncStrategiesHash();
+  if (!s && strategies.missing) {
+    box.innerHTML = `<div class="strat-card">No strategy has the id "${esc(strategies.missing)}" in strategies.json. It may have been renamed or deleted,
+      or the link may come from another machine's strategies. Pick one from the list.</div>${strategyActions()}`;
+    return wireStrategyActions(box);
+  }
   if (!s) { box.innerHTML = `<div class="strat-card">No strategies yet: add one with New strategy.</div>${strategyActions()}`; return wireStrategyActions(box); }
   const input = (path, f, value) => f.options
     ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => `<option ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`
-    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" step="${f.step}" value="${esc(value)}"></label>`;
+    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" step="${f.step}" value="${esc(value)}"></label>${varyInputs(s, path, f.step)}`;
   const steps = strategySteps(s);
   const part = ({ key, title, kind }) => {
     const p = key.split('.').reduce((o, k) => o?.[k], s), type = STRATEGY_TYPES[kind][p.type], step = kind === 'entry' ? steps.indexOf(p) : -1;
@@ -5439,7 +5706,7 @@ function renderStrategy() {
       ${step >= 0 && steps.length > 1 ? `<button type="button" class="step-remove" data-step-remove="${step}" title="Take this step out of the chain" aria-label="Remove ${esc(title)}">×</button>` : ''}
       <label>Type<select data-type="${key}" data-kind="${kind}">${Object.entries(STRATEGY_TYPES[kind]).filter(([, t]) => !t.only || t.only === key).map(([id, t]) => `<option value="${id}" ${id === p.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
       ${(type?.fields ?? []).map(f => input(`${key}.${f.key}`, f, p[f.key])).join('')}
-      ${step > 0 ? `<label title="The most candles from the candle that met the step before to the one that meets this. Blank for no limit.">Within (candles)<input type="number" data-path="${key}.within" data-number data-blank min="1" step="1" value="${esc(p.within ?? '')}" placeholder="no limit"></label>` : ''}</fieldset>`;
+      ${step > 0 ? `<label title="The most candles from the candle that met the step before to the one that meets this. Blank for no limit.">Within (candles)<input type="number" data-path="${key}.within" data-number data-blank min="1" step="1" value="${esc(p.within ?? '')}" placeholder="no limit"></label>${varyInputs(s, `${key}.within`, 1)}` : ''}</fieldset>`;
   };
   // The steps of the entry condition, top to bottom, with a + above, between and below them to add a step there.
   const stepParts = steps.map((_, k) => ({ key: k < steps.length - 1 ? `after.${k}` : 'entry', title: steps.length > 1 ? `Step ${k + 1}${k === steps.length - 1 ? ': Entry' : ''}` : 'Entry', kind: 'entry' }));
@@ -5452,9 +5719,19 @@ function renderStrategy() {
         <label>Direction<select data-path="direction">${['Long', 'Short'].map(o => `<option ${o === s.direction ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
         <label class="check"><input type="checkbox" data-path="onePositionAtATime" ${s.onePositionAtATime ? 'checked' : ''}>One trade at a time</label>
       </div>
+      <div class="strat-fields strat-cost">
+        <label class="check" title="Whether the fee is counted; off, the strategy keeps its fee but pays none"><input type="checkbox" data-count="countFees" ${s.countFees !== false ? 'checked' : ''}>Fees</label>
+        <label title="The fee on each side of a trade, entry and exit, as a percentage of its value">Fee % a side<input type="number" data-path="feePercent" data-number min="0" step="0.01" value="${esc(s.feePercent ?? 0)}" ${s.countFees !== false ? '' : 'disabled'}></label>${varyInputs(s, 'feePercent', 0.01, s.countFees === false)}
+      </div>
+      <div class="strat-fields strat-cost">
+        <label class="check" title="Whether slippage is counted; off, the strategy keeps its slippage but none is taken"><input type="checkbox" data-count="countSlippage" ${s.countSlippage !== false ? 'checked' : ''}>Slippage</label>
+        <label title="How far a market order fills against the trade: the entry and a Stop Loss. A Take Profit is a limit order and does not slip.">Slippage %<input type="number" data-path="slippagePercent" data-number min="0" step="0.01" value="${esc(s.slippagePercent ?? 0)}" ${s.countSlippage !== false ? '' : 'disabled'}></label>${varyInputs(s, 'slippagePercent', 0.01, s.countSlippage === false)}
+      </div>
+      <div class="strat-fields">${costButtons(s)}</div>
       <div class="strat-fields strat-steps">${stepsHtml}</div>
       <div class="strat-fields">${STRATEGY_PARTS.filter(x => x.kind !== 'entry').map(part).join('')}</div>
       <p class="strat-says">${esc(strategySays(s))}</p>
+      <p class="strat-vary-says">${esc(varySays(s))}</p>
       ${strategyActions()}
     </div>
     <div class="strat-card"><h3>Run</h3><div class="strat-run-body"></div></div>`;
@@ -5471,12 +5748,37 @@ function renderStrategy() {
     } else if (value === undefined) delete target[key];
     else target[key] = value;
     box.querySelector('.strat-says').textContent = strategySays(s);
+    box.querySelector('.strat-vary-says').textContent = varySays(s);
     if (key === 'name' || key === 'id') renderStrategyList();
+    if (key === 'id') syncStrategiesHash();
+    updateStrategyStatus();
+    // The cost buttons are available by how the costs stand against the defaults.
+    if (key === 'feePercent' || key === 'slippagePercent') {
+      box.querySelector('.strat-costs').outerHTML = costButtons(s);
+      wireCostButtons(box, s);
+      rerunForCosts(s);
+    }
+  }));
+  wireCostButtons(box, s);
+  // On is the default, so only a cost turned off is kept, as false.
+  box.querySelectorAll('[data-count]').forEach(el => el.addEventListener('change', () => {
+    if (el.checked) delete s[el.dataset.count];
+    else s[el.dataset.count] = false;
+    renderStrategy();
+    updateStrategyStatus();
+    rerunForCosts(s);
+  }));
+  box.querySelectorAll('[data-vary]').forEach(el => el.addEventListener('change', () => {
+    const path = el.dataset.vary, [to, step] = ['to', 'step'].map(k => box.querySelector(`[data-vary="${path}"][data-vary-key="${k}"]`).value);
+    setVary(s, path, to === '' ? undefined : Number(to), step === '' ? undefined : Number(step));
+    box.querySelector('.strat-vary-says').textContent = varySays(s);
     updateStrategyStatus();
   }));
   box.querySelectorAll('[data-type]').forEach(el => el.addEventListener('change', () => {
     const path = el.dataset.type.split('.'), key = path.pop(), target = path.reduce((o, k) => o[k], s), within = target[key]?.within;
     target[key] = { type: el.value, ...STRATEGY_TYPES[el.dataset.kind][el.value].defaults, ...(within ? { within } : {}) };
+    // The new type's numbers are not the old one's, all but Within.
+    dropVary(s, k => k.startsWith(`${el.dataset.type}.`) && k !== `${el.dataset.type}.within`);
     renderStrategy();
     updateStrategyStatus();
   }));
@@ -5485,6 +5787,8 @@ function renderStrategy() {
   const changeSteps = change => {
     const all = [...strategySteps(s)];
     change(all);
+    // A step's numbers are varied by its place in the chain, which this changes.
+    dropVary(s, k => k.startsWith('after.') || k.startsWith('entry.'));
     s.entry = all.pop();
     if (all.length) s.after = all;
     else delete s.after;
@@ -5523,6 +5827,8 @@ function updateStrategyStatus() {
 }
 
 async function strategyAction(act) {
+  // The page a tour shows keeps its strategies as they are.
+  if (embedMode) return;
   const list = strategies.book.strategies, s = selectedStrategy();
   strategies.note = '';
   if (act === 'save') {
@@ -5555,16 +5861,27 @@ async function strategyAction(act) {
 function renderStrategyRun() {
   const box = document.querySelector('.strat-run-body'), s = selectedStrategy();
   if (!box || !s) return;
-  const run = strategies.runs.get(s.id);
+  const key = strategies.cell.get(s.id), run = strategyCells(s).get(key);
+  const ticked = [...strategies.included].filter(runnable);
   box.innerHTML = `<div class="strat-run">
-      <select data-run-dataset aria-label="Dataset">${(datasetList ?? []).map(d => `<option value="${esc(d.id)}" ${d.id === strategies.dataset ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>
-      <button type="button" data-run ${strategies.running ? 'disabled' : ''}>${strategies.running ? 'Running…' : 'Run'}</button>
-      ${run?.trades ? '<button type="button" data-csv>Download CSV</button>' : ''}
-      <span class="strat-note${run?.error ? ' bad' : ''}">${esc(run?.error ?? (run ? `Saved to ${run.saved}` : 'Runs the strategy as it is here, saved or not.'))}</span>
+      <button type="button" data-run ${strategies.running || !ticked.length ? 'disabled' : ''} title="Runs the strategy as it is here, saved or not, with a random baseline, on each period ticked">${strategies.running ? esc(strategies.running) : `Run on ${ticked.length} period${ticked.length === 1 ? '' : 's'}`}</button>
+      <button type="button" data-periods title="Choose the periods to run on, and set each year's role">Periods…</button>
+      <button type="button" data-sweep ${strategies.sweeping ? 'disabled' : ''} title="Runs every variation of the numbers given a To and a Step on the period shown, each against its own random baseline; on a Search period only">${strategies.sweeping ? 'Sweeping…' : 'Run sweep'}</button>
     </div>
+    ${periodChips(s)}
     <form class="strat-run" data-chart-add><input class="strat-chart-name" data-chart-name aria-label="Name on the charts" value="${esc(chartStrategyName(s))}">
       <button type="submit">Add to strategies on charts</button><span class="strat-note" data-chart-note>Adds the strategy as it is here, under this name, to the Strategies section beside the charts.</span></form>
+    ${key ? `<h3 class="strat-cell-head">${esc(cellName(key))}</h3>` : ''}
+    <div class="strat-run">
+      ${run?.trades ? '<button type="button" data-csv>Download CSV</button>' : ''}
+      ${run?.trades && (!run.baseline || run.baseline.error) ? `<button type="button" data-baseline ${run.baselining ? 'disabled' : ''} title="Runs the same exits from random entries, as often as the strategy enters, to see what the entry adds">${run.baselining ? 'Running baseline…' : 'Random baseline'}</button>` : ''}
+      <span class="strat-note${run?.error ? ' bad' : ''}">${esc(run?.error ?? (run?.saved ? `Saved to ${run.saved}` : run?.trades ? 'Run for the tour, which saves nothing.' : key ? 'Not run on this period yet.' : 'Click a period to see its results.'))}</span>
+    </div>
+    <div class="strat-sweep"></div>
+    ${run?.baseline ? baselineResults(run.baseline) : ''}
     <div class="strat-results">${run?.trades ? strategyResults(run) : ''}</div>`;
+  if (run?.baseline?.curve) baselinePlot(box.querySelector('[data-baseline-plot]'), run.baseline, run);
+  renderSweep(box.querySelector('.strat-sweep'), strategies.sweeps?.get(s.id));
   box.querySelector('[data-chart-add]').addEventListener('submit', e => {
     e.preventDefault();
     const label = box.querySelector('[data-chart-name]').value.trim() || chartStrategyName(s), like = chartStrategyLike(s, label);
@@ -5572,12 +5889,24 @@ function renderStrategyRun() {
     box.querySelector('[data-chart-note]').textContent = c ? `Added as "${c.label}": turn it on in the Strategies section on the Chart, Replay, Tour or Analysis page.`
       : strategyRules(like.strategy) === strategyRules(s) ? `Not added: it is on the charts already, as "${like.label}".` : `Not added: "${like.label}" is already the name of another on the charts.`;
   });
-  box.querySelector('[data-run-dataset]').addEventListener('change', e => { strategies.dataset = e.target.value; });
+  box.querySelector('[data-periods]').addEventListener('click', () => openPeriodsDialog(s));
+  box.querySelectorAll('[data-chip-cell]').forEach(el => el.addEventListener('click', () => {
+    strategies.cell.set(s.id, el.dataset.chipCell);
+    syncStrategiesHash();
+    renderStrategyRun();
+  }));
+  renderPeriodsDialog(s);
   box.querySelector('[data-run]').addEventListener('click', () => runStrategy(s));
   box.querySelector('[data-csv]')?.addEventListener('click', () => downloadTrades(run));
-  // The results' own clicks: Analyse a trade, count a trade in or out of the totals, or the * trades all at once. The
-  // results are drawn again in place, the table kept where it was scrolled to.
-  const results = box.querySelector('.strat-results');
+  box.querySelector('[data-baseline]')?.addEventListener('click', () => runBaseline(s, run));
+  box.querySelector('[data-sweep]').addEventListener('click', () => runSweep(s));
+  wireStrategyResults(box.querySelector('.strat-results'), run, () => { if (run.baseline?.curve) baselinePlot(box.querySelector('[data-baseline-plot]'), run.baseline, run); });
+}
+
+// A run's results' own clicks: Analyse a trade, count a trade in or out of the totals, or the * trades all at once. The
+// results are drawn again in place, the table kept where it was scrolled to, and then counted, as by the graph of the
+// baseline beside them.
+function wireStrategyResults(results, run, counted) {
   results.addEventListener('click', e => {
     const analyse = e.target.closest('[data-trade-row]'), one = e.target.closest('[data-include]'), both = e.target.closest('[data-include-both]'), all = e.target.closest('[data-include-all]');
     const order = e.target.closest('[data-sort]');
@@ -5604,6 +5933,7 @@ function renderStrategyRun() {
     results.innerHTML = strategyResults(run);
     const again = results.querySelector('.strat-trades');
     if (again) [again.scrollTop, again.scrollLeft] = [top, left];
+    counted();
   });
 }
 
@@ -5617,19 +5947,440 @@ function summariseTrades(trades) {
     averageWin: wins.length ? sum(wins, 'profit') / wins.length : 0, averageLoss: losses.length ? sum(losses, 'profit') / losses.length : 0,
     largestWin: wins.length ? Math.max(...wins.map(t => t.profit)) : 0, largestLoss: losses.length ? Math.min(...losses.map(t => t.profit)) : 0,
     profitFactor: grossLoss > 0 ? sum(wins, 'profit') / grossLoss : null, bothTouched: closed.filter(t => t.bothTouched).length,
+    fees: sum(closed, 'fees'), slippage: sum(closed, 'slippage'),
   };
 }
 
-async function runStrategy(s) {
-  strategies.running = true;
-  renderStrategyRun();
-  const response = await fetch('api/backtest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataset: strategies.dataset, strategy: s }) }).catch(() => null);
-  const result = response?.ok ? await response.json()
-    : { error: response?.status === 404 || response?.status === 405 ? 'The local server was started before strategies could be run. Restart ./build-site.ps1 -Serve.'
+// A POST to one of the backtest endpoints, its answer as JSON, or { error } saying why there is none.
+async function postBacktest(path, body, what) {
+  // The page a tour shows saves nothing, and keeps what it has run, to be put back where the tour is without running again.
+  if (embedMode) {
+    body = { ...body, save: false };
+    const key = `${path}|${JSON.stringify(body)}`;
+    if (!embedded.runs.has(key)) {
+      const result = await postToServer(path, body, what);
+      if (result.error) return result;
+      embedded.runs.set(key, result);
+    }
+    return structuredClone(embedded.runs.get(key));
+  }
+  return postToServer(path, body, what);
+}
+
+async function postToServer(path, body, what) {
+  const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+  return response?.ok ? response.json()
+    : { error: response?.status === 404 || response?.status === 405 ? `The local server was started before ${what} could be run. Restart ./build-site.ps1 -Serve.`
       : `Not run: ${response ? await response.text() : 'the local server did not answer.'}` };
+}
+
+// Runs the strategy as it is here on each period ticked, one after another, each with its random baseline, and shows the
+// first of them when none is shown. With again, it is run again for a change of costs: costs do not change which trades
+// are made, so a period's trades left out stay left out, and its order stays.
+async function runStrategy(s, again = false) {
+  const cells = strategyCells(s), keys = [...strategies.included].filter(runnable);
+  if (!keys.length) return;
+  if (!keys.includes(strategies.cell.get(s.id)) && !cells.has(strategies.cell.get(s.id))) strategies.cell.set(s.id, keys[0]);
+  syncStrategiesHash();
+  const shown = () => currentPage === 'Strategies' && selectedStrategy() === s;
+  for (const [n, key] of keys.entries()) {
+    strategies.running = `Running ${n + 1} of ${keys.length}…`;
+    const before = cells.get(key), { market } = cellOf(key), window = cellWindow(key);
+    cells.set(key, { running: true });
+    if (shown()) renderStrategyRun();
+    const result = await postBacktest('api/backtest', { dataset: market, ...window, strategy: s }, 'strategies');
+    const run = result.error ? result : { saved: result.saved, ...result.run, window };
+    if (again && before?.trades && run.trades) Object.assign(run, { leftOut: before.leftOut, sort: before.sort });
+    if (run.trades) {
+      const b = await postBacktest('api/backtest/baseline', { dataset: market, ...window, strategy: run.strategy }, 'baselines');
+      run.baseline = b.error ? b : { saved: b.saved, ...b.baseline };
+    }
+    cells.set(key, run);
+  }
   strategies.running = false;
-  strategies.runs.set(s.id, result.error ? result : { saved: result.saved, ...result.run });
+  // A run on a Test period is counted, so the counts are fetched again.
+  await loadMarkets();
+  if (shown()) renderStrategyRun();
+}
+
+// A strategy's costs changed: a strategy run on any period is run again on those ticked, so their results and graphs have them.
+function rerunForCosts(s) {
+  if (strategyCells(s).size && !strategies.running) runStrategy(s, true);
+}
+
+// The random-entry baseline of a run (POST api/backtest/baseline, see StrategyBaseline) when it has none, as when it
+// failed: the run's own strategy, as it was when run, on its period, with its entry swapped for random candles.
+async function runBaseline(s, run) {
+  run.baselining = true;
+  renderStrategyRun();
+  const result = await postBacktest('api/backtest/baseline', { dataset: run.dataset, ...run.window, strategy: run.strategy }, 'baselines');
+  run.baselining = false;
+  run.baseline = result.error ? result : { saved: result.saved, ...result.baseline };
+  if (currentPage === 'Strategies' && selectedStrategy() === s && strategyCells(s).get(strategies.cell.get(s.id)) === run) renderStrategyRun();
+}
+
+// A period's result for a strategy, as its cell and chip show it: its score (the share of its random runs it beats on
+// Total %) · its total after costs · its trades, and a tone by the score.
+function cellResult(s, key) {
+  const y = yearOf(key), run = strategyCells(s).get(key), total = run?.baseline?.measures?.find(x => x.name === 'Total %');
+  const result = y?.role === 'locked' ? 'Kept back'
+    : run?.running ? 'Running…'
+    : run?.error ? `<span class="bad" title="${esc(run.error)}">Not run</span>`
+    : total ? `<b>${Math.round(total.percentile ?? 0)}%</b> · ${fmtPercent(total.strategy)} · ${run.baseline.trades}`
+    : run?.trades ? `${fmtPercent(run.summary.totalProfitPercent)} · ${run.summary.trades}` : '';
+  const tone = total?.percentile == null ? '' : total.percentile >= 95 ? ' good' : total.percentile >= 90 ? ' fair' : total.percentile <= 5 ? ' poor' : '';
+  return { result, tone };
+}
+
+// The periods ticked, and any run before, as a chip each under its market: click one for its results below.
+function periodChips(s) {
+  const cells = strategyCells(s), selected = strategies.cell.get(s.id);
+  const rows = (strategies.markets ?? []).map(m => {
+    const keys = m.years.map(y => cellKey(m.id, y.year)).filter(k => (strategies.included.has(k) && runnable(k)) || cells.has(k));
+    return keys.length ? `<div class="strat-chip-row"><span class="strat-chip-market">${esc(m.name)}</span>${keys.map(k => {
+      const { result, tone } = cellResult(s, k);
+      return `<button type="button" class="strat-chip role-${yearOf(k)?.role}${tone}${k === selected ? ' sel' : ''}${strategies.included.has(k) ? '' : ' off'}" data-chip-cell="${k}"
+        title="${esc(cellName(k))}${strategies.included.has(k) ? '' : ': not ticked, so not run again'}">${cellOf(k).year}${result ? ` · ${result}` : ''}</button>`;
+    }).join('')}</div>` : '';
+  }).join('');
+  return rows ? `<div class="strat-chips">${rows}</div>` : '<p class="remarks strat-note">No periods ticked: choose them with Periods.</p>';
+}
+
+// The periods dialog: the grid of market years, to tick the periods to run on and set each year's role.
+function openPeriodsDialog(s) {
+  let dialog = document.getElementById('strat-periods');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'strat-periods';
+    dialog.setAttribute('aria-label', 'Periods to run on');
+    document.body.append(dialog);
+    // Closed by Done, or a click outside it on the backdrop.
+    dialog.addEventListener('click', e => {
+      const r = dialog.getBoundingClientRect(), outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+      if (e.target.closest('[data-periods-close]') || (e.target === dialog && outside)) dialog.close();
+    });
+  }
+  dialog.showModal();
+  renderPeriodsDialog(s);
+}
+
+function renderPeriodsDialog(s) {
+  const dialog = document.getElementById('strat-periods');
+  if (!dialog?.open) return;
+  dialog.innerHTML = `<h4>Periods: ${esc(s.name || s.id)}</h4>
+    <p>Tick the periods to run on. Each run opens its trades in the period, reading the candles before it, and may close them after it.</p>
+    ${strategyGrid(s)}
+    <div class="sim-foot"><button type="button" class="go" data-periods-close>Done</button></div>`;
+  wireStrategyGrid(dialog, s);
+}
+
+// The periods to run on: a row a year, a column a market, each cell with a tick to run on it, its role, and the strategy's
+// result there once run: its score (how much of its random runs it beats on Total %), its total after costs and its trades.
+// A year's role is its market group's, shared by its candle lengths.
+function strategyGrid(s) {
+  const markets = strategies.markets ?? [];
+  if (!markets.length) return '<p class="remarks strat-note bad">The local server has no markets: restart ./build-site.ps1 -Serve.</p>';
+  const years = [...new Set(markets.flatMap(m => m.years.map(y => y.year)))].sort((a, b) => a - b);
+  const selected = strategies.cell.get(s.id);
+  const cell = (m, year) => {
+    const y = m.years.find(x => x.year === year);
+    if (!y) return '<td class="strat-cell none"></td>';
+    const key = cellKey(m.id, year), { result, tone } = cellResult(s, key);
+    return `<td class="strat-cell role-${y.role}${tone}${key === selected ? ' sel' : ''}" data-cell="${key}" title="${esc(`${cellName(key)}: ${fmtTime(y.first)} to ${fmtTime(y.last)} UTC, ${y.candles.toLocaleString()} candles`)}">
+      <div class="strat-cell-top"><input type="checkbox" data-cell-tick="${key}" ${strategies.included.has(key) && y.role !== 'locked' ? 'checked' : ''} ${y.role === 'locked' ? 'disabled' : ''} aria-label="Run on ${esc(cellName(key))}">
+        <select data-cell-role="${m.group}:${year}" aria-label="Role of ${year}">${Object.entries(ROLE_NAMES).map(([r, name]) => `<option value="${r}" ${r === y.role ? 'selected' : ''}>${name}</option>`).join('')}</select></div>
+      <div class="strat-cell-result">${result}</div>
+      ${y.role === 'test' ? `<div class="strat-cell-note">Looked at ${y.testRuns}×</div>` : ''}</td>`;
+  };
+  return `<div class="strat-grid-wrap"><table class="strat-grid">
+      <thead><tr><th></th>${markets.map(m => `<th><button type="button" data-tick-market="${m.id}" title="Tick or untick all of this market's periods">${esc(m.name)}</button></th>`).join('')}</tr></thead>
+      <tbody>${years.map(year => `<tr><th><button type="button" data-tick-year="${year}" title="Tick or untick this year in every market">${year}</button></th>${markets.map(m => cell(m, year)).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+    <p class="remarks">A cell is a year of a market: once run, <b>its score</b> (the share of its random runs it beats on Total %) · its total after costs · its trades;
+      click one to show its results on the page. Strategies are searched for on <b>Search</b> years, where sweeps run. <b>Test</b> years check what was found: each look is
+      counted, as every look makes a good result there a little more likely by luck. <b>Locked</b> years are kept back for a final check, and run on nothing
+      until unlocked. Roles are kept at once, and every change is logged.</p>`;
+}
+
+// The grid's ticks, roles and clicks: a tick runs on a period, a heading's on all of its row or column, a role is kept at
+// once (unlocking only once confirmed, as it spends the period), and a click elsewhere in a cell shows its results.
+function wireStrategyGrid(box, s) {
+  const grid = box.querySelector('.strat-grid');
+  if (!grid) return;
+  const toggle = keys => {
+    keys = keys.filter(runnable);
+    const on = keys.some(k => !strategies.included.has(k));
+    keys.forEach(k => on ? strategies.included.add(k) : strategies.included.delete(k));
+    syncStrategiesHash();
+    renderStrategyRun();
+  };
+  grid.querySelectorAll('[data-cell-tick]').forEach(el => el.addEventListener('change', () => toggle([el.dataset.cellTick])));
+  grid.querySelectorAll('[data-tick-market]').forEach(el => el.addEventListener('click', () =>
+    toggle(marketOf(el.dataset.tickMarket).years.map(y => cellKey(el.dataset.tickMarket, y.year)))));
+  grid.querySelectorAll('[data-tick-year]').forEach(el => el.addEventListener('click', () =>
+    toggle(strategies.markets.map(m => cellKey(m.id, Number(el.dataset.tickYear))).filter(yearOf))));
+  grid.querySelectorAll('[data-cell-role]').forEach(el => el.addEventListener('change', async () => {
+    if (embedMode) return;
+    const [group, year] = el.dataset.cellRole.split(':'), role = el.value;
+    const was = strategies.markets.find(m => m.group === group)?.years.find(y => y.year === Number(year))?.role;
+    if (was === 'locked' && !confirm(`Unlock ${year} of ${group}? It was kept back for a final check: once looked at, it can no longer give one. The unlocking is logged.`)) {
+      el.value = was;
+      return;
+    }
+    const response = await fetch('api/periods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group, year: Number(year), role }) }).catch(() => null);
+    if (!response?.ok) alert(`The role was not kept: ${response ? await response.text() : 'the local server did not answer.'}`);
+    await loadMarkets();
+    [...strategies.included].filter(k => !runnable(k)).forEach(k => strategies.included.delete(k));
+    syncStrategiesHash();
+    renderStrategyRun();
+  }));
+  grid.addEventListener('click', e => {
+    const td = e.target.closest('[data-cell]');
+    if (!td || e.target.closest('input, select, button')) return;
+    strategies.cell.set(s.id, td.dataset.cell);
+    syncStrategiesHash();
+    renderStrategyRun();
+  });
+}
+
+// Where the strategy's totals sit among the random runs': a row a total, with the share of runs it beat. Beating 95% or
+// more, or fewer than 5%, is outside what random entries with the same exits make nine times in ten.
+function baselineResults(b) {
+  if (b.error) return `<p class="remarks strat-note bad">${esc(b.error)}</p>`;
+  const fmt = { 'Win rate': v => `${v.toFixed(1)}%`, 'Profit factor': v => v.toFixed(2), 'Average %': fmtPercent, 'Total %': fmtPercent };
+  const show = (name, v) => v == null ? '–' : (fmt[name] ?? (x => x.toFixed(2)))(v);
+  const verdict = p => p == null ? ['–', ''] : p >= 95 ? ['above random', 'won'] : p <= 5 ? ['below random', 'lost'] : ['within random', ''];
+  const rows = b.measures.map(m => {
+    const [says, cls] = verdict(m.percentile);
+    return `<tr><td>${esc(m.name)}</td><td class="num">${show(m.name, m.strategy)}</td><td class="num">${show(m.name, m.median)}</td>
+      <td class="num">${show(m.name, m.low)} to ${show(m.name, m.high)}</td><td class="num">${m.percentile == null ? '–' : `${Math.round(m.percentile)}%`}</td><td class="${cls}">${says}</td></tr>`;
+  }).join('');
+  return `<div class="strat-baseline">
+    <p class="remarks">Against ${b.runs.toLocaleString()} runs entering at random candles, each tried by the chance the strategy's entry is met at
+      (${b.signals.toLocaleString()} of ${b.candles.toLocaleString()} candles), with the strategy's exits. They made ${Math.round(b.averageTrades)} trades
+      on average to its ${b.trades}. The table counts every trade; the graph's strategy lines count only those not left out below.${b.saved ? ` Saved to ${esc(b.saved)}.` : ''}</p>
+    <table><thead><tr><th></th><th class="num">Strategy</th><th class="num">Random median</th><th class="num">Random 5% to 95%</th><th class="num">Beats</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    ${b.curve ? `<p class="remarks">Profit over time, as the sum of each closed trade's %: the strategy against the band nine random runs in ten stay within.
+      With costs, the dashed line is the strategy before its fees and slippage, the gap to the solid line what they cost; the random runs pay the same costs.</p>
+      <div class="strat-baseline-plot" data-baseline-plot></div>` : ''}</div>`;
+}
+
+// A line of a baseline's curve: one of its values at each point, as a % of profit.
+const curveLine = (b, name, key, color, extra = {}) => ({ type: 'scatter', mode: 'lines', name, x: b.curve.map(p => p.time), y: b.curve.map(p => p[key]),
+  line: { color, width: 2 }, hovertemplate: `${name}: %{y:+.1f}%<extra></extra>`, ...extra });
+
+// The random runs of a baseline's curve: their band, 5% to 95%, with a legend entry of its own, and their median.
+function bandTraces(b) {
+  const muted = css('--muted');
+  return [
+    curveLine(b, 'Random 5%', 'low', 'rgba(0,0,0,0)', { showlegend: false }),
+    curveLine(b, 'Random 95%', 'high', 'rgba(0,0,0,0)', { fill: 'tonexty', fillcolor: withAlpha(muted, 0.2), showlegend: false }),
+    { type: 'scatter', mode: 'lines', name: 'Random 5% to 95%', x: [null], y: [null], line: { color: withAlpha(muted, 0.35), width: 10 }, hoverinfo: 'skip' },
+    curveLine(b, 'Random median', 'median', muted, { line: { color: muted, width: 2, dash: 'dash' } }),
+  ];
+}
+
+// The layout the baseline and sweep charts share, with the axes given.
+function resultsLayout(xaxis, yaxis, extra = {}) {
+  const muted = css('--muted'), grid = css('--grid') || css('--border');
+  return {
+    margin: { t: 10, r: 56, b: 36, l: 10 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
+    xaxis: { gridcolor: grid, linecolor: grid, ...xaxis }, yaxis: { gridcolor: grid, linecolor: grid, side: 'right', ...yaxis },
+    showlegend: true, legend: { orientation: 'h', x: 0, y: 1.02, yanchor: 'bottom' }, ...extra,
+  };
+}
+
+const RESULTS_CONFIG = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['select2d', 'lasso2d'] };
+
+// The strategy's profit before fees and slippage, dashed, for the gap to the solid line to show what they cost; none when
+// the strategy has no costs, or the baseline was run before there were any.
+const grossLine = (b, name = 'Before fees and slippage') => b.curve.some(p => p.gross != null && Math.abs(p.gross - p.strategy) > 1e-9)
+  ? [curveLine(b, name, 'gross', css('--accent'), { line: { color: css('--accent'), width: 2, dash: 'dash' } })] : [];
+
+// The baseline's curve with the strategy's lines from the run's trades still counted, when some are left out: each closed
+// trade's % added at its exit, after costs and before them. The random runs' band and median are theirs, and stay.
+function countedCurve(b, run) {
+  const off = run?.leftOut;
+  if (!off?.size) return b;
+  const closed = run.trades.filter(t => t.outcome !== 'Open' && !off.has(t.entryIndex))
+    .map(t => ({ at: Date.parse(t.exitTime), net: t.profitPercent, gross: 100 * (t.profit + (t.fees ?? 0) + (t.slippage ?? 0)) / t.entryPrice }))
+    .sort((a, c) => a.at - c.at);
+  let k = 0, net = 0, gross = 0;
+  const curve = b.curve.map(p => {
+    for (const at = Date.parse(p.time); k < closed.length && closed[k].at <= at; k++) {
+      net += closed[k].net;
+      gross += closed[k].gross;
+    }
+    return { ...p, strategy: net, gross };
+  });
+  return { ...b, curve, counted: closed.length, closed: run.trades.filter(t => t.outcome !== 'Open').length };
+}
+
+// The baseline's curve: the strategy's profit over time on the band of the random runs', 5% to 95%, and their median, and
+// what it would have been before fees and slippage; from the trades counted, when the run is given and some are left out.
+function baselinePlot(el, b, run) {
+  if (!el) return;
+  b = countedCurve(b, run);
+  const name = `Strategy, after fees and slippage${b.counted != null ? ` (${b.counted} of ${b.closed} trades)` : ''}`;
+  Plotly.react(el, [...bandTraces(b), ...grossLine(b), curveLine(b, name, 'strategy', css('--accent'))],
+    resultsLayout({ type: 'date' }, { ticksuffix: '%', zeroline: true, zerolinecolor: css('--muted') }, { hovermode: 'x unified' }), RESULTS_CONFIG);
+}
+
+// ---- Sweeps ----------------------------------------------------------------------------------------------------------
+// A sweep (POST api/backtest/sweep, see StrategySweep) runs the strategy as it is here once for each combination of the
+// numbers given a To and a Step, each against its own random baseline, on the period shown, which must be a Search one. It
+// is kept by strategy until the next sweep.
+async function runSweep(s) {
+  strategies.sweeps ??= new Map();
+  const plan = varyPlan(s), key = strategies.cell.get(s.id) ?? [...strategies.included].find(runnable);
+  const refused = plan.error ?? (!key ? 'pick a period to sweep on, by clicking it in the grid.'
+    : yearOf(key)?.role !== 'search' ? `${cellName(key)} is a ${ROLE_NAMES[yearOf(key)?.role] ?? ''} period, and sweeps search, so they run only on Search periods.` : null);
+  if (refused) {
+    strategies.sweeps.set(s.id, { error: `Not swept: ${refused}` });
+    return renderStrategyRun();
+  }
+  strategies.sweeping = true;
+  renderStrategyRun();
+  // The strategy as it was swept, as the page keeps it, for a variation to be extracted from.
+  const sent = structuredClone(s);
+  const result = await postBacktest('api/backtest/sweep', { dataset: cellOf(key).market, ...cellWindow(key), strategy: sent }, 'sweeps');
+  strategies.sweeping = false;
+  strategies.sweeps.set(s.id, result.error ? { error: result.error.replace(/^Not run/, 'Not swept') } : { saved: result.saved, ...result.sweep, sent, cell: key });
   if (currentPage === 'Strategies' && selectedStrategy() === s) renderStrategyRun();
+}
+
+// A variation as its values: "Stop Loss Target (R) 1.5", or each of them for more than one varied.
+const sweepLabel = (sw, v) => Object.entries(v.values).map(([path, value]) => `${varyLabel(sw.strategy, path)} ${value}`).join(' · ') || 'As it is';
+
+// A total as the baseline's table shows it.
+const showTotal = (name, v) => v == null ? '–' : name === 'Win rate' ? `${v.toFixed(1)}%` : name === 'Profit factor' ? v.toFixed(2) : fmtPercent(v);
+
+// The sweep's results: where each variation's total beats its own random runs, by the value varied, and every variation's
+// profit over time with the selected one on its band. The selected variation starts as the best by the measure shown, and
+// a click on a dot or a line selects another; both charts are drawn again for it.
+function renderSweep(el, sw) {
+  if (!el || !sw) return;
+  if (sw.error) { el.innerHTML = `<p class="remarks strat-note bad">${esc(sw.error)}</p>`; return; }
+  const ran = sw.variations.map((v, i) => i).filter(i => sw.variations[i].baseline);
+  if (!ran.length) { el.innerHTML = `<p class="remarks strat-note bad">No variation could be run: ${esc(sw.variations[0]?.error ?? '')}</p>`; return; }
+  const measure = sw.measure ??= 'Total %', best = sw.best.find(b => b.against.name === measure);
+  if (!ran.includes(sw.selected)) sw.selected = best?.variation ?? ran[0];
+  const failed = sw.variations.filter(v => !v.baseline), data = datasetList?.find(d => d.id === sw.dataset);
+  const own = i => sw.variations[i].baseline.measures.find(m => m.name === measure);
+  const top = best?.variation != null ? `Best by ${measure}: ${sweepLabel(sw, sw.variations[best.variation])}, at ${showTotal(measure, best.against.strategy)}. It beats
+    ${Math.round(own(best.variation).percentile ?? 0)}% of its own random runs, and ${Math.round(best.against.percentile ?? 0)}% of the best of ${ran.length} random runs,
+    one from each variation, which is the fair test of a best picked from ${ran.length}.` : '';
+  el.innerHTML = `<div class="strat-baseline">
+    <p class="remarks">A sweep over ${esc(sw.cell ? cellName(sw.cell) : data?.name ?? sw.dataset)} of ${sw.variations.length} variations, each against its own ${sw.runs.toLocaleString()} random runs:
+      ${esc(sw.varied.map(p => varyLabel(sw.strategy, p)).join(', '))}.${failed.length ? ` ${failed.length} could not be run: ${esc(sweepLabel(sw, failed[0]))}, ${esc(failed[0].error)}${failed.length > 1 ? ' and others' : ''}.` : ''}${sw.saved ? ` Saved to ${esc(sw.saved)}.` : ''}</p>
+    <div class="strat-run"><label>Measure <select data-sweep-measure>${sw.best.map(b => `<option ${b.against.name === measure ? 'selected' : ''}>${esc(b.against.name)}</option>`).join('')}</select></label></div>
+    <p class="remarks">${esc(top)}</p>
+    <div class="strat-sweep-beats" data-sweep-beats></div>
+    <p class="remarks">Profit over time of every variation, lighter to darker in the order of the values; the selected one bold, on its own random runs' band.
+      Click a dot above or a line here to select another.</p>
+    <div class="strat-baseline-plot" data-sweep-lines></div></div>
+    ${sw.card ? sweepCard(sw, ran, measure) : ''}`;
+  // A click on a dot or a line selects its variation and opens its card where the click was.
+  const pick = (i, event) => {
+    const box = el.getBoundingClientRect();
+    sw.selected = i;
+    // Kept inside the charts' width; the card is 260px wide and set 12px off the click.
+    sw.card = event ? { x: Math.max(0, Math.min(event.clientX - box.left, box.width - 290)), y: event.clientY - box.top } : null;
+    renderSweep(el, sw);
+  };
+  el.querySelector('[data-card-close]')?.addEventListener('click', () => { sw.card = null; renderSweep(el, sw); });
+  el.querySelector('[data-extract]')?.addEventListener('click', () => extractVariation(sw, sw.selected));
+  el.querySelector('[data-sweep-measure]').addEventListener('change', e => { sw.measure = e.target.value; sw.selected = null; sw.card = null; renderSweep(el, sw); });
+  sweepBeatsPlot(el.querySelector('[data-sweep-beats]'), sw, ran, measure, best, pick);
+  sweepLinesPlot(el.querySelector('[data-sweep-lines]'), sw, ran, pick);
+}
+
+// Each variation's share of its own random runs it beats on the measure, by the value varied (or by the variation, when
+// more than one number is varied), with the lines a variation must clear to be promising (90%) or above random (95%), and
+// the best variation against the best of the random runs.
+function sweepBeatsPlot(el, sw, ran, measure, best, pick) {
+  const muted = css('--muted'), accent = css('--accent'), single = sw.varied.length === 1;
+  const xOf = i => single ? sw.variations[i].values[sw.varied[0]] : sweepLabel(sw, sw.variations[i]);
+  const m = i => sw.variations[i].baseline.measures.find(x => x.name === measure);
+  const x = ran.map(xOf), y = ran.map(i => m(i).percentile);
+  const text = ran.map(i => `${sweepLabel(sw, sw.variations[i])}<br>${measure} ${showTotal(measure, m(i).strategy)}, random median ${showTotal(measure, m(i).median)}<br>Beats ${Math.round(m(i).percentile ?? 0)}% of its random runs`);
+  // The two lines are close, so one's label sits below it on the left and the other's above it on the right.
+  const guide = (y, dash, label, side) => ({ shape: { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color: muted, width: 1, dash } },
+    note: { xref: 'paper', x: side === 'left' ? 0 : 1, y, yanchor: side === 'left' ? 'top' : 'bottom', xanchor: side, showarrow: false, text: label, font: { size: 11, color: muted } } });
+  const guides = [guide(90, 'dot', 'Promising, 90%', 'left'), guide(95, 'dash', 'Above random, 95%', 'right')];
+  const traces = [
+    { type: 'scatter', mode: 'lines+markers', name: 'Beats % of its own random runs', x, y, text, customdata: ran, hovertemplate: '%{text}<extra></extra>',
+      line: { color: accent, width: 2 }, marker: { size: 9, color: accent, line: { color: css('--panel'), width: 2 } } },
+    { type: 'scatter', mode: 'markers', name: 'Selected', x: [xOf(sw.selected)], y: [m(sw.selected).percentile], hoverinfo: 'skip',
+      marker: { size: 17, color: 'rgba(0,0,0,0)', line: { color: css('--text'), width: 2 } } },
+  ];
+  if (best?.variation != null) traces.push({ type: 'scatter', mode: 'markers', name: `Best against the best of ${ran.length} random`, x: [xOf(best.variation)], y: [best.against.percentile],
+    hovertemplate: `Best, ${sweepLabel(sw, sw.variations[best.variation])}: beats ${Math.round(best.against.percentile ?? 0)}% of the best of ${ran.length} random runs<extra></extra>`,
+    marker: { symbol: 'diamond-open', size: 13, color: muted, line: { width: 2 } } });
+  Plotly.react(el, traces, resultsLayout(
+    single ? { title: { text: varyLabel(sw.strategy, sw.varied[0]), font: { size: 12 } } } : { type: 'category', tickangle: -30 },
+    { range: [-2, 102], ticksuffix: '%', title: { text: 'Beats', font: { size: 12 } } },
+    { hovermode: 'closest', shapes: guides.map(g => g.shape), annotations: guides.map(g => g.note) }), RESULTS_CONFIG);
+  el.on('plotly_click', e => { const p = e.points?.[0]; if (p?.curveNumber === 0) pick(p.customdata, e.event); });
+}
+
+// Where a variation ranks among those run, by how much of its own random runs it beats on the measure: 1 for the best, a
+// tie sharing the better rank, and one with no value for the measure after all that have one.
+function sweepRank(sw, ran, measure, i) {
+  const beats = j => sw.variations[j].baseline.measures.find(m => m.name === measure)?.percentile ?? -1;
+  return 1 + ran.filter(j => beats(j) > beats(i)).length;
+}
+
+// The selected variation's card, where it was clicked: its rank of all run, its total and how much of its random runs it
+// beats, and Extract, to make it a strategy of its own.
+function sweepCard(sw, ran, measure) {
+  const v = sw.variations[sw.selected], m = v.baseline.measures.find(x => x.name === measure);
+  return `<div class="strat-sweep-card" style="left:${Math.round(sw.card.x)}px;top:${Math.round(sw.card.y)}px" role="dialog" aria-label="${esc(sweepLabel(sw, v))}">
+    <button type="button" class="close" data-card-close aria-label="Close">×</button>
+    <b>${esc(sweepLabel(sw, v))}</b>
+    <div class="rank">${sweepRank(sw, ran, measure, sw.selected)} / ${ran.length}</div>
+    <div>Ranked by the share of its random runs it beats on ${esc(measure)}. ${esc(measure)} ${showTotal(measure, m.strategy)}, beating ${Math.round(m.percentile ?? 0)}%.</div>
+    ${currentPage === 'Strategies' ? '<button type="button" data-extract>Extract as a strategy</button>' : ''}
+  </div>`;
+}
+
+// Makes a variation a strategy of its own: the strategy as it was swept, with the variation's values and nothing varied,
+// added after the one swept and opened, unsaved, as Duplicate does.
+function extractVariation(sw, i) {
+  const v = sw.variations[i], s = structuredClone(sw.sent);
+  delete s.vary;
+  for (const [path, value] of Object.entries(v.values)) {
+    const parts = path.split('.'), key = parts.pop();
+    parts.reduce((o, k) => o[k], s)[key] = value;
+  }
+  s.name = `${sw.sent.name || sw.sent.id} (${sweepLabel(sw, v)})`;
+  // The id names the saved runs' files, so it is the swept one's with the variation's number rather than all its values.
+  s.id = newStrategyId(`${sw.sent.id} variation ${i + 1}`);
+  const list = strategies.book.strategies, from = list.findIndex(x => x.id === sw.sent.id);
+  list.splice(from < 0 ? list.length : from + 1, 0, s);
+  strategies.selected = s.id;
+  renderStrategyList();
+  renderStrategy();
+  window.scrollTo(0, 0);
+}
+
+// Every variation's profit over time, lighter to darker in order, and the selected one bold on its own band and median.
+function sweepLinesPlot(el, sw, ran, pick) {
+  const accent = css('--accent'), selected = sw.variations[sw.selected].baseline;
+  const lines = ran.filter(i => i !== sw.selected).map(i => {
+    const color = withAlpha(accent, 0.15 + 0.5 * (ran.length > 1 ? ran.indexOf(i) / (ran.length - 1) : 1));
+    return curveLine(sw.variations[i].baseline, sweepLabel(sw, sw.variations[i]), 'strategy', color, { showlegend: false, meta: i, line: { color, width: 1.5 } });
+  });
+  Plotly.react(el, [
+    ...bandTraces(selected),
+    { type: 'scatter', mode: 'lines', name: 'Other variations', x: [null], y: [null], line: { color: withAlpha(accent, 0.4), width: 1.5 }, hoverinfo: 'skip' },
+    ...lines,
+    ...grossLine(selected, 'Selected, before fees and slippage').map(t => ({ ...t, meta: sw.selected })),
+    curveLine(selected, `Selected: ${sweepLabel(sw, sw.variations[sw.selected])}`, 'strategy', accent, { line: { color: accent, width: 3 }, meta: sw.selected }),
+  ], resultsLayout({ type: 'date' }, { ticksuffix: '%', zeroline: true, zerolinecolor: css('--muted') }, { hovermode: 'closest' }), RESULTS_CONFIG);
+  el.on('plotly_click', e => { const meta = e.points?.[0]?.data?.meta; if (meta != null) pick(meta, e.event); });
 }
 
 // Prices as the chart is read: whole numbers, rounded down. Profits are rounded, as they can be small and either side of 0.
@@ -5654,6 +6405,7 @@ function strategyResults(run) {
       ${stat('Average win', fmtProfit(m.averageWin), 'won')}${stat('Average loss', fmtProfit(m.averageLoss), 'lost')}
       ${stat('Largest win', fmtProfit(m.largestWin), 'won')}${stat('Largest loss', fmtProfit(m.largestLoss), 'lost')}
       ${stat('Profit factor', m.profitFactor == null ? '–' : m.profitFactor.toFixed(2))}${stat('Still open', m.stillOpen)}${stat('Reached both', m.bothTouched)}
+      ${stat('Fees and slippage', (m.fees ?? 0) + (m.slippage ?? 0) > 0 ? fmtProfit(-(m.fees + m.slippage)) : 'none', (m.fees ?? 0) + (m.slippage ?? 0) > 0 ? 'lost' : '')}
     </div>
     <div class="strat-counted">
       <span>${off.size ? `Counting ${counted.length} of ${run.trades.length} trades: ${off.size} left out.` : `Counting all ${run.trades.length} trades. Click a ● to leave a trade out of the totals.`}</span>
@@ -5688,6 +6440,7 @@ const TRADE_COLUMNS = {
     sort: r => r.trade && `${OUTCOMES[r.trade.outcome] ?? r.trade.outcome}${r.trade.bothTouched ? ' *' : ''}` },
   profit: { head: 'Profit', num: true, cls: r => tradeSign(r.trade?.profit), cell: r => r.trade ? fmtProfit(r.trade.profit) : '', sort: r => r.trade?.profit },
   percent: { head: '%', num: true, cls: r => tradeSign(r.trade?.profit), cell: r => r.trade ? fmtPercent(r.trade.profitPercent) : '', sort: r => r.trade?.profitPercent },
+  costs: { head: 'Costs', num: true, cell: r => r.trade && (r.trade.fees || r.trade.slippage) ? fmtProfit(-(r.trade.fees + r.trade.slippage)) : '', sort: r => r.trade && -(r.trade.fees + r.trade.slippage) },
   candles: { head: 'Candles', num: true, cell: r => r.trade?.candles ?? '', sort: r => r.trade?.candles },
   status: { head: 'Found', cell: r => esc(r.status ?? '') + (r.current ? ' · this one' : ''), sort: r => r.status },
 };
@@ -5760,6 +6513,190 @@ function syncStrategyLayers() {
   LAYERS.splice(0, LAYERS.length, ...SECTIONS.flatMap(s => s.layers));
 }
 syncStrategyLayers();
+
+// ---- A page shown in the tour ----------------------------------------------------------------------------------------
+// A tour section with "page" shows one of the site's own pages in place of the chart: the page itself, in a frame, opened
+// with ?embed so that it is read-only (see embedMode). A text of the section can do things on it, with "do", and point at a
+// part of it, with "highlight"; what is done is done through the page's own controls, so the tour shows what the page does.
+//   do         a list of things done as the text comes on show, each one of:
+//              { "select": id }                    a strategy picked from the list
+//              { "click": name }                   a button pressed: run, periods, done (the periods dialog's), sweep, baseline
+//              { "periods": ["market:year"] }      the periods ticked, in the periods dialog, and no others
+//              { "set": path, "value": v }         a setting of the strategy, by its path, as "takeProfit.percent"
+//              { "vary": path, "to": n, "step": n } a number's To and Step
+//              { "count": name, "on": bool }       a cost counted or not: countFees, countSlippage
+//              { "cell": "market:year" }           the period whose results are shown
+//   highlight  a part of the page outlined and brought into view while the text is on show (see embedFind for the names).
+// The page is put where the tour is by all that its texts have done up to there, so the tour can be entered anywhere:
+// going on, only what is new is done; going back, the page starts again and does it all, from runs it has kept.
+const TOUR_PAGES = ['Strategies'];
+const PAGE_ACTIONS = ['select', 'click', 'periods', 'set', 'vary', 'count', 'cell'];
+// How many times the page in the tour is still being put where the tour is: the tour waits for it before it reads on.
+const tourPage = { pending: 0 };
+
+// What a text does on the page and what it highlights, checked as the server's Tours.PageProblems checks them.
+function pageCue(c, onPage, strategyById, what, errors) {
+  const problems = [];
+  if (c.highlight != null && typeof c.highlight !== 'string') problems.push('highlight names a part of the page shown, as "entry"');
+  let does = [];
+  if (c.do != null) {
+    if (!Array.isArray(c.do) || c.do.some(a => !a || typeof a !== 'object' || Array.isArray(a) || !Object.keys(a).length)) problems.push('do is a list of things done on the page shown, as [{ "click": "run" }]');
+    else {
+      does = c.do;
+      for (const a of does) {
+        if (PAGE_ACTIONS.filter(k => k in a).length !== 1) problems.push(`each thing done is one of ${PAGE_ACTIONS.join(', ')}`);
+        else if (typeof a.select === 'string' && !strategyById.has(a.select)) problems.push(`no strategy "${a.select}" on the Strategies page`);
+      }
+    }
+  }
+  if (!onPage && (c.highlight != null || c.do != null)) problems.push('highlight and do are for a section that shows a page, with "page"');
+  errors.push(...problems.map(p => `${what}: ${p}`));
+  return { highlight: typeof c.highlight === 'string' ? c.highlight : null, do: problems.length ? [] : does };
+}
+
+// Where the page in the tour should be for the section on show: all that the texts of its page have done up to the text
+// on show, and what that text highlights. Null when the section shows the chart.
+function tourPageState() {
+  const s = tour?.page === 'Tour' ? tourSection() : null;
+  if (!s?.page) return null;
+  const actions = tour.sections.slice(0, tour.index).filter(x => x.page === s.page).flatMap(x => x.cues.filter(c => !c.skipped).flatMap(c => c.do));
+  for (const c of tour.shown) actions.push(...c.do);
+  return { page: s.page, actions, highlight: tour.shown.at(-1)?.highlight ?? null };
+}
+
+// Shows the page of the section on show in place of the chart, and puts it where the tour is; the chart when the section
+// has no page. The page is loaded once and kept, hidden, while the chart shows.
+function syncTourPage() {
+  const frame = document.querySelector('[data-tour="page"]');
+  if (!frame) return;
+  const at = tourPageState();
+  frame.hidden = !at;
+  if (!at) return;
+  const key = JSON.stringify(at);
+  if (frame.dataset.key === key) return;
+  frame.dataset.key = key;
+  if (frame.dataset.page !== at.page) { frame.dataset.page = at.page; frame.src = `${location.pathname}?embed#${at.page}`; }
+  tourPage.pending++;
+  (async () => {
+    for (let i = 0; i < 600 && !frame.contentWindow?.embed?.ready(); i++) await new Promise(r => setTimeout(r, 50));
+    await frame.contentWindow?.embed?.apply(at.actions, at.highlight);
+  })().catch(e => console.warn('The page in the tour could not be put where the tour is.', e)).finally(() => { tourPage.pending--; });
+}
+
+// ---- The page as a tour shows it (embedMode) -------------------------------------------------------------------------
+// What the tour asks of the page it shows: whether it is ready, and to be put where the tour is. The things done so far are
+// kept, so a list that carries on from them does only what is new; any other starts the page again.
+const embedded = { done: [], queue: Promise.resolve(), runs: new Map() };
+const embedPause = ms => new Promise(r => setTimeout(r, ms));
+const EMBED_CLICKS = { run: '[data-run]', periods: '[data-periods]', done: '#strat-periods [data-periods-close]', sweep: '[data-sweep]', baseline: '[data-baseline]' };
+
+// The parts of the Strategies page a text can highlight, by name; some take what they are of after a colon, as
+// "strategy:three-green", "vary:takeProfit.percent", "period:btc-coinbase-1h:2023" and "trade:2023-02-14 19:00".
+function embedFind(name) {
+  const cut = String(name).indexOf(':'), kind = cut < 0 ? String(name) : String(name).slice(0, cut), of = cut < 0 ? '' : String(name).slice(cut + 1);
+  const q = sel => [...document.querySelectorAll(sel)], row = () => q('.strat-results .strat-trades tbody tr').filter(tr => [...tr.cells].some(td => td.textContent.trim() === of));
+  switch (kind) {
+    case 'list': return q('.strat-list');
+    case 'strategy': return q(`.strat-list [data-pick="${CSS.escape(of)}"]`);
+    case 'settings': return q('.strat-body .strat-fields').slice(0, 1);
+    case 'entry': return q('.strat-steps fieldset');
+    case 'takeProfit': case 'stopLoss': return q(`.strat-body [data-type="${kind}"]`).map(el => el.closest('fieldset'));
+    case 'costs': return q('.strat-body .strat-cost');
+    case 'says': return q('.strat-says');
+    case 'vary': return q(`.strat-body [data-vary="${CSS.escape(of)}"]`).map(el => el.closest('label'));
+    case 'varySays': return q('.strat-vary-says');
+    case 'run': return q('[data-run]');
+    case 'periodsButton': return q('[data-periods]');
+    case 'sweepButton': return q('[data-sweep]');
+    case 'chips': return q('.strat-chips');
+    case 'chip': return q(`[data-chip-cell="${CSS.escape(of)}"]`);
+    case 'grid': return q('#strat-periods .strat-grid');
+    case 'period': return q(`#strat-periods [data-cell="${CSS.escape(of)}"]`);
+    case 'roles': return q('#strat-periods [data-cell-role]');
+    case 'stats': return q('.strat-results .strat-stats');
+    case 'trades': return q('.strat-results .strat-trades');
+    case 'trade': return row();
+    case 'analyse': return row().map(tr => tr.querySelector('[data-trade-row]'));
+    case 'baseline': return q('.strat-run-body > .strat-baseline table');
+    case 'baselinePlot': return q('[data-baseline-plot]');
+    case 'sweep': return q('.strat-sweep');
+    case 'sweepBest': return q('.strat-sweep p.remarks').slice(1, 2);
+    case 'sweepBeats': return q('[data-sweep-beats]');
+    case 'sweepLines': return q('[data-sweep-lines]');
+    default: return [];
+  }
+}
+
+// Outlines the part named and brings it into view; with no name, nothing is outlined.
+function embedHighlight(name) {
+  document.querySelectorAll('.tour-hl').forEach(el => el.classList.remove('tour-hl'));
+  const found = name ? embedFind(name).filter(Boolean) : [];
+  if (name && !found.length) console.warn(`The tour highlights "${name}", which the page does not have here.`);
+  found.forEach(el => el.classList.add('tour-hl'));
+  found[0]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+// Waits for the page's runs, baselines and sweeps to be done.
+async function embedIdle() {
+  const busy = () => strategies?.running || strategies?.sweeping || [...(strategies?.runs?.values() ?? [])].some(cells => [...cells.values()].some(r => r.running || r.baselining));
+  await embedPause(20);
+  while (busy()) await embedPause(40);
+  await embedPause(20);
+}
+
+// One thing done on the page, through its own controls, and waited for. Shown as it happens, it takes a moment a step.
+async function embedAct(a, shown) {
+  const body = document.querySelector('.strat-body');
+  const change = (el, value) => {
+    if (!el) return console.warn('The tour changes something the page does not have here.', a);
+    if (el.type === 'checkbox') el.checked = !!value; else el.value = String(value ?? '');
+    el.dispatchEvent(new Event(el.dataset.path === 'name' ? 'input' : 'change', { bubbles: true }));
+  };
+  const click = sel => { const el = document.querySelector(sel); if (el) el.click(); else console.warn('The tour presses something the page does not have here.', a); };
+  if (a.select != null) click(`.strat-list [data-pick="${CSS.escape(a.select)}"]`);
+  else if (a.click != null) click(EMBED_CLICKS[a.click] ?? '[data-no-such-button]');
+  else if (a.periods != null) {
+    // Ticked in the periods dialog, one at a time, as each tick draws the dialog again.
+    const dialog = document.getElementById('strat-periods'), keys = (strategies.markets ?? []).flatMap(m => m.years.map(y => cellKey(m.id, y.year)));
+    if (!dialog?.open) console.warn('The tour ticks periods with the periods dialog closed.', a);
+    for (const key of dialog?.open ? keys : []) {
+      const el = dialog.querySelector(`[data-cell-tick="${CSS.escape(key)}"]`);
+      if (!el || el.disabled || el.checked === a.periods.includes(key)) continue;
+      el.click();
+      if (shown) await embedPause(150);
+    }
+  } else if (a.set != null) change(body?.querySelector(`[data-path="${CSS.escape(a.set)}"]`), a.value);
+  else if (a.vary != null) {
+    for (const k of ['to', 'step'].filter(k => a[k] !== undefined)) {
+      change(document.querySelector(`.strat-body [data-vary="${CSS.escape(a.vary)}"][data-vary-key="${k}"]`), a[k]);
+      if (shown) await embedPause(250);
+    }
+  } else if (a.count != null) change(body?.querySelector(`[data-count="${CSS.escape(a.count)}"]`), a.on !== false);
+  else if (a.cell != null) click(`[data-chip-cell="${CSS.escape(a.cell)}"]`);
+  await embedIdle();
+}
+
+// The page as it opens: its strategies read again, with nothing run, ticked as it first is.
+async function embedReset() {
+  const dialog = document.getElementById('strat-periods');
+  if (dialog?.open) dialog.close();
+  strategies = null;
+  await renderStrategiesPage(new URLSearchParams());
+  window.scrollTo(0, 0);
+}
+
+window.embed = {
+  ready: () => embedMode && currentPage === 'Strategies' && !!strategies?.markets && !!document.querySelector('.strat-run-body'),
+  apply: (actions, highlight) => embedded.queue = embedded.queue.then(async () => {
+    const asked = actions.map(a => JSON.stringify(a)), carriesOn = embedded.done.length <= asked.length && embedded.done.every((k, i) => k === asked[i]);
+    if (!carriesOn) { await embedReset(); embedded.done = []; }
+    for (const a of actions.slice(embedded.done.length)) {
+      await embedAct(a, carriesOn);
+      embedded.done.push(JSON.stringify(a));
+    }
+    embedHighlight(highlight);
+  }).catch(e => console.warn('The page could not be put where the tour is.', e)),
+};
 
 // A short name for a strategy on the charts: its run, its direction and its targets, as "4 Green Long · ±100% body".
 function chartStrategyName(s) {
@@ -5876,9 +6813,20 @@ const candleHours = trades => {
   return t ? (Date.parse(t.exitTime) - Date.parse(t.entryTime)) / 3600000 / t.candles : 1;
 };
 
-// The trade an analysis tells of, when its chart is of the analysis's dataset and its "trade" layer is on.
+// The trade an analysis tells of, when its chart is of the analysis's dataset and its "trade" layer is on; on the Tour page,
+// the trade the section on show explains, in its scene.
 function analysedTrade(dataset) {
-  if (!on('trade') || tour?.page !== 'Analysis' || !tour.params?.strategy || tour.params.dataset !== dataset) return null;
+  if (!on('trade')) return null;
+  if (tour?.page === 'Tour') {
+    const own = tourSection()?.trade, ex = tour.ex;
+    if (!own || ex.dataset !== dataset) return null;
+    const run = chartTrades(dataset, own.strategy), i = ex.anchor + own.at;
+    // As the server reads it (see Explain.TradeAt): the trade entered there, else open there, else the one it is part of.
+    const trade = run && (run.trades.find(t => t.entryIndex === i) ?? run.trades.find(t => t.entryIndex < i && i <= t.exitIndex)
+      ?? run.trades.find(t => t.entryIndex > i && t.entryIndex - tradeReads(own.strategy, t) <= i));
+    return trade ? { strategy: own.strategy, trade } : null;
+  }
+  if (tour?.page !== 'Analysis' || !tour.params?.strategy || tour.params.dataset !== dataset) return null;
   const strategy = JSON.parse(tour.params.strategy), run = chartTrades(dataset, strategy);
   const trade = run && tradeCovering(run.trades, strategy, tour.params.at);
   return trade ? { strategy, trade } : null;
@@ -5898,7 +6846,8 @@ function drawStrategies(ex, traces) {
   for (const { name, colour, strategy, at } of drawn) {
     const run = chartTrades(dataset, strategy);
     if (!run) continue;
-    const shown = run.trades.filter(t => (!at || minuteOf(t.entryTime) === at) && minuteOf(t.entryTime) <= last && minuteOf(t.exitTime) >= first)
+    // A tour's scene starts its story at its first candle, so a trade entered before it is not shown.
+    const shown = run.trades.filter(t => (!at || minuteOf(t.entryTime) === at) && minuteOf(t.entryTime) <= last && minuteOf(t.exitTime) >= first && (!ex.tour || minuteOf(t.entryTime) >= first))
       .map(t => ({ t, done: t.outcome !== 'Open' && minuteOf(t.exitTime) <= last }));
     if (!shown.length) continue;
     const end = s => s.done ? s.t.exitTime : ahead;
@@ -6062,17 +7011,174 @@ function showTradeSimilar() {
   dialog.querySelector('tr.current')?.scrollIntoView({ block: 'nearest' });
 }
 
+// ---- Explore ----------------------------------------------------------------------------------------------------------
+// Conditions measured directly, before a strategy is built on one (POST api/explore, see Explorer): for each condition and
+// size, after it, how often the price went up by the size before down by it, against after any candle, in each period ticked
+// and pooled. Exploring searches, so only Search periods can be ticked; roles are set on the Strategies page.
+let explore = null;
+const EXPLORE_DEFAULTS = { sizes: '0.5, 1, 2, 3', horizon: '48', cost: '0.3' };
+const exploreYear = key => { const { market, year } = cellOf(key); return explore.markets?.find(m => m.id === market)?.years.find(y => y.year === year); };
+const explorePct = x => `${(100 * x).toFixed(1)}%`;
+
+async function renderExplorePage(asked = new URLSearchParams()) {
+  const main = document.getElementById('main');
+  currentPage = 'Explore';
+  const head = `<section class="term-head"><h2>Explore</h2>
+    <p>Measure conditions directly, before building a strategy on one: after each, how often the price went up by a size before it went down by it, against after any candle.</p>
+    <p class="remarks">The score is the share of random samples of candles a condition beats: near 100, up first more often than after any candle; near 0, down first
+    more often. Exploring searches, so it runs on Search periods only, and every condition at every size is a test: a * marks a result beyond chance once all of
+    them are allowed for. Each condition reads only the candle it is met at and those before it.</p></section>`;
+  if (!serverOn) {
+    main.innerHTML = head + `<div class="empty" data-server-check>Checking for the local server…</div>`;
+    return checkLocalServer();
+  }
+  explore ??= { ...EXPLORE_DEFAULTS, cells: new Set(), result: null, running: false, condition: null };
+  explore.markets = await fetchMarkets();
+  if (currentPage !== 'Explore') return;
+  const cells = asked.get('cells')?.split(',').filter(k => exploreYear(k)?.role === 'search');
+  if (cells?.length) explore.cells = new Set(cells);
+  [...explore.cells].filter(k => exploreYear(k)?.role !== 'search').forEach(k => explore.cells.delete(k));
+  if (!explore.cells.size) {
+    const m = explore.markets[0];
+    (m?.years ?? []).filter(y => y.role === 'search').forEach(y => explore.cells.add(cellKey(m.id, y.year)));
+  }
+  for (const k of Object.keys(EXPLORE_DEFAULTS)) if (asked.get(k)) explore[k] = asked.get(k);
+  if (asked.get('condition')) explore.condition = asked.get('condition');
+  main.innerHTML = head + '<div class="explore"></div>';
+  renderExplore();
+}
+
+// The page's address keeps the periods ticked, the settings and the condition shown, as the Strategies page's does.
+function exploreHash() {
+  const q = new URLSearchParams();
+  if (explore.cells.size) q.set('cells', [...explore.cells].join(','));
+  for (const [k, v] of Object.entries(EXPLORE_DEFAULTS)) if (String(explore[k]) !== v) q.set(k, explore[k]);
+  if (explore.condition) q.set('condition', explore.condition);
+  return `#Explore${q.size ? `?${q}` : ''}`;
+}
+
+function syncExploreHash() {
+  if (currentPage === 'Explore' && location.hash !== exploreHash()) history.replaceState(null, '', exploreHash());
+}
+
+function renderExplore() {
+  const box = document.querySelector('.explore');
+  if (!box) return;
+  syncExploreHash();
+  const markets = explore.markets ?? [];
+  const years = [...new Set(markets.flatMap(m => m.years.map(y => y.year)))].sort((a, b) => a - b);
+  const cell = (m, year) => {
+    const y = m.years.find(x => x.year === year);
+    if (!y) return '<td class="strat-cell none"></td>';
+    const key = cellKey(m.id, year), search = y.role === 'search';
+    return `<td class="strat-cell role-${y.role}" title="${esc(`${m.name}, ${year}: ${fmtTime(y.first)} to ${fmtTime(y.last)} UTC, ${y.candles.toLocaleString()} candles`)}">
+      <label class="strat-cell-top"><input type="checkbox" data-explore-tick="${key}" ${search && explore.cells.has(key) ? 'checked' : ''} ${search ? '' : 'disabled'}>${ROLE_NAMES[y.role]}</label></td>`;
+  };
+  const r = explore.result;
+  box.innerHTML = `<div class="strat-card">
+      ${markets.length ? `<div class="strat-grid-wrap"><table class="strat-grid">
+        <thead><tr><th></th>${markets.map(m => `<th><button type="button" data-explore-market="${m.id}" title="Tick or untick all of this market's Search periods">${esc(m.name)}</button></th>`).join('')}</tr></thead>
+        <tbody>${years.map(year => `<tr><th><button type="button" data-explore-year="${year}" title="Tick or untick this year in every market">${year}</button></th>${markets.map(m => cell(m, year)).join('')}</tr>`).join('')}</tbody>
+      </table></div>` : '<p class="remarks strat-note bad">The local server has no markets: restart ./build-site.ps1 -Serve.</p>'}
+      <p class="remarks">Only Search periods can be explored. Roles are set on the <a href="#Strategies">Strategies</a> page.</p>
+      <div class="strat-fields">
+        <label title="How far the price must go either way, as percentages of the close: 0.5, 1, 2, 3">Sizes, % either way<input type="text" data-explore="sizes" value="${esc(explore.sizes)}"></label>
+        <label title="The candles after a condition the price has to go a size either way; neither, if it does not">Within (candles)<input type="number" data-explore="horizon" min="1" step="1" value="${esc(explore.horizon)}"></label>
+        <label title="Fees and slippage of a trade, in and out, as a percentage: what a lean must clear to pay, marked ▲ (long) or ▼ (short)">Costs, % a round trip<input type="number" data-explore="cost" min="0" step="0.05" value="${esc(explore.cost)}"></label>
+      </div>
+      <div class="strat-run">
+        <button type="button" data-explore-run ${explore.running || !explore.cells.size ? 'disabled' : ''}>${explore.running ? 'Exploring…' : `Explore ${explore.cells.size} period${explore.cells.size === 1 ? '' : 's'}`}</button>
+        <span class="strat-note${r?.error ? ' bad' : ''}">${esc(r?.error ?? '')}</span>
+      </div>
+    </div>
+    ${r && !r.error ? exploreResults(r) : ''}`;
+
+  const toggle = keys => {
+    keys = keys.filter(k => exploreYear(k)?.role === 'search');
+    const on = keys.some(k => !explore.cells.has(k));
+    keys.forEach(k => on ? explore.cells.add(k) : explore.cells.delete(k));
+    renderExplore();
+  };
+  box.querySelectorAll('[data-explore-tick]').forEach(el => el.addEventListener('change', () => toggle([el.dataset.exploreTick])));
+  box.querySelectorAll('[data-explore-market]').forEach(el => el.addEventListener('click', () =>
+    toggle(markets.find(m => m.id === el.dataset.exploreMarket).years.map(y => cellKey(el.dataset.exploreMarket, y.year)))));
+  box.querySelectorAll('[data-explore-year]').forEach(el => el.addEventListener('click', () =>
+    toggle(markets.map(m => cellKey(m.id, Number(el.dataset.exploreYear))).filter(exploreYear))));
+  box.querySelectorAll('[data-explore]').forEach(el => el.addEventListener('change', () => {
+    explore[el.dataset.explore] = el.value.trim() || EXPLORE_DEFAULTS[el.dataset.explore];
+    if (el.dataset.explore === 'cost') renderExplore();
+    else syncExploreHash();
+  }));
+  box.querySelector('[data-explore-run]').addEventListener('click', runExplore);
+  box.querySelectorAll('[data-explore-condition]').forEach(el => el.addEventListener('click', () => {
+    explore.condition = explore.condition === el.dataset.exploreCondition ? null : el.dataset.exploreCondition;
+    renderExplore();
+  }));
+}
+
+async function runExplore() {
+  const sizes = String(explore.sizes).split(/[\s,]+/).map(Number).filter(x => x > 0);
+  explore.running = true;
+  renderExplore();
+  const cells = [...explore.cells].map(k => ({ dataset: cellOf(k).market, ...cellWindow(k) }));
+  explore.result = await postBacktest('api/explore', { cells, sizes, horizon: Number(explore.horizon) }, 'explorations');
+  explore.running = false;
+  if (currentPage === 'Explore') renderExplore();
+}
+
+// The results: a row a condition, a column a size. A cell is the share that went up first after the condition, its lean
+// from after any candle in points, tinted by its score (green up first, red down first); * when beyond chance allowing for
+// every test, ▲ or ▼ when the lean would pay its costs long or short. A row's click shows it period by period below.
+function exploreResults(r) {
+  const cost = Number(explore.cost) || 0;
+  const tone = score => score >= 97.5 ? ' up2' : score >= 90 ? ' up1' : score <= 2.5 ? ' down2' : score <= 10 ? ' down1' : '';
+  const pays = (stat, size) => {
+    const hurdle = 0.5 + cost / (2 * size);
+    return stat.up + stat.down === 0 ? '' : stat.upRate > hurdle ? ' ▲' : 1 - stat.upRate > hurdle ? ' ▼' : '';
+  };
+  const lean = stat => `${stat.edge >= 0 ? '+' : ''}${(100 * stat.edge).toFixed(1)}`;
+  const tip = (z, stat) => `${stat.events.toLocaleString()} times; up first ${stat.up}, down first ${stat.down}, neither ${stat.neither}, both in a candle ${stat.both}.
+Up first ${explorePct(stat.upRate)} against ${explorePct(stat.baseRate)} after any candle: score ${stat.score.toFixed(1)}${z ? `, chance allowing for all ${r.tests} tests ${(100 * z.corrected).toFixed(1)}%` : ''}.`;
+  const base = r.conditions[0]?.sizes.map(z => z.pooled) ?? [];
+  const rows = [...new Set(r.conditions.map(c => c.group))].map(group => `<tr class="explore-group"><th colspan="${r.sizes.length + 1}">${esc(group)}</th></tr>` +
+    r.conditions.filter(c => c.group === group).map(c => `<tr class="${c.id === explore.condition ? 'sel' : ''}" data-explore-condition="${c.id}">
+      <th>${esc(c.name)}</th>
+      ${c.sizes.map(z => `<td class="num explore-cell${tone(z.pooled.score)}" title="${esc(tip(z, z.pooled))}">${z.pooled.up + z.pooled.down
+        ? `${explorePct(z.pooled.upRate)} <small>${lean(z.pooled)}</small>${z.corrected < 0.05 ? ' *' : ''}${pays(z.pooled, z.size)}` : '–'}</td>`).join('')}
+    </tr>`).join('')).join('');
+  const shown = r.conditions.find(c => c.id === explore.condition);
+  const detail = shown ? `<h3 class="strat-cell-head">${esc(shown.name)}, period by period</h3>
+    <div class="strat-trades"><table><thead><tr><th>Period</th>${r.sizes.map(s => `<th class="num">${s}%</th>`).join('')}</tr></thead><tbody>
+      ${r.cells.map((cell, k) => `<tr><th>${esc(cell.name)}, ${esc(fmtTime(cell.from).slice(0, 4))}</th>
+        ${shown.sizes.map(z => { const s = z.cells[k]; return `<td class="num explore-cell${tone(s.score)}" title="${esc(tip(null, s))}">${s.up + s.down ? `${explorePct(s.upRate)} <small>${lean(s)}</small>` : '–'}</td>`; }).join('')}</tr>`).join('')}
+    </tbody></table></div>` : '';
+  return `<div class="strat-card">
+    <p class="remarks">${r.cells.length} period${r.cells.length === 1 ? '' : 's'} pooled, ${r.tests} tests (${r.conditions.length} conditions × ${r.sizes.length} sizes), within ${r.horizon} candles.
+      After any candle the price went up first ${base.map((b, k) => `${explorePct(b.baseRate)} of the time at ${r.sizes[k]}%`).join(', ')}.
+      A cell is the share up first after the condition, then its lean from that in points. Hover for the counts; click a row for its periods.</p>
+    <div class="strat-trades explore-table"><table><thead><tr><th>Condition</th>${r.sizes.map(s => `<th class="num">${s}%</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+    ${detail}</div>`;
+}
+
 function route() {
   document.body.classList.remove('analysing');
+  document.body.classList.toggle('embed', embedMode);
   stopPlaying();
   pauseTour();
   // An analysis has an address of its own: #Analysis?explain=Swing&dataset=...
   const [first, asked] = location.hash.slice(1).split('?');
-  document.body.classList.toggle('strategizing', first === 'Strategies');
+  document.body.classList.toggle('strategizing', first === 'Strategies' || first === 'Explore');
+  if (first === 'Explore') {
+    ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
+    renderNav('Explore');
+    renderExplorePage(new URLSearchParams(asked ?? ''));
+    window.scrollTo(0, 0);
+    return;
+  }
   if (first === 'Strategies') {
     ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
     renderNav('Strategies');
-    renderStrategiesPage();
+    renderStrategiesPage(new URLSearchParams(asked ?? ''));
     window.scrollTo(0, 0);
     return;
   }

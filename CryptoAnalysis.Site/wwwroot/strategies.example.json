@@ -1,0 +1,26 @@
+{
+  "strategies": [
+    {
+      "id": "green-run-4",
+      "name": "After 4 green candles",
+      "direction": "Long",
+      "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 4 },
+      "takeProfit": { "type": "HighestWick", "candles": 6 },
+      "stopLoss": { "type": "RiskRatio", "ratio": 1 },
+      "onePositionAtATime": true
+    },
+    {
+      "id": "three-green",
+      "name": "3 green candles",
+      "direction": "Long",
+      "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 3 },
+      "takeProfit": { "type": "Percent", "percent": 1 },
+      "stopLoss": { "type": "Percent", "percent": 1 },
+      "onePositionAtATime": true,
+      "feePercent": 0.1,
+      "slippagePercent": 0.05,
+      "countFees": false,
+      "countSlippage": false
+    }
+  ]
+}

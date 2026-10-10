@@ -232,9 +232,10 @@ public static partial class Explain
             Define(t.EntryIndex, "Trade.outcome"),
         };
         var later = $"{Capital(Duration(t.Candles, length))} later, at {Clock(t.ExitTime, length)}";
+        var costs = t.Fees + t.Slippage > 0 ? $", after {Money(t.Fees + t.Slippage)} in fees and slippage" : "";
         var result = t.Profit >= 0
-            ? $"it won {Money(Math.Abs(t.Profit))}, {Math.Abs(t.ProfitPercent).ToString("0.00", CultureInfo.InvariantCulture)}%"
-            : $"it lost {Money(Math.Abs(t.Profit))}, {Math.Abs(t.ProfitPercent).ToString("0.00", CultureInfo.InvariantCulture)}%";
+            ? $"it won {Money(Math.Abs(t.Profit))}, {Math.Abs(t.ProfitPercent).ToString("0.00", CultureInfo.InvariantCulture)}%{costs}"
+            : $"it lost {Money(Math.Abs(t.Profit))}, {Math.Abs(t.ProfitPercent).ToString("0.00", CultureInfo.InvariantCulture)}%{costs}";
         var gapped = t.ExitPrice == exit.Open && t.Outcome != EnumTradeOutcome.Open && t.ExitPrice != (t.Outcome == EnumTradeOutcome.TakeProfit ? t.TakeProfit : t.StopLoss);
         var reached = r.Long ? (exit.High, exit.Low) : (exit.Low, exit.High);
         var said = t.Outcome switch
@@ -246,6 +247,11 @@ public static partial class Explain
             _ => $"{later}, the {low} of {Money(reached.Item2)} reaches the Stop Loss, so the trade closes at {Money(t.ExitPrice)}: {result}.",
         };
         cues.Add(Say(t.ExitIndex, said));
+        // The rules of how the exits are reached are told one at a time, after the first, so a section can leave any out
+        // by its id. They are at the entry, so they are told before the candle that ends the trade.
+        cues.Add(Define(t.EntryIndex, "Trade.exits"));
+        cues.Add(Define(t.EntryIndex, "Trade.gap"));
+        cues.Add(Define(t.EntryIndex, "Trade.both"));
         return new Block(cues, ["candles", "trade"]);
     }
 

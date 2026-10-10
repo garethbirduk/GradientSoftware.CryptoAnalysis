@@ -157,6 +157,12 @@ if (serve && full.Count > 0)
         if (File.Exists(Path.Combine(repoRoot, dataset.Path)))
             datasets.Add(new Dataset(dataset.Id, dataset.Name, Tours.Load(dataset, repoRoot)));
     }
+    // The markets strategies are tested on, each a dataset of its own.
+    foreach (var market in Markets.All)
+    {
+        if (market.Sources.All(x => File.Exists(Path.Combine(repoRoot, x.Path))))
+            datasets.Add(new Dataset(market.Id, market.Name, Markets.Load(market, repoRoot)));
+    }
     await ReplayServer.Run(outDir, datasets, port, sourceDir, video);
 }
 return 0;

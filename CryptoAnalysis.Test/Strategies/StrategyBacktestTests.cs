@@ -97,6 +97,124 @@ public class StrategyBacktestTests
         Assert.AreEqual((EnumTradeOutcome.TakeProfit, 10.0), (trade.Outcome, trade.Profit));
     }
 
+    private static Strategy WithCosts(Strategy strategy, double fee, double slippage)
+    {
+        strategy.FeePercent = fee;
+        strategy.SlippagePercent = slippage;
+        return strategy;
+    }
+
+    [TestMethod]
+    public void Run_FeeIsPaidOnTheEntryAndTheExit()
+    {
+        // In at 160, out at the take profit, 175: 0.1% of each is 0.16 and 0.175.
+        var prices = Candles([.. FourGreen, (160, 176, 158, 170)]);
+
+        var trade = StrategyBacktest.Run(prices, WithCosts(RunOf(), fee: 0.1, slippage: 0)).Trades.Single();
+
+        Assert.AreEqual((160.0, 175.0), (trade.EntryPrice, trade.ExitPrice));
+        Assert.AreEqual(0.335, trade.Fees, 1e-9);
+        Assert.AreEqual(15 - 0.335, trade.Profit, 1e-9);
+        Assert.AreEqual(100 * (15 - 0.335) / 160, trade.ProfitPercent, 1e-9);
+    }
+
+    [TestMethod]
+    public void Run_TakeProfitIsALimitOrderSoOnlyTheEntrySlips()
+    {
+        var prices = Candles([.. FourGreen, (160, 176, 158, 170)]);
+
+        var trade = StrategyBacktest.Run(prices, WithCosts(RunOf(), fee: 0, slippage: 0.1)).Trades.Single();
+
+        Assert.AreEqual(0.16, trade.Slippage, 1e-9);
+        Assert.AreEqual(15 - 0.16, trade.Profit, 1e-9);
+    }
+
+    [TestMethod]
+    public void Run_StopLossIsAMarketOrderSoItSlipsAsTheEntryDoes()
+    {
+        // In at 160, stopped at 145: 0.1% of each is 0.16 and 0.145.
+        var prices = Candles([.. FourGreen, (160, 165, 150, 152), (152, 153, 140, 141)]);
+
+        var trade = StrategyBacktest.Run(prices, WithCosts(RunOf(), fee: 0, slippage: 0.1)).Trades.Single();
+
+        Assert.AreEqual(0.305, trade.Slippage, 1e-9);
+        Assert.AreEqual(-15 - 0.305, trade.Profit, 1e-9);
+    }
+
+    [TestMethod]
+    public void Run_CostsComeOffAShortsProfitToo()
+    {
+        var prices = Candles((100, 101, 89, 90), (90, 91, 79, 80), (80, 81, 69, 70), (70, 71, 59, 60), (60, 62, 48, 49));
+
+        var trade = StrategyBacktest.Run(prices, WithCosts(RunOf(direction: EnumTradeDirection.Short, colour: EnumCandleColour.Red), fee: 1, slippage: 1)).Trades.Single();
+
+        // In at 60, out at the take profit, 50: fees of 0.6 and 0.5, and 0.6 of slippage on the entry.
+        Assert.AreEqual((1.1, 0.6), (Math.Round(trade.Fees, 9), Math.Round(trade.Slippage, 9)));
+        Assert.AreEqual(10 - 1.7, trade.Profit, 1e-9);
+    }
+
+    [TestMethod]
+    public void Run_TakeProfitSmallerThanItsCostsIsALoss()
+    {
+        var prices = Candles([.. FourGreen, (160, 176, 158, 170)]);
+
+        var run = StrategyBacktest.Run(prices, WithCosts(RunOf(), fee: 5, slippage: 0));
+
+        Assert.AreEqual(EnumTradeOutcome.TakeProfit, run.Trades[0].Outcome);
+        Assert.IsTrue(run.Trades[0].Profit < 0);
+        Assert.AreEqual((0, 1), (run.Summary.Won, run.Summary.Lost));
+        Assert.AreEqual(0.05 * 335, run.Summary.Fees, 1e-9);
+    }
+
+    [TestMethod]
+    public void Run_CostsTurnedOffAreNotCountedThoughTheirValuesAreKept()
+    {
+        var prices = Candles([.. FourGreen, (160, 165, 150, 152), (152, 153, 140, 141)]);
+        var strategy = WithCosts(RunOf(), fee: 0.1, slippage: 0.1);
+
+        strategy.CountFees = false;
+        var noFees = StrategyBacktest.Run(prices, strategy).Trades.Single();
+        strategy.CountFees = true;
+        strategy.CountSlippage = false;
+        var noSlippage = StrategyBacktest.Run(prices, strategy).Trades.Single();
+
+        Assert.AreEqual((0.0, 0.305), (noFees.Fees, Math.Round(noFees.Slippage, 9)));
+        Assert.AreEqual((0.305, 0.0), (Math.Round(noSlippage.Fees, 9), noSlippage.Slippage));
+        Assert.AreEqual((0.1, 0.1), (strategy.FeePercent, strategy.SlippagePercent));
+    }
+
+    [TestMethod]
+    public void Window_IsTheCandlesFromOneDateUpToAnother()
+    {
+        var prices = Candles([.. FourGreen, .. FourGreen]);
+
+        Assert.AreEqual((0, 8), StrategyBacktest.Window(prices, null, null));
+        Assert.AreEqual((2, 5), StrategyBacktest.Window(prices, Start.AddHours(2), Start.AddHours(5)));
+        Assert.AreEqual((2, 8), StrategyBacktest.Window(prices, Start.AddHours(1.5), Start.AddDays(1)));
+        Assert.AreEqual((8, 8), StrategyBacktest.Window(prices, Start.AddDays(1), null));
+    }
+
+    [TestMethod]
+    public void Run_InAWindowEntersOnlyThereButReadsBeforeItAndClosesAfterIt()
+    {
+        // The run's fourth green candle closes at 3, the first of the window, so it is met there from candles before it;
+        // the trade closes at 4, after the window's end.
+        var prices = Candles([.. FourGreen, (160, 176, 158, 170), .. FourGreen]);
+
+        var run = StrategyBacktest.Run(prices, RunOf(), window: (3, 4));
+        var outside = StrategyBacktest.Run(prices, RunOf(), window: (4, 9));
+
+        Assert.AreEqual((3, 4, EnumTradeOutcome.TakeProfit), (run.Trades.Single().EntryIndex, run.Trades.Single().ExitIndex, run.Trades.Single().Outcome));
+        Assert.AreEqual((1, Start.AddHours(3), Start.AddHours(3)), (run.Candles, run.From, run.To));
+        Assert.IsTrue(outside.Trades.All(x => x.EntryIndex >= 4));
+    }
+
+    [TestMethod]
+    public void Validate_CostsCannotBeNegative()
+    {
+        Assert.AreEqual(2, WithCosts(RunOf(), fee: -0.1, slippage: -0.1).Validate().Count);
+    }
+
     [TestMethod]
     public void Run_OnePositionAtATimeSkipsRunsWhileATradeIsOpen()
     {
@@ -200,6 +318,19 @@ public class StrategyBacktestTests
         Assert.AreEqual(0, s.Validate().Count);
         s.After[0].Within = 5;
         CollectionAssert.Contains(s.Validate(), "Step 1: Within needs a step before it.");
+    }
+
+    [TestMethod]
+    public void Parse_ReadsTheDefaultCostsAndEachStrategysOwn()
+    {
+        var book = StrategyBook.Parse("""
+            { "defaults": { "feePercent": 0.1, "slippagePercent": 0.05 },
+              "strategies": [ { "id": "costed", "feePercent": 0.2, "slippagePercent": 0 }, { "id": "none" } ] }
+            """);
+
+        Assert.AreEqual((0.1, 0.05), (book.Defaults!.FeePercent, book.Defaults.SlippagePercent));
+        Assert.AreEqual((0.2, 0.0), (book.Strategies[0].FeePercent, book.Strategies[0].SlippagePercent));
+        Assert.AreEqual((0.0, 0.0), (book.Strategies[1].FeePercent, book.Strategies[1].SlippagePercent));
     }
 
     [TestMethod]
