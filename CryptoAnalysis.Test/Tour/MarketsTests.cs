@@ -10,7 +10,7 @@ public class MarketsTests
     private static readonly string RepoRoot = FindRepoRoot(AppContext.BaseDirectory);
     private static readonly DateTime Start = new(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-    private static readonly Lazy<List<Price>> BtcCoinbase = new(() => Markets.Load(Markets.All.Single(x => x.Id == "btc-coinbase-1h"), RepoRoot));
+
 
     [TestMethod]
     public void FromLondon_IsAnHourBackInSummerTimeOnly()
@@ -20,30 +20,29 @@ public class MarketsTests
     }
 
     [TestMethod]
-    public void Load_BtcCoinbaseIsOneRunOfHoursFrom2020InUtc()
+    public void Load_BtcIsOneRunOfHoursFromCoinbasesFirst()
     {
-        var prices = BtcCoinbase.Value;
+        var prices = Btc.Hourly;
         var steps = prices.Zip(prices.Skip(1), (a, b) => b.DateTime - a.DateTime).ToList();
 
-        Assert.AreEqual(new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc), prices[0].DateTime);
-        Assert.AreEqual(new DateTime(2024, 8, 5, 14, 0, 0, DateTimeKind.Utc), prices[^1].DateTime);
+        Assert.AreEqual(new DateTime(2015, 7, 20, 21, 0, 0, DateTimeKind.Utc), prices[0].DateTime);
+        Assert.IsTrue(prices[^1].DateTime >= new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc));
         Assert.IsTrue(steps.All(x => x > TimeSpan.Zero), "Candles out of order or repeated.");
-        // The odd hour missing, as where the clocks go back or the exchange paused, but no more than a few in all.
-        Assert.IsTrue(steps.Count(x => x > TimeSpan.FromHours(1)) < 20);
-        Assert.IsTrue(steps.All(x => x <= TimeSpan.FromHours(6)));
+        // The odd hours missing, where the exchange has no candle, but few in all and none long.
+        Assert.IsTrue(steps.Count(x => x > TimeSpan.FromHours(1)) < 40);
+        Assert.IsTrue(steps.All(x => x <= TimeSpan.FromHours(24)));
     }
 
     [TestMethod]
-    public void Load_BtcCoinbaseIsTheSameCandleEitherSideOfTheJoin()
+    public void Load_TheFourHourMarketIsBuiltFromTheOneSource()
     {
-        // The 2023 file holds the true UTC times; the 2020 file, read back from London time, must agree with it where both
-        // have the candle, as in the summer of 2023.
-        var older = new Csv.CsvReaderHelper().ReadData<Price, global::CryptoAnalysis.Csv.ClassMaps.PriceClassMap>(Path.Combine(RepoRoot, "CryptoAnalysis.Test", "TestData", "COINBASE_BTCUSD, 60.csv"))
-            .Select(x => (Time: Markets.FromLondon(x.DateTime), x.Close)).Where(x => x.Time.Year == 2023 && x.Time.Month == 7).ToDictionary(x => x.Time, x => x.Close);
-        var joined = BtcCoinbase.Value.Where(x => older.ContainsKey(x.DateTime)).ToList();
+        var fourHour = Markets.Load(Markets.All.Single(x => x.Id == "btc-coinbase-4h"), Btc.RepoRoot);
+        var day = new DateTime(2023, 2, 14, 0, 0, 0, DateTimeKind.Utc);
+        var hours = Btc.Between(day.AddHours(8), day.AddHours(12));
+        var candle = fourHour.Single(x => x.DateTime == day.AddHours(8));
 
-        Assert.IsTrue(joined.Count > 600);
-        Assert.IsTrue(joined.All(x => Math.Abs(older[x.DateTime] - x.Close) < 0.02), "The 2020 file's times are not read back to UTC.");
+        Assert.AreEqual((hours[0].Open, hours.Max(x => x.High), hours.Min(x => x.Low), hours[^1].Close), (candle.Open, candle.High, candle.Low, candle.Close));
+        Assert.AreEqual(0, Markets.All.Count(x => x.Id.Contains("bitstamp")), "Bitstamp's BTC is put away, in Markets.Archived.");
     }
 
     [TestMethod]
@@ -73,7 +72,9 @@ public class MarketsTests
             StringAssert.Contains(roles.Check("btc-coinbase-4h", prices, both, "sweep", "s"), "Search");
             StringAssert.Contains(roles.Check("btc-coinbase-1h", prices, both, "explore", "s"), "Search");
             Assert.IsNull(roles.Check("btc-coinbase-1h", prices, both, "baseline", "s"));
-            Assert.IsNull(roles.Check("btc-1h", prices, both, "baseline", "s"));
+            // The same market at another candle length shares its periods, so a run there is a look at them too.
+            Assert.IsNull(roles.Check("btc-coinbase-4h", prices, both, "baseline", "s"));
+
             Assert.IsNull(roles.Check("eth-coinbase-1h", prices, both, "sweep", "s"));
             Assert.AreEqual(2, roles.TestRuns()[("btc-coinbase", 2024)]);
 

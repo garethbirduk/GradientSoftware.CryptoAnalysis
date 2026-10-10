@@ -8,7 +8,6 @@ using System.Text.Json;
 // Defaults: CryptoAnalysis.Test/TestData/Terms and artifacts/site, relative to the repo root.
 // Builds the static site; with --serve it then serves it on localhost, with replay batches for the full history.
 
-const string FullHistoryDataset = "btc-1h";
 var serve = args.Contains("--serve");
 var port = args.Where(x => x.StartsWith("--port=")).Select(x => int.Parse(x["--port=".Length..])).DefaultIfEmpty(5178).First();
 args = args.Where(x => !x.StartsWith("--")).ToArray();
@@ -80,10 +79,6 @@ object SawtoothExample(string id, string title, string description, List<Price> 
     Structure = StructureOf(prices),
 };
 
-var fullPath = Path.Combine(repoRoot, "CryptoAnalysis.Test", "TestData", "PricesExtensionsData", "COINBASE_BTCUSD, 60", "COINBASE_BTCUSD, 60.csv");
-var full = File.Exists(fullPath)
-    ? new CsvReaderHelper().ReadData<Price, PriceClassMap>(fullPath).ToList()
-    : [];
 // The full history is not built into the page: the Replay page loads it from the local server.
 var sawtoothExamples = new List<object>();
 
@@ -145,24 +140,29 @@ File.WriteAllText(Path.Combine(outDir, "data.js"), $"window.SITE_DATA = {json};\
 var mismatched = examples.Count(x => !x.Matches);
 Console.WriteLine($"{terms.Count} terms, {examples.Count} examples ({mismatched} mismatched) -> {Path.Combine(outDir, "index.html")}");
 
-if (serve && full.Count > 0)
+if (serve)
 {
     var sourceDir = Path.Combine(repoRoot, "CryptoAnalysis.Site", "wwwroot");
     var video = new TourVideo(Path.Combine(repoRoot, "tools", "tour-video"), Path.Combine(repoRoot, "artifacts", "tour-video", "tour.mp4"),
         Path.Combine(sourceDir, "tour.json"), $"http://localhost:{port}");
-    // The tour's own dataset first, then the others the tour's scenes can play on, such as the longer history from 2020.
-    var datasets = new List<Dataset> { new(FullHistoryDataset, Tours.Datasets[0].Name, full) };
-    foreach (var dataset in Tours.Datasets.Skip(1))
-    {
-        if (File.Exists(Path.Combine(repoRoot, dataset.Path)))
-            datasets.Add(new Dataset(dataset.Id, dataset.Name, Tours.Load(dataset, repoRoot)));
-    }
-    // The markets strategies are tested on, each a dataset of its own.
+    // The markets, each a dataset of its own: the one source of BTC candles first, which the tour plays on and the pages
+    // open on. A market none of whose candles are here yet, as before any are fetched, is left out.
+    var datasets = new List<Dataset>();
     foreach (var market in Markets.All)
     {
-        if (market.Sources.All(x => File.Exists(Path.Combine(repoRoot, x.Path))))
-            datasets.Add(new Dataset(market.Id, market.Name, Markets.Load(market, repoRoot)));
+        if (!market.Sources.All(x => File.Exists(Path.Combine(repoRoot, x.Path))))
+            continue;
+        var prices = Markets.Load(market, repoRoot);
+        if (prices.Count > 0)
+            datasets.Add(new Dataset(market.Id, market.Name, prices));
     }
+
+    if (datasets.Count == 0)
+    {
+        Console.WriteLine("No market has candles to serve: fetch some into Data/fetched first.");
+        return 1;
+    }
+
     await ReplayServer.Run(outDir, datasets, port, sourceDir, video);
 }
 return 0;

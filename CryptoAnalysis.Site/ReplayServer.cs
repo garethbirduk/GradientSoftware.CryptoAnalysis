@@ -19,6 +19,34 @@ namespace Gradient.CryptoAnalysis.Site;
 public sealed record Dataset(string Id, string Name, List<Price> Prices);
 
 /// <summary>
+/// A fetching of months of a market from its source, as it goes: how many of its months are done, the one being fetched,
+/// the candles fetched and how many of them were new, the years it Locked, and how it ended: of itself, cancelled, at the
+/// start of the source's history (Began), or with an error.
+/// </summary>
+public sealed class DataJob(string market, string source, int total)
+{
+    /// <summary>
+    /// The hours a month's fetch must add to a year that already has candles for the year to become Locked: a week's worth,
+    /// so that new stretches are kept back and a few missing hours filled in are not.
+    /// </summary>
+    public const int LockAt = 168;
+
+    public string Market { get; } = market;
+    public string Source { get; } = source;
+    public int Total { get; } = total;
+    public int Done { get; set; }
+    public int Year { get; set; }
+    public int Month { get; set; }
+    public int Fetched { get; set; }
+    public int Gained { get; set; }
+    public List<int> Locked { get; } = [];
+    public bool Running { get; set; } = true;
+    public bool Cancelled { get; set; }
+    public bool Began { get; set; }
+    public string? Error { get; set; }
+}
+
+/// <summary>
 /// Serves the built site and, for replays too long to build into it, the replay in batches: the structure as known at each
 /// candle of a range, computed from the dataset's first candle, or from a later candle given as the anchor. Local only.
 /// </summary>
@@ -221,6 +249,144 @@ public static class ReplayServer
 
         // The markets strategies are tested on, each with its years: their candles, and their roles with the baselines run
         // on each Test year so far.
+        // The Data page: what is held of each hourly market, month by month, and the fetching of a month from a source (see
+        // DataStore). A month fetched is read into its market at once, and its caches dropped, so no restart is needed.
+        var repoRoot = sourceDir != null ? Path.GetFullPath(Path.Combine(sourceDir, "..", "..")) : null;
+        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        var fetching = new SemaphoreSlim(1, 1);
+
+        void Reload(string group)
+        {
+            foreach (var market in Markets.All.Where(x => x.Group == group && x.Generate == null))
+            {
+                var data = new Dataset(market.Id, market.Name, Markets.Load(market, repoRoot!));
+                byId[market.Id] = data;
+                byDataset[market.Id] = data.Prices;
+                if (datasets is List<Dataset> list)
+                {
+                    var at = list.FindIndex(x => x.Id == market.Id);
+                    if (at >= 0)
+                        list[at] = data;
+                    else
+                        list.Add(data);
+                }
+
+                foreach (var key in batches.Keys.Where(x => x.Dataset == market.Id))
+                    batches.TryRemove(key, out _);
+                foreach (var key in completes.Keys.Where(x => x.Dataset == market.Id))
+                    completes.TryRemove(key, out _);
+                foreach (var key in events.Keys.Where(x => x.Item1 == market.Id))
+                    events.TryRemove(key, out _);
+            }
+        }
+
+        app.MapGet("/api/data", () =>
+        {
+            var sources = sourceDir != null ? DataStore.Sources(sourceDir) : [];
+            return Results.Json(Markets.All.Where(x => x.Hours == 1 && x.Generate == null && byId.ContainsKey(x.Id)).Select(market =>
+            {
+                var source = sources.FirstOrDefault(x => x.Pairs.ContainsKey(market.Group));
+                var fetched = repoRoot != null ? DataStore.Held(repoRoot, market.Group) : [];
+                var months = byId[market.Id].Prices.GroupBy(x => (x.DateTime.Year, x.DateTime.Month)).Select(x => new
+                {
+                    x.Key.Year, x.Key.Month, Candles = x.Count(), First = x.Min(p => p.DateTime), Last = x.Max(p => p.DateTime),
+                    Fetched = fetched.Where(f => f.Year == x.Key.Year && f.Month == x.Key.Month).Select(f => new { f.Source, f.Candles, f.Whole }),
+                });
+                // The months a source was asked for and had nothing in, so the page does not offer them again.
+                var empty = (repoRoot != null ? DataStore.Empty(repoRoot, market.Group) : []).Select(x => new { x.Year, x.Month, x.Source });
+                return new { market.Id, market.Name, market.Group, Source = source == null ? null : new { source.Id, source.Name }, Months = months, Empty = empty };
+            }), Json);
+        });
+
+        // Fetching runs here, not on the page, so it goes on when the page is reloaded or closed: { market, months: [{ year,
+        // month }] } starts a job that fetches the months from the market's source one after another, newest first, each
+        // kept and read in as it comes. A Search year becomes Locked when it had no candles before, or when a month adds
+        // a good part of a month to it (DataJob.LockAt hours), as nothing has yet been run on what is new in it; a few
+        // missing hours filled in a year already run on do not lock it. Two months running, before the oldest held, that the source has nothing in
+        // end the job: the source's history begins after them. One job runs at a time; the page asks how it is going
+        // (GET api/data/job) and can cancel it (POST api/data/cancel), which stops it after the month being fetched.
+        DataJob? job = null;
+        CancellationTokenSource? cancel = null;
+
+        app.MapGet("/api/data/job", () => Results.Json(job, Json));
+
+        app.MapPost("/api/data/cancel", () =>
+        {
+            cancel?.Cancel();
+            return Results.Ok();
+        });
+
+        app.MapPost("/api/data/fetch", async (HttpRequest request) =>
+        {
+            var body = await JsonNode.ParseAsync(request.Body);
+            var market = Markets.All.FirstOrDefault(x => x.Id == body?["market"]?.GetValue<string>() && x.Hours == 1 && x.Generate == null);
+            var now = DateTime.UtcNow;
+            var months = (body?["months"]?.AsArray() ?? [])
+                .Select(x => (Year: x?["year"]?.GetValue<int>() ?? 0, Month: x?["month"]?.GetValue<int>() ?? 0))
+                .Where(x => x.Month is >= 1 and <= 12 && x.Year is >= 1 and <= 9999 && new DateTime(x.Year, x.Month, 1, 0, 0, 0, DateTimeKind.Utc) <= now)
+                .Distinct().OrderByDescending(x => x.Year * 12 + x.Month).ToList();
+            if (market == null || repoRoot == null || sourceDir == null || months.Count == 0)
+                return Results.BadRequest("The request is { market, months: [{ year, month }] }, with an hourly market and months that have begun.");
+            var source = DataStore.Sources(sourceDir).FirstOrDefault(x => x.Pairs.ContainsKey(market.Group));
+            if (source == null)
+                return Results.BadRequest($"No source in data-sources.json has a pair for {market.Group}.");
+            if (!await fetching.WaitAsync(0))
+                return Results.Conflict("A fetch is already running.");
+
+            var mine = job = new DataJob(market.Id, source.Name, months.Count);
+            var stop = cancel = new CancellationTokenSource();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var oldest = byId.TryGetValue(market.Id, out var held) && held.Prices.Count > 0 ? held.Prices[0].DateTime.Year * 12 + held.Prices[0].DateTime.Month : int.MaxValue;
+                    var nothing = 0;
+                    foreach (var (year, month) in months)
+                    {
+                        if (stop.IsCancellationRequested)
+                        {
+                            mine.Cancelled = true;
+                            break;
+                        }
+
+                        if (nothing >= 2)
+                        {
+                            mine.Began = true;
+                            break;
+                        }
+
+                        mine.Year = year;
+                        mine.Month = month;
+                        int Held() => byId.TryGetValue(market.Id, out var data) ? data.Prices.Count(x => x.DateTime.Year == year) : 0;
+                        var before = Held();
+                        var kept = await DataStore.Fetch(http, repoRoot, source, market.Group, year, month, DateTime.UtcNow);
+                        Reload(market.Group);
+                        var gained = Held() - before;
+                        if (gained > 0 && (before == 0 || gained >= DataJob.LockAt) && roles != null && roles.Role(market.Group, year) == EnumPeriodRole.Search)
+                        {
+                            roles.Set(market.Group, year, EnumPeriodRole.Locked);
+                            mine.Locked.Add(year);
+                        }
+
+                        mine.Fetched += kept.Count;
+                        mine.Gained += gained;
+                        nothing = kept.Count == 0 && year * 12 + month < oldest ? nothing + 1 : 0;
+                        mine.Done++;
+                    }
+                }
+                catch (Exception e)
+                {
+                    mine.Error = mine.Year > 0 ? $"{new DateTime(mine.Year, mine.Month, 1):MMM yyyy}: {e.Message}" : e.Message;
+                }
+                finally
+                {
+                    mine.Running = false;
+                    fetching.Release();
+                }
+            });
+            return Results.Json(mine, Json);
+        });
+
         app.MapGet("/api/markets", () =>
         {
             var counts = roles?.TestRuns() ?? [];

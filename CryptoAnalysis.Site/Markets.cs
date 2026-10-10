@@ -34,25 +34,23 @@ public enum EnumPeriodRole
 public static class Markets
 {
     private static readonly DateTime Y2020 = new(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-    private static readonly DateTime Y2023 = new(2023, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     // The synthetic markets' hours, 2020 to the end of 2024.
     private static readonly int SyntheticCandles = (int)(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) - Y2020).TotalHours;
     private static readonly TimeZoneInfo London = TimeZoneInfo.FindSystemTimeZoneById("Europe/London");
 
-    // Coinbase's BTC from 2020 is a file of London times up to 2023, then one of UTC times on, as each was exported.
-    private static readonly MarketSource[] BtcCoinbase =
-    [
-        new(System.IO.Path.Combine("CryptoAnalysis.Test", "TestData", "COINBASE_BTCUSD, 60.csv"), To: Y2023, LondonTime: true),
-        new(System.IO.Path.Combine("CryptoAnalysis.Test", "TestData", "PricesExtensionsData", "COINBASE_BTCUSD, 60", "COINBASE_BTCUSD, 60.csv"), From: Y2023),
-    ];
+    /// <summary>
+    /// The id of the market that is the one source of BTC candles: Coinbase's BTC/USD by the hour, every candle of it
+    /// fetched from Coinbase and kept (see <see cref="DataStore"/>). The tour, the tests and the pages all read it, and the
+    /// 4-hour market is built from it.
+    /// </summary>
+    public const string Btc = "btc-coinbase-1h";
 
     public static readonly IReadOnlyList<Market> All =
     [
-        new("btc-coinbase-1h", "BTC/USD · Coinbase · 1h", "btc-coinbase", 1, BtcCoinbase),
-        new("btc-coinbase-4h", "BTC/USD · Coinbase · 4h", "btc-coinbase", 4, BtcCoinbase),
+        new(Btc, "BTC/USD · Coinbase · 1h", "btc-coinbase", 1, []),
+        new("btc-coinbase-4h", "BTC/USD · Coinbase · 4h", "btc-coinbase", 4, []),
         new("eth-coinbase-1h", "ETH/USD · Coinbase · 1h", "eth-coinbase", 1, [new(System.IO.Path.Combine("Data", "COINBASE_ETHUSD, 60", "COINBASE_ETHUSD, 60.csv"))]),
-        new("btc-bitstamp-1h", "BTC/USD · Bitstamp · 1h", "btc-bitstamp", 1, [new(System.IO.Path.Combine("Data", "BITSTAMP_BTCUSD, 60", "BITSTAMP_BTCUSD, 60 (1).csv"))]),
         // Markets where the truth is known (see Synthetic): nothing to find in the one, and one edge, after 3 green candles,
         // in the other.
         new("synthetic-random-1h", "Synthetic · random walk · 1h", "synthetic-random", 1, [],
@@ -62,29 +60,32 @@ public static class Markets
     ];
 
     /// <summary>
-    /// The tour's datasets that hold a market group's candles, so a run on one of them keeps to that group's roles.
+    /// Markets put away for now: their files are kept, but they are not loaded, served or listed. BTC from other places
+    /// than the one source is here until that source is all it needs to be: Bitstamp's BTC/USD, a part of 2016 and 2017.
+    /// The two files BTC was first read from, exported from a charting site, are put away with it: the one from 2020 under
+    /// CryptoAnalysis.Test/TestData, whose times are London's, and the one from 2023 under its PricesExtensionsData.
     /// </summary>
-    public static readonly IReadOnlyDictionary<string, string> DatasetGroups = new Dictionary<string, string>
-    {
-        ["btc-1h"] = "btc-coinbase",
-        ["btc-1h-2020"] = "btc-coinbase",
-        ["btc-4h-2020"] = "btc-coinbase",
-    };
+    public static readonly IReadOnlyList<Market> Archived =
+    [
+        new("btc-bitstamp-1h", "BTC/USD · Bitstamp · 1h", "btc-bitstamp", 1, [new(System.IO.Path.Combine("Data", "BITSTAMP_BTCUSD, 60", "BITSTAMP_BTCUSD, 60 (1).csv"))]),
+    ];
 
     /// <summary>
     /// The market group whose roles a dataset keeps to; null for one of no group, which has none.
     /// </summary>
-    public static string? GroupOf(string dataset) => All.FirstOrDefault(x => x.Id == dataset)?.Group ?? DatasetGroups.GetValueOrDefault(dataset);
+    public static string? GroupOf(string dataset) => All.FirstOrDefault(x => x.Id == dataset)?.Group;
 
     /// <summary>
-    /// Loads a market: its sources' candles in time order, the first of any time kept, built to its candle length when that
-    /// is more than an hour.
+    /// Loads a market: its sources' candles and then those fetched for its group (see <see cref="DataStore"/>), in time
+    /// order, the first of any time kept, built to its candle length when that is more than an hour. The last candle of the
+    /// sources gives way to a fetched one of the same hour, as a file can be exported while its last hour is still being made.
+    /// Without fetched, only its own sources are read, as a test of them needs: what is fetched is each person's own.
     /// </summary>
-    public static List<Price> Load(Market market, string repoRoot)
+    public static List<Price> Load(Market market, string repoRoot, bool fetched = true)
     {
         if (market.Generate != null)
             return market.Generate();
-        var prices = market.Sources.SelectMany(source =>
+        var files = market.Sources.SelectMany(source =>
             new Csv.CsvReaderHelper().ReadData<Price, global::CryptoAnalysis.Csv.ClassMaps.PriceClassMap>(System.IO.Path.Combine(repoRoot, source.Path))
                 .Select(x =>
                 {
@@ -93,6 +94,11 @@ public static class Markets
                     return x;
                 })
                 .Where(x => (source.From == null || x.DateTime >= source.From) && (source.To == null || x.DateTime < source.To)))
+            .ToList();
+        var kept = fetched ? DataStore.Read(repoRoot, market.Group) : [];
+        if (files.Count > 0 && files.Max(x => x.DateTime) is var last && kept.Any(x => x.DateTime == last))
+            files.RemoveAll(x => x.DateTime == last);
+        var prices = files.Concat(kept)
             .DistinctBy(x => x.DateTime)
             .OrderBy(x => x.DateTime)
             .ToList();

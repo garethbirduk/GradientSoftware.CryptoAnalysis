@@ -266,21 +266,23 @@ public class SawtoothTests
             string.Join(" ", tree.Select(x => $"{x.Level}{x.Direction}:{x.Start.Hour}-{x.Break.Hour}{(x.Parent is DateTime p ? $"^{p.Hour}" : "")}")));
     }
 
+    private const string BtcFrom2023 = "BTC from 2023";
+
     public static IEnumerable<object[]> RealData()
     {
         var root = Path.Combine(AppContext.BaseDirectory, "TestData");
-        var files = TermExampleLibrary.Discover(Path.Combine(root, "Terms")).Select(x => x.CsvPath)
-            .Append(Path.Combine(root, "PricesExtensionsData", "COINBASE_BTCUSD, 60", "COINBASE_BTCUSD, 60.csv"));
+        // The term examples, and a long stretch of the one source of BTC candles, named rather than a file.
+        var files = TermExampleLibrary.Discover(Path.Combine(root, "Terms")).Select(x => Path.GetRelativePath(root, x.CsvPath)).Append(BtcFrom2023);
         foreach (var file in files)
             foreach (var basis in Enum.GetValues<EnumPriceBasis>())
-                yield return new object[] { Path.GetRelativePath(root, file), basis };
+                yield return new object[] { file, basis };
     }
 
     [DataTestMethod]
     [DynamicData(nameof(RealData), DynamicDataSourceType.Method)]
     public void RealData_LevelsAreWellFormed(string file, EnumPriceBasis basis)
     {
-        var prices = new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(AppContext.BaseDirectory, "TestData", file)).ToList();
+        var prices = file == BtcFrom2023 ? Btc.From2023() : new CsvReaderHelper().ReadData<Price, PriceClassMap>(Path.Combine(AppContext.BaseDirectory, "TestData", file)).ToList();
         var levels = Sawtooth.Levels(prices, basis, maxLevel: 50);
 
         for (var l = 0; l < levels.Count; l++)

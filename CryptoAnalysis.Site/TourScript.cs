@@ -102,24 +102,15 @@ public static class Tours
     private const int EventSearchLimit = 3000;
 
     /// <summary>
-    /// The datasets the local server serves, by id: a file under the repository root and, for a coarser dataset built from
-    /// it, the hours its candles span. The first is the tour's own.
+    /// The datasets a tour's scenes play on: the markets of the one source of BTC candles (see <see cref="Markets.Btc"/>),
+    /// by the hour, which is the tour's own, and built to 4 hours.
     /// </summary>
-    public static readonly IReadOnlyList<(string Id, string Name, string Path, int Hours)> Datasets =
-    [
-        ("btc-1h", "BTC/USD hourly (Coinbase)", Path.Combine("CryptoAnalysis.Test", "TestData", "PricesExtensionsData", "COINBASE_BTCUSD, 60", "COINBASE_BTCUSD, 60.csv"), 1),
-        ("btc-1h-2020", "BTC/USD hourly (Coinbase, from 2020)", Path.Combine("CryptoAnalysis.Test", "TestData", "COINBASE_BTCUSD, 60.csv"), 1),
-        ("btc-4h-2020", "BTC/USD 4-hour (Coinbase, from 2020)", Path.Combine("CryptoAnalysis.Test", "TestData", "COINBASE_BTCUSD, 60.csv"), 4),
-    ];
+    public static readonly IReadOnlyList<Market> Datasets = Markets.All.Where(x => x.Group == "btc-coinbase").ToList();
 
     /// <summary>
-    /// Loads a dataset of the catalogue: its file, resampled to its candle length when that is more than an hour.
+    /// Loads a dataset of the tour's: the market's candles.
     /// </summary>
-    public static List<Price> Load((string Id, string Name, string Path, int Hours) dataset, string repoRoot)
-    {
-        var prices = new Csv.CsvReaderHelper().ReadData<Price, global::CryptoAnalysis.Csv.ClassMaps.PriceClassMap>(Path.Combine(repoRoot, dataset.Path)).ToList();
-        return dataset.Hours > 1 ? Resample.To(prices, TimeSpan.FromHours(dataset.Hours)) : prices;
-    }
+    public static List<Price> Load(Market dataset, string repoRoot) => Markets.Load(dataset, repoRoot);
 
     /// <summary>
     /// The strategies of the Strategies page, as written, by id: those of strategies.json in the site's folder, or of
