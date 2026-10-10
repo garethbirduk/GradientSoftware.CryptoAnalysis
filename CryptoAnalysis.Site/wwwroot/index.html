@@ -421,6 +421,23 @@
   .strat-cell-result { margin-top: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 1.3em; }
   .strat-cell-note { font-size: 11px; color: var(--muted); }
   .strat-cell-head { margin: 18px 0 0; font-size: 15px; }
+  .strat-chips { display: grid; gap: 6px; margin-top: 10px; font-size: 13px; }
+  .strat-chip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .strat-chip-market { color: var(--muted); min-width: 170px; }
+  .strat-chip { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-left-width: 4px;
+    border-radius: 6px; padding: 2px 8px; cursor: pointer; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .strat-chip.role-test { border-left-color: var(--warn); }
+  .strat-chip.good { background: color-mix(in srgb, var(--ok) 22%, var(--panel)); }
+  .strat-chip.fair { background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
+  .strat-chip.poor { background: color-mix(in srgb, var(--bad) 12%, var(--panel)); }
+  .strat-chip.sel { box-shadow: 0 0 0 2px var(--accent); }
+  .strat-chip.off { opacity: .6; }
+  #strat-periods { width: min(1180px, calc(100vw - 32px)); max-height: 86vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
+  #strat-periods::backdrop { background: rgba(0, 0, 0, .35); }
+  #strat-periods h4 { margin: 0 0 4px; font-size: 15px; }
+  #strat-periods > p { margin: 0 0 6px; color: var(--muted); }
+  #strat-periods .sim-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+  #strat-periods .sim-foot button { font: inherit; border-radius: 6px; padding: 4px 16px; cursor: pointer; background: var(--accent); border: 1px solid var(--accent); color: #fff; }
   /* Explore: a condition's lean, tinted green when up first more often than after any candle, red when down first. */
   .explore { margin-top: 18px; }
   .explore .strat-card + .strat-card { margin-top: 14px; }
@@ -5807,11 +5824,11 @@ function renderStrategyRun() {
   const key = strategies.cell.get(s.id), run = strategyCells(s).get(key);
   const ticked = [...strategies.included].filter(runnable);
   box.innerHTML = `<div class="strat-run">
-      <button type="button" data-run ${strategies.running || !ticked.length ? 'disabled' : ''}>${strategies.running ? esc(strategies.running) : `Run on ${ticked.length} period${ticked.length === 1 ? '' : 's'}`}</button>
+      <button type="button" data-run ${strategies.running || !ticked.length ? 'disabled' : ''} title="Runs the strategy as it is here, saved or not, with a random baseline, on each period ticked">${strategies.running ? esc(strategies.running) : `Run on ${ticked.length} period${ticked.length === 1 ? '' : 's'}`}</button>
+      <button type="button" data-periods title="Choose the periods to run on, and set each year's role">Periods…</button>
       <button type="button" data-sweep ${strategies.sweeping ? 'disabled' : ''} title="Runs every variation of the numbers given a To and a Step on the period shown, each against its own random baseline; on a Search period only">${strategies.sweeping ? 'Sweeping…' : 'Run sweep'}</button>
-      <span class="strat-note">Runs the strategy as it is here, saved or not, with a random baseline, on each period ticked below. Its trades open in the period, reading the candles before it, and may close after it.</span>
     </div>
-    ${strategyGrid(s)}
+    ${periodChips(s)}
     <form class="strat-run" data-chart-add><input class="strat-chart-name" data-chart-name aria-label="Name on the charts" value="${esc(chartStrategyName(s))}">
       <button type="submit">Add to strategies on charts</button><span class="strat-note" data-chart-note>Adds the strategy as it is here, under this name, to the Strategies section beside the charts.</span></form>
     ${key ? `<h3 class="strat-cell-head">${esc(cellName(key))}</h3>` : ''}
@@ -5832,7 +5849,13 @@ function renderStrategyRun() {
     box.querySelector('[data-chart-note]').textContent = c ? `Added as "${c.label}": turn it on in the Strategies section on the Chart, Replay, Tour or Analysis page.`
       : strategyRules(like.strategy) === strategyRules(s) ? `Not added: it is on the charts already, as "${like.label}".` : `Not added: "${like.label}" is already the name of another on the charts.`;
   });
-  wireStrategyGrid(box, s);
+  box.querySelector('[data-periods]').addEventListener('click', () => openPeriodsDialog(s));
+  box.querySelectorAll('[data-chip-cell]').forEach(el => el.addEventListener('click', () => {
+    strategies.cell.set(s.id, el.dataset.chipCell);
+    syncStrategiesHash();
+    renderStrategyRun();
+  }));
+  renderPeriodsDialog(s);
   box.querySelector('[data-run]').addEventListener('click', () => runStrategy(s));
   box.querySelector('[data-csv]')?.addEventListener('click', () => downloadTrades(run));
   box.querySelector('[data-baseline]')?.addEventListener('click', () => runBaseline(s, run));
@@ -5937,6 +5960,61 @@ async function runBaseline(s, run) {
   if (currentPage === 'Strategies' && selectedStrategy() === s && strategyCells(s).get(strategies.cell.get(s.id)) === run) renderStrategyRun();
 }
 
+// A period's result for a strategy, as its cell and chip show it: its score (the share of its random runs it beats on
+// Total %) · its total after costs · its trades, and a tone by the score.
+function cellResult(s, key) {
+  const y = yearOf(key), run = strategyCells(s).get(key), total = run?.baseline?.measures?.find(x => x.name === 'Total %');
+  const result = y?.role === 'locked' ? 'Kept back'
+    : run?.running ? 'Running…'
+    : run?.error ? `<span class="bad" title="${esc(run.error)}">Not run</span>`
+    : total ? `<b>${Math.round(total.percentile ?? 0)}%</b> · ${fmtPercent(total.strategy)} · ${run.baseline.trades}`
+    : run?.trades ? `${fmtPercent(run.summary.totalProfitPercent)} · ${run.summary.trades}` : '';
+  const tone = total?.percentile == null ? '' : total.percentile >= 95 ? ' good' : total.percentile >= 90 ? ' fair' : total.percentile <= 5 ? ' poor' : '';
+  return { result, tone };
+}
+
+// The periods ticked, and any run before, as a chip each under its market: click one for its results below.
+function periodChips(s) {
+  const cells = strategyCells(s), selected = strategies.cell.get(s.id);
+  const rows = (strategies.markets ?? []).map(m => {
+    const keys = m.years.map(y => cellKey(m.id, y.year)).filter(k => (strategies.included.has(k) && runnable(k)) || cells.has(k));
+    return keys.length ? `<div class="strat-chip-row"><span class="strat-chip-market">${esc(m.name)}</span>${keys.map(k => {
+      const { result, tone } = cellResult(s, k);
+      return `<button type="button" class="strat-chip role-${yearOf(k)?.role}${tone}${k === selected ? ' sel' : ''}${strategies.included.has(k) ? '' : ' off'}" data-chip-cell="${k}"
+        title="${esc(cellName(k))}${strategies.included.has(k) ? '' : ': not ticked, so not run again'}">${cellOf(k).year}${result ? ` · ${result}` : ''}</button>`;
+    }).join('')}</div>` : '';
+  }).join('');
+  return rows ? `<div class="strat-chips">${rows}</div>` : '<p class="remarks strat-note">No periods ticked: choose them with Periods.</p>';
+}
+
+// The periods dialog: the grid of market years, to tick the periods to run on and set each year's role.
+function openPeriodsDialog(s) {
+  let dialog = document.getElementById('strat-periods');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'strat-periods';
+    dialog.setAttribute('aria-label', 'Periods to run on');
+    document.body.append(dialog);
+    // Closed by Done, or a click outside it on the backdrop.
+    dialog.addEventListener('click', e => {
+      const r = dialog.getBoundingClientRect(), outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+      if (e.target.closest('[data-periods-close]') || (e.target === dialog && outside)) dialog.close();
+    });
+  }
+  dialog.showModal();
+  renderPeriodsDialog(s);
+}
+
+function renderPeriodsDialog(s) {
+  const dialog = document.getElementById('strat-periods');
+  if (!dialog?.open) return;
+  dialog.innerHTML = `<h4>Periods: ${esc(s.name || s.id)}</h4>
+    <p>Tick the periods to run on. Each run opens its trades in the period, reading the candles before it, and may close them after it.</p>
+    ${strategyGrid(s)}
+    <div class="sim-foot"><button type="button" class="go" data-periods-close>Done</button></div>`;
+  wireStrategyGrid(dialog, s);
+}
+
 // The periods to run on: a row a year, a column a market, each cell with a tick to run on it, its role, and the strategy's
 // result there once run: its score (how much of its random runs it beats on Total %), its total after costs and its trades.
 // A year's role is its market group's, shared by its candle lengths.
@@ -5944,17 +6022,11 @@ function strategyGrid(s) {
   const markets = strategies.markets ?? [];
   if (!markets.length) return '<p class="remarks strat-note bad">The local server has no markets: restart ./build-site.ps1 -Serve.</p>';
   const years = [...new Set(markets.flatMap(m => m.years.map(y => y.year)))].sort((a, b) => a - b);
-  const cells = strategyCells(s), selected = strategies.cell.get(s.id);
+  const selected = strategies.cell.get(s.id);
   const cell = (m, year) => {
     const y = m.years.find(x => x.year === year);
     if (!y) return '<td class="strat-cell none"></td>';
-    const key = cellKey(m.id, year), run = cells.get(key), total = run?.baseline?.measures?.find(x => x.name === 'Total %');
-    const result = y.role === 'locked' ? 'Kept back'
-      : run?.running ? 'Running…'
-      : run?.error ? `<span class="bad" title="${esc(run.error)}">Not run</span>`
-      : total ? `<b>${Math.round(total.percentile ?? 0)}%</b> · ${fmtPercent(total.strategy)} · ${run.baseline.trades}`
-      : run?.trades ? `${fmtPercent(run.summary.totalProfitPercent)} · ${run.summary.trades}` : '';
-    const tone = total?.percentile == null ? '' : total.percentile >= 95 ? ' good' : total.percentile >= 90 ? ' fair' : total.percentile <= 5 ? ' poor' : '';
+    const key = cellKey(m.id, year), { result, tone } = cellResult(s, key);
     return `<td class="strat-cell role-${y.role}${tone}${key === selected ? ' sel' : ''}" data-cell="${key}" title="${esc(`${cellName(key)}: ${fmtTime(y.first)} to ${fmtTime(y.last)} UTC, ${y.candles.toLocaleString()} candles`)}">
       <div class="strat-cell-top"><input type="checkbox" data-cell-tick="${key}" ${strategies.included.has(key) && y.role !== 'locked' ? 'checked' : ''} ${y.role === 'locked' ? 'disabled' : ''} aria-label="Run on ${esc(cellName(key))}">
         <select data-cell-role="${m.group}:${year}" aria-label="Role of ${year}">${Object.entries(ROLE_NAMES).map(([r, name]) => `<option value="${r}" ${r === y.role ? 'selected' : ''}>${name}</option>`).join('')}</select></div>
@@ -5966,7 +6038,7 @@ function strategyGrid(s) {
       <tbody>${years.map(year => `<tr><th><button type="button" data-tick-year="${year}" title="Tick or untick this year in every market">${year}</button></th>${markets.map(m => cell(m, year)).join('')}</tr>`).join('')}</tbody>
     </table></div>
     <p class="remarks">A cell is a year of a market: once run, <b>its score</b> (the share of its random runs it beats on Total %) · its total after costs · its trades;
-      click one for its results below. Strategies are searched for on <b>Search</b> years, where sweeps run. <b>Test</b> years check what was found: each look is
+      click one to show its results on the page. Strategies are searched for on <b>Search</b> years, where sweeps run. <b>Test</b> years check what was found: each look is
       counted, as every look makes a good result there a little more likely by luck. <b>Locked</b> years are kept back for a final check, and run on nothing
       until unlocked. Roles are kept at once, and every change is logged.</p>`;
 }
