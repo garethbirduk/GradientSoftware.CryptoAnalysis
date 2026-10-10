@@ -1,7 +1,9 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using CryptoAnalysis.Csv.ClassMaps;
 using Gradient.CryptoAnalysis.Csv;
 using Gradient.CryptoAnalysis.Site;
+using Gradient.CryptoAnalysis.Strategies;
 
 namespace Gradient.CryptoAnalysis.Test.Tour;
 
@@ -38,6 +40,58 @@ public class TourTests
 
         Assert.IsTrue(tour.Sections.Count > 0, "The tour has no sections.");
         Assert.AreEqual(0, tour.Errors.Count, $"tour.json has problems:\n{string.Join("\n", tour.Errors.Select(x => "  " + x))}");
+    }
+
+    [TestMethod]
+    public void TourStrategies_AreLayersAndTheirProblemsListed()
+    {
+        var def = JsonNode.Parse("""
+            { "strategies": [
+                { "id": "ok", "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 3 }, "takeProfit": { "type": "Percent", "percent": 1 }, "stopLoss": { "type": "Percent", "percent": 1 } },
+                { "id": "bad", "takeProfit": { "type": "Percent", "percent": 0 } },
+                { "name": "no id" },
+                { "id": "ok" } ] }
+            """)!;
+        var errors = new List<string>();
+
+        CollectionAssert.AreEqual(new[] { "ok", "bad", "ok" }, Tours.TourStrategies(def, errors));
+        Assert.IsTrue(errors.Any(x => x.StartsWith("strategy 2 (bad): Take Profit")), string.Join("\n", errors));
+        Assert.IsTrue(errors.Any(x => x.StartsWith("strategy 3: a strategy needs an id")), string.Join("\n", errors));
+        Assert.IsTrue(errors.Any(x => x.StartsWith("strategy 4: \"ok\" is the id of a strategy before it")), string.Join("\n", errors));
+    }
+
+    [TestMethod]
+    public void TourResults_ProblemsListed()
+    {
+        var strategies = new Dictionary<string, JsonNode>
+        {
+            ["plain"] = JsonNode.Parse("""{ "id": "plain" }""")!,
+            ["varied"] = JsonNode.Parse("""{ "id": "varied", "vary": { "takeProfit.percent": { "to": 3, "step": 0.5 } } }""")!,
+        };
+        List<string> Problems(string json) => Tours.ResultsProblems(JsonNode.Parse(json)!, strategies);
+
+        Assert.AreEqual(0, Problems("""{ "show": "sweep", "strategy": "varied", "period": "btc-coinbase-1h:2023" }""").Count);
+        Assert.AreEqual(0, Problems("""{ "show": "baseline", "strategy": "plain", "period": "btc-coinbase-1h:2023" }""").Count);
+        Assert.IsTrue(Problems("""{ "show": "graph", "strategy": "plain", "period": "btc-coinbase-1h:2023" }""").Single().StartsWith("results show one of"));
+        Assert.IsTrue(Problems("""{ "show": "run", "strategy": "none", "period": "btc-coinbase-1h:2023" }""").Single().EndsWith("there is no \"none\""));
+        Assert.IsTrue(Problems("""{ "show": "sweep", "strategy": "plain", "period": "btc-coinbase-1h:2023" }""").Single().Contains("has no \"vary\""));
+        Assert.IsTrue(Problems("""{ "show": "run", "strategy": "plain", "period": "nowhere:2023" }""").Single().StartsWith("results need \"period\""));
+    }
+
+    [TestMethod]
+    public void Tour_StrategyChapterTradesWhereItsTextsSay()
+    {
+        var def = JsonNode.Parse(File.ReadAllText(TourPath))!;
+        var strategy = def["strategies"]!.AsArray().Single(x => x?["id"]?.GetValue<string>() == "three-green")
+            .Deserialize<Strategy>(StrategyBook.JsonOptions)!;
+        var prices = Datasets.Value["btc-1h"];
+        var anchor = prices.ToList().FindIndex(x => x.DateTime == new DateTime(2023, 2, 14, 7, 0, 0, DateTimeKind.Utc));
+
+        var trades = StrategyBacktest.Run(prices.ToList(), strategy).Trades
+            .Where(x => x.EntryIndex >= anchor && x.EntryIndex <= anchor + 56)
+            .Select(x => $"{x.EntryIndex - anchor}-{x.ExitIndex - anchor} {x.Outcome}");
+
+        Assert.AreEqual("12-28 TakeProfit, 28-29 TakeProfit, 36-37 TakeProfit, 42-54 StopLoss", string.Join(", ", trades));
     }
 
     [TestMethod]

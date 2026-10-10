@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace Gradient.CryptoAnalysis.Site;
@@ -121,6 +122,86 @@ public static class Tours
     }
 
     /// <summary>
+    /// The ids of the tour's own strategies, each written as strategies.json keeps one, which a section turns on as the layer
+    /// "strategy:" and its id. One that cannot be run is listed with its problems, and its id still counted.
+    /// </summary>
+    public static List<string> TourStrategies(JsonNode def, List<string> errors)
+    {
+        var ids = new List<string>();
+        foreach (var (node, k) in (def["strategies"]?.AsArray() ?? []).Select((x, k) => (x, k)))
+        {
+            var where = $"strategy {k + 1}";
+            Strategies.Strategy? strategy;
+            try
+            {
+                strategy = node?.Deserialize<Strategies.Strategy>(Strategies.StrategyBook.JsonOptions);
+            }
+            catch (JsonException e)
+            {
+                errors.Add($"{where}: not a strategy as strategies.json keeps one: {e.Message}");
+                continue;
+            }
+
+            if (strategy == null || string.IsNullOrWhiteSpace(strategy.Id))
+            {
+                errors.Add($"{where}: a strategy needs an id, which a section turns it on by as the layer \"strategy:\" and the id");
+                continue;
+            }
+
+            if (ids.Contains(strategy.Id))
+                errors.Add($"{where}: \"{strategy.Id}\" is the id of a strategy before it");
+            errors.AddRange(strategy.Validate().Select(x => $"{where} ({strategy.Id}): {x}"));
+            ids.Add(strategy.Id);
+        }
+
+        return ids;
+    }
+
+    // The tour's strategies as written, by id, the first of an id kept.
+    private static Dictionary<string, JsonNode> StrategyNodes(JsonNode def)
+    {
+        var nodes = new Dictionary<string, JsonNode>();
+        foreach (var node in def["strategies"]?.AsArray() ?? [])
+        {
+            if (node?["id"] is JsonValue id && id.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text))
+                nodes.TryAdd(text, node);
+        }
+
+        return nodes;
+    }
+
+    /// <summary>
+    /// The kinds of results a section can show in place of the chart, as the Strategies page shows them: a run's totals and
+    /// trades, its random baseline, or a sweep of the numbers the strategy varies.
+    /// </summary>
+    public static readonly IReadOnlyList<string> ResultKinds = ["run", "baseline", "sweep"];
+
+    /// <summary>
+    /// What is wrong with a section's "results": { "show", "strategy", "period" }, with show one of <see cref="ResultKinds"/>,
+    /// strategy the id of one of the tour's strategies and period a market's year as the Strategies page keys it
+    /// ("btc-coinbase-1h:2023"). A sweep needs a strategy that varies something.
+    /// </summary>
+    public static List<string> ResultsProblems(JsonNode results, IReadOnlyDictionary<string, JsonNode> strategies)
+    {
+        var problems = new List<string>();
+        string? Text(string key) => results[key] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+        if (results is not JsonObject)
+            return ["results are { \"show\", \"strategy\", \"period\" }"];
+        var show = Text("show");
+        if (show == null || !ResultKinds.Contains(show))
+            problems.Add($"results show one of {string.Join(", ", ResultKinds)}");
+        var id = Text("strategy");
+        if (id == null || !strategies.TryGetValue(id, out var strategy))
+            problems.Add($"results need \"strategy\", the id of one of the tour's strategies{(id != null ? $": there is no \"{id}\"" : "")}");
+        else if (show == "sweep" && strategy["vary"] is not JsonObject { Count: > 0 })
+            problems.Add($"a sweep runs the variations of the numbers a strategy varies, and \"{id}\" has no \"vary\"");
+        var period = Text("period")?.Split(':');
+        if (period is not [var market, var year] || !Markets.All.Any(x => x.Id == market) || !int.TryParse(year, out _))
+            problems.Add($"results need \"period\", a market and year as \"btc-coinbase-1h:2023\": {string.Join(", ", Markets.All.Select(x => x.Id))}");
+        return problems;
+    }
+
+    /// <summary>
     /// Compiles the tour against one dataset, the tour's own: a tour without scenes needs no other.
     /// </summary>
     public static TourScript Compile(JsonNode def, IReadOnlyList<Price> dataset, bool teachOnce = false)
@@ -139,6 +220,9 @@ public static class Tours
     {
         var errors = new List<string>();
         var known = new HashSet<string>(PageLayers.Concat(Terms.All.Select(x => x.Type.ToString())));
+        foreach (var id in TourStrategies(def, errors))
+            known.Add($"strategy:{id}");
+        var strategyNodes = StrategyNodes(def);
         var start = def["start"]?.AsObject();
         var own = def["dataset"]?.GetValue<string>() ?? "";
         var ownPrices = datasets.TryGetValue(own, out var found) ? found : datasets.Values.First();
@@ -223,11 +307,25 @@ public static class Tours
             // A section that explains something is written out from the prices before it is read like any other.
             if (node["explain"] != null)
             {
+                // A Trade's strategy is one of the tour's own, named by its id.
+                if (node["strategy"] is JsonValue named && named.TryGetValue<string>(out var strategyId))
+                {
+                    node = node.DeepClone().AsObject();
+                    if (strategyNodes.TryGetValue(strategyId, out var strategyNode))
+                        node["strategy"] = strategyNode.DeepClone();
+                    else
+                        errors.Add($"{where}: no strategy \"{strategyId}\" among the tour's strategies");
+                }
+
+
                 // What the written texts taught, as written before any edit, is told.
                 node = Explain.Expand(node, prices, node["from"] is JsonValue f && f.TryGetValue<int>(out var begins) ? begins : at, where, errors, cited, teachOnce ? cited : null);
                 if (expandedSections != null)
                     expandedSections[i] = node.DeepClone();
             }
+
+            if (node["results"] is JsonNode results)
+                errors.AddRange(ResultsProblems(results, strategyNodes).Select(x => $"{where}: {x}"));
 
             if (node["layers"] != null)
                 layers = Ids(node["layers"], where);

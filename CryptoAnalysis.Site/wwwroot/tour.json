@@ -2,6 +2,9 @@
   "title": "Market structure basics",
   "dataset": "btc-1h",
   "glossary": { "BoS": "Break of Structure", "(BoS)": "", "HH": "Higher High", "(HH)": "", "HL": "Higher Low", "(HL)": "", "LL": "Lower Low", "(LL)": "", "LH": "Lower High", "(LH)": "", "MSB": "Market Structure Break", "(MSB)": "", "an HH": "a Higher High", "an HL": "a Higher Low", "an LL": "a Lower Low", "an LH": "a Lower High", "an MSB": "a Market Structure Break", "An MSB": "A Market Structure Break", ":00": "hundred" },
+  "strategies": [
+    { "id": "three-green", "name": "3 green candles, long", "direction": "Long", "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 3 }, "takeProfit": { "type": "Percent", "percent": 1 }, "stopLoss": { "type": "Percent", "percent": 1 }, "onePositionAtATime": true, "feePercent": 0.1, "slippagePercent": 0.05, "vary": { "takeProfit.percent": { "to": 3, "step": 0.5 } } }
+  ],
   "start": { "time": "2023-01-01T00:00", "view": [0, 168], "speed": 5, "layers": ["level1"] },
   "sections": [
     {
@@ -723,6 +726,59 @@
       "cues": [
         { "texts": { "education": "On hourly candles the same week reads differently. Between the Swing High and the LL the price made three Lower Lows, each a Downswing with a Swing High of its own, so the tools measured the Retracement against the last of those Swing Highs, and read it as a Bullish MSB. Same rules; the candle size changes what they see." } },
         { "texts": { "education": "Which candle size to read a Range at is a choice. Choices are strategy." } }
+      ]
+    },
+    {
+      "chapter": "A strategy",
+      "scene": { "dataset": "btc-1h", "time": "2023-02-14T07:00" },
+      "layers": ["price", "strategy:three-green"],
+      "view": [0, 60],
+      "cues": [
+        { "texts": { "education": "A strategy is a set of rules for trading, written down so they can be tested." } }
+      ]
+    },
+    {
+      "explain": "Trade",
+      "at": 12,
+      "layers": ["price", "trade"],
+      "strategy": "three-green"
+    },
+    {
+      "layers": ["price", "strategy:three-green"],
+      "view": [0, 60],
+      "until": 56,
+      "speed": 4,
+      "cues": [
+        { "at": 36, "texts": { "education": "The strategy trades again at each new run of three: each arrow is a trade it enters." } }
+      ]
+    },
+    {
+      "explain": "Trade",
+      "at": 42,
+      "layers": ["price", "trade"],
+      "strategy": "three-green",
+      "blocks": ["Outcome"]
+    },
+    {
+      "chapter": "Testing a strategy",
+      "results": { "show": "run", "strategy": "three-green", "period": "btc-coinbase-1h:2023" },
+      "cues": [
+        { "texts": { "education": "Run over a whole year, the same rules make many trades. They are counted up: how many won and how many lost, and what they made after fees and slippage." } }
+      ]
+    },
+    {
+      "results": { "show": "baseline", "strategy": "three-green", "period": "btc-coinbase-1h:2023" },
+      "cues": [
+        { "texts": { "education": "Rules can win by luck. So the same exits are run from random candles, as often as the strategy enters, a thousand times over, and the strategy's totals are set among theirs." } },
+        { "texts": { "education": "The graph is the strategy's profit over the year, against the band that nine random runs in ten stay within." } }
+      ]
+    },
+    {
+      "results": { "show": "sweep", "strategy": "three-green", "period": "btc-coinbase-1h:2023" },
+      "cues": [
+        { "texts": { "education": "A sweep runs each variation of a number, here the Take Profit from 1% to 3%, each against random runs of its own." } },
+        { "texts": { "education": "The best of several variations is bound to look good, so it is also set against the best of as many random runs." } },
+        { "texts": { "education": "A variation found this way has been searched for, so it is checked on years kept back from the search: the Test and Locked periods on the Strategies page." } }
       ]
     }
   ]

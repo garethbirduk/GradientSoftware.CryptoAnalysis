@@ -492,6 +492,10 @@
   .strat-baseline { margin-top: 12px; }
   .strat-baseline table { margin-top: 6px; font-size: 13px; }
   .strat-baseline-plot { height: 300px; margin-top: 4px; }
+  /* A tour section's results, as the Strategies page shows them, over the chart they stand in for. */
+  .tour-stage { position: relative; }
+  .tour-results { position: absolute; inset: 0; overflow: auto; padding: 4px 12px 12px; background: var(--panel); z-index: 2; }
+  .tour-results .strat-cell-head { margin-top: 0; }
   .strat-baseline td.num, .strat-baseline th.num { text-align: right; padding-right: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .strat-counted { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font-size: 13px; color: var(--muted); }
   .strat-counted button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
@@ -505,6 +509,7 @@
   /* Strategies on charts: the section's add form, each strategy's remove button, and Find similar. */
   .layerbar .strat-remove { flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); font-size: 11px; cursor: pointer; }
   .layerbar .strat-remove:hover { background: var(--chip); color: var(--bad); }
+  .layerbar .strat-tour { flex: none; font-size: 10px; color: var(--muted); padding: 0 4px; }
   .layerbar .strat-add { margin-top: 6px; font-size: 12px; }
   .layerbar .strat-add summary { color: var(--accent); font-size: 12px; }
   .layerbar .strat-note { color: var(--bad); font-size: 11px; }
@@ -759,8 +764,9 @@ function layerSection(s, i, foldable = true) {
   const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>`;
   const items = s => s.levels
     ? `<div class="items levels"><button class="layer text" data-levels="none">None</button>${s.layers.map(button).join('')}<button class="layer text" data-levels="all">All</button></div>`
-    : s.strategies ? `<div class="items">${s.layers.map(l => `<div class="item">${button(l)}<button type="button" class="strat-remove" data-strategy-remove="${esc(l.chartStrategy.id)}"
-        title="Take ${esc(l.label)} off the charts" aria-label="Take ${esc(l.label)} off the charts">✕</button></div>`).join('')}${strategyLayerExtras()}</div>`
+    : s.strategies ? `<div class="items">${s.layers.filter(l => !l.tour || currentPage === 'Tour').map(l => `<div class="item">${button(l)}${l.tour
+        ? '<span class="strat-tour" title="The tour\'s own strategy, kept in tour.json">tour</span>'
+        : `<button type="button" class="strat-remove" data-strategy-remove="${esc(l.chartStrategy.id)}" title="Take ${esc(l.label)} off the charts" aria-label="Take ${esc(l.label)} off the charts">✕</button>`}</div>`).join('')}${strategyLayerExtras()}</div>`
     : `<div class="items">${s.layers.map(l => `<div class="item">${button(l)}${runInput(l)}</div>`).join('')}</div>`;
   const lead = `<button type="button" class="lead" data-section="${i}" title="Show all or none of ${esc(s.name.toLowerCase())}">${esc(s.name)}<span class="state"></span></button>`;
   if (!foldable) return `<div class="section" role="group" aria-label="${esc(s.name)}">${lead}${items(s)}</div>`;
@@ -3344,6 +3350,11 @@ const eventName = (spec, from) => `${{ 1: 'the first', 2: 'the second', 3: 'the 
 // With teachOnce, as the tour is played start to end, what a written section teaches is not taught again by the next.
 function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'education', { teachOnce = true } = {}) {
   const errors = [], known = new Set([...LAYERS.map(l => l.id), 'trade']), chapters = [], wanted = [];
+  const strategyById = new Map();
+  (Array.isArray(def.strategies) ? def.strategies : []).forEach((s, k) => {
+    if (typeof s?.id !== 'string' || !s.id.trim()) errors.push(`strategy ${k + 1}: a strategy needs an id, which a section turns it on by as the layer "strategy:" and the id`);
+    else if (!strategyById.has(s.id)) strategyById.set(s.id, s);
+  });
   // The definitions told so far, cited or taught by a written section: a section that explains something does not teach
   // them again.
   const cited = [];
@@ -3390,6 +3401,14 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
     // only that one again. A written text that teaches what the tour has told already, cited or taught by a written section
     // before, is left out here. Its written texts changed by its "edits" are laid over them here too, so a change to one
     // is not written out again.
+    // A Trade's strategy is one of the tour's own, named by its id, and the trade is drawn on the "trade" layer.
+    let trade = null;
+    if (s.explain === 'Trade' && typeof s.strategy === 'string') {
+      if (!strategyById.has(s.strategy)) errors.push(`${where}: no strategy "${s.strategy}" among the tour's strategies`);
+      else s = { ...s, strategy: strategyById.get(s.strategy) };
+    }
+    if (s.explain === 'Trade' && Number.isInteger(s.at) && typeof s.strategy === 'object') trade = { strategy: s.strategy, at: s.at };
+    const results = s.results == null ? null : tourResults(s.results, strategyById, where, errors);
     if (s.explain != null) {
       const { edits = {}, ...asked } = s;
       const from = Number.isInteger(s.from) ? s.from : at, key = `explain|${scene}|${from}|${JSON.stringify(asked)}`;
@@ -3470,7 +3489,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
         clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0, given: c.hold >= 0 ? c.hold : null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
     });
-    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, detail: given.detail ?? null, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, detail: given.detail ?? null, trade, results, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
@@ -3478,6 +3497,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
 // A player's definition compiled again, as its page plays it: the tour teaches each definition once from start to end,
 // and an analysis, which shows no pins, leaves its pinned texts out, so they do not hold the run for their seconds either.
 function recompile(t = tour) {
+  if (t.page === 'Tour') setTourStrategies(t.def);
   Object.assign(t, compileTour(t.def, t.scenes, t.resolved, t.audio, t.detail, { teachOnce: t.page === 'Tour' }));
   if (t.pins === false) for (const s of t.sections) for (const c of s.cues) if (c.on != null) c.skipped = true; else timeCue(c, t.audio, false);
   return t;
@@ -3980,6 +4000,7 @@ function refreshTour() {
   if (editorSection !== tour.index && (tour.page === 'Tour' || analysisEditing)) renderContents();
   drawAll(tour.page);
   updateTourPanel();
+  showTourResults();
 }
 
 function updateTourPanel() {
@@ -4040,6 +4061,8 @@ function tourTick() {
   showScrub();
   showCaption();
   const s = tourSection(), ex = tour.ex, now = performance.now(), t = cursorOf(ex);
+  // A section that shows results reads its texts once they have come.
+  if (tourResultsWaiting(s)) return;
   // A text still waiting for the voice has not begun its time on show.
   const reading = tour.active && (now < tour.activeUntil || tour.voice.waiting.includes(tour.active));
   if (!reading && tour.queue.length) {
@@ -4345,7 +4368,7 @@ async function renderTourPage(chapter) {
     <article class="example replay-big" id="ex-${esc(ex.id)}">
       <header><h3 data-tour="chapter"></h3><span class="id" data-tour="where"></span></header>
       ${playerPanel('Tour')}
-      ${chartRow(ex)}
+      <div class="tour-stage">${chartRow(ex)}<div class="tour-results" data-tour="results" hidden></div></div>
       <div class="tour-warning" data-tour="warning" hidden></div>
     </article>`);
   wirePlayerPanel(main);
@@ -4577,7 +4600,7 @@ let editorSection = -1, editorFolded = false;
 const definitionsOpen = new Set();
 const editorOn = () => state.tourEditor !== false && !videoMode;
 const tourDirty = () => !!tours.Tour && (JSON.stringify(tours.Tour.def) !== tours.Tour.saved || definitionsDirty());
-const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
+const TOUR_KEYS = { tour: ['title', 'dataset', 'glossary', 'strategies', 'start', 'sections'], start: ['time', 'view', 'speed', 'layers'],
   section: ['chapter', 'scene', 'layers', 'add', 'remove', 'fastForward', 'rewind', 'from', 'until', 'view', 'speed', 'cues'], cue: ['at', 'on', 'place', 'to', 'heads', 'color', 'define', 'direction', 'texts', 'hold', 'keep', 'voice'] };
 
 // tour.json as text: a line for each text and for each of a section's settings, so a change shows as a small diff.
@@ -4591,7 +4614,9 @@ function formatTour(def) {
   const section = s => `    {\n${lines(ordered(s, TOUR_KEYS.section).map(([k, v]) =>
     [k, k === 'cues' && Array.isArray(v) ? list(v, '      ', c => `        ${inline(c, TOUR_KEYS.cue)}`) : inline(v)]), '      ')}\n    }`;
   return `{\n${lines(ordered(def, TOUR_KEYS.tour).map(([k, v]) =>
-    [k, k === 'sections' && Array.isArray(v) ? list(v, '  ', section) : inline(v, k === 'start' ? TOUR_KEYS.start : [])]), '  ')}\n}\n`;
+    [k, k === 'sections' && Array.isArray(v) ? list(v, '  ', section)
+      : k === 'strategies' && Array.isArray(v) ? list(v, '  ', s => `    ${inline(s, ['id', 'name'])}`)
+      : inline(v, k === 'start' ? TOUR_KEYS.start : [])]), '  ')}\n}\n`;
 }
 
 // How long a section takes to play: the replay waits at each text that has a candle, and the rest is read while it runs.
@@ -5860,9 +5885,13 @@ function renderStrategyRun() {
   box.querySelector('[data-csv]')?.addEventListener('click', () => downloadTrades(run));
   box.querySelector('[data-baseline]')?.addEventListener('click', () => runBaseline(s, run));
   box.querySelector('[data-sweep]').addEventListener('click', () => runSweep(s));
-  // The results' own clicks: Analyse a trade, count a trade in or out of the totals, or the * trades all at once. The
-  // results are drawn again in place, the table kept where it was scrolled to.
-  const results = box.querySelector('.strat-results');
+  wireStrategyResults(box.querySelector('.strat-results'), run, () => { if (run.baseline?.curve) baselinePlot(box.querySelector('[data-baseline-plot]'), run.baseline, run); });
+}
+
+// A run's results' own clicks: Analyse a trade, count a trade in or out of the totals, or the * trades all at once. The
+// results are drawn again in place, the table kept where it was scrolled to, and then counted, as by the graph of the
+// baseline beside them.
+function wireStrategyResults(results, run, counted) {
   results.addEventListener('click', e => {
     const analyse = e.target.closest('[data-trade-row]'), one = e.target.closest('[data-include]'), both = e.target.closest('[data-include-both]'), all = e.target.closest('[data-include-all]');
     const order = e.target.closest('[data-sort]');
@@ -5889,7 +5918,7 @@ function renderStrategyRun() {
     results.innerHTML = strategyResults(run);
     const again = results.querySelector('.strat-trades');
     if (again) [again.scrollTop, again.scrollLeft] = [top, left];
-    if (run.baseline?.curve) baselinePlot(box.querySelector('[data-baseline-plot]'), run.baseline, run);
+    counted();
   });
 }
 
@@ -6282,7 +6311,7 @@ function sweepCard(sw, ran, measure) {
     <b>${esc(sweepLabel(sw, v))}</b>
     <div class="rank">${sweepRank(sw, ran, measure, sw.selected)} / ${ran.length}</div>
     <div>Ranked by the share of its random runs it beats on ${esc(measure)}. ${esc(measure)} ${showTotal(measure, m.strategy)}, beating ${Math.round(m.percentile ?? 0)}%.</div>
-    <button type="button" data-extract>Extract as a strategy</button>
+    ${currentPage === 'Strategies' ? '<button type="button" data-extract>Extract as a strategy</button>' : ''}
   </div>`;
 }
 
@@ -6448,11 +6477,108 @@ const chartStrategyLike = (strategy, label) =>
 // Repeats added before they were refused are dropped, the first kept.
 state.chartStrategies = (state.chartStrategies ?? []).filter((c, i, all) => all.findIndex(o => strategyRules(o.strategy) === strategyRules(c.strategy)) === i);
 
+// The tour's own strategies (tour.json's "strategies", each as strategies.json keeps one): layers like those added by hand,
+// but kept in the tour rather than the page, so a section can turn one on for anyone. They are in the list on the Tour page
+// only, and cannot be taken off there. Their colours count from the first, so a tour's are the same for everyone.
+let tourStrategies = [];
+
 function syncStrategyLayers() {
-  STRATEGY_SECTION.layers = (state.chartStrategies ?? []).map((c, i) => ({ id: `strategy:${c.id}`, label: c.label, chartStrategy: c, colour: STRATEGY_COLOURS[i % STRATEGY_COLOURS.length] }));
+  const colour = i => STRATEGY_COLOURS[i % STRATEGY_COLOURS.length];
+  STRATEGY_SECTION.layers = [
+    ...(state.chartStrategies ?? []).map((c, i) => ({ id: `strategy:${c.id}`, label: c.label, chartStrategy: c, colour: colour(i) })),
+    ...tourStrategies.map((s, i) => ({ id: `strategy:${s.id}`, label: s.name || s.id, chartStrategy: { id: s.id, label: s.name || s.id, strategy: s }, tour: true, colour: colour(i) })),
+  ];
   LAYERS.splice(0, LAYERS.length, ...SECTIONS.flatMap(s => s.layers));
 }
+
+// Takes a tour's strategies from its file, the layers made again when they change.
+function setTourStrategies(def) {
+  const list = (Array.isArray(def?.strategies) ? def.strategies : []).filter(s => s && typeof s === 'object' && typeof s.id === 'string' && s.id.trim());
+  if (JSON.stringify(list) === JSON.stringify(tourStrategies)) return;
+  tourStrategies = structuredClone(list);
+  syncStrategyLayers();
+}
 syncStrategyLayers();
+
+// ---- Results in the tour ---------------------------------------------------------------------------------------------
+// A tour section's "results": { "show", "strategy", "period" } shows, in place of the chart, what the Strategies page shows
+// for one of the tour's strategies on a market's year: its run (totals and trades), its random baseline, or a sweep of the
+// numbers it varies. They are drawn by the Strategies page's own parts, run by the local server without being saved, and
+// kept for as long as the page is open. The periods' roles still hold, as on the Strategies page.
+const TOUR_RESULTS = ['run', 'baseline', 'sweep'];
+const tourResultRuns = new Map();
+
+// A section's results checked, as the server's Tours.ResultsProblems checks them, with the strategy in place of its id.
+function tourResults(r, strategyById, where, errors) {
+  const problems = [];
+  if (typeof r !== 'object' || Array.isArray(r)) problems.push('results are { "show", "strategy", "period" }');
+  else {
+    if (!TOUR_RESULTS.includes(r.show)) problems.push(`results show one of ${TOUR_RESULTS.join(', ')}`);
+    if (!strategyById.has(r.strategy)) problems.push(`results need "strategy", the id of one of the tour's strategies${typeof r.strategy === 'string' ? `: there is no "${r.strategy}"` : ''}`);
+    else if (r.show === 'sweep' && !Object.keys(strategyById.get(r.strategy).vary ?? {}).length) problems.push(`a sweep runs the variations of the numbers a strategy varies, and "${r.strategy}" has no "vary"`);
+    if (typeof r.period !== 'string' || !/^[^:]+:\d+$/.test(r.period)) problems.push('results need "period", a market and year as "btc-coinbase-1h:2023"');
+  }
+  errors.push(...problems.map(p => `${where}: ${p}`));
+  return problems.length ? null : { show: r.show, strategy: strategyById.get(r.strategy), period: r.period };
+}
+
+const tourResultsKey = r => JSON.stringify([r.show, r.period, r.strategy]);
+
+// A section's results: there when run, otherwise run and shown when they come. A baseline comes with the run it is of.
+function tourResultsRun(r) {
+  const key = tourResultsKey(r), got = tourResultRuns.get(key);
+  if (got && !(got instanceof Promise)) return got;
+  if (!got) tourResultRuns.set(key, (async () => {
+    // The period's name and window are the Strategies page's, from its markets.
+    if (!strategies) await loadStrategies().catch(() => { strategies = { book: { strategies: [], defaults: { ...FIRST_DEFAULT_COSTS } }, runs: new Map(), cell: new Map(), note: '' }; });
+    if (!strategies.markets?.length) await loadMarkets();
+    const body = { dataset: cellOf(r.period).market, ...cellWindow(r.period), strategy: r.strategy, save: false };
+    let done;
+    if (r.show === 'sweep') {
+      const result = await postBacktest('api/backtest/sweep', body, 'sweeps');
+      done = result.error ? { error: result.error.replace(/^Not run/, 'Not swept') } : { sweep: { ...result.sweep, sent: structuredClone(r.strategy), cell: r.period } };
+    } else {
+      const result = await postBacktest('api/backtest', body, 'strategies');
+      const run = result.error ? result : { ...result.run, window: cellWindow(r.period) };
+      if (r.show === 'baseline' && run.trades) {
+        const b = await postBacktest('api/backtest/baseline', { ...body, strategy: run.strategy }, 'baselines');
+        run.baseline = b.error ? b : b.baseline;
+      }
+      done = { run };
+    }
+    tourResultRuns.set(key, done);
+    if (tour?.page === 'Tour') showTourResults(true);
+  })());
+  return null;
+}
+
+// The results of the section on show in place of the chart, or the chart when it has none. Drawn again only when the
+// section's results change, or, with again, when they have come.
+function showTourResults(again = false) {
+  const panel = document.querySelector('[data-tour="results"]');
+  if (!panel) return;
+  const r = tour?.page === 'Tour' ? tourSection()?.results : null, key = r ? tourResultsKey(r) : '';
+  if (panel.dataset.key === key && !again) return;
+  panel.dataset.key = key;
+  panel.hidden = !r;
+  if (!r) return void (panel.innerHTML = '');
+  const got = tourResultsRun(r), name = r.strategy.name || r.strategy.id;
+  const head = `<h3 class="strat-cell-head">${esc(name)} · ${esc(strategies?.markets ? cellName(r.period) : r.period)}</h3><p class="remarks">${esc(strategySays(r.strategy))}</p>`;
+  if (!got) return void (panel.innerHTML = `${head}<p class="remarks strat-note">Running…</p>`);
+  if (got.error || got.run?.error) return void (panel.innerHTML = `${head}<p class="remarks strat-note bad">${esc(got.error ?? got.run.error)}</p>`);
+  if (r.show === 'sweep') {
+    panel.innerHTML = `${head}<div class="strat-sweep"></div>`;
+    return renderSweep(panel.querySelector('.strat-sweep'), got.sweep);
+  }
+  const run = got.run;
+  panel.innerHTML = head + (r.show === 'baseline' ? baselineResults(run.baseline) : `<div class="strat-results">${strategyResults(run)}</div>`);
+  if (r.show === 'baseline' && run.baseline?.curve) baselinePlot(panel.querySelector('[data-baseline-plot]'), run.baseline, run);
+  const results = panel.querySelector('.strat-results');
+  if (results) wireStrategyResults(results, run, () => {});
+}
+
+// Whether the section on show is still waiting for its results, which the tour waits for before it reads its texts.
+const tourResultsWaiting = s => !!s?.results && !tourResultsRun(s.results);
 
 // A short name for a strategy on the charts: its run, its direction and its targets, as "4 Green Long · ±100% body".
 function chartStrategyName(s) {
@@ -6569,9 +6695,20 @@ const candleHours = trades => {
   return t ? (Date.parse(t.exitTime) - Date.parse(t.entryTime)) / 3600000 / t.candles : 1;
 };
 
-// The trade an analysis tells of, when its chart is of the analysis's dataset and its "trade" layer is on.
+// The trade an analysis tells of, when its chart is of the analysis's dataset and its "trade" layer is on; on the Tour page,
+// the trade the section on show explains, in its scene.
 function analysedTrade(dataset) {
-  if (!on('trade') || tour?.page !== 'Analysis' || !tour.params?.strategy || tour.params.dataset !== dataset) return null;
+  if (!on('trade')) return null;
+  if (tour?.page === 'Tour') {
+    const own = tourSection()?.trade, ex = tour.ex;
+    if (!own || ex.dataset !== dataset) return null;
+    const run = chartTrades(dataset, own.strategy), i = ex.anchor + own.at;
+    // As the server reads it (see Explain.TradeAt): the trade entered there, else open there, else the one it is part of.
+    const trade = run && (run.trades.find(t => t.entryIndex === i) ?? run.trades.find(t => t.entryIndex < i && i <= t.exitIndex)
+      ?? run.trades.find(t => t.entryIndex > i && t.entryIndex - tradeReads(own.strategy, t) <= i));
+    return trade ? { strategy: own.strategy, trade } : null;
+  }
+  if (tour?.page !== 'Analysis' || !tour.params?.strategy || tour.params.dataset !== dataset) return null;
   const strategy = JSON.parse(tour.params.strategy), run = chartTrades(dataset, strategy);
   const trade = run && tradeCovering(run.trades, strategy, tour.params.at);
   return trade ? { strategy, trade } : null;
@@ -6591,7 +6728,8 @@ function drawStrategies(ex, traces) {
   for (const { name, colour, strategy, at } of drawn) {
     const run = chartTrades(dataset, strategy);
     if (!run) continue;
-    const shown = run.trades.filter(t => (!at || minuteOf(t.entryTime) === at) && minuteOf(t.entryTime) <= last && minuteOf(t.exitTime) >= first)
+    // A tour's scene starts its story at its first candle, so a trade entered before it is not shown.
+    const shown = run.trades.filter(t => (!at || minuteOf(t.entryTime) === at) && minuteOf(t.entryTime) <= last && minuteOf(t.exitTime) >= first && (!ex.tour || minuteOf(t.entryTime) >= first))
       .map(t => ({ t, done: t.outcome !== 'Open' && minuteOf(t.exitTime) <= last }));
     if (!shown.length) continue;
     const end = s => s.done ? s.t.exitTime : ahead;
