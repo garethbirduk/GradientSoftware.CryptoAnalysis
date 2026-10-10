@@ -15,7 +15,7 @@ public class ExplainTests
     // The tour's dataset from its start time, 2023-01-01, so the candles are numbered as the tour numbers them.
     private static readonly Lazy<List<Price>> TourPrices = new(() =>
     {
-        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+        var prices = Btc.From2023();
         return prices.Skip(Tours.AnchorOf("2023-01-01T00:00", prices)).ToList();
     });
 
@@ -98,7 +98,7 @@ public class ExplainTests
     [TestMethod]
     public void At_ListsWhatIsAtTheCandle_AndATourHasAChapterForEachThingTicked()
     {
-        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+        var prices = Btc.From2023();
 
         // The third of the tour's six green candles, as the Replay page had it at the run's last candle.
         var things = Explain.At(prices, "2023-01-04T15:00", "2023-01-04T18:00");
@@ -111,7 +111,7 @@ public class ExplainTests
         CollectionAssert.AreEqual(levels.OrderByDescending(x => x).ToList(), levels, "From the finest level outwards.");
 
         var def = Explain.Tour([new Explain.Thing("Swing", 1, "Swing"), new Explain.Thing("Candle", null, "Candle"), new Explain.Thing("SuccessiveCandles", null, "Run"), new Explain.Thing("Trend", 8, "Trend")],
-            "btc-1h", prices, "2023-01-04T15:00", "2023-01-04T18:00", out var missing)!;
+            "btc-coinbase-1h", prices, "2023-01-04T15:00", "2023-01-04T18:00", out var missing)!;
         var tour = Tours.Compile(def, prices);
 
         Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
@@ -144,10 +144,10 @@ public class ExplainTests
     [TestMethod]
     public void Point_TellsOfTheHighAgainstTheOneBefore()
     {
-        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+        var prices = Btc.From2023();
         var point = Explain.At(prices, "2023-01-04T18:00", "2023-01-04T18:00").First(x => x.Kind == "Point");
 
-        var tour = Tours.Compile(Explain.Tour([point], "btc-1h", prices, "2023-01-04T18:00", "2023-01-04T18:00", out _)!, prices);
+        var tour = Tours.Compile(Explain.Tour([point], "btc-coinbase-1h", prices, "2023-01-04T18:00", "2023-01-04T18:00", out _)!, prices);
 
         Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
         var texts = tour.Sections[0].Cues.Where(c => c.On == null).Select(c => c.Text).ToList();
@@ -301,9 +301,9 @@ public class ExplainTests
     [TestMethod]
     public void Tour_AroundASwing_JumpsToItAndRunsThroughIt()
     {
-        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+        var prices = Btc.From2023();
 
-        var def = Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T12:00")!;
+        var def = Explain.Tour("Swing", "btc-coinbase-1h", prices, "2023-01-03T12:00")!;
         var tour = Tours.Compile(def, prices);
 
         Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
@@ -311,23 +311,23 @@ public class ExplainTests
         Assert.AreEqual(45, tour.Sections[0].From, "The run begins on the Upswing's first candle.");
         Assert.AreEqual(75, tour.Sections[0].Until, "The BoS.");
         StringAssert.StartsWith(def["title"]!.GetValue<string>(), "1st order Swing at 12:00 on 3 January 2023");
-        Assert.IsNull(Explain.Tour("Trend", "btc-1h", prices, "2023-01-01T00:00", level: 8), "No level 8 Trend has the first candle.");
+        Assert.IsNull(Explain.Tour("Trend", "btc-coinbase-1h", prices, "2023-01-01T00:00", level: 8), "No level 8 Trend has the first candle.");
 
         // A Trend runs to the candle, and is the one the Replay page showed at its cursor: at #64 the Uptrend has ended.
-        var trend = Tours.Compile(Explain.Tour("Trend", "btc-1h", prices, "2023-01-02T12:00", seen: "2023-01-03T16:00")!, prices);
+        var trend = Tours.Compile(Explain.Tour("Trend", "btc-coinbase-1h", prices, "2023-01-02T12:00", seen: "2023-01-03T16:00")!, prices);
         Assert.AreEqual(0, trend.Errors.Count, string.Join("\n", trend.Errors));
         Assert.AreEqual(36, trend.Sections[0].Until, "The candle clicked.");
         Assert.IsTrue(trend.Sections[0].Cues.Any(c => c.Text == "Still running: no Downswing Confirmed since."), "Seen from #36 the Uptrend still runs.");
-        Assert.IsNull(Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T12:00", seen: "2023-01-03T13:00"), "At #61 the Upswing from #45 has no BoS yet, so the page did not show it.");
+        Assert.IsNull(Explain.Tour("Swing", "btc-coinbase-1h", prices, "2023-01-03T12:00", seen: "2023-01-03T13:00"), "At #61 the Upswing from #45 has no BoS yet, so the page did not show it.");
 
         // A 2nd order Swing the page showed at #100 is not on the chart at its own BoS, so the tour runs on to the cursor.
-        var finer = Tours.Compile(Explain.Tour("Swing", "btc-1h", prices, "2023-01-03T12:00", level: 2, seen: "2023-01-05T04:00")!, prices);
+        var finer = Tours.Compile(Explain.Tour("Swing", "btc-coinbase-1h", prices, "2023-01-03T12:00", level: 2, seen: "2023-01-05T04:00")!, prices);
         Assert.AreEqual(0, finer.Errors.Count, string.Join("\n", finer.Errors));
         Assert.AreEqual(100, finer.Sections[0].Until);
         Assert.IsTrue(finer.Sections[0].Cues.Any(c => c.Text.StartsWith("2nd order ")), finer.Sections[0].Cues[1].Text);
 
         // At #290 the Uptrend had ended at a Downswing's BoS; by the cursor those Downswings were Ghosts and it ran on, so the tour runs to the cursor.
-        var ghosted = Tours.Compile(Explain.Tour("Trend", "btc-1h", prices, "2023-01-13T02:00", seen: "2023-01-14T00:00")!, prices);
+        var ghosted = Tours.Compile(Explain.Tour("Trend", "btc-coinbase-1h", prices, "2023-01-13T02:00", seen: "2023-01-14T00:00")!, prices);
         Assert.AreEqual(0, ghosted.Errors.Count, string.Join("\n", ghosted.Errors));
         Assert.AreEqual(312, ghosted.Sections[0].Until);
     }
@@ -335,7 +335,7 @@ public class ExplainTests
     [TestMethod]
     public void AllTrends_ListsEveryLevelByStart_AndTheToursTrendIsAmongThem()
     {
-        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+        var prices = Btc.From2023();
 
         var shown = Explain.TrendShown(prices, "2023-02-28T15:00", level: 3, seen: "2023-03-01T22:00")!;
         var trends = Explain.AllTrends(prices, 8).Select(x => x!.AsObject()).ToList();
@@ -361,7 +361,7 @@ public class ExplainTests
         {
             var seen = Explain.TrendShown(prices, row["at"]!.GetValue<string>(), row["level"]!.GetValue<int>())!;
             Assert.AreEqual($"{row["direction"]} {row["swings"]} {row["strength"]} {row["start"]}", $"{seen["direction"]} {seen["swings"]} {seen["strength"]} {seen["start"]}");
-            var tour = Tours.Compile(Explain.Tour("Trend", "btc-1h", prices, row["at"]!.GetValue<string>(), row["level"]!.GetValue<int>())!, prices);
+            var tour = Tours.Compile(Explain.Tour("Trend", "btc-coinbase-1h", prices, row["at"]!.GetValue<string>(), row["level"]!.GetValue<int>())!, prices);
             Assert.AreEqual(Tours.AnchorOf(row["at"]!.GetValue<string>(), prices), tour.Sections[0].Until);
         }
 
@@ -371,9 +371,9 @@ public class ExplainTests
     [TestMethod]
     public void Tour_RunsToTheCandleThenExplainsIt()
     {
-        var prices = Tours.Load(Tours.Datasets[0], RepoRoot);
+        var prices = Btc.From2023();
 
-        var def = Explain.Tour("Candle", "btc-1h", prices, "2023-01-03T00:00")!;
+        var def = Explain.Tour("Candle", "btc-coinbase-1h", prices, "2023-01-03T00:00")!;
         var tour = Tours.Compile(def, prices);
 
         Assert.AreEqual("Candle at 00:00 on 3 January 2023", def["title"]!.GetValue<string>());
@@ -384,7 +384,7 @@ public class ExplainTests
         CollectionAssert.AreEqual(new[] { 48, 49 }, tour.Sections[0].View.ToArray(), "The view is the candle and that one.");
         CollectionAssert.AreEqual(new[] { EnumDetail.Education }, tour.Sections[0].Cues[0].Texts.Keys.ToArray(), "What a candle is comes first, at Education only.");
         Assert.AreEqual("The hour from 00:00 to 01:00 on Tuesday 3 January 2023.", tour.Sections[0].Cues[1].Text);
-        Assert.IsNull(Explain.Tour("Weather", "btc-1h", prices, "2023-01-03T00:00"));
+        Assert.IsNull(Explain.Tour("Weather", "btc-coinbase-1h", prices, "2023-01-03T00:00"));
     }
 
     [TestMethod]
@@ -408,7 +408,7 @@ public class ExplainTests
             Assert.AreNotEqual(0, Definitions.Of(term.Type).Count, $"{term.Type} has definitions.");
 
         // A cue that cites a definition has it as its text, written out in the expanded tour for the narration.
-        var def = JsonNode.Parse("""{ "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [{ "cues": [{ "define": "Trend.ends" }, { "define": "Trend.next" }, { "define": "Trend.nothing" }] }] }""")!;
+        var def = JsonNode.Parse("""{ "dataset": "btc-coinbase-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [{ "cues": [{ "define": "Trend.ends" }, { "define": "Trend.next" }, { "define": "Trend.nothing" }] }] }""")!;
         var tour = Tours.Compile(def, TourPrices.Value);
         Assert.AreEqual("A Trend ends at the BoS of the first Swing in the opposite direction.", tour.Sections[0].Cues[0].Text);
         Assert.AreEqual("A Trend ends at the BoS of the first Swing in the opposite direction.", tour.Expanded!["sections"]![0]!["cues"]![0]!["texts"]!["education"]!.GetValue<string>());
@@ -468,7 +468,7 @@ public class ExplainTests
     {
         // The tour's Upswing then its Downswing, both at the 1st order, seen from #67.
         var def = JsonNode.Parse("""
-            { "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [
+            { "dataset": "btc-coinbase-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [
               { "from": 0, "until": 67 },
               { "explain": "Swing", "at": 12, "blocks": ["Bos"] },
               { "explain": "Swing", "at": 47, "until": 67, "blocks": ["Bos"], "cues": [{ "define": "Swing.count" }] } ] }
@@ -519,7 +519,7 @@ public class ExplainTests
         var first = Explain.Expand(JsonNode.Parse("""{ "explain": "Swing", "at": 12, "blocks": ["Bos"] }""")!.AsObject(), TourPrices.Value, 67, "section 2", []);
         var id = first["cues"]!.AsArray().First(x => Explain.Taught(x) == bos)!["id"]!.GetValue<string>();
         var def = JsonNode.Parse($$"""
-            { "dataset": "btc-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [
+            { "dataset": "btc-coinbase-1h", "start": { "time": "2023-01-01T00:00" }, "sections": [
               { "from": 0, "until": 67 },
               { "explain": "Swing", "at": 12, "blocks": ["Bos"], "edits": { "{{id}}": { "education": "A BoS, told my way." } } },
               { "explain": "Swing", "at": 47, "until": 67, "blocks": ["Bos"] } ] }

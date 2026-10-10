@@ -1,0 +1,13 @@
+{
+  "sources": [
+    {
+      "id": "coinbase",
+      "name": "Coinbase",
+      "url": "https://api.exchange.coinbase.com/products/{pair}/candles?granularity={seconds}&start={start}&end={end}",
+      "most": 300,
+      "format": "arrays",
+      "fields": ["time", "low", "high", "open", "close", "volume"],
+      "pairs": { "btc-coinbase": "BTC-USD", "eth-coinbase": "ETH-USD" }
+    }
+  ]
+}

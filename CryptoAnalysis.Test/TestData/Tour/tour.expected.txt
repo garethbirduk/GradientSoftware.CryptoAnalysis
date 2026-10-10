@@ -98,11 +98,12 @@
 #62 · section 67 text 2 "Ended at the first Downswing's BoS, at 14:00 on Tuesday 3 January 2023." · seen at #62: L1 LL* · L1 downswing BoS
 #62 · section 67 text 3 "Uptrend ends" on close · seen at #62: L1 LL* · L1 downswing BoS
 #64 · section 68 runs to it: L1 LL* · L1 downswing BoS
-#47 · section 68 text 1 "1st order Downtrend, beginning at 23:00 on Monday 2 January 2023." · seen at #64: L1 LL · L1 downswing start
-#47 · section 68 text 2 "Downtrend begins" on close · seen at #64: L1 LL · L1 downswing start
-#64 · section 68 text 3 "The BoS of the second Downswing makes two in a row: that Confirms the Downtrend." · seen at #64: L1 LL* · L1 downswing BoS
-#64 · section 68 text 4 "Confirmed at the second Downswing's BoS, at 16:00 on Tuesday 3 January 2023." · seen at #64: L1 LL* · L1 downswing BoS
-#64 · section 68 text 5 "Downtrend Confirmed" on close · seen at #64: L1 LL* · L1 downswing BoS
+#47 · section 68 text 1 "A Trend is two or more Swings in a row in one direction: a Downtrend is a run of Downswings, and begins where its first Downswing begins." · seen at #64: L1 LL · L1 downswing start
+#47 · section 68 text 2 "1st order Downtrend, beginning at 23:00 on Monday 2 January 2023." · seen at #64: L1 LL · L1 downswing start
+#47 · section 68 text 3 "Downtrend begins" on close · seen at #64: L1 LL · L1 downswing start
+#64 · section 68 text 4 "The BoS of the second Downswing makes two in a row: that Confirms the Downtrend." · seen at #64: L1 LL* · L1 downswing BoS
+#64 · section 68 text 5 "Confirmed at the second Downswing's BoS, at 16:00 on Tuesday 3 January 2023." · seen at #64: L1 LL* · L1 downswing BoS
+#64 · section 68 text 6 "Downtrend Confirmed" on close · seen at #64: L1 LL* · L1 downswing BoS
 #75 · section 69 (Ghost Trends) runs to it: L1 HH* · L1 upswing BoS
 #75 · section 69 (Ghost Trends) text 2 "The close above the previous HH turns the Downswings into Ghosts, and their Downtrend becomes a Ghost with them." · seen at #75: L1 HH* · L1 upswing BoS
 #64 · section 71 text 1 "Confirmed at the second Downswing's BoS, at 16:00 on Tuesday 3 January 2023." · seen at #75: L1 LL · L1 upswing low · L2 LL · L2 downswing BoS · L2 MSB↓
@@ -119,48 +120,47 @@
 #1103 · section 74 text 6 "BoS" on close · seen at #1103: L1 HH* · L1 upswing BoS
 #1103 · section 74 text 7 "The Downleg is eleven days; the Upleg is two days." · seen at #1103: L1 HH* · L1 upswing BoS
 #1103 · section 74 text 8 "Nothing new has been defined. A high, a Swing Low, a close above the high: the same Upswing as the ones that took an hour or two." · seen at #1103: L1 HH* · L1 upswing BoS
-#40 · section 77 (A Range from the training) in scene 2 runs to it: L1 HH* · L1 MSB↑
-#40 · section 77 (A Range from the training) in scene 2 text 3 "HH and MSB: 60761" on close · seen at #40: L1 HH* · L1 MSB↑
-#50 · section 78 in scene 2 runs to it: L1 LL*
-#47 · section 78 in scene 2 text 1 "BoS" on close · seen at #50: L1 downswing BoS
-#50 · section 78 in scene 2 text 3 "LL: 55927" on close · seen at #50: L1 LL*
-#61 · section 79 in scene 2 runs to it: L1 LH*
-#61 · section 79 in scene 2 text 1 "79% back" on close · seen at #61: L1 LH*
-#68 · section 80 in scene 2 runs to it: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
-#68 · section 80 in scene 2 text 2 "MSB" on close · seen at #68: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
-#94 · section 81 in scene 2 runs to it: L1 LL* · L1 downswing BoS · L1 range ends below
-#94 · section 81 in scene 2 text 4 "Range ends: 53751" on close · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
-#69 · section 82 in scene 2 text 2 "1: +1917" on 56885 · seen at #94: nothing
-#71 · section 82 in scene 2 text 2 line ends on 58802 · seen at #94: nothing
-#71 · section 82 in scene 2 text 3 "2: +1917" on 56885 · seen at #94: nothing
-#89 · section 82 in scene 2 text 3 line ends on 58802 · seen at #94: nothing
-#93 · section 82 in scene 2 text 4 "3: -1725" on 56885 · seen at #94: nothing
-#94 · section 82 in scene 2 text 4 line ends on 55160 · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
-#9 · section 84 (Trading) in scene 3 runs to it: L1 HL*
-#28 · section 85 in scene 3 runs to it: L1 HH* · L1 upswing BoS
-#10 · section 85 in scene 3 text 1 "A trade is entered when a condition set beforehand is met by the close of a candle." · seen at #28: nothing
-#10 · section 85 in scene 3 text 2 "Here the entry condition is three Successive Green Candles." · seen at #28: nothing
-#12 · section 85 in scene 3 text 3 "That meets the entry condition, so the trade is entered at the close of the candle at 19:00, buying at 22218." · seen at #28: nothing
-#12 · section 85 in scene 3 text 4 "A trade's Take Profit is set as it is entered: the price where it closes with a gain, above the entry for a long trade and below it for a short one." · seen at #28: nothing
-#12 · section 85 in scene 3 text 5 "A trade's Stop Loss is set as it is entered: the price where it closes with a loss, below the entry for a long trade and above it for a short one." · seen at #28: nothing
-#12 · section 85 in scene 3 text 6 "Whichever exit the price reaches first ends the trade. From the next candle on, each candle is checked against the exits." · seen at #28: nothing
-#12 · section 85 in scene 3 text 7 "When it reaches the Take Profit, the trade closes there with a gain; when it reaches the Stop Loss, it closes there with a loss." · seen at #28: nothing
-#12 · section 85 in scene 3 text 8 "A candle that opens beyond an exit closes the trade at its open." · seen at #28: nothing
-#28 · section 85 in scene 3 text 9 "Sixteen hours later, the price reaches the Take Profit first, so the trade closes there with a gain." · seen at #28: L1 HH* · L1 upswing BoS
-#28 · section 85 in scene 3 text 10 "Here is another trade, entered the same way a day later." · seen at #28: L1 HH* · L1 upswing BoS
-#40 · section 86 in scene 3 gets there by fast forward: L1 HH* · L1 upswing BoS
-#54 · section 86 in scene 3 runs to it: L1 LL* · L1 downswing BoS
-#54 · section 86 in scene 3 text 1 "This time the price reaches the Stop Loss first, so the trade closes there with a loss." · seen at #54: L1 LL* · L1 downswing BoS
-#28 · section 91 in scene 4 runs to it: L1 HH* · L1 upswing BoS
-#12 · section 91 in scene 4 text 1 "Candles of one colour that follow one another are Successive Candles, counted from the first of the colour to the last." · seen at #28: nothing
-#12 · section 91 in scene 4 text 2 "Third of three Successive Green Candles, 17:00 to 19:00." · seen at #28: nothing
-#12 · section 91 in scene 4 text 3 "That meets the entry condition, so the trade is entered at the close of the candle at 19:00, buying at 22218." · seen at #28: nothing
-#12 · section 91 in scene 4 text 4 "The Take Profit is 1% of the entry price, 222 above the entry, at 22440." · seen at #28: nothing
-#12 · section 91 in scene 4 text 5 "The Stop Loss is 1% of the entry price, 222 below the entry, at 21995." · seen at #28: nothing
-#12 · section 91 in scene 4 text 6 "A trade's reward is how far its Take Profit is from its entry: what it wins if the Take Profit is reached. Its risk is how far its Stop Loss is from its entry: what it loses if the Stop Loss is reached." · seen at #28: nothing
-#12 · section 91 in scene 4 text 7 "R is the unit of risk: 1R is how far the Stop Loss is from the entry. The reward is counted in R, so a Take Profit twice as far from the entry as the Stop Loss is a 2R target." · seen at #28: nothing
-#12 · section 91 in scene 4 text 8 "With 222 to win and 222 to lose, the Take Profit is a 1R target." · seen at #28: nothing
-#12 · section 91 in scene 4 text 9 "A trade that wins its target in R or loses 1R breaks even over many trades when the share it wins is one divided by one plus its target: half at 1R, a third at 2R." · seen at #28: nothing
-#12 · section 91 in scene 4 text 10 "At 1R, it breaks even over many trades when it wins 50% of them." · seen at #28: nothing
-#12 · section 91 in scene 4 text 11 "A candle that reaches both exits cannot say which came first, so it counts as the Stop Loss." · seen at #28: nothing
-#28 · section 91 in scene 4 text 12 "Sixteen hours later, at 11:00, the high of 22500 reaches the Take Profit, so the trade closes at 22440: it won 222, 1.00%." · seen at #28: L1 HH* · L1 upswing BoS
+#9 · section 77 (Trading) in scene 2 runs to it: L1 HL*
+#28 · section 78 in scene 2 runs to it: L1 HH* · L1 upswing BoS
+#10 · section 78 in scene 2 text 1 "A trade is entered when a condition set beforehand is met by the close of a candle." · seen at #28: nothing
+#10 · section 78 in scene 2 text 2 "Here the entry condition is three Successive Green Candles." · seen at #28: nothing
+#12 · section 78 in scene 2 text 3 "The third green candle closes at 19:00, and the trade is entered at that close." · seen at #28: nothing
+#12 · section 78 in scene 2 text 4 "A trade's Take Profit is set as it is entered: the price where it closes with a gain, above the entry." · seen at #28: nothing
+#12 · section 78 in scene 2 text 5 "A trade's Stop Loss is set as it is entered: the price where it closes with a loss, below the entry." · seen at #28: nothing
+#12 · section 78 in scene 2 text 6 "Whichever exit the price reaches first ends the trade. From the next candle on, each candle is checked against the exits." · seen at #28: nothing
+#12 · section 78 in scene 2 text 7 "When it reaches the Take Profit, the trade closes there with a gain; when it reaches the Stop Loss, it closes there with a loss." · seen at #28: nothing
+#28 · section 78 in scene 2 text 8 "Sixteen hours later, the price reaches the Take Profit first, so the trade closes there with a gain." · seen at #28: L1 HH* · L1 upswing BoS
+#28 · section 78 in scene 2 text 9 "Here is another trade, entered the same way thirty hours later." · seen at #28: L1 HH* · L1 upswing BoS
+#40 · section 79 in scene 2 gets there by fast forward: L1 HH* · L1 upswing BoS
+#54 · section 79 in scene 2 runs to it: L1 LL* · L1 downswing BoS
+#54 · section 79 in scene 2 text 1 "This time the price reaches the Stop Loss first, so the trade closes there with a loss." · seen at #54: L1 LL* · L1 downswing BoS
+#40 · section 80 (A Range from the training) in scene 3 runs to it: L1 HH* · L1 MSB↑
+#40 · section 80 (A Range from the training) in scene 3 text 4 "HH and MSB: 60761" on close · seen at #40: L1 HH* · L1 MSB↑
+#50 · section 81 in scene 3 runs to it: L1 LL*
+#47 · section 81 in scene 3 text 1 "BoS" on close · seen at #50: L1 downswing BoS
+#50 · section 81 in scene 3 text 3 "LL: 55927" on close · seen at #50: L1 LL*
+#61 · section 82 in scene 3 runs to it: L1 LH*
+#61 · section 82 in scene 3 text 1 "79% back" on close · seen at #61: L1 LH*
+#68 · section 83 in scene 3 runs to it: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
+#68 · section 83 in scene 3 text 2 "MSB" on close · seen at #68: L1 range 55927-59761 at 79% · L2 LL* · L2 MSB↓
+#94 · section 84 in scene 3 runs to it: L1 LL* · L1 downswing BoS · L1 range ends below
+#94 · section 84 in scene 3 text 4 "Range ends: 53751" on close · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
+#69 · section 85 in scene 3 text 2 "1: +1917" on 56885 · seen at #94: nothing
+#71 · section 85 in scene 3 text 2 line ends on 58802 · seen at #94: nothing
+#71 · section 85 in scene 3 text 3 "2: +1917" on 56885 · seen at #94: nothing
+#89 · section 85 in scene 3 text 3 line ends on 58802 · seen at #94: nothing
+#93 · section 85 in scene 3 text 4 "3: -1725" on 56885 · seen at #94: nothing
+#94 · section 85 in scene 3 text 4 line ends on 55160 · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
+#17 · section 91 in scene 4 runs to it: L1 HH*
+#7 · section 91 in scene 4 text 1 "Third of three Successive Green Candles, 04:00 to 06:00." · seen at #17: nothing
+#7 · section 91 in scene 4 text 2 "That meets the entry condition, so the trade is entered at the close of the candle at 06:00, buying at 21813." · seen at #17: nothing
+#7 · section 91 in scene 4 text 3 "The Take Profit is 1% of the entry price, 218 above the entry, at 22031." · seen at #17: nothing
+#7 · section 91 in scene 4 text 4 "The Stop Loss is 1% of the entry price, 218 below the entry, at 21595." · seen at #17: nothing
+#17 · section 91 in scene 4 text 5 "Ten hours later, at 16:00, the high of 22091 reaches the Take Profit, so the trade closes at 22031: it won 218, 1.00%." · seen at #17: L1 HH*
+#17 · section 91 in scene 4 text 6 "Before this trade was entered, its two exits already set what it stood to win and what it stood to lose." · seen at #17: L1 HH*
+#7 · section 92 (Risk) in scene 4 text 1 "A trade's reward is how far its Take Profit is from its entry: what it wins if the Take Profit is reached. Its risk is how far its Stop Loss is from its entry: what it loses if the Stop Loss is reached." · seen at #17: nothing
+#7 · section 92 (Risk) in scene 4 text 2 "R is the unit of risk: 1R is how far the Stop Loss is from the entry. The reward is counted in R, so a Take Profit twice as far from the entry as the Stop Loss is a 2R target." · seen at #17: nothing
+#7 · section 92 (Risk) in scene 4 text 3 "With 218 to win and 218 to lose, the Take Profit is a 1R target." · seen at #17: nothing
+#7 · section 92 (Risk) in scene 4 text 4 "A trade that wins its target in R or loses 1R breaks even over many trades when the share it wins is one divided by one plus its target: half at 1R, a third at 2R." · seen at #17: nothing
+#7 · section 92 (Risk) in scene 4 text 5 "At 1R, it breaks even over many trades when it wins 50% of them." · seen at #17: nothing
+#17 · section 92 (Risk) in scene 4 text 6 "In the run, the strategy won about half of its trades: what a 1R target needs to break even, and no more." · seen at #17: L1 HH*

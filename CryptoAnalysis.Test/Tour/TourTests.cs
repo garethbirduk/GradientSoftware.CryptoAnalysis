@@ -62,17 +62,20 @@ public class TourTests
     }
 
     [TestMethod]
-    public void Tour_StrategyChapterTradeIsWhereTheTourAnalysesIt()
+    [DataRow(14, 7, 30, "12-28 TakeProfit, 28-29 TakeProfit", DisplayName = "The Trading chapter's trade")]
+    [DataRow(11, 23, 16, "7-17 TakeProfit", DisplayName = "The trade picked from the run's table")]
+    public void Tour_TradesAreWhereTheTourAnalysesThem(int day, int hour, int upTo, string expected)
     {
         var strategy = Strategies.Value["three-green"].Deserialize<Strategy>(StrategyBook.JsonOptions)!;
-        var prices = Datasets.Value["btc-1h"];
-        var anchor = prices.ToList().FindIndex(x => x.DateTime == new DateTime(2023, 2, 14, 7, 0, 0, DateTimeKind.Utc));
+        var prices = Datasets.Value[Markets.Btc];
+        var anchor = prices.ToList().FindIndex(x => x.DateTime == new DateTime(2023, 2, day, hour, 0, 0, DateTimeKind.Utc));
 
+        // A scene's trades are those of its own candles, from its start in February 2023, as the tour's writer runs the strategy.
         var trades = StrategyBacktest.Run(prices.ToList().GetRange(anchor, prices.Count - anchor), strategy).Trades
-            .Where(x => x.EntryIndex <= 30)
+            .Where(x => x.EntryIndex <= upTo)
             .Select(x => $"{x.EntryIndex}-{x.ExitIndex} {x.Outcome}");
 
-        Assert.AreEqual("12-28 TakeProfit, 28-29 TakeProfit", string.Join(", ", trades));
+        Assert.AreEqual(expected, string.Join(", ", trades));
     }
 
     [TestMethod]

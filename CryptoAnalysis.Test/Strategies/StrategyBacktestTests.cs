@@ -293,8 +293,7 @@ public class StrategyBacktestTests
     [DataRow(12)]
     public void Occurrences_OfAChain_AreTheEntriesWhenTradesMayOverlap(int? within)
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "TestData", "COINBASE_BTCUSD, 60.csv");
-        var prices = new Csv.CsvReaderHelper().ReadData<Price, global::CryptoAnalysis.Csv.ClassMaps.PriceClassMap>(path).ToList();
+        var prices = Btc.From2020();
         var strategy = RedThenGreen(within, red: 3);
 
         var entries = StrategyBacktest.Run(prices, strategy).Trades.Select(t => t.EntryIndex).ToList();
@@ -401,8 +400,7 @@ public class StrategyBacktestTests
     [DataRow(EnumCandleColour.Green, 7)]
     public void Occurrences_AreTheEntriesWhenTradesMayOverlap(EnumCandleColour colour, int length)
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "TestData", "COINBASE_BTCUSD, 60.csv");
-        var prices = new Csv.CsvReaderHelper().ReadData<Price, global::CryptoAnalysis.Csv.ClassMaps.PriceClassMap>(path).ToList();
+        var prices = Btc.From2020();
         var strategy = RunOf(length, colour: colour);
         strategy.OnePositionAtATime = false;
 

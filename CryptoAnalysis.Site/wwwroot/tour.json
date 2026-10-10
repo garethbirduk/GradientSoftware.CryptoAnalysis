@@ -1,6 +1,6 @@
 {
   "title": "Market structure basics",
-  "dataset": "btc-1h",
+  "dataset": "btc-coinbase-1h",
   "glossary": { "BoS": "Break of Structure", "(BoS)": "", "HH": "Higher High", "(HH)": "", "HL": "Higher Low", "(HL)": "", "LL": "Lower Low", "(LL)": "", "LH": "Lower High", "(LH)": "", "MSB": "Market Structure Break", "(MSB)": "", "an HH": "a Higher High", "an HL": "a Higher Low", "an LL": "a Lower Low", "an LH": "a Lower High", "an MSB": "a Market Structure Break", "An MSB": "A Market Structure Break", ":00": "hundred" },
   "start": { "time": "2023-01-01T00:00", "view": [0, 168], "speed": 5, "layers": ["level1"] },
   "sections": [
@@ -447,8 +447,7 @@
     {
       "add": ["Uptrend"],
       "cues": [
-        { "texts": { "education": "Just as candles of one colour in a row are Successive Candles, two or more Upswings in a row are an Uptrend." } },
-        { "define": "Trend.what", "direction": "Down" }
+        { "texts": { "education": "Just as candles of one colour in a row are Successive Candles, two or more Upswings in a row are an Uptrend." } }
       ]
     },
     {
@@ -646,14 +645,49 @@
       ]
     },
     {
+      "chapter": "Trading",
+      "scene": { "dataset": "btc-coinbase-1h", "time": "2023-02-14T07:00" },
+      "layers": ["price"],
+      "until": 9,
+      "view": [0, 30],
+      "speed": 4,
+      "cues": [
+        { "define": "Trade.what" },
+        { "texts": { "education": "The example is of a long trade, which buys and later sells. Short trades will be covered later." } }
+      ]
+    },
+    {
+      "layers": ["price", "trade"],
+      "cues": [
+        { "at": 28, "texts": { "education": "Here is another trade, entered the same way thirty hours later." } }
+      ],
+      "explain": "Trade",
+      "at": 12,
+      "strategy": "three-green",
+      "blocks": ["Entry", "TakeProfit", "StopLoss", "Outcome"],
+      "omit": ["Entry.4", "Entry.5", "TakeProfit.2", "StopLoss.2", "Outcome.4", "Outcome.5"],
+      "edits": { "Entry.1": { "education": "A trade is entered when a condition set beforehand is met by the close of a candle." }, "Entry.2": { "education": "Here the entry condition is three Successive Green Candles." }, "Entry.6": { "summary": "The third green candle closes at 19:00, and the trade is entered at that close." }, "TakeProfit.1": { "education": "A trade's Take Profit is set as it is entered: the price where it closes with a gain, above the entry." }, "StopLoss.1": { "education": "A trade's Stop Loss is set as it is entered: the price where it closes with a loss, below the entry." }, "Outcome.2": { "summary": "Sixteen hours later, the price reaches the Take Profit first, so the trade closes there with a gain." } }
+    },
+    {
+      "layers": ["price", "trade"],
+      "fastForward": { "to": 40, "speed": 8 },
+      "explain": "Trade",
+      "at": 42,
+      "strategy": "three-green",
+      "blocks": ["Outcome"],
+      "omit": ["Outcome.4", "Outcome.5"],
+      "edits": { "Outcome.2": { "summary": "This time the price reaches the Stop Loss first, so the trade closes there with a loss." } }
+    },
+    {
       "chapter": "A Range from the training",
-      "scene": { "dataset": "btc-4h-2020", "time": "2021-11-10T16:00" },
+      "scene": { "dataset": "btc-coinbase-4h", "time": "2021-11-10T16:00" },
       "layers": ["level1", "close", "Downswing", "BearishBreakOfStructure", "HigherHigh", "BullishMarketStructureBreak"],
       "until": 40,
       "view": [20, 110],
       "speed": 20,
       "cues": [
-        { "texts": { "education": "This chapter leaves 2023 for November 2021, where the training drew its own example of a Range. The training's chart had four hours to a candle, so this scene does too, with the Sawtooth starting at the all-time high of the 10th." } },
+        { "texts": { "education": "This chapter leaves 2023 for November 2021, where the training drew its own example of a Range." } },
+        { "texts": { "education": "The training's chart had four hours to a candle, so this scene does too, with the Sawtooth starting at the all-time high of the 10th." } },
         { "texts": { "education": "The price falls for a week, in 1st order Downswings." } },
         { "at": 40, "on": "close", "place": "above", "texts": { "education": "HH and MSB: 60761" }, "hold": 3.5, "voice": false },
         { "texts": { "education": "The rise of the 17th makes an HH, and closes above the Swing High before it: a Bullish MSB." } }
@@ -712,7 +746,7 @@
     },
     {
       "cues": [
-        { "texts": { "education": "Traded as the training trades a Range, buying in the buy-low zone and selling in the sell-high zone with the stop at the band, this Range gave three trades." }, "hold": 0 },
+        { "texts": { "education": "Traded as the training trades a Range, buying in the buy-low zone and selling in the sell-high zone with the Stop Loss at the band, this Range gave three trades." }, "hold": 0 },
         { "at": 69, "on": 56885, "to": { "at": 71, "on": 58802 }, "color": "up", "texts": { "education": "1: +1917" }, "hold": 3, "keep": "chapter", "voice": false },
         { "at": 71, "on": 56885, "to": { "at": 89, "on": 58802 }, "color": "up", "texts": { "education": "2: +1917" }, "hold": 3, "keep": "chapter", "voice": false },
         { "at": 93, "on": 56885, "to": { "at": 94, "on": 55160 }, "color": "down", "texts": { "education": "3: -1725" }, "hold": 3, "keep": "chapter", "voice": false },
@@ -729,40 +763,6 @@
       ]
     },
     {
-      "chapter": "Trading",
-      "scene": { "dataset": "btc-1h", "time": "2023-02-14T07:00" },
-      "layers": ["price"],
-      "until": 9,
-      "view": [0, 30],
-      "speed": 4,
-      "cues": [
-        { "define": "Trade.what" },
-        { "texts": { "education": "The example is of a long trade, which buys and later sells. Short trades will be covered later." } }
-      ]
-    },
-    {
-      "layers": ["price", "trade"],
-      "cues": [
-        { "at": 28, "texts": { "education": "Here is another trade, entered the same way a day later." } }
-      ],
-      "explain": "Trade",
-      "at": 12,
-      "strategy": "three-green",
-      "blocks": ["Entry", "TakeProfit", "StopLoss", "Outcome"],
-      "omit": ["Entry.4", "Entry.5", "TakeProfit.2", "StopLoss.2", "Outcome.5"],
-      "edits": { "Entry.1": { "education": "A trade is entered when a condition set beforehand is met by the close of a candle." }, "Entry.2": { "education": "Here the entry condition is three Successive Green Candles." }, "Outcome.2": { "summary": "Sixteen hours later, the price reaches the Take Profit first, so the trade closes there with a gain." } }
-    },
-    {
-      "layers": ["price", "trade"],
-      "fastForward": { "to": 40, "speed": 8 },
-      "explain": "Trade",
-      "at": 42,
-      "strategy": "three-green",
-      "blocks": ["Outcome"],
-      "omit": ["Outcome.5"],
-      "edits": { "Outcome.2": { "summary": "This time the price reaches the Stop Loss first, so the trade closes there with a loss." } }
-    },
-    {
       "chapter": "What is a strategy?",
       "page": "Strategies",
       "cues": [
@@ -774,7 +774,7 @@
       "chapter": "An example strategy",
       "page": "Strategies",
       "cues": [
-        { "texts": { "education": "Our previous example is called 3 green candles. Picking it from the list shows its settings." }, "highlight": "strategy:three-green", "do": [{ "select": "three-green" }] },
+        { "texts": { "education": "The example from the Trading chapter is called 3 green candles. Picking it from the list shows its settings." }, "highlight": "strategy:three-green", "do": [{ "select": "three-green" }] },
         { "texts": { "education": "It is a Long strategy, so it buys, and it holds one trade at a time." }, "highlight": "settings" },
         { "texts": { "education": "Its entry condition is 3 Successive Green Candles." }, "highlight": "entry" },
         { "texts": { "education": "Its Take Profit is 1% of the entry price, above the entry." }, "highlight": "takeProfit" },
@@ -785,10 +785,8 @@
       "chapter": "Running a strategy",
       "page": "Strategies",
       "cues": [
-        { "texts": { "education": "A strategy is run on periods. Each period is a year of a market." }, "highlight": "grid", "do": [{ "click": "periods" }] },
-        { "texts": { "education": "Here it is run on one: 2023 of BTC/USD on Coinbase, in hourly candles." }, "highlight": "period:btc-coinbase-1h:2023", "do": [{ "periods": ["btc-coinbase-1h:2023"] }] },
-        { "texts": { "education": "Run goes through the period candle by candle, and enters a trade wherever the entry condition is met." }, "highlight": "run", "do": [{ "click": "done" }] },
-        { "texts": { "education": "The results count the trades up: how many won and how many lost, and what they made." }, "highlight": "stats", "do": [{ "click": "run" }] },
+        { "texts": { "education": "Run goes through the candles one by one, and enters a trade wherever the entry condition is met." }, "highlight": "run", "do": [{ "periods": ["btc-coinbase-1h:2023"] }] },
+        { "texts": { "education": "The results count the trades up: how many won and how many lost. Total % is what they made, each trade counted as a percentage of its entry price." }, "highlight": "stats", "do": [{ "click": "run" }] },
         { "texts": { "education": "Below them is every trade: where it was entered, where its Take Profit and Stop Loss were, and how it ended." }, "highlight": "trades" }
       ]
     },
@@ -796,16 +794,32 @@
       "chapter": "One trade",
       "page": "Strategies",
       "cues": [
-        { "texts": { "education": "Take one of them: the trade entered at 19:00 on the 14th of February." }, "highlight": "trade:2023-02-14 19:00" },
-        { "texts": { "education": "Analyse opens an analysis of a trade, on the chart. This is that analysis." }, "highlight": "analyse:2023-02-14 19:00" }
+        { "texts": { "education": "Take one of them: the trade entered at 06:00 on the 12th of February." }, "highlight": "trade:2023-02-12 06:00" },
+        { "texts": { "education": "Analyse opens an analysis of a trade, on the chart. This is that analysis." }, "highlight": "analyse:2023-02-12 06:00" }
       ]
     },
     {
-      "scene": { "dataset": "btc-1h", "time": "2023-02-14T07:00" },
+      "scene": { "dataset": "btc-coinbase-1h", "time": "2023-02-11T23:00" },
       "layers": ["price", "trade"],
       "explain": "Trade",
-      "at": 12,
-      "strategy": "three-green"
+      "at": 7,
+      "strategy": "three-green",
+      "blocks": ["Entry", "TakeProfit", "StopLoss", "Outcome"],
+      "detail": "summary",
+      "cues": [
+        { "at": 17, "texts": { "education": "Before this trade was entered, its two exits already set what it stood to win and what it stood to lose." } }
+      ]
+    },
+    {
+      "chapter": "Risk",
+      "layers": ["price", "trade"],
+      "explain": "Trade",
+      "at": 7,
+      "strategy": "three-green",
+      "blocks": ["Risk"],
+      "cues": [
+        { "at": 17, "texts": { "education": "In the run, the strategy won about half of its trades: what a 1R target needs to break even, and no more." } }
+      ]
     },
     {
       "chapter": "Against random entries",
@@ -813,6 +827,7 @@
       "cues": [
         { "texts": { "education": "Back on the Strategies page. Rules can win or lose by luck, so a run comes with a random baseline: the same exits, entered at random candles as often as the strategy enters, a thousand times over." }, "highlight": "baseline" },
         { "texts": { "education": "The table sets each of the strategy's totals among those of the random runs, and says how many of them it beats." }, "highlight": "baseline" },
+        { "texts": { "education": "Here the strategy beats about half of its random runs on every total, which the table calls within random: entering after three green candles did no better than entering at random." }, "highlight": "baseline" },
         { "texts": { "education": "The graph is the strategy's profit over the year, against the band that nine random runs in ten stay within." }, "highlight": "baselinePlot" }
       ]
     },
@@ -822,9 +837,10 @@
       "cues": [
         { "texts": { "education": "A number of the strategy can be varied. Given a To and a Step, it is tried at each value from its own up to the To." }, "highlight": "vary:takeProfit.percent", "do": [{ "vary": "takeProfit.percent", "to": 3, "step": 0.5 }] },
         { "texts": { "education": "Here the Take Profit is varied from 1% to 3% in steps of 0.5%, and the page says what that makes." }, "highlight": "varySays" },
-        { "texts": { "education": "Run sweep runs every variation on the period shown, each against random runs of its own." }, "highlight": "sweepButton" },
+        { "texts": { "education": "Run sweep runs every variation, each against random runs of its own." }, "highlight": "sweepButton" },
         { "texts": { "education": "The first graph shows how many of its own random runs each variation beats." }, "highlight": "sweepBeats", "do": [{ "click": "sweep" }] },
         { "texts": { "education": "The best variation is named. The best of several is bound to look good, so it is also set against the best of as many random runs." }, "highlight": "sweepBest" },
+        { "texts": { "education": "Here the larger Take Profits beat nearly all of their random runs, and the best still stands against the best of five." }, "highlight": "sweepBeats" },
         { "texts": { "education": "The second graph is every variation's profit over time, with the selected one on the band of its own random runs." }, "highlight": "sweepLines" }
       ]
     },
@@ -832,12 +848,14 @@
       "chapter": "Periods, fees and slippage",
       "page": "Strategies",
       "cues": [
+        { "texts": { "education": "So far the strategy has been run on a single year, 2023." }, "highlight": "chips" },
         { "texts": { "education": "One year can flatter a strategy or wrong it. The periods are a grid: a column for each market and a row for each year." }, "highlight": "grid", "do": [{ "click": "periods" }] },
         { "texts": { "education": "Each year has a role. Strategies are searched for on Search years. Test years check what was found, and every look at one is counted. Locked years are kept back for a final check." }, "highlight": "roles" },
         { "texts": { "education": "Ticking more years runs the strategy on each of them." }, "highlight": "grid", "do": [{ "periods": ["btc-coinbase-1h:2020", "btc-coinbase-1h:2021", "btc-coinbase-1h:2022", "btc-coinbase-1h:2023", "btc-coinbase-1h:2024"] }] },
         { "texts": { "education": "Each period then shows its own result: how many of its random runs the strategy beats, its total and its trades." }, "highlight": "chips", "do": [{ "click": "done" }, { "click": "run" }] },
         { "texts": { "education": "So far the trades have been counted without their costs. Every trade pays to be made: a fee is taken on each side of it, and slippage is how far a market order fills against it." }, "highlight": "costs" },
-        { "texts": { "education": "With both turned on, the same trades are counted with their costs, and each period's total shows the difference." }, "highlight": "chips", "do": [{ "count": "countFees", "on": true }, { "count": "countSlippage", "on": true }] }
+        { "texts": { "education": "With both turned on, the same trades are counted with their costs, and each period's total shows the difference." }, "highlight": "chips", "do": [{ "count": "countFees", "on": true }, { "count": "countSlippage", "on": true }] },
+        { "texts": { "education": "With them, every period's total is a heavy loss: over hundreds of trades a year, the costs outweigh what the entries make." }, "highlight": "chips" }
       ]
     }
   ]

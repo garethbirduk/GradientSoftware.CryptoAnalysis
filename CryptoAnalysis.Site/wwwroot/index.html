@@ -217,7 +217,7 @@
   .tour-controls .edit { margin-left: auto; }
   .tour-warning { color: var(--warn); font-size: 13px; }
   .player { margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
-  .player .tour-caption { min-height: 2.9em; max-width: 100ch; margin-top: 4px; cursor: pointer; }
+  .player .tour-caption { min-height: 2.9em; max-width: none; margin-top: 4px; cursor: pointer; }
   .tour-caption .unread { color: var(--muted); opacity: .7; }
   .player-scrub { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 13px; color: var(--muted); }
   .player-scrub input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); }
@@ -492,11 +492,43 @@
   .strat-baseline { margin-top: 12px; }
   .strat-baseline table { margin-top: 6px; font-size: 13px; }
   .strat-baseline-plot { height: 300px; margin-top: 4px; }
+  /* The Data page: what is held of each market, a row a year and a cell a month. */
+  .data-page { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+  .data-sizes, .data-legend, .data-market-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .data-sizes button { font: inherit; font-size: 13px; padding: 4px 14px; border: 1px solid var(--accent); border-radius: 999px; background: var(--accent); color: var(--bg); }
+  .data-legend { font-size: 13px; color: var(--muted); }
+  .data-market-head h3 { margin: 0; }
+  .data-market-head button, .data-years button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px 10px; }
+  .data-market-head button:disabled, .data-years button:disabled { color: var(--muted); }
+  .data-market-head label { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .data-years { border-collapse: separate; border-spacing: 3px 4px; margin-top: 10px; font-size: 13px; }
+  .data-years th { text-align: left; font-weight: 600; color: var(--muted); padding: 0 6px 0 0; white-space: nowrap; }
+  .data-years th.data-month-head { font-weight: 400; font-size: 11px; text-align: center; padding: 0; }
+  .data-years td { padding: 0 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .data-years td.num, .data-years th.num { text-align: right; }
+  .data-years td.data-range { color: var(--muted); }
+  .data-month { display: inline-block; width: 30px; height: 18px; padding: 0 !important; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); overflow: hidden; vertical-align: middle; }
+  td.data-month { display: table-cell; }
+  .data-month span { display: block; width: 0; height: 100%; background: var(--accent); }
+  .data-month.part span { opacity: .55; }
+  .data-month.none { border-style: dashed; }
+  .data-month.future { border-color: transparent; background: none; }
+  .data-month.absent { border-color: transparent; background: none; color: var(--muted); text-align: center; font-size: 12px; line-height: 16px; }
+  .data-month.short span { background: repeating-linear-gradient(135deg, var(--accent) 0 5px, color-mix(in srgb, var(--accent) 55%, transparent) 5px 8px); }
+  .data-month.can { cursor: pointer; }
+  .data-month.can:hover { border-color: var(--accent); }
+  .data-month.fetched { border-color: var(--accent); border-width: 2px; }
   /* A page a tour section shows, in a frame over the chart it stands in for; the page itself is read-only there, with its
      own chrome left off, and the part a text points at outlined. */
   .tour-stage { position: relative; }
   .tour-page { position: absolute; inset: 0; width: 100%; height: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); z-index: 2; pointer-events: none; }
   body.embed #nav { display: none; }
+  /* The frame is narrower than a window, so the page is laid out as it is in a narrow one, its list above its body, and
+     a little smaller, for its tables to fit without scrolling sideways. */
+  body.embed { zoom: 0.92; }
+  body.embed main { padding-left: 12px; padding-right: 12px; }
+  body.embed .strat { grid-template-columns: 1fr; }
+  body.embed .strat-list { flex-direction: row; flex-wrap: wrap; }
   body.embed .tour-hl { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: 6px; box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 18%, transparent); }
   .strat-baseline td.num, .strat-baseline th.num { text-align: right; padding-right: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .strat-counted { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font-size: 13px; color: var(--muted); }
@@ -677,7 +709,7 @@ function renderNav(active) {
   const nav = document.getElementById('nav');
   // The term pages and their examples are no longer in the bar; their addresses still open them.
   nav.innerHTML = `<h1>Market structure</h1>
-    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}${link('Explore')}
+    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}${link('Explore')}${link('Data')}
     <span class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC</span>`;
   document.documentElement.style.setProperty('--nav-h', `${nav.offsetHeight}px`);
 }
@@ -1972,9 +2004,17 @@ function draw(el, ex, focus) {
     for (const w of (ex.swingsByLevel?.[level] ?? []).filter(w => w.confirmed && on(SWINGS[w.direction].layer))) traces.push(swingBox(w, depth || false));
   const allSwings = shownSwings(ex);
 
-  if (on('price')) {
+  // A whole dataset can be zoomed out to all of its history. With more candles across the chart than can be told apart,
+  // the candles are drawn as the line of their closes, and come back as candles when the view narrows (see moveView).
+  const whole = (ex.hindsight ?? ex).prices.t, candleMs = whole.length > 1 ? Date.parse(whole[1]) - Date.parse(whole[0]) : 3600000;
+  const opensOn = ex.window ? ex.window.to - ex.window.from : whole.length, asCloses = !!ex.complete && widerThanCandles(ex.id, candleMs, opensOn);
+  if (on('price') && !asCloses) {
     traces.push({ type: 'candlestick', name: 'Price', x: p.t, open: p.o, high: p.h, low: p.l, close: p.c,
       increasing: { line: { color: css('--up'), width: 1 } }, decreasing: { line: { color: css('--down'), width: 1 } }, hoverinfo: 'x+y' });
+  }
+  if (on('price') && asCloses && !on('close')) {
+    traces.push({ type: 'scatter', mode: 'lines', name: 'Close', x: p.t, y: p.c, line: { color: text, width: 1.2 },
+      hovertemplate: '%{x}<br>close %{y}<extra></extra>' });
   }
   if (on('close')) {
     traces.push({ type: 'scatter', mode: 'lines', name: 'Close', x: p.t, y: p.c, hoverinfo: 'skip',
@@ -2092,7 +2132,9 @@ function draw(el, ex, focus) {
   const times = span(full.t).map(Date.parse), first = times[0], last = times[times.length - 1], candle = times.length > 1 ? (last - first) / (times.length - 1) : oneCandle;
   // Room either side is a candle, or for a view of one candle just over half of one, so its neighbours stay out of frame.
   const pad = times.length > 1 ? candle : candle * 0.6;
-  const view = { t: times, h: span(full.h), l: span(full.l), candle, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
+  // The whole of a complete dataset's history, which its chart can be zoomed out to.
+  const all = ex.complete && full.t.length > 1 ? [new Date(Date.parse(full.t[0]) - oneCandle).toISOString(), new Date(Date.parse(full.t[full.t.length - 1]) + oneCandle).toISOString()] : null;
+  const view = { t: times, h: span(full.h), l: span(full.l), candle, all, asCloses, candleMs, opensOn, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
     from: w?.from ?? 0, numbered: !!ex.tour, floor: ex.tour ? 0.01 : 0,
     until: ex.tour && !on('future') ? Date.parse(full.t[ex.cursor]) : undefined, now: ex.tour ? [full.l[ex.cursor], full.h[ex.cursor]] : null,
     pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46) };
@@ -2203,6 +2245,17 @@ function shownRanges(zoom, view) {
   return { x, y: zoom?.y ?? fitPrices(view, x) ?? view.y, manual: zoom?.y != null };
 }
 
+// How many candles across a chart of a whole dataset stops drawing them as candles: past this they are narrower than a
+// pixel or two, and slow to draw, so the line of their closes is drawn in their place.
+const CLOSES_ABOVE = 1500;
+
+// Whether a chart shows more candles across than are drawn as candles, at the zoom it has: the times its zoom spans, or
+// with no zoom the candles it opens on. A candle is so many milliseconds long.
+function widerThanCandles(id, candle, opensOn) {
+  const x = zooms.get(id)?.x;
+  return (x ? (axisTime(x[1]) - axisTime(x[0])) / candle : opensOn) > CLOSES_ABOVE;
+}
+
 // Records a chart's zoom (none for the default view) and shows it on the next frame, so a run of wheel or drag events
 // costs one redraw. A move that would leave no candles in view keeps the time range as it was.
 function moveView(el, zoom, { gliding = false } = {}) {
@@ -2217,6 +2270,9 @@ function moveView(el, zoom, { gliding = false } = {}) {
     viewsToMove.delete(el);
     const view = views.get(id);
     if (!view || !el.isConnected || !el._fullLayout) return;
+    // A zoom across the point where candles become closes, or back, draws the chart again in the other.
+    const ex = view.all ? findExample(id) : null;
+    if (ex && widerThanCandles(id, view.candleMs, view.opensOn) !== view.asCloses) return redrawExample(ex);
     const { x, y, manual } = shownRanges(zooms.get(id), view);
     movingViews++;
     try { await Plotly.relayout(el, { 'xaxis.range': x, 'yaxis.range': y, 'yaxis.fixedrange': !manual }); }
@@ -2286,10 +2342,11 @@ function wireZoom(el) {
         const shift = width * e.deltaX * lines / p.w;
         zoom.x = [from + shift, to + shift].map(iso);
       } else {
-        const full = view.x.map(axisTime);
-        if (k < 1 ? width * k < view.candle * 5 : width * k > (full[1] - full[0]) * 4) return;
+        // A whole dataset zooms out as far as all of its history, and no further; any other chart to four times its view.
+        const full = view.x.map(axisTime), all = view.all?.map(axisTime);
+        if (k < 1 ? width * k < view.candle * 5 : all ? width >= all[1] - all[0] : width * k > (full[1] - full[0]) * 4) return;
         const at = from + width * p.x / p.w;
-        zoom.x = [at - (at - from) * k, at + (to - at) * k].map(iso);
+        zoom.x = (all && k > 1 && width * k >= all[1] - all[0] ? all : [at - (at - from) * k, at + (to - at) * k]).map(iso);
       }
     }
     moveView(el, zoom);
@@ -6521,7 +6578,8 @@ syncStrategyLayers();
 //   do         a list of things done as the text comes on show, each one of:
 //              { "select": id }                    a strategy picked from the list
 //              { "click": name }                   a button pressed: run, periods, done (the periods dialog's), sweep, baseline
-//              { "periods": ["market:year"] }      the periods ticked, in the periods dialog, and no others
+//              { "periods": ["market:year"] }      the periods ticked, and no others: one by one in the periods dialog when
+//                                                  it is open, otherwise set without being shown
 //              { "set": path, "value": v }         a setting of the strategy, by its path, as "takeProfit.percent"
 //              { "vary": path, "to": n, "step": n } a number's To and Step
 //              { "count": name, "on": bool }       a cost counted or not: countFees, countSlippage
@@ -6656,9 +6714,14 @@ async function embedAct(a, shown) {
   if (a.select != null) click(`.strat-list [data-pick="${CSS.escape(a.select)}"]`);
   else if (a.click != null) click(EMBED_CLICKS[a.click] ?? '[data-no-such-button]');
   else if (a.periods != null) {
-    // Ticked in the periods dialog, one at a time, as each tick draws the dialog again.
+    // Ticked in the periods dialog, one at a time, as each tick draws the dialog again. With the dialog closed, the page
+    // is set to those periods without showing it, as its address sets them, for a tour that does not tell of periods yet.
     const dialog = document.getElementById('strat-periods'), keys = (strategies.markets ?? []).flatMap(m => m.years.map(y => cellKey(m.id, y.year)));
-    if (!dialog?.open) console.warn('The tour ticks periods with the periods dialog closed.', a);
+    if (!dialog?.open) {
+      strategies.included = new Set(a.periods.filter(runnable));
+      syncStrategiesHash();
+      renderStrategyRun();
+    }
     for (const key of dialog?.open ? keys : []) {
       const el = dialog.querySelector(`[data-cell-tick="${CSS.escape(key)}"]`);
       if (!el || el.disabled || el.checked === a.periods.includes(key)) continue;
@@ -7160,6 +7223,189 @@ Up first ${explorePct(stat.upRate)} against ${explorePct(stat.baseRate)} after a
     ${detail}</div>`;
 }
 
+// ---- Data ------------------------------------------------------------------------------------------------------------
+// The candles held for each hourly market, by date range: a row a year and a cell a month, each by how many of its hours
+// are held, so what is missing can be seen and fetched, a month at a time (GET api/data and POST api/data/fetch, see
+// DataStore in CryptoAnalysis.Site). A month fetched is kept by the server as its source gave it and converted to the one
+// format candles are read in; it fills what the market's own files lack. A year that gains candles while it is a Search
+// year becomes Locked, as nothing has been run on what is new in it.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const hoursBetween = (from, to) => Math.max(0, Math.floor((to - from) / 3600000));
+let dataPage = null;
+
+// How far back the page looks for more: this many months before the oldest candle held, or before now with none held. As
+// older months are fetched the oldest held moves back, and the look with it, until the source has nothing older.
+const LOOK_BACK_MONTHS = 60;
+const monthNumber = (year, month) => year * 12 + month - 1;
+
+// The months the page shows of a market: from the look back before its oldest held month up to now. When its source was
+// asked for a month before the oldest held and had nothing, its history is taken to begin at the oldest held, and the
+// page looks no further back. A market with no source to fetch from is shown from its oldest held.
+function dataWindow(m, now = Date.now()) {
+  const today = new Date(now), held = m.months.map(x => monthNumber(x.year, x.month));
+  const oldest = held.length ? Math.min(...held) : monthNumber(today.getUTCFullYear(), today.getUTCMonth() + 1);
+  const reached = (m.empty ?? []).some(x => monthNumber(x.year, x.month) < oldest);
+  return { oldest, reached, start: reached || !m.source ? oldest : oldest - LOOK_BACK_MONTHS };
+}
+
+// A market's years in its window, each with what is held of it and of each of its months. A month's hours are those that
+// have ended, so this month is complete when it is held up to the last whole hour. A month its source had nothing in is
+// not missing, and counts no hours.
+function dataYears(m, now = Date.now()) {
+  const held = new Map(m.months.map(x => [monthNumber(x.year, x.month), x])), empty = new Set((m.empty ?? []).map(x => monthNumber(x.year, x.month)));
+  const { start } = dataWindow(m, now), rows = [];
+  for (let year = Math.floor(start / 12); year <= new Date(now).getUTCFullYear(); year++) {
+    const months = Array.from({ length: 12 }, (_, k) => {
+      const n = monthNumber(year, k + 1), a = Date.UTC(year, k, 1), b = Math.min(Date.UTC(year, k + 1, 1), now);
+      if (b <= a || n < start) return { year, month: k + 1, out: true, hours: 0, have: 0 };
+      const h = held.get(n), have = h?.candles ?? 0;
+      if (!have && empty.has(n)) return { year, month: k + 1, absent: true, hours: 0, have: 0 };
+      const hours = hoursBetween(a, b);
+      // Fetched whole from the source after the month ended, what it lacks the source lacks: it is not missing.
+      return { year, month: k + 1, hours, have, share: hours ? Math.min(1, have / hours) : 1, fetched: h?.fetched ?? [], whole: (h?.fetched ?? []).some(f => f.whole) };
+    });
+    const expected = months.reduce((s, x) => s + x.hours, 0), candles = months.reduce((s, x) => s + x.have, 0);
+    const mine = m.months.filter(x => x.year === year);
+    rows.push({ year, expected, candles, share: expected ? Math.min(1, candles / expected) : 0, months,
+      first: mine.length ? mine.reduce((a, x) => x.first < a ? x.first : a, mine[0].first) : null, last: mine.length ? mine.reduce((a, x) => x.last > a ? x.last : a, mine[0].last) : null });
+  }
+  return rows;
+}
+
+const dataMissing = months => months.filter(x => !x.out && !x.absent && !x.whole && x.hours > 0 && x.have < x.hours);
+// Fetching runs on the local server (see api/data/fetch), so it goes on through a reload of the page: the page starts a
+// job, then asks how it is going, and reads what is held again each time a month is done, so the grid fills as it goes.
+// A job cancelled stops after the month being fetched.
+async function fetchData(m, months) {
+  if (dataPage.job?.running || !months.length) return;
+  const response = await fetch('api/data/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ market: m.id, months: months.map(x => ({ year: x.year, month: x.month })) }) }).catch(() => null);
+  if (!response?.ok) {
+    dataPage.job = { market: m.id, running: false, done: 0, total: 0, locked: [], error: response?.status === 404 || response?.status === 405
+      ? 'The local server was started before data could be fetched. Restart ./build-site.ps1 -Serve.' : response ? await response.text() : 'The local server did not answer.' };
+    return renderData();
+  }
+  dataPage.job = await response.json();
+  renderData();
+  watchDataJob();
+}
+
+async function watchDataJob() {
+  if (dataPage.watching) return;
+  dataPage.watching = true;
+  let done = -1;
+  while (currentPage === 'Data') {
+    const job = await fetch('api/data/job', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+    if (!job) break;
+    dataPage.job = job;
+    // A month done, or the job over: what is held is read again, and the grid drawn with it.
+    if (job.done !== done || !job.running) {
+      done = job.done;
+      dataPage.markets = await fetch('api/data', { cache: 'no-store' }).then(r => r.ok ? r.json() : dataPage.markets).catch(() => dataPage.markets);
+    }
+    if (currentPage === 'Data') renderData();
+    if (!job.running) break;
+    await new Promise(r => setTimeout(r, 700));
+  }
+  dataPage.watching = false;
+  // The Strategies page reads its markets again, as their years and roles may have changed.
+  if (strategies) strategies.markets = null;
+}
+
+// How a job stands or ended, in words.
+function dataJobSays(job) {
+  if (job.running) return null;
+  const total = job.fetched == null ? '' : `Fetched ${job.fetched.toLocaleString()} candles from ${job.source}, ${job.gained.toLocaleString()} of them new.`;
+  const how = job.error ? ` Stopped: ${job.error}` : job.cancelled ? ` Cancelled after ${job.done} of ${job.total} months.`
+    : job.began ? ` ${job.source} had nothing in two months running, so its history begins after them and the older months were not asked for.` : '';
+  const locked = job.locked?.length ? ` ${job.locked.join(', ')} ${job.locked.length === 1 ? 'is' : 'are'} now Locked: nothing has been run on the new candles, so the year is kept back until it is unlocked on the Strategies page.` : '';
+  return `${total}${how}${locked}`.trim();
+}
+async function renderDataPage() {
+  const main = document.getElementById('main');
+  currentPage = 'Data';
+  const head = `<section class="term-head"><h2>Data</h2>
+    <p>The candles held for each market, by date range, and what is missing from each.</p>
+    <p class="remarks">A row is a year and a small cell a month: filled when all its hours are held, part filled when some are, empty when none are.
+    A month is fetched from the market's source and kept, so a range can be filled in over several visits; click a month that is not full to fetch it.
+    What is fetched fills what a market's own files lack. A Search year that is new, or gains a week or more of candles in a month, becomes Locked.</p></section>`;
+  if (!serverOn) {
+    main.innerHTML = head + `<div class="empty" data-server-check>Checking for the local server…</div>`;
+    return checkLocalServer();
+  }
+  main.innerHTML = head + '<div class="data-page"><div class="empty">Reading what is held…</div></div>';
+  const response = await fetch('api/data', { cache: 'no-store' }).catch(() => null);
+  if (currentPage !== 'Data') return;
+  if (!response?.ok) { main.querySelector('.data-page').innerHTML = '<div class="empty">The local server was started before the Data page existed. Restart ./build-site.ps1 -Serve.</div>'; return; }
+  dataPage = { markets: await response.json(), job: await fetch('api/data/job', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null), watching: false };
+  renderData();
+  // A job still running, as after a reload of the page, is followed again.
+  if (dataPage.job?.running) watchDataJob();
+}
+
+function renderData() {
+  const box = document.querySelector('.data-page');
+  if (!box || !dataPage) return;
+  const percent = share => share >= 0.99995 ? '100%' : `${(100 * share).toFixed(share > 0.99 ? 2 : 0)}%`, job = dataPage.job, busy = !!job?.running;
+  const cell = (m, mo) => {
+    if (mo.out) return '<td class="data-month future"></td>';
+    if (mo.absent) return `<td class="data-month absent" title="${MONTHS[mo.month - 1]} ${mo.year}: ${esc(m.source?.name ?? 'the source')} has no candles in this month">–</td>`;
+    const from = mo.fetched.length ? `, ${mo.fetched.map(f => `${f.candles.toLocaleString()} fetched from ${f.source}`).join(', ')}` : '';
+    const what = `${MONTHS[mo.month - 1]} ${mo.year}: ${mo.have.toLocaleString()} of ${mo.hours.toLocaleString()} hours held${from}`;
+    const short = mo.whole && mo.have < mo.hours, can = mo.have < mo.hours && !mo.whole && m.source && !busy;
+    return `<td class="data-month${mo.have >= mo.hours || short ? ' full' : mo.have > 0 ? ' part' : ' none'}${short ? ' short' : ''}${can ? ' can' : ''}${mo.fetched.length ? ' fetched' : ''}" ${can ? `data-fetch-month="${m.id}|${mo.year}|${mo.month}" role="button" tabindex="0"` : ''}
+      title="${esc(what)}${short ? `. ${esc(m.source?.name ?? 'The source')} has no more: ${(mo.hours - mo.have).toLocaleString()} hours it has no candle for` : can ? '. Click to fetch it' : ''}"><span style="width:${short ? 100 : Math.round(100 * mo.share)}%"></span></td>`;
+  };
+  const card = m => {
+    const rows = dataYears(m), expected = rows.reduce((a, y) => a + y.expected, 0), candles = rows.reduce((a, y) => a + y.candles, 0);
+    const missing = dataMissing(rows.flatMap(y => y.months)), mine = job?.market === m.id, says = mine ? dataJobSays(job) : null;
+    const off = !m.source ? 'disabled title="No source in data-sources.json has a pair for this market"' : busy || !missing.length ? 'disabled' : '';
+    const win = dataWindow(m), month = n => `${MONTHS[n % 12]} ${Math.floor(n / 12)}`;
+    const looks = !m.source ? 'No source to fetch from, so only what is held is shown.'
+      : win.reached ? `${m.source.name} has nothing before ${month(win.oldest)}, the oldest held.`
+      : `Looking back to ${month(win.start)}, five years before the oldest held (${month(win.oldest)}). When older months are held, the look moves back with them.`;
+    return `<div class="strat-card data-market">
+      <div class="data-market-head"><h3>${esc(m.name)}</h3>
+        <span class="strat-note">${candles.toLocaleString()} of ${expected.toLocaleString()} hours since ${rows[0].year} (${percent(candles / expected)}) · fetched from ${esc(m.source?.name ?? 'nowhere yet')}</span>
+        <button type="button" data-fetch-all="${m.id}" ${off}>${mine && busy ? `Fetching ${job.month ? `${MONTHS[job.month - 1]} ${job.year}` : ''}: ${job.done} of ${job.total}…` : `Fetch all ${missing.length} missing months`}</button>
+        ${mine && busy ? '<button type="button" data-fetch-cancel title="Stops after the month being fetched; what is fetched is kept">Cancel</button>' : ''}</div>
+      <p class="remarks strat-note">${esc(looks)}</p>
+      ${says ? `<p class="remarks strat-note${job.error ? ' bad' : ''}">${esc(says)}</p>` : ''}
+      <table class="data-years"><thead><tr><th>Year</th>${MONTHS.map(x => `<th class="data-month-head">${x}</th>`).join('')}<th class="num">Held</th><th class="num">Of</th><th class="num">Complete</th><th>Range held</th><th></th></tr></thead>
+        <tbody>${rows.map(y => `<tr><th>${y.year}</th>${y.months.map(mo => cell(m, mo)).join('')}
+          <td class="num">${y.candles.toLocaleString()}</td><td class="num">${y.expected.toLocaleString()}</td>
+          <td class="num${y.candles >= y.expected ? ' won' : y.candles === 0 ? ' lost' : ''}">${percent(y.share)}</td>
+          <td class="data-range">${y.first ? `${esc(fmtTime(y.first))} to ${esc(fmtTime(y.last))}` : 'none held'}</td>
+          <td>${dataMissing(y.months).length ? `<button type="button" data-fetch-year="${m.id}|${y.year}" ${off}>Fetch ${y.year}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  };
+  box.innerHTML = `
+    <div class="data-sizes" role="tablist" aria-label="Candle length"><button type="button" role="tab" aria-selected="true">1 hour</button>
+      <span class="strat-note">Longer candles are built from the hourly ones.</span></div>
+    <div class="data-legend"><span class="data-month full"><span style="width:100%"></span></span> held
+      <span class="data-month part"><span style="width:50%"></span></span> part held
+      <span class="data-month none"><span></span></span> none held
+      <span class="data-month full fetched"><span style="width:100%"></span></span> fetched
+      <span class="data-month full short"><span style="width:100%"></span></span> all the source has, with hours it lacks
+      <span class="data-month absent">–</span> the source has none</div>
+    ${dataPage.markets.map(card).join('')}
+    <div class="strat-card data-market data-add"><div class="data-market-head"><h3>Add a market</h3>
+      <label>Exchange <select disabled><option>Coinbase</option></select></label>
+      <label>Pair <select disabled><option>ETH/USD</option><option>SOL/USD</option><option>BTC/USD</option></select></label>
+      <label>From <input type="month" value="2020-01" disabled></label>
+      <button type="button" disabled>Add and fetch</button>
+      <span class="strat-note">Not built yet.</span></div></div>`;
+  const market = id => dataPage.markets.find(m => m.id === id), months = m => dataYears(m).flatMap(y => y.months);
+  box.querySelector('[data-fetch-cancel]')?.addEventListener('click', e => { e.target.disabled = true; fetch('api/data/cancel', { method: 'POST' }).catch(() => null); });
+  box.querySelectorAll('[data-fetch-all]').forEach(b => b.addEventListener('click', () => { const m = market(b.dataset.fetchAll); fetchData(m, dataMissing(months(m))); }));
+  box.querySelectorAll('[data-fetch-year]').forEach(b => b.addEventListener('click', () => {
+    const [id, year] = b.dataset.fetchYear.split('|'), m = market(id);
+    fetchData(m, dataMissing(months(m).filter(x => x.year === Number(year))));
+  }));
+  box.querySelectorAll('[data-fetch-month]').forEach(el => el.addEventListener('click', () => {
+    const [id, year, month] = el.dataset.fetchMonth.split('|'), m = market(id);
+    fetchData(m, months(m).filter(x => x.year === Number(year) && x.month === Number(month)));
+  }));
+}
 function route() {
   document.body.classList.remove('analysing');
   document.body.classList.toggle('embed', embedMode);
@@ -7167,7 +7413,14 @@ function route() {
   pauseTour();
   // An analysis has an address of its own: #Analysis?explain=Swing&dataset=...
   const [first, asked] = location.hash.slice(1).split('?');
-  document.body.classList.toggle('strategizing', first === 'Strategies' || first === 'Explore');
+  document.body.classList.toggle('strategizing', first === 'Strategies' || first === 'Explore' || first === 'Data');
+  if (first === 'Data') {
+    ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
+    renderNav('Data');
+    renderDataPage();
+    window.scrollTo(0, 0);
+    return;
+  }
   if (first === 'Explore') {
     ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
     renderNav('Explore');

@@ -22,3 +22,9 @@ temp/
 
 # Charts the tests write for comparison
 actual_*.html
+
+# Candles fetched from exchanges are kept locally, all but the one source of truth, Coinbase's BTC/USD by the hour, which
+# the tour and the tests read. Of that, the candles are kept in git and the answers as the exchange gave them are not.
+Data/fetched/*
+!Data/fetched/btc-coinbase/
+Data/fetched/**/raw/
