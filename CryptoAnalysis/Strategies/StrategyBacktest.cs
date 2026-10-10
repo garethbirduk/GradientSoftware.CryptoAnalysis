@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Gradient.CryptoAnalysis.Research;
 
 namespace Gradient.CryptoAnalysis.Strategies;
 
@@ -15,9 +16,10 @@ public enum EnumTradeOutcome
 }
 
 /// <summary>
-/// A candle that met a step of an entry condition.
+/// A candle that met a step of an entry condition, and the first candle the step read to it, From: the first of a run, or
+/// where the Swing or Trend a break is read from begins.
 /// </summary>
-public sealed record StrategyStep(int Index, DateTime Time);
+public sealed record StrategyStep(int Index, DateTime Time, int From);
 
 /// <summary>
 /// One trade of a backtest. EntryPrice and ExitPrice are the market's, where the orders were: the entry candle's close, and
@@ -25,16 +27,18 @@ public sealed record StrategyStep(int Index, DateTime Time);
 /// gains as the price falls), less its Fees and Slippage, each a cost in price units; ProfitPercent is that as a percentage
 /// of the entry price. BothTouched marks a candle that reached the take profit and the stop loss alike, which is counted as
 /// the stop loss since the candle does not say which came first. Met is the candles that met the steps of the strategy's
-/// After, in order; empty for an entry of one step.
+/// After, in order; empty for an entry of one step. EntryFrom is the first candle the step that entered read.
 /// </summary>
 public sealed record StrategyTrade(int Number, EnumTradeDirection Direction, int EntryIndex, DateTime EntryTime, double EntryPrice,
     double TakeProfit, double StopLoss, int ExitIndex, DateTime ExitTime, double ExitPrice, EnumTradeOutcome Outcome,
     double Profit, double ProfitPercent, int Candles, bool BothTouched, IReadOnlyList<StrategyStep> Met, double Fees = 0, double Slippage = 0)
 {
+    public int EntryFrom { get; init; } = EntryIndex;
+
     /// <summary>
-    /// The first candle the entry condition read: the first its first step read.
+    /// The first candle the entry condition read: the earliest any of its steps read from.
     /// </summary>
-    public int FirstRead(Strategy strategy) => Math.Max(0, (Met.Count > 0 ? Met[0].Index : EntryIndex) - strategy.Steps[0].Reads);
+    public int FirstRead => Met.Select(x => x.From).Append(EntryFrom).Min();
 }
 
 /// <summary>
@@ -110,13 +114,14 @@ public static class StrategyBacktest
     public static List<StrategyTrade> Trades(IReadOnlyList<Price> prices, Strategy strategy, IEnumerable<(int Index, IReadOnlyList<int> Met)> signals)
     {
         var trades = new List<StrategyTrade>();
+        var steps = strategy.Steps;
         var free = 0;
         foreach (var (i, met) in signals)
         {
             if (strategy.OnePositionAtATime && i < free)
                 continue;
 
-            var trade = Trade(prices, i, strategy, trades.Count + 1, met.Select(x => new StrategyStep(x, prices[x].DateTime)).ToList());
+            var trade = Trade(prices, i, strategy, trades.Count + 1, met.Select((x, k) => new StrategyStep(x, prices[x].DateTime, ReadFrom(prices, x, steps[k]))).ToList());
             if (trade == null)
                 continue;
             trades.Add(trade);
@@ -185,6 +190,9 @@ public static class StrategyBacktest
     /// </summary>
     public static bool Enters(IReadOnlyList<Price> prices, int index, StrategyEntry entry)
     {
+        if (entry.IsStructure)
+            return Found(prices, index, entry) != null;
+
         // A run of Length candles ending here that the candle before it does not belong to, so a longer run enters once.
         var first = index - entry.Length + 1;
         if (first < 0)
@@ -197,6 +205,31 @@ public static class StrategyBacktest
 
         return first == 0 || Colour(prices[first - 1]) != entry.Colour;
     }
+
+    /// <summary>
+    /// The break that meets a market structure step at the close of candle index, with what it was read from; null when
+    /// none does, or the step is not one of market structure.
+    /// </summary>
+    public static KnownBreak? Found(IReadOnlyList<Price> prices, int index, StrategyEntry entry)
+    {
+        if (!entry.IsStructure)
+            return null;
+        var kind = entry.Type == StrategyEntry.MarketStructureBreak ? EnumKnownBreak.MarketStructureBreak : EnumKnownBreak.BreakOfStructure;
+        return KnownStructure.Breaks(prices)[index].FirstOrDefault(x => x.Level == entry.Level && x.Kind == kind && x.Direction == entry.Direction
+            && entry.Type switch
+            {
+                StrategyEntry.Swing => entry.Strength == EnumSwingStrength.Any || x.Weak == (entry.Strength == EnumSwingStrength.Weak),
+                StrategyEntry.Trend => x.Run == entry.Swings,
+                _ => true,
+            });
+    }
+
+    /// <summary>
+    /// The first candle a step met at the close of candle index read: the first of its run, or where what its break is read
+    /// from begins, the Swing, or for a Trend the first of its Swings.
+    /// </summary>
+    public static int ReadFrom(IReadOnlyList<Price> prices, int index, StrategyEntry entry) =>
+        Found(prices, index, entry) is not { } found ? Math.Max(0, index - entry.Reads) : entry.Type == StrategyEntry.Trend ? found.Begins : found.From;
 
     /// <summary>
     /// Every candle that meets the strategy's entry condition, found another way from Signals, to check the trades against:
@@ -231,10 +264,14 @@ public static class StrategyBacktest
 
     /// <summary>
     /// Every candle that meets a step, found another way from Enters: for SuccessiveCandles, the Length-th candle of each
-    /// run of at least Length candles of the colour, from CandleRuns.
+    /// run of at least Length candles of the colour, from CandleRuns. A market structure step has no other way: its candles
+    /// are those KnownStructure has its break at.
     /// </summary>
     public static List<int> Occurrences(List<Price> prices, StrategyEntry entry)
     {
+        if (entry.IsStructure)
+            return Enumerable.Range(0, prices.Count).Where(i => Found(prices, i, entry) != null).ToList();
+
         var index = prices.Select((p, i) => (p.DateTime, i)).ToDictionary(x => x.DateTime, x => x.i);
         return CandleRuns.Runs(prices, entry.Length)
             .Where(r => r.Green == (entry.Colour == EnumCandleColour.Green))
@@ -343,7 +380,10 @@ public static class StrategyBacktest
             var slippage = (strategy.CountSlippage ? strategy.SlippagePercent : 0) / 100 * (entry + (outcome == EnumTradeOutcome.StopLoss ? exitPrice : 0));
             var profit = sign * (exitPrice - entry) - fees - slippage;
             return new StrategyTrade(number, strategy.Direction, index, prices[index].DateTime, entry, takeProfit, stopLoss,
-                exitIndex, prices[exitIndex].DateTime, exitPrice, outcome, profit, 100 * profit / entry, exitIndex - index, both, met, fees, slippage);
+                exitIndex, prices[exitIndex].DateTime, exitPrice, outcome, profit, 100 * profit / entry, exitIndex - index, both, met, fees, slippage)
+            {
+                EntryFrom = ReadFrom(prices, index, strategy.Entry),
+            };
         }
     }
 

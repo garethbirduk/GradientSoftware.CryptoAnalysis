@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Gradient.CryptoAnalysis.Research;
 
 namespace Gradient.CryptoAnalysis.Strategies;
 
@@ -115,19 +116,52 @@ public sealed class Strategy
 }
 
 /// <summary>
+/// Which Swings a Swing step is met by: any, only a Strong one (no market structure break inside it), or only a Weak one.
+/// </summary>
+public enum EnumSwingStrength
+{
+    Any,
+    Strong,
+    Weak,
+}
+
+/// <summary>
 /// A step of an entry condition: what is met at the close of a candle. SuccessiveCandles is met at the close of the candle
 /// that makes a run of Length candles of one colour, once a run, so a longer run does not meet it again.
+/// The others are market structure at a sawtooth Level, read as a chart of the last candles to that one shows it (see
+/// <see cref="KnownStructure"/>), in a Direction: up for bullish, an Upswing or an Uptrend. BreakOfStructure and
+/// MarketStructureBreak are met at the close that breaks. Swing is met at the break of structure that Confirms a Swing, of
+/// the Strength asked for. Trend is met at the break of structure that makes Swings Swings in a row, once a run, so two is
+/// the Trend being Confirmed and a longer Trend does not meet it again.
 /// </summary>
 public sealed class StrategyEntry
 {
     public const string SuccessiveCandles = nameof(SuccessiveCandles);
-    public static readonly string[] Types = [SuccessiveCandles];
+    public const string BreakOfStructure = nameof(BreakOfStructure);
+    public const string MarketStructureBreak = nameof(MarketStructureBreak);
+    public const string Swing = nameof(Swing);
+    public const string Trend = nameof(Trend);
+    public static readonly string[] Types = [SuccessiveCandles, BreakOfStructure, MarketStructureBreak, Swing, Trend];
 
     public string Type { get; set; } = SuccessiveCandles;
 
     public EnumCandleColour Colour { get; set; } = EnumCandleColour.Green;
 
     public int Length { get; set; } = 4;
+
+    public EnumSwingDirection Direction { get; set; } = EnumSwingDirection.Up;
+
+    public int Level { get; set; } = 2;
+
+    public int Swings { get; set; } = 2;
+
+    public EnumSwingStrength Strength { get; set; } = EnumSwingStrength.Any;
+
+    /// <summary>
+    /// Whether the step is market structure rather than a run of candles.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsStructure => Type is BreakOfStructure or MarketStructureBreak or Swing or Trend;
 
     /// <summary>
     /// The most candles from the candle that met the step before to the one that meets this; no limit when not set.
@@ -136,7 +170,8 @@ public sealed class StrategyEntry
     public int? Within { get; set; }
 
     /// <summary>
-    /// How many candles before the candle that meets the step it reads: a run's candles before its Length-th.
+    /// How many candles before the candle that meets the step must come after the step before it: a run's candles before
+    /// its Length-th. A break is met by its own candle alone, though the Swing or Trend it is read from began before.
     /// </summary>
     [JsonIgnore]
     public int Reads => Type == SuccessiveCandles ? Math.Max(0, Length - 1) : 0;
@@ -149,8 +184,12 @@ public sealed class StrategyEntry
         if (!Types.Contains(Type))
             return [$"\"{Type}\" is not an entry type: {string.Join(", ", Types)}."];
         var errors = new List<string>();
-        if (Length < 1)
+        if (Type == SuccessiveCandles && Length < 1)
             errors.Add("Length must be at least 1.");
+        if (IsStructure && Level is < 1 or > KnownStructure.Levels)
+            errors.Add($"Level must be from 1 to {KnownStructure.Levels}.");
+        if (Type == Trend && Swings < 2)
+            errors.Add("Swings must be at least 2: a Trend is two or more Swings in a row.");
         if (Within < 1)
             errors.Add("Within must be at least 1 candle.");
         return errors;

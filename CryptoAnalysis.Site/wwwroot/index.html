@@ -1307,9 +1307,29 @@ function trendSoFar(tr, time) {
 // While a tour that has a known candle plays, as an analysis does, the structure is the one its texts are written from (as
 // known there), drawn a part at a time: each part once the cursor has reached its candle, so the sawtooth, points and Swings
 // come as the run goes.
+// A section that tells of a strategy's market structure steps shows the structure each was read from: that of a chart of
+// the last candles to the candle that met it (the section's "structure", a { from, at } for each such step), not of the
+// chart from its own first candle. The step the cursor has yet to reach is the one shown; null past the last, or when the
+// section has none.
+function structureWindow(ex, t) {
+  if (!ex.tour || tour?.ex !== ex) return null;
+  return (tourSection()?.structure ?? []).find(w => t <= w.at) ?? null;
+}
+
+// The candles of an example from one of them on, as an example of its own: its replay is anchored there, so its structure
+// is that of a chart that begins there.
+const windowExamples = new Map();
+function windowExample(ex, from) {
+  const id = `${ex.id}@window${from}`;
+  if (!windowExamples.has(id)) windowExamples.set(id, { id, dataset: ex.dataset, anchor: (ex.anchor ?? 0) + from, prices: { t: ex.prices.t.slice(from) } });
+  return windowExamples.get(id);
+}
+
 function liveView(ex, t) {
-  const told = tour?.ex === ex && tour.known != null && t <= tour.known && timelineAt(ex, tour.known) ? tour.known : null;
-  const reveal = told != null, r = timelineAt(ex, told ?? t), holds = holdsAt(told ?? t), time = ex.prices.t[t];
+  // A structure step's chart counts its candles from where it begins: shift on from the example's own.
+  const win = structureWindow(ex, t), src = win ? windowExample(ex, win.from) : ex, shift = win?.from ?? 0;
+  const told = win ? win.at : tour?.ex === ex && tour.known != null && t <= tour.known && timelineAt(ex, tour.known) ? tour.known : null;
+  const reveal = told != null, r = timelineAt(src, (told ?? t) - shift), holds = holdsAt((told ?? t) - shift), time = ex.prices.t[t];
   // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
   const window = ex.tour ? tourWindow(ex, t)
     : isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
@@ -1317,7 +1337,8 @@ function liveView(ex, t) {
   const cut = a => a.slice(ex.tour ? Math.max(0, window.from - TOUR_CONTEXT) : window?.from ?? 0, t + 1);
   const prices = { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) };
   if (!r) {
-    prefetch(ex, t);
+    if (win) fetchBatch(src, win.at - shift).then(batch => batch && redrawExample(ex));
+    else prefetch(ex, t);
     return { ...ex, hindsight: ex, cursor: t, window, loading: true, timeline: null, prices, sawtooth: [], swingsByLevel: [], pointsByLevel: [],
       marketStructureBreaksByLevel: [], trendsByLevel: [], candidatesByLevel: [], retracementsByLevel: [], rangesByLevel: [], candleRuns: [], liveByLevel: null };
   }
@@ -1329,12 +1350,12 @@ function liveView(ex, t) {
   const reached = (list, when) => reveal ? list.filter(v => when(v) <= time) : list;
   const open = v => reveal && v.end && v.end.time > time ? { ...v, end: null } : v;
   const sawtooth = byLevel(r.pivots, v => v.pivot).map(pivots => {
-    if (reveal) pivots = pivots.filter(p => p.index <= t);
+    if (reveal) pivots = pivots.filter(p => p.index + shift <= t);
     if (!pivots.length) return [];
     pivots.sort((a, b) => a.index - b.index);
-    const out = pivots.map(p => ({ kind: p.kind, time: p.time, price: p.price, confirmedTime: p.confirmedIndex != null ? ex.prices.t[p.confirmedIndex] : null }));
+    const out = pivots.map(p => ({ kind: p.kind, time: p.time, price: p.price, confirmedTime: p.confirmedIndex != null ? ex.prices.t[p.confirmedIndex + shift] : null }));
     // The timeline leaves out the current price: it is this candle's close, unless the level already ends here.
-    if (pivots[pivots.length - 1].index < t) out.push({ kind: 'Current', time, price: ex.prices.c[t], confirmedTime: null });
+    if (pivots[pivots.length - 1].index + shift < t) out.push({ kind: 'Current', time, price: ex.prices.c[t], confirmedTime: null });
     return out;
   });
   return {
@@ -2995,10 +3016,12 @@ const thingLevel = id => Number(id?.split(':')[1]) || null;
 
 // The layers a section shows: the section's own, beside the page's; on the Analysis page, the levels are every order the
 // analysis has a chapter on for, so the Levels buttons say which orders it tells of. While a candle is being picked, the
-// candles still to come are shown, to pick from.
+// candles still to come are shown, to pick from. A section that shows the structure a strategy's steps read (see
+// structureWindow) has its own levels alone there too: they are the orders of the steps' own charts, not the analysis's.
 function sectionLayers(s) {
   const analysis = tour.page === 'Analysis';
-  const levels = analysis ? [...new Set(tour.chapters.flatMap((c, i) => tour.chaptersOff.has(i) ? [] : [thingLevel(tour.sections[c.section].thing)]).filter(Boolean))].map(l => `level${l}`) : [];
+  const levels = !analysis ? [] : s.structure ? s.layers.filter(id => /^level\d+$/.test(id))
+    : [...new Set(tour.chapters.flatMap((c, i) => tour.chaptersOff.has(i) ? [] : [thingLevel(tour.sections[c.section].thing)]).filter(Boolean))].map(l => `level${l}`);
   return [...new Set(['replay', ...(tour.extraLayers ?? []), ...s.layers.filter(id => !analysis || !/^level\d+$/.test(id)), ...levels, ...(tour.picking ? ['future'] : [])])];
 }
 
@@ -3544,7 +3567,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
         clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0, given: c.hold >= 0 ? c.hold : null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
     });
-    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, detail: given.detail ?? null, trade, page, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, detail: given.detail ?? null, trade, structure: s.structure ?? null, page, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
@@ -5445,6 +5468,12 @@ function renderInterims() {
 // each of a type; STRATEGY_TYPES says what each type's fields are and how it reads, so a new type is added there and in
 // the server's Strategy.cs. The entry condition can be a chain: the steps of "after", in order, then "entry", each looked
 // for once the one before it is met, within its "within" candles of it when that is set.
+// A market structure step is read at a sawtooth level as a chart of the last STRUCTURE_WINDOW candles shows it (the
+// server's KnownStructure), so its levels are that chart's, up to STRUCTURE_LEVELS. Its direction is Up or Down, named as
+// the term names it: a Bullish or Bearish break, an Upswing or Downswing, an Uptrend or Downtrend.
+const STRUCTURE_WINDOW = 500, STRUCTURE_LEVELS = 4;
+const stepLevel = { key: 'level', label: 'Level', number: true, min: 1, max: STRUCTURE_LEVELS, step: 1 };
+const stepDirection = (label, up, down) => ({ key: 'direction', label, options: [{ value: 'Up', label: up }, { value: 'Down', label: down }] });
 const STRATEGY_TYPES = {
   entry: {
     SuccessiveCandles: {
@@ -5452,6 +5481,43 @@ const STRATEGY_TYPES = {
       defaults: { colour: 'Green', length: 4 },
       fields: [{ key: 'colour', label: 'Colour', options: ['Green', 'Red'] }, { key: 'length', label: 'Length', number: true, min: 1, step: 1 }],
       says: e => `${e.length} Successive ${e.colour} Candles`,
+      short: e => `${e.length} ${e.colour}`,
+    },
+    // Met at the close that breaks structure, which Confirms a Swing.
+    BreakOfStructure: {
+      label: 'Break of Structure',
+      structure: true,
+      defaults: { direction: 'Up', level: 2 },
+      fields: [stepDirection('BoS', 'Bullish', 'Bearish'), stepLevel],
+      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
+      short: e => `L${e.level} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
+    },
+    // Met at the close beyond the Swing Low or Swing High of a Confirmed Swing.
+    MarketStructureBreak: {
+      label: 'Market Structure Break',
+      structure: true,
+      defaults: { direction: 'Up', level: 2 },
+      fields: [stepDirection('MSB', 'Bullish', 'Bearish'), stepLevel],
+      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
+      short: e => `L${e.level} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
+    },
+    // Met at the BoS that Confirms the Swing: any, or only a Strong one (no MSB inside it) or a Weak one.
+    Swing: {
+      label: 'Swing',
+      structure: true,
+      defaults: { direction: 'Up', level: 2, strength: 'Any' },
+      fields: [stepDirection('Swing', 'Upswing', 'Downswing'), stepLevel, { key: 'strength', label: 'Strength', options: ['Any', 'Strong', 'Weak'] }],
+      says: e => `a ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${orderOf(e.level)} ${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
+      short: e => `L${e.level} ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
+    },
+    // Met at the BoS that makes so many Swings in a row, once a Trend: two is the Trend being Confirmed.
+    Trend: {
+      label: 'Trend',
+      structure: true,
+      defaults: { direction: 'Up', level: 2, swings: 2 },
+      fields: [stepDirection('Trend', 'Uptrend', 'Downtrend'), stepLevel, { key: 'swings', label: 'Swings', number: true, min: 2, step: 1 }],
+      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} of ${e.swings} ${e.direction === 'Down' ? 'Downswings' : 'Upswings'}`,
+      short: e => `L${e.level} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} ×${e.swings}`,
     },
   },
   target: {
@@ -5589,7 +5655,8 @@ function strategySays(s) {
   const costs = fee && slip ? ` Costs: ${fee}% fee a side and ${slip}% slippage on the entry and a Stop Loss.`
     : fee ? ` Costs: ${fee}% fee a side; no slippage is counted.`
     : slip ? ` Costs: ${slip}% slippage on the entry and a Stop Loss; no fees are counted.` : ' No fees or slippage are counted.';
-  return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}. Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}${costs}`;
+  const structure = strategySteps(s).some(e => STRATEGY_TYPES.entry[e?.type]?.structure) ? ` Market structure is read as a chart of the last ${STRUCTURE_WINDOW} candles shows it, so an order is that chart's.` : '';
+  return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}.${structure} Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}${costs}`;
 }
 
 // The default costs strategies.json starts with when it has none: about an exchange's taker fee and a liquid market's
@@ -5753,9 +5820,10 @@ function renderStrategy() {
     return wireStrategyActions(box);
   }
   if (!s) { box.innerHTML = `<div class="strat-card">No strategies yet: add one with New strategy.</div>${strategyActions()}`; return wireStrategyActions(box); }
+  // An option is its value, or { value, label } when the page names it otherwise than strategies.json keeps it.
   const input = (path, f, value) => f.options
-    ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => `<option ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`
-    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" step="${f.step}" value="${esc(value)}"></label>${varyInputs(s, path, f.step)}`;
+    ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => o.value ?? o).map((v, k) => `<option value="${esc(v)}" ${v === value ? 'selected' : ''}>${esc(f.options[k].label ?? v)}</option>`).join('')}</select></label>`
+    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" ${f.max != null ? `max="${f.max}" ` : ''}step="${f.step}" value="${esc(value)}"></label>${varyInputs(s, path, f.step)}`;
   const steps = strategySteps(s);
   const part = ({ key, title, kind }) => {
     const p = key.split('.').reduce((o, k) => o?.[k], s), type = STRATEGY_TYPES[kind][p.type], step = kind === 'entry' ? steps.indexOf(p) : -1;
@@ -6765,7 +6833,7 @@ window.embed = {
 function chartStrategyName(s) {
   const target = t => t.type === 'Percent' ? `${t.percent}%` : t.type === 'HighestWick' ? `high of ${t.candles}` : t.type === 'LowestWick' ? `low of ${t.candles}` : t.type === 'RiskRatio' ? `${t.ratio}R target`
     : `${t.percent}% ${String(t.measure ?? 'Body').toLowerCase()}${t.candles !== s.entry?.length ? ` of ${t.candles}` : ''}`;
-  const entry = strategySteps(s).map(e => e?.type === 'SuccessiveCandles' ? `${e.length} ${e.colour}` : e?.type ?? '').join(' → ');
+  const entry = strategySteps(s).map(e => STRATEGY_TYPES.entry[e?.type]?.short(e) ?? e?.type ?? '').join(' → ');
   const [tp, sl] = [target(s.takeProfit), target(s.stopLoss)];
   return `${entry} ${s.direction} · ${tp === sl ? `±${tp}` : `+${tp} / −${sl}`}`;
 }
@@ -6848,9 +6916,10 @@ const minuteOf = t => String(t).slice(0, 16);
 
 // How many candles before the candle that meets it a step reads (StrategyEntry.Reads): a run's candles before its last.
 const entryReads = e => e?.type === 'SuccessiveCandles' ? Math.max(0, e.length - 1) : 0;
-// How many candles before its entry a trade's entry condition read (StrategyTrade.FirstRead): from the first candle its first
-// step read, the candle that met that step being the first of the trade's "met" when the condition is a chain.
-const tradeReads = (strategy, t) => t.entryIndex - Math.max(0, (t.met?.[0]?.index ?? t.entryIndex) - entryReads(strategySteps(strategy)[0]));
+// How many candles before its entry a trade's entry condition read (StrategyTrade.FirstRead): from the earliest candle any
+// of its steps read. A run kept before trades said so has it worked out here: from the first candle its first step read,
+// the candle that met that step being the first of the trade's "met" when the condition is a chain.
+const tradeReads = (strategy, t) => t.entryIndex - (t.firstRead ?? Math.max(0, (t.met?.[0]?.index ?? t.entryIndex) - entryReads(strategySteps(strategy)[0])));
 
 // The trades of the strategies on that a candle is part of: entered there, open there, or with the candle among those its
 // entry condition read. Those entered there come first.
@@ -6914,20 +6983,24 @@ function drawStrategies(ex, traces) {
       .map(t => ({ t, done: t.outcome !== 'Open' && minuteOf(t.exitTime) <= last }));
     if (!shown.length) continue;
     const end = s => s.done ? s.t.exitTime : ahead;
-    // The run of candles that met each Successive Candles step of the entry condition, boxed from its first candle's low to
-    // its highest high: the entry's own run, and those of the steps before it, at the candles the trade says met them.
+    // The candles each step of the entry condition read, boxed from their lowest low to their highest high: a run of
+    // candles, or the Swing or Trend a break was read from, for the entry's own step and those before it, at the candles the
+    // trade says met them. A trade says where each step read from; one kept before trades did has only its runs boxed.
     const trade = at && shown.find(x => minuteOf(x.t.entryTime) === at)?.t, steps = strategySteps(strategy);
     const metAt = trade ? [...(trade.met ?? []).map(m => minuteOf(m.time)), at] : [];
+    // How many candles back from the one that met it each step read.
+    const readBack = trade ? [...(trade.met ?? []).map(m => m.index - m.from), trade.entryIndex - trade.entryFrom] : [];
     steps.forEach((step, k) => {
-      if (step?.type !== 'SuccessiveCandles' || !metAt[k]) return;
-      const i = whole.t.findIndex(x => minuteOf(x) === metAt[k]), from = Math.max(0, i - step.length + 1);
+      const type = STRATEGY_TYPES.entry[step?.type];
+      if (!type || !metAt[k] || (type.structure && !(readBack[k] >= 0))) return;
+      const i = whole.t.findIndex(x => minuteOf(x) === metAt[k]), from = Math.max(0, i - (readBack[k] >= 0 ? readBack[k] : step.length - 1));
       if (i < 0) return;
       const hi = Math.max(...whole.h.slice(from, i + 1)), lo = Math.min(...whole.l.slice(from, i + 1)), half = (Date.parse(whole.t[1]) - Date.parse(whole.t[0])) / 2;
       const [x0, x1] = [new Date(Date.parse(whole.t[from]) - half).toISOString(), new Date(Date.parse(whole.t[i]) + half).toISOString()];
       const label = steps.length > 1 ? `Entry condition, step ${k + 1}` : 'Entry condition';
       traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', name: label, x: [x0, x1, x1, x0, x0], y: [lo, lo, hi, hi, lo],
-        line: { color: colour, width: 1, dash: 'dot' }, fillcolor: withAlpha(css(step.colour === 'Red' ? '--down' : '--up'), 0.08),
-        hovertemplate: `${label}: ${step.length} ${step.colour.toLowerCase()} candles in a row<extra></extra>` });
+        line: { color: colour, width: 1, dash: 'dot' }, fillcolor: withAlpha(css(step.colour === 'Red' || (type.structure && step.direction === 'Down') ? '--down' : '--up'), 0.08),
+        hovertemplate: `${label}: ${esc(type.says(step))}<extra></extra>` });
     });
     const level = (key, color) => traces.push({ type: 'scatter', mode: 'lines', name: `${name} ${key === 'takeProfit' ? 'Take Profit' : 'Stop Loss'}`, hoverinfo: 'skip',
       x: shown.flatMap(s => [s.t.entryTime, end(s), null]), y: shown.flatMap(s => [s.t[key], s.t[key], null]), line: { color, width: 1.25, dash: 'dash' } });

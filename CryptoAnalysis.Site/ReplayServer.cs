@@ -151,6 +151,11 @@ public static class ReplayServer
             return Results.Json(new { Index = index }, Json);
         });
 
+        // A scene's prices, a dataset's from its anchor on, are kept as one list for each: what is worked out once for a
+        // series and kept with it, as a strategy's market structure is (see KnownStructure), is then worked out once a scene.
+        var scenes = new ConcurrentDictionary<(string, int), List<Price>>();
+        List<Price> SceneOf(Dataset data, int first) => first == 0 ? data.Prices : scenes.GetOrAdd((data.Id, first), k => data.Prices.GetRange(k.Item2, data.Prices.Count - k.Item2));
+
         // A section that explains something is written out here from the prices of its scene (see Explain): the page sends the
         // section as the tour has it, with the candle the replay has reached before it, and gets back the section to play.
         app.MapPost("/api/explain", async (HttpRequest request) =>
@@ -172,7 +177,7 @@ public static class ReplayServer
             var errors = new List<string>();
             // The definitions the tour has cited before the section, which it does not teach again.
             var cited = (body["cited"] as JsonArray ?? []).Select(x => x?.GetValue<string>() ?? "").ToHashSet();
-            var expanded = Explain.Expand(section, data.Prices.GetRange(first, data.Prices.Count - first), body["from"]?.GetValue<int>() ?? 0,
+            var expanded = Explain.Expand(section, SceneOf(data, first), body["from"]?.GetValue<int>() ?? 0,
                 body["where"]?.GetValue<string>() ?? "the section", errors, cited);
             return Results.Json(new { Section = expanded, Errors = errors }, Json);
         });

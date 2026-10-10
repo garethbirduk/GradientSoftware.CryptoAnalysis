@@ -742,11 +742,8 @@ public static partial class Explain
     {
         if (Seen("Swing", prices, at, level, reached, runsTo, known, (p, a, d) => SwingAt(p, a, level, d), out var end, out problem) is not { } seen)
             return null;
-        var (swing, span, index) = (seen.Swing, seen.Span, seen.Index);
-        var against = swing.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
-        var msb = seen.Breaks.FirstOrDefault(b => b.Type == against && b.Break.Time > swing.Start.Time && b.Break.Time < swing.BreakOfStructure!.Time);
-        var s = new SwingRead(prices, swing, level, span.First, index[swing.Extreme.Time], span.Last,
-            LabelAt(seen.Points, swing.Start.Time), LabelAt(seen.Points, swing.Extreme.Time), msb != null ? index[msb.Break.Time] : null);
+        var span = seen.Span;
+        var s = SwingReadOf(prices, seen.Swing, level, seen.Breaks, seen.Points, seen.Index);
 
         // A block for each term a Swing is made of, each where it shows on this one; the MSB's only when it has one. The
         // view is the Swing, and on to where the replay runs when it runs on past the BoS.
@@ -764,6 +761,17 @@ public static partial class Explain
         public string Name => SwingName(Direction);
         public string Turn => Up ? "Swing Low" : "Swing High";
         public TimeSpan Period => Length(Prices);
+    }
+
+    // A Confirmed Swing read for its blocks, from the structure that has it: its breaks, points and candles by time. That
+    // structure may be read from the candles from first on alone, which its candles are then counted from.
+    private static SwingRead SwingReadOf(List<Price> prices, SwingOutline swing, int level, List<MarketStructureBreakOutline> breaks, List<StructurePoint> points,
+        Dictionary<DateTime, int> index, int first = 0)
+    {
+        var against = swing.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
+        var msb = breaks.FirstOrDefault(b => b.Type == against && b.Break.Time > swing.Start.Time && b.Break.Time < swing.BreakOfStructure!.Time);
+        return new SwingRead(prices, swing, level, first + index[swing.Start.Time], first + index[swing.Extreme.Time], first + index[swing.BreakOfStructure!.Time],
+            LabelAt(points, swing.Start.Time), LabelAt(points, swing.Extreme.Time), msb != null ? first + index[msb.Break.Time] : null);
     }
 
     // The Swing: what one is, then where this one begins and at what kind of high or low.

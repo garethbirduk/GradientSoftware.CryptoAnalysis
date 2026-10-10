@@ -49,6 +49,7 @@
   "Trade.what": "A trade is entered at one price and closed later at another, for a gain or a loss.",
   "Trade.entry": "A strategy enters a trade when its entry condition is met. The condition is read at the close of each candle, from that candle and the ones before it alone, and the trade is entered at that close.",
   "Trade.chain": "An entry condition can be a chain of steps. Each step is looked for only once the one before it is met, and only within as many candles of it as the strategy allows. The trade is entered when the last step is met, and the next trade needs the whole chain again.",
+  "Trade.structure": "Market structure in an entry condition is read at the close of each candle as a chart of the last 500 candles to it shows it. An order is that chart's order, so it need not be the order a longer chart gives the same Swing.",
   "Risk.what": "A trade's reward is how far its Take Profit is from its entry: what it wins if the Take Profit is reached. Its risk is how far its Stop Loss is from its entry: what it loses if the Stop Loss is reached.",
   "Risk.ratio": "R is the unit of risk: 1R is how far the Stop Loss is from the entry. The reward is counted in R, so a Take Profit twice as far from the entry as the Stop Loss is a 2R target.",
   "Risk.breakeven": "A trade that wins its target in R or loses 1R breaks even over many trades when the share it wins is one divided by one plus its target: half at 1R, a third at 2R.",

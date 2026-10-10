@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Gradient.CryptoAnalysis.Research;
 using Gradient.CryptoAnalysis.Strategies;
 
 namespace Gradient.CryptoAnalysis.Site;
@@ -42,7 +43,7 @@ public static partial class Explain
     {
         public bool Long => Trade.Direction == EnumTradeDirection.Long;
 
-        public int First => Trade.FirstRead(Strategy);
+        public int First => Trade.FirstRead;
     }
 
     /// <summary>
@@ -79,7 +80,7 @@ public static partial class Explain
         var trades = StrategyBacktest.Run(prices, strategy).Trades;
         return trades.FirstOrDefault(x => x.EntryIndex == at)
             ?? trades.FirstOrDefault(x => x.EntryIndex < at && at <= x.ExitIndex)
-            ?? trades.FirstOrDefault(x => x.FirstRead(strategy) <= at && at < x.EntryIndex);
+            ?? trades.FirstOrDefault(x => x.FirstRead <= at && at < x.EntryIndex);
     }
 
     // The chapters of a Trade entered at the candle: one section for each block, the strategy in each.
@@ -123,7 +124,10 @@ public static partial class Explain
         var last = told.SelectMany(x => x.Cues).Max(x => x["at"]!.GetValue<int>());
         // Every chapter frames the whole trade, from the first candle the entry condition reads to the one that ends it.
         var view = new[] { read.First, trade.ExitIndex };
-        return Section(view, last > reached ? last : null, told);
+        var section = Section(view, last > reached ? last : null, told);
+        if (told.Any(x => x.Name == "Entry") && StructureWindows(read) is { Count: > 0 } windows)
+            section["structure"] = windows;
+        return section;
     }
 
     // What an entry condition is and this one; then each of its steps, told by its term's own block as it stood at the
@@ -138,10 +142,17 @@ public static partial class Explain
         var cues = new List<JsonObject> { Define(r.First, "Trade.entry") };
         if (steps.Count > 1)
             cues.Add(Define(r.First, "Trade.chain"));
+        if (steps.Any(x => x.IsStructure))
+            cues.Add(Define(r.First, "Trade.structure"));
         cues.Add(Teach(r.First, ConditionText(r.Strategy)));
+        var layers = new List<string> { "candles", "trade" };
         for (var k = 0; k < steps.Count; k++)
         {
-            cues.AddRange(StepCues(r.Prices, steps[k], met[k]));
+            var told = StepBlocks(r.Prices, steps[k], met[k]);
+            cues.AddRange(told.SelectMany(x => x.Cues));
+            // The chart draws a structure step's level, read from the step's own candles (see StructureWindows).
+            if (steps[k].IsStructure)
+                layers.AddRange([$"level{steps[k].Level}", "close", "sawtooth", .. told.SelectMany(x => x.Layers)]);
             if (k < steps.Count - 1)
                 cues.Add(Say(met[k], $"That meets the {Ordinal(k + 1)} step, so the strategy now looks for {StepWords(steps[k + 1])}{WithinWords(steps[k + 1])}."));
         }
@@ -149,34 +160,106 @@ public static partial class Explain
         cues.Add(Say(t.EntryIndex, $"That meets the entry condition, so the trade is entered at the close of the candle at {Clock(t.EntryTime, length)}, {buys} at {Money(t.EntryPrice)}."));
         // A definition is taught once in the chapter, however many steps cite it.
         var taught = new HashSet<string>();
-        return new Block(cues.Where(x => x["definition"] == null || taught.Add(x["texts"]!.ToJsonString())).ToList(), ["candles", "trade"]);
+        return new Block(cues.Where(x => x["definition"] == null || taught.Add(x["texts"]!.ToJsonString())).ToList(), layers);
+    }
+
+    // The candles each market structure step of a trade's entry condition was read from, in the order they were met: the
+    // chart of the last candles to the candle that met it (see KnownStructure), as { from, at }. The page draws the
+    // structure from each in turn, so what it shows is what the step read.
+    private static JsonArray StructureWindows(TradeRead r)
+    {
+        var met = r.Trade.Met.Select(x => x.Index).Append(r.Trade.EntryIndex).ToList();
+        return new JsonArray(r.Strategy.Steps.Select((step, k) => (step, at: met[k])).Where(x => x.step.IsStructure)
+            .Select(x => (JsonNode)new JsonObject { ["from"] = Math.Max(0, x.at + 1 - KnownStructure.Window), ["at"] = x.at }).ToArray());
     }
 
     // A strategy's entry condition in words: its steps in order, each after the one before, and how a run is counted.
     private static string ConditionText(Strategy strategy)
     {
         var steps = strategy.Steps;
+        // How a count is met, for the steps that count: a run of candles, and a Trend's Swings.
+        var counted = steps.Any(x => !x.IsStructure) ? "A run counts on the candle that makes its count, once a run, so a longer run does not count again."
+            : steps.Any(x => x.Type == StrategyEntry.Trend) ? "A Trend counts at the BoS that makes its count, once a Trend, so a longer Trend does not count again." : "";
         if (steps.Count == 1)
-            return $"This strategy's entry condition is {StepWords(steps[0])}. It enters on the {Ordinal(steps[0].Length)} of them, once a run, so a longer run does not enter again.";
+            return $"This strategy's entry condition is {StepWords(steps[0])}. {(steps[0].IsStructure ? counted : $"It enters on the {Ordinal(steps[0].Length)} of them, once a run, so a longer run does not enter again.")}".TrimEnd();
         var chain = string.Join(", then ", steps.Select((x, k) => k == 0 ? StepWords(x) : StepWords(x) + WithinWords(x)));
-        return $"This strategy's entry condition is {chain}. A run counts on the candle that makes its count, once a run, so a longer run does not count again.";
+        return $"This strategy's entry condition is {chain}. {counted}".TrimEnd();
     }
 
-    // A step as the condition names it: "four Successive Green Candles".
-    private static string StepWords(StrategyEntry step) =>
-        $"{Words(step.Length)} Successive {(step.Colour == EnumCandleColour.Green ? "Green" : "Red")} Candles";
+    // A step as the condition names it: "four Successive Green Candles", "a 2nd order Bullish BoS", "a Strong 2nd order
+    // Upswing", "a 2nd order Uptrend of three Upswings".
+    private static string StepWords(StrategyEntry step)
+    {
+        var up = step.Direction == EnumSwingDirection.Up;
+        var order = Order(step.Level);
+        return step.Type switch
+        {
+            StrategyEntry.BreakOfStructure => $"a {order} {(up ? "Bullish" : "Bearish")} BoS",
+            StrategyEntry.MarketStructureBreak => $"a {order} {(up ? "Bullish" : "Bearish")} MSB",
+            StrategyEntry.Swing => $"a {(step.Strength == EnumSwingStrength.Any ? "" : $"{step.Strength} ")}{order} {SwingName(step.Direction)}",
+            StrategyEntry.Trend => $"a {order} {TrendName(step.Direction)} of {Words(step.Swings)} {SwingName(step.Direction)}s",
+            _ => $"{Words(step.Length)} Successive {(step.Colour == EnumCandleColour.Green ? "Green" : "Red")} Candles",
+        };
+    }
 
     // How soon a step must follow the one before it, when the strategy says.
     private static string WithinWords(StrategyEntry step) => step.Within is int within ? $" within {Words(within)} candles" : "";
 
     // A step met at a candle, told by the blocks of the term it is made of, as the term stood at that candle: for a run,
-    // what makes a candle green or red, from the first candle the step reads, then the run's own block.
-    private static IEnumerable<JsonObject> StepCues(List<Price> prices, StrategyEntry step, int at)
+    // what makes a candle green or red, from the first candle the step reads, then the run's own block; for market
+    // structure, the blocks of the Swing or Trend its break is read from (see StructureBlocks).
+    private static Block[] StepBlocks(List<Price> prices, StrategyEntry step, int at)
     {
-        yield return Define(Math.Max(0, at - step.Reads), "Candle.colour");
-        if (RunAt(prices.GetRange(0, at + 1), at, step.Length) is { } run)
-            foreach (var cue in RunOf(new RunRead(prices, run, step.Colour == EnumCandleColour.Green)).Cues)
-                yield return cue;
+        if (step.IsStructure)
+            return StructureBlocks(prices, step, at);
+        var colour = new Block([Define(Math.Max(0, at - step.Reads), "Candle.colour")], []);
+        return RunAt(prices.GetRange(0, at + 1), at, step.Length) is { } run ? [colour, RunOf(new RunRead(prices, run, step.Colour == EnumCandleColour.Green))] : [colour];
+    }
+
+    // The blocks that tell a market structure step met at a candle, read as the step was: from the chart of the last
+    // candles to it (see KnownStructure). A BoS is told by the Swing it Confirms, where it begins and its BoS; a Swing by
+    // those and its turn, its MSB when it has one, and its Strength when the step asks for one; an MSB by the Swing whose
+    // Swing Low or Swing High it closes beyond, that turn and the MSB; a Trend by where it begins, where it was Confirmed
+    // and its count.
+    private static Block[] StructureBlocks(List<Price> prices, StrategyEntry step, int at)
+    {
+        var first = Math.Max(0, at + 1 - KnownStructure.Window);
+        if (Read(prices.GetRange(first, at + 1 - first), step.Level) is not { } s)
+            return [];
+        var last = prices[at].DateTime;
+        var up = step.Direction == EnumSwingDirection.Up;
+        SwingRead Told(SwingOutline swing) => SwingReadOf(prices, swing, step.Level, s.Breaks, s.Points, s.Index, first);
+
+        switch (step.Type)
+        {
+            case StrategyEntry.MarketStructureBreak:
+            {
+                // A Bullish MSB closes above the Swing High of a Downswing, a Bearish one below the Swing Low of an Upswing.
+                var type = up ? EnumAnnotationType.BullishMarketStructureBreak : EnumAnnotationType.BearishMarketStructureBreak;
+                if (s.Breaks.FirstOrDefault(x => x.Type == type && x.Break.Time == last) is not { } msb
+                    || s.Swings.LastOrDefault(x => x.Direction != step.Direction && x.Extreme == msb.Reference && x.BreakOfStructure?.Time < last) is not { } broken)
+                    return [];
+                var read = Told(broken) with { MsbAt = at };
+                return [SwingTurn(read), SwingMsb(read)];
+            }
+            case StrategyEntry.Trend:
+            {
+                if (s.Trends.LastOrDefault(x => x.Direction == step.Direction && x.End == null && x.Parts[^1].BreakOfStructure.Time == last) is not { } trend)
+                    return [];
+                var weak = trend.Parts.Select((part, i) => (part, i)).Where(x => !x.part.Strong).Select(x => Ordinal(x.i + 1)).ToList();
+                var read = new TrendRead(prices, trend, step.Level, first + s.Index[trend.Start.Time], first + s.Index[trend.Confirmed.Time], at, null, weak);
+                return [TrendBegins(read), TrendConfirmed(read), TrendSwings(read)];
+            }
+            default:
+            {
+                if (s.Swings.LastOrDefault(x => x.Direction == step.Direction && x.BreakOfStructure?.Time == last) is not { } swing)
+                    return [];
+                var read = Told(swing);
+                if (step.Type == StrategyEntry.BreakOfStructure)
+                    return [SwingBegins(read), SwingBos(read)];
+                return [SwingBegins(read), SwingTurn(read), SwingMsb(read), SwingBos(read), step.Strength == EnumSwingStrength.Any ? Block.None : SwingStrength(read)];
+            }
+        }
     }
 
     // What a Take Profit or a Stop Loss is; then where this trade's is, and how it was worked out from the candles up to the

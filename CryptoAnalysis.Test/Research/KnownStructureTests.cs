@@ -41,6 +41,48 @@ public class KnownStructureTests
     }
 
     [TestMethod]
+    public void Breaks_SayWhatEachWasReadFrom()
+    {
+        // Upswings from the highs of 12 and 13; the close of 10.5 is below the first's Swing Low of 11, inside the second.
+        var breaks = KnownStructure.Read(Closes(10, 12, 11, 13, 10.5, 12.5, 14), EnumPriceBasis.Close, 100, 1).Breaks;
+
+        Assert.AreEqual("3:BreakOfStructure Up from 1, 1 in a row from 1; 4:MarketStructureBreak Down from 2; 6:BreakOfStructure Up from 3, 2 in a row from 1, Weak",
+            string.Join("; ", breaks.SelectMany((x, i) => x.Select(b => b.Kind == EnumKnownBreak.MarketStructureBreak
+                ? $"{i}:{b.Kind} {b.Direction} from {b.From}"
+                : $"{i}:{b.Kind} {b.Direction} from {b.From}, {b.Run} in a row from {b.Begins}{(b.Weak ? ", Weak" : "")}"))));
+    }
+
+    [TestMethod]
+    public void Breaks_AreTheFlagsBreaksAndCountWhatTheTrendFlagsHold()
+    {
+        var prices = Synthetic.Walk(5, Start, 1500);
+
+        var (masks, breaks) = KnownStructure.Read(prices, EnumPriceBasis.Close, 200, KnownStructure.Levels);
+
+        bool Flagged(int i, int level, Flag flag) => (masks[i] & (1 << KnownStructure.Bit(level, flag))) != 0;
+        for (var i = 0; i < prices.Count; i++)
+        {
+            for (var level = 1; level <= KnownStructure.Levels; level++)
+            {
+                bool Made(EnumKnownBreak kind, EnumSwingDirection direction) => breaks[i].Any(x => x.Level == level && x.Kind == kind && x.Direction == direction);
+                Assert.AreEqual(Flagged(i, level, Flag.BreakUp), Made(EnumKnownBreak.BreakOfStructure, EnumSwingDirection.Up), $"#{i} level {level}");
+                Assert.AreEqual(Flagged(i, level, Flag.BreakDown), Made(EnumKnownBreak.BreakOfStructure, EnumSwingDirection.Down), $"#{i} level {level}");
+                Assert.AreEqual(Flagged(i, level, Flag.BullishMarketStructureBreak), Made(EnumKnownBreak.MarketStructureBreak, EnumSwingDirection.Up), $"#{i} level {level}");
+                Assert.AreEqual(Flagged(i, level, Flag.BearishMarketStructureBreak), Made(EnumKnownBreak.MarketStructureBreak, EnumSwingDirection.Down), $"#{i} level {level}");
+            }
+
+            // A break of structure that makes two or more in a row is a Trend holding, and one that makes one is none.
+            foreach (var b in breaks[i].Where(x => x.Kind == EnumKnownBreak.BreakOfStructure))
+            {
+                Assert.AreEqual(b.Run >= 2, Flagged(i, b.Level, b.Direction == EnumSwingDirection.Up ? Flag.Uptrend : Flag.Downtrend), $"#{i} level {b.Level}");
+                Assert.IsTrue(b.Begins <= b.From && b.From < i && (b.Run > 1 || b.Begins == b.From), $"#{i} level {b.Level}");
+            }
+        }
+
+        Assert.IsTrue(breaks.Sum(x => x.Count(b => b.Run >= 3)) > 20, "A random walk has Trends of three Swings and more.");
+    }
+
+    [TestMethod]
     public void Masks_OfACandleDoNotChangeWithTheCandlesAfterIt()
     {
         var prices = Synthetic.Walk(3, Start, 900);
