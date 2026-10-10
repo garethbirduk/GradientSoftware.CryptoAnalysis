@@ -122,46 +122,16 @@ public static class Tours
     }
 
     /// <summary>
-    /// The ids of the tour's own strategies, each written as strategies.json keeps one, which a section turns on as the layer
-    /// "strategy:" and its id. One that cannot be run is listed with its problems, and its id still counted.
+    /// The strategies of the Strategies page, as written, by id: those of strategies.json in the site's folder, or of
+    /// strategies.example.json when there is none, as the page reads them. A section names one by its id.
     /// </summary>
-    public static List<string> TourStrategies(JsonNode def, List<string> errors)
-    {
-        var ids = new List<string>();
-        foreach (var (node, k) in (def["strategies"]?.AsArray() ?? []).Select((x, k) => (x, k)))
-        {
-            var where = $"strategy {k + 1}";
-            Strategies.Strategy? strategy;
-            try
-            {
-                strategy = node?.Deserialize<Strategies.Strategy>(Strategies.StrategyBook.JsonOptions);
-            }
-            catch (JsonException e)
-            {
-                errors.Add($"{where}: not a strategy as strategies.json keeps one: {e.Message}");
-                continue;
-            }
-
-            if (strategy == null || string.IsNullOrWhiteSpace(strategy.Id))
-            {
-                errors.Add($"{where}: a strategy needs an id, which a section turns it on by as the layer \"strategy:\" and the id");
-                continue;
-            }
-
-            if (ids.Contains(strategy.Id))
-                errors.Add($"{where}: \"{strategy.Id}\" is the id of a strategy before it");
-            errors.AddRange(strategy.Validate().Select(x => $"{where} ({strategy.Id}): {x}"));
-            ids.Add(strategy.Id);
-        }
-
-        return ids;
-    }
-
-    // The tour's strategies as written, by id, the first of an id kept.
-    private static Dictionary<string, JsonNode> StrategyNodes(JsonNode def)
+    public static Dictionary<string, JsonNode> StrategiesOf(string siteDir)
     {
         var nodes = new Dictionary<string, JsonNode>();
-        foreach (var node in def["strategies"]?.AsArray() ?? [])
+        var path = new[] { "strategies.json", "strategies.example.json" }.Select(x => Path.Combine(siteDir, x)).FirstOrDefault(File.Exists);
+        if (path == null)
+            return nodes;
+        foreach (var node in JsonNode.Parse(File.ReadAllText(path))?["strategies"]?.AsArray() ?? [])
         {
             if (node?["id"] is JsonValue id && id.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text))
                 nodes.TryAdd(text, node);
@@ -171,42 +141,52 @@ public static class Tours
     }
 
     /// <summary>
-    /// The kinds of results a section can show in place of the chart, as the Strategies page shows them: a run's totals and
-    /// trades, its random baseline, or a sweep of the numbers the strategy varies.
+    /// The pages a section can show in place of the chart, as they are, without being changed.
     /// </summary>
-    public static readonly IReadOnlyList<string> ResultKinds = ["run", "baseline", "sweep"];
+    public static readonly IReadOnlyList<string> Pages = ["Strategies"];
 
     /// <summary>
-    /// What is wrong with a section's "results": { "show", "strategy", "period" }, with show one of <see cref="ResultKinds"/>,
-    /// strategy the id of one of the tour's strategies and period a market's year as the Strategies page keys it
-    /// ("btc-coinbase-1h:2023"). A sweep needs a strategy that varies something.
+    /// What a text can do on the page its section shows, each an object with one of these keys: select (a strategy, by
+    /// id), click (a button, by name), periods (the periods ticked, as "market:year"), set (a setting, by its path, with
+    /// value), vary (a number's To and Step, by its path), count (a cost counted or not, with on) and cell (the period
+    /// whose results are shown).
     /// </summary>
-    public static List<string> ResultsProblems(JsonNode results, IReadOnlyDictionary<string, JsonNode> strategies)
+    public static readonly IReadOnlyList<string> PageActions = ["select", "click", "periods", "set", "vary", "count", "cell"];
+
+    /// <summary>
+    /// What is wrong with what a text does on a page and what it highlights there: "do" is a list of actions (see
+    /// <see cref="PageActions"/>) and "highlight" names a part of the page; both need a section that shows a page, and a
+    /// strategy selected is one of the Strategies page's.
+    /// </summary>
+    public static List<string> PageProblems(JsonObject cue, bool onPage, IReadOnlyDictionary<string, JsonNode> strategies)
     {
         var problems = new List<string>();
-        string? Text(string key) => results[key] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
-        if (results is not JsonObject)
-            return ["results are { \"show\", \"strategy\", \"period\" }"];
-        var show = Text("show");
-        if (show == null || !ResultKinds.Contains(show))
-            problems.Add($"results show one of {string.Join(", ", ResultKinds)}");
-        var id = Text("strategy");
-        if (id == null || !strategies.TryGetValue(id, out var strategy))
-            problems.Add($"results need \"strategy\", the id of one of the tour's strategies{(id != null ? $": there is no \"{id}\"" : "")}");
-        else if (show == "sweep" && strategy["vary"] is not JsonObject { Count: > 0 })
-            problems.Add($"a sweep runs the variations of the numbers a strategy varies, and \"{id}\" has no \"vary\"");
-        var period = Text("period")?.Split(':');
-        if (period is not [var market, var year] || !Markets.All.Any(x => x.Id == market) || !int.TryParse(year, out _))
-            problems.Add($"results need \"period\", a market and year as \"btc-coinbase-1h:2023\": {string.Join(", ", Markets.All.Select(x => x.Id))}");
+        if (cue["highlight"] is { } highlight && (highlight is not JsonValue part || !part.TryGetValue<string>(out _)))
+            problems.Add("highlight names a part of the page shown, as \"entry\"");
+        if (cue["do"] is { } does)
+        {
+            if (does is not JsonArray actions || actions.Any(x => x is not JsonObject { Count: > 0 }))
+                return [.. problems, "do is a list of things done on the page shown, as [{ \"click\": \"run\" }]"];
+            foreach (var action in actions.Select(x => x!.AsObject()))
+            {
+                if (PageActions.Count(action.ContainsKey) != 1)
+                    problems.Add($"each thing done is one of {string.Join(", ", PageActions)}");
+                else if (action["select"] is JsonValue id && id.TryGetValue<string>(out var selected) && !strategies.ContainsKey(selected))
+                    problems.Add($"no strategy \"{selected}\" on the Strategies page");
+            }
+        }
+
+        if (!onPage && (cue["highlight"] != null || cue["do"] != null))
+            problems.Add("highlight and do are for a section that shows a page, with \"page\"");
         return problems;
     }
 
     /// <summary>
     /// Compiles the tour against one dataset, the tour's own: a tour without scenes needs no other.
     /// </summary>
-    public static TourScript Compile(JsonNode def, IReadOnlyList<Price> dataset, bool teachOnce = false)
+    public static TourScript Compile(JsonNode def, IReadOnlyList<Price> dataset, bool teachOnce = false, IReadOnlyDictionary<string, JsonNode>? strategies = null)
     {
-        return Compile(def, new Dictionary<string, IReadOnlyList<Price>> { [def["dataset"]?.GetValue<string>() ?? ""] = dataset }, teachOnce);
+        return Compile(def, new Dictionary<string, IReadOnlyList<Price>> { [def["dataset"]?.GetValue<string>() ?? ""] = dataset }, teachOnce, strategies);
     }
 
     /// <summary>
@@ -216,13 +196,11 @@ public static class Tours
     /// section never teaches a definition the tour has cited before it; with teachOnce, as tour.json is played start to end,
     /// nor one a written section before it has taught. An analysis, whose chapters are ticked on and off, teaches each in full.
     /// </summary>
-    public static TourScript Compile(JsonNode def, IReadOnlyDictionary<string, IReadOnlyList<Price>> datasets, bool teachOnce = false)
+    public static TourScript Compile(JsonNode def, IReadOnlyDictionary<string, IReadOnlyList<Price>> datasets, bool teachOnce = false, IReadOnlyDictionary<string, JsonNode>? strategies = null)
     {
         var errors = new List<string>();
         var known = new HashSet<string>(PageLayers.Concat(Terms.All.Select(x => x.Type.ToString())));
-        foreach (var id in TourStrategies(def, errors))
-            known.Add($"strategy:{id}");
-        var strategyNodes = StrategyNodes(def);
+        var strategyNodes = strategies ?? new Dictionary<string, JsonNode>();
         var start = def["start"]?.AsObject();
         var own = def["dataset"]?.GetValue<string>() ?? "";
         var ownPrices = datasets.TryGetValue(own, out var found) ? found : datasets.Values.First();
@@ -307,16 +285,15 @@ public static class Tours
             // A section that explains something is written out from the prices before it is read like any other.
             if (node["explain"] != null)
             {
-                // A Trade's strategy is one of the tour's own, named by its id.
+                // A Trade's strategy is one of the Strategies page's, named by its id.
                 if (node["strategy"] is JsonValue named && named.TryGetValue<string>(out var strategyId))
                 {
                     node = node.DeepClone().AsObject();
                     if (strategyNodes.TryGetValue(strategyId, out var strategyNode))
                         node["strategy"] = strategyNode.DeepClone();
                     else
-                        errors.Add($"{where}: no strategy \"{strategyId}\" among the tour's strategies");
+                        errors.Add($"{where}: no strategy \"{strategyId}\" on the Strategies page");
                 }
-
 
                 // What the written texts taught, as written before any edit, is told.
                 node = Explain.Expand(node, prices, node["from"] is JsonValue f && f.TryGetValue<int>(out var begins) ? begins : at, where, errors, cited, teachOnce ? cited : null);
@@ -324,8 +301,10 @@ public static class Tours
                     expandedSections[i] = node.DeepClone();
             }
 
-            if (node["results"] is JsonNode results)
-                errors.AddRange(ResultsProblems(results, strategyNodes).Select(x => $"{where}: {x}"));
+            // A section can show a page in place of the chart, as it is.
+            var page = node["page"] is JsonValue shown && shown.TryGetValue<string>(out var pageName) ? pageName : null;
+            if (node["page"] != null && (page == null || !Pages.Contains(page)))
+                errors.Add($"{where}: page is a page shown in place of the chart: {string.Join(", ", Pages)}");
 
             if (node["layers"] != null)
                 layers = Ids(node["layers"], where);
@@ -381,6 +360,8 @@ public static class Tours
             foreach (var (cue, j) in (node["cues"]?.AsArray() ?? []).Select((x, j) => (x?.AsObject(), j)))
             {
                 var what = $"{where}, text {j + 1}";
+                if (cue != null)
+                    errors.AddRange(PageProblems(cue, page != null, strategyNodes).Select(x => $"{what}: {x}"));
                 var texts = new Dictionary<EnumDetail, string>();
                 foreach (var (name, value) in cue?["texts"]?.AsObject() ?? [])
                 {

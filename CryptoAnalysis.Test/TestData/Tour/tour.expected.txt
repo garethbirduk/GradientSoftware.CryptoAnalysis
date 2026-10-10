@@ -136,23 +136,31 @@
 #89 · section 82 in scene 2 text 3 line ends on 58802 · seen at #94: nothing
 #93 · section 82 in scene 2 text 4 "3: -1725" on 56885 · seen at #94: nothing
 #94 · section 82 in scene 2 text 4 line ends on 55160 · seen at #94: L1 LL* · L1 downswing BoS · L1 range ends below
+#9 · section 84 (Trading) in scene 3 runs to it: L1 HL*
 #28 · section 85 in scene 3 runs to it: L1 HH* · L1 upswing BoS
-#10 · section 85 in scene 3 text 1 "A strategy enters a trade when its entry condition is met. The condition is read at the close of each candle, from that candle and the ones before it alone, and the trade is entered at that close." · seen at #28: nothing
-#10 · section 85 in scene 3 text 2 "This strategy's entry condition is three Successive Green Candles. It enters on the third of them, once a run, so a longer run does not enter again." · seen at #28: nothing
-#12 · section 85 in scene 3 text 3 "Candles of one colour that follow one another are Successive Candles, counted from the first of the colour to the last." · seen at #28: nothing
-#12 · section 85 in scene 3 text 4 "Third of three Successive Green Candles, 17:00 to 19:00." · seen at #28: nothing
-#12 · section 85 in scene 3 text 5 "That meets the entry condition, so the trade is entered at the close of the candle at 19:00, buying at 22218." · seen at #28: nothing
-#12 · section 85 in scene 3 text 6 "A trade's Take Profit is set as it is entered: the price where it closes with a gain, above the entry for a long trade and below it for a short one." · seen at #28: nothing
-#12 · section 85 in scene 3 text 7 "The Take Profit is 1% of the entry price, 222 above the entry, at 22440." · seen at #28: nothing
-#12 · section 85 in scene 3 text 8 "A trade's Stop Loss is set as it is entered: the price where it closes with a loss, below the entry for a long trade and above it for a short one." · seen at #28: nothing
-#12 · section 85 in scene 3 text 9 "The Stop Loss is 1% of the entry price, 222 below the entry, at 21995." · seen at #28: nothing
-#12 · section 85 in scene 3 text 10 "A trade's reward is how far its Take Profit is from its entry: what it wins if the Take Profit is reached. Its risk is how far its Stop Loss is from its entry: what it loses if the Stop Loss is reached." · seen at #28: nothing
-#12 · section 85 in scene 3 text 11 "R is the unit of risk: 1R is how far the Stop Loss is from the entry. The reward is counted in R, so a Take Profit twice as far from the entry as the Stop Loss is a 2R target." · seen at #28: nothing
-#12 · section 85 in scene 3 text 12 "With 222 to win and 222 to lose, the Take Profit is a 1R target." · seen at #28: nothing
-#12 · section 85 in scene 3 text 13 "A trade that wins its target in R or loses 1R breaks even over many trades when the share it wins is one divided by one plus its target: half at 1R, a third at 2R." · seen at #28: nothing
-#12 · section 85 in scene 3 text 14 "At 1R, it breaks even over many trades when it wins 50% of them." · seen at #28: nothing
-#12 · section 85 in scene 3 text 15 "Whichever exit the price reaches first ends the trade. From the next candle on, each candle is checked against the exits. When it reaches the Take Profit, the trade closes there with a gain; when it reaches the Stop Loss, it closes there with a loss. A candle that opens beyond an exit closes the trade at its open. A candle that reaches both cannot say which came first, so it counts as the Stop Loss." · seen at #28: nothing
-#28 · section 85 in scene 3 text 16 "Sixteen hours later, at 11:00, the high of 22500 reaches the Take Profit, so the trade closes at 22440: it won 166, 0.75%, after 55 in fees and slippage." · seen at #28: L1 HH* · L1 upswing BoS
-#56 · section 86 in scene 3 runs to it: L1 HH* · L1 upswing BoS
-#36 · section 86 in scene 3 text 1 "The strategy trades again at each new run of three: each arrow is a trade it enters." · seen at #56: nothing
-#54 · section 87 in scene 3 text 1 "Twelve hours later, at 13:00, the low of 24344 reaches the Stop Loss, so the trade closes at 24384: it lost 319, 1.30%, after 73 in fees and slippage." · seen at #56: nothing
+#10 · section 85 in scene 3 text 1 "A trade is entered when a condition set beforehand is met by the close of a candle." · seen at #28: nothing
+#10 · section 85 in scene 3 text 2 "Here the entry condition is three Successive Green Candles." · seen at #28: nothing
+#12 · section 85 in scene 3 text 3 "That meets the entry condition, so the trade is entered at the close of the candle at 19:00, buying at 22218." · seen at #28: nothing
+#12 · section 85 in scene 3 text 4 "A trade's Take Profit is set as it is entered: the price where it closes with a gain, above the entry for a long trade and below it for a short one." · seen at #28: nothing
+#12 · section 85 in scene 3 text 5 "A trade's Stop Loss is set as it is entered: the price where it closes with a loss, below the entry for a long trade and above it for a short one." · seen at #28: nothing
+#12 · section 85 in scene 3 text 6 "Whichever exit the price reaches first ends the trade. From the next candle on, each candle is checked against the exits." · seen at #28: nothing
+#12 · section 85 in scene 3 text 7 "When it reaches the Take Profit, the trade closes there with a gain; when it reaches the Stop Loss, it closes there with a loss." · seen at #28: nothing
+#12 · section 85 in scene 3 text 8 "A candle that opens beyond an exit closes the trade at its open." · seen at #28: nothing
+#28 · section 85 in scene 3 text 9 "Sixteen hours later, the price reaches the Take Profit first, so the trade closes there with a gain." · seen at #28: L1 HH* · L1 upswing BoS
+#28 · section 85 in scene 3 text 10 "Here is another trade, entered the same way a day later." · seen at #28: L1 HH* · L1 upswing BoS
+#40 · section 86 in scene 3 gets there by fast forward: L1 HH* · L1 upswing BoS
+#54 · section 86 in scene 3 runs to it: L1 LL* · L1 downswing BoS
+#54 · section 86 in scene 3 text 1 "This time the price reaches the Stop Loss first, so the trade closes there with a loss." · seen at #54: L1 LL* · L1 downswing BoS
+#28 · section 91 in scene 4 runs to it: L1 HH* · L1 upswing BoS
+#12 · section 91 in scene 4 text 1 "Candles of one colour that follow one another are Successive Candles, counted from the first of the colour to the last." · seen at #28: nothing
+#12 · section 91 in scene 4 text 2 "Third of three Successive Green Candles, 17:00 to 19:00." · seen at #28: nothing
+#12 · section 91 in scene 4 text 3 "That meets the entry condition, so the trade is entered at the close of the candle at 19:00, buying at 22218." · seen at #28: nothing
+#12 · section 91 in scene 4 text 4 "The Take Profit is 1% of the entry price, 222 above the entry, at 22440." · seen at #28: nothing
+#12 · section 91 in scene 4 text 5 "The Stop Loss is 1% of the entry price, 222 below the entry, at 21995." · seen at #28: nothing
+#12 · section 91 in scene 4 text 6 "A trade's reward is how far its Take Profit is from its entry: what it wins if the Take Profit is reached. Its risk is how far its Stop Loss is from its entry: what it loses if the Stop Loss is reached." · seen at #28: nothing
+#12 · section 91 in scene 4 text 7 "R is the unit of risk: 1R is how far the Stop Loss is from the entry. The reward is counted in R, so a Take Profit twice as far from the entry as the Stop Loss is a 2R target." · seen at #28: nothing
+#12 · section 91 in scene 4 text 8 "With 222 to win and 222 to lose, the Take Profit is a 1R target." · seen at #28: nothing
+#12 · section 91 in scene 4 text 9 "A trade that wins its target in R or loses 1R breaks even over many trades when the share it wins is one divided by one plus its target: half at 1R, a third at 2R." · seen at #28: nothing
+#12 · section 91 in scene 4 text 10 "At 1R, it breaks even over many trades when it wins 50% of them." · seen at #28: nothing
+#12 · section 91 in scene 4 text 11 "A candle that reaches both exits cannot say which came first, so it counts as the Stop Loss." · seen at #28: nothing
+#28 · section 91 in scene 4 text 12 "Sixteen hours later, at 11:00, the high of 22500 reaches the Take Profit, so the trade closes at 22440: it won 222, 1.00%." · seen at #28: L1 HH* · L1 upswing BoS

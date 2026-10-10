@@ -96,7 +96,8 @@ public static partial class Explain
     /// before it (so the section runs on to the thing it explains when that is further on). The section's "explain", "at"
     /// and "level" are taken out, so what comes back compiles as any other section does. "blocks" tells only the blocks it
     /// names (see <see cref="BlocksOf"/>). A written text that is one of the cited definitions, which the tour has already
-    /// told, is left out. "edits" changes written texts by their id ({ "Begins.2": { "education": "..." } }), and "detail"
+    /// told, is left out. "edits" changes written texts by their id ({ "Begins.2": { "education": "..." } }), "omit" leaves
+    /// written texts out by their id (["Begins.2"]), and "detail"
     /// tells the written texts at that one level alone, as an analysis tells what a thing is apart from what this one is.
     /// Problems are listed, not thrown, and a section with a problem comes back with only what it says
     /// for itself. What the written texts teach, as written before any edit, is added to taught.
@@ -112,6 +113,7 @@ public static partial class Explain
         result.Remove("blocks");
         result.Remove("detail");
         result.Remove("edits");
+        result.Remove("omit");
         result.Remove("strategy");
         result.Remove("risk");
         var term = node["explain"]?.GetValue<string>() ?? "";
@@ -126,6 +128,18 @@ public static partial class Explain
         {
             errors.Add($"{where}: edits are the written texts changed, by id: {{ \"Begins.2\": {{ \"education\": \"...\" }} }}");
             return result;
+        }
+
+        var omitted = new HashSet<string>();
+        if (node["omit"] is { } omit)
+        {
+            if (omit is not JsonArray ids || ids.Any(x => x is not JsonValue id || !id.TryGetValue<string>(out _)))
+            {
+                errors.Add($"{where}: omit is the written texts left out, by id: [\"Begins.2\"]");
+                return result;
+            }
+
+            omitted = ids.Select(x => x!.GetValue<string>()).ToHashSet();
         }
 
         // Risk is told from inputs of the section's own, not found at a candle, so it is not one of the things at a candle.
@@ -183,8 +197,14 @@ public static partial class Explain
             result[key] ??= value?.DeepClone();
         // A definition is taught once, where the tour first tells it; a written section does not teach it again.
         var cues = new JsonArray();
+        var writtenIds = (written["cues"]?.AsArray() ?? []).Select(x => x?["id"]?.GetValue<string>()).ToHashSet();
+        if (omitted.Where(x => !writtenIds.Contains(x)).ToList() is { Count: > 0 } unknown)
+            errors.Add($"{where}: omit names written texts the section does not have: {string.Join(", ", unknown)}");
         foreach (var cue in (written["cues"]?.AsArray() ?? []).Where(x => cited == null || Taught(x) is not { } text || !cited.Contains(text)))
         {
+            // A text left out is not told, so it teaches nothing.
+            if (cue?["id"]?.GetValue<string>() is { } cueId && omitted.Contains(cueId))
+                continue;
             if (Taught(cue) is { } text)
                 taught?.Add(text);
             if (Edited(cue!.DeepClone().AsObject(), node["edits"] as JsonObject, detail) is { } told)

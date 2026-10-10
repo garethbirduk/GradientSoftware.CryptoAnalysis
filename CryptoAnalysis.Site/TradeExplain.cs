@@ -247,6 +247,11 @@ public static partial class Explain
             _ => $"{later}, the {low} of {Money(reached.Item2)} reaches the Stop Loss, so the trade closes at {Money(t.ExitPrice)}: {result}.",
         };
         cues.Add(Say(t.ExitIndex, said));
+        // The rules of how the exits are reached are told one at a time, after the first, so a section can leave any out
+        // by its id. They are at the entry, so they are told before the candle that ends the trade.
+        cues.Add(Define(t.EntryIndex, "Trade.exits"));
+        cues.Add(Define(t.EntryIndex, "Trade.gap"));
+        cues.Add(Define(t.EntryIndex, "Trade.both"));
         return new Block(cues, ["candles", "trade"]);
     }
 

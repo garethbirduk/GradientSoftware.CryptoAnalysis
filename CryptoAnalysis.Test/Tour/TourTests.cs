@@ -27,10 +27,15 @@ public class TourTests
     private static readonly Lazy<IReadOnlyDictionary<string, IReadOnlyList<Price>>> Datasets = new(() =>
         Tours.Datasets.ToDictionary(x => x.Id, x => (IReadOnlyList<Price>)Tours.Load(x, RepoRoot)));
 
+    // The Strategies page's strategies as the repository has them, in strategies.example.json: strategies.json is local.
+    private static readonly Lazy<Dictionary<string, JsonNode>> Strategies = new(() =>
+        JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot, "CryptoAnalysis.Site", "wwwroot", "strategies.example.json")))!["strategies"]!.AsArray()
+            .ToDictionary(x => x!["id"]!.GetValue<string>(), x => x!));
+
     private static TourScript Compile()
     {
         var def = JsonNode.Parse(File.ReadAllText(TourPath)) ?? throw new InvalidOperationException("tour.json is empty");
-        return Tours.Compile(def, Datasets.Value, teachOnce: true);
+        return Tours.Compile(def, Datasets.Value, teachOnce: true, Strategies.Value);
     }
 
     [TestMethod]
@@ -43,55 +48,31 @@ public class TourTests
     }
 
     [TestMethod]
-    public void TourStrategies_AreLayersAndTheirProblemsListed()
+    public void PageTexts_ProblemsListed()
     {
-        var def = JsonNode.Parse("""
-            { "strategies": [
-                { "id": "ok", "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 3 }, "takeProfit": { "type": "Percent", "percent": 1 }, "stopLoss": { "type": "Percent", "percent": 1 } },
-                { "id": "bad", "takeProfit": { "type": "Percent", "percent": 0 } },
-                { "name": "no id" },
-                { "id": "ok" } ] }
-            """)!;
-        var errors = new List<string>();
+        var strategies = new Dictionary<string, JsonNode> { ["three-green"] = JsonNode.Parse("""{ "id": "three-green" }""")! };
+        List<string> Problems(string json, bool onPage = true) => Tours.PageProblems(JsonNode.Parse(json)!.AsObject(), onPage, strategies);
 
-        CollectionAssert.AreEqual(new[] { "ok", "bad", "ok" }, Tours.TourStrategies(def, errors));
-        Assert.IsTrue(errors.Any(x => x.StartsWith("strategy 2 (bad): Take Profit")), string.Join("\n", errors));
-        Assert.IsTrue(errors.Any(x => x.StartsWith("strategy 3: a strategy needs an id")), string.Join("\n", errors));
-        Assert.IsTrue(errors.Any(x => x.StartsWith("strategy 4: \"ok\" is the id of a strategy before it")), string.Join("\n", errors));
+        Assert.AreEqual(0, Problems("""{ "highlight": "entry", "do": [{ "select": "three-green" }, { "click": "run" }, { "vary": "takeProfit.percent", "to": 3, "step": 0.5 }] }""").Count);
+        Assert.AreEqual(0, Problems("""{ "texts": { "education": "No page needed." } }""", onPage: false).Count);
+        Assert.IsTrue(Problems("""{ "do": [{ "select": "none" }] }""").Single().StartsWith("no strategy \"none\""));
+        Assert.IsTrue(Problems("""{ "do": [{ "press": "run" }] }""").Single().StartsWith("each thing done is one of"));
+        Assert.IsTrue(Problems("""{ "do": { "click": "run" } }""").Single().StartsWith("do is a list"));
+        Assert.IsTrue(Problems("""{ "highlight": "entry" }""", onPage: false).Single().StartsWith("highlight and do are for a section that shows a page"));
     }
 
     [TestMethod]
-    public void TourResults_ProblemsListed()
+    public void Tour_StrategyChapterTradeIsWhereTheTourAnalysesIt()
     {
-        var strategies = new Dictionary<string, JsonNode>
-        {
-            ["plain"] = JsonNode.Parse("""{ "id": "plain" }""")!,
-            ["varied"] = JsonNode.Parse("""{ "id": "varied", "vary": { "takeProfit.percent": { "to": 3, "step": 0.5 } } }""")!,
-        };
-        List<string> Problems(string json) => Tours.ResultsProblems(JsonNode.Parse(json)!, strategies);
-
-        Assert.AreEqual(0, Problems("""{ "show": "sweep", "strategy": "varied", "period": "btc-coinbase-1h:2023" }""").Count);
-        Assert.AreEqual(0, Problems("""{ "show": "baseline", "strategy": "plain", "period": "btc-coinbase-1h:2023" }""").Count);
-        Assert.IsTrue(Problems("""{ "show": "graph", "strategy": "plain", "period": "btc-coinbase-1h:2023" }""").Single().StartsWith("results show one of"));
-        Assert.IsTrue(Problems("""{ "show": "run", "strategy": "none", "period": "btc-coinbase-1h:2023" }""").Single().EndsWith("there is no \"none\""));
-        Assert.IsTrue(Problems("""{ "show": "sweep", "strategy": "plain", "period": "btc-coinbase-1h:2023" }""").Single().Contains("has no \"vary\""));
-        Assert.IsTrue(Problems("""{ "show": "run", "strategy": "plain", "period": "nowhere:2023" }""").Single().StartsWith("results need \"period\""));
-    }
-
-    [TestMethod]
-    public void Tour_StrategyChapterTradesWhereItsTextsSay()
-    {
-        var def = JsonNode.Parse(File.ReadAllText(TourPath))!;
-        var strategy = def["strategies"]!.AsArray().Single(x => x?["id"]?.GetValue<string>() == "three-green")
-            .Deserialize<Strategy>(StrategyBook.JsonOptions)!;
+        var strategy = Strategies.Value["three-green"].Deserialize<Strategy>(StrategyBook.JsonOptions)!;
         var prices = Datasets.Value["btc-1h"];
         var anchor = prices.ToList().FindIndex(x => x.DateTime == new DateTime(2023, 2, 14, 7, 0, 0, DateTimeKind.Utc));
 
-        var trades = StrategyBacktest.Run(prices.ToList(), strategy).Trades
-            .Where(x => x.EntryIndex >= anchor && x.EntryIndex <= anchor + 56)
-            .Select(x => $"{x.EntryIndex - anchor}-{x.ExitIndex - anchor} {x.Outcome}");
+        var trades = StrategyBacktest.Run(prices.ToList().GetRange(anchor, prices.Count - anchor), strategy).Trades
+            .Where(x => x.EntryIndex <= 30)
+            .Select(x => $"{x.EntryIndex}-{x.ExitIndex} {x.Outcome}");
 
-        Assert.AreEqual("12-28 TakeProfit, 28-29 TakeProfit, 36-37 TakeProfit, 42-54 StopLoss", string.Join(", ", trades));
+        Assert.AreEqual("12-28 TakeProfit, 28-29 TakeProfit", string.Join(", ", trades));
     }
 
     [TestMethod]
