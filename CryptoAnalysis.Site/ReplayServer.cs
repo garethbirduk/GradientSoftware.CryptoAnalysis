@@ -243,7 +243,7 @@ public static class ReplayServer
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
             var options = new ExplainOptions(greenRuns ?? ExplainOptions.Default.GreenRuns, redRuns ?? ExplainOptions.Default.RedRuns);
-            return Results.Text(new JsonArray(Explain.At(data.Prices, at, seen, options, MaxLevel).Select(x => (JsonNode)x.ToJson()).ToArray()).ToJsonString(), "application/json");
+            return Results.Text(new JsonArray(Explain.At(data.Prices, at, seen, Structure(data), options, MaxLevel).Select(x => (JsonNode)x.ToJson()).ToArray()).ToJsonString(), "application/json");
         });
 
         // things lists what to explain, by id as /api/explain/at gives them ("Candle,SuccessiveCandles,Swing:1"), a chapter
