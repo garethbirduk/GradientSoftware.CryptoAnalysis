@@ -429,9 +429,9 @@ public static class Sawtooth
         return trends;
     }
 
-    private static double HighOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.High : price.Close;
+    internal static double HighOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.High : price.Close;
 
-    private static double LowOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.Low : price.Close;
+    internal static double LowOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.Low : price.Close;
 
     private static List<SawtoothPivot> LevelZero(List<Price> prices, EnumPriceBasis basis)
     {
@@ -488,7 +488,7 @@ public static class Sawtooth
     /// Finds the alternating pivots inside a leg that starts at from and runs to candle end.
     /// For an upleg: the end of each run of new highs, and the first lowest price before the next new high.
     /// </summary>
-    private static List<SawtoothPivot> Chain(List<Price> prices, EnumPriceBasis basis, SawtoothPivot from, int end, bool up, bool includeLastExtreme)
+    internal static List<SawtoothPivot> Chain(List<Price> prices, EnumPriceBasis basis, SawtoothPivot from, int end, bool up, bool includeLastExtreme)
     {
         double Extreme(Price p) => up ? HighOf(p, basis) : LowOf(p, basis);
         double Counter(Price p) => up ? LowOf(p, basis) : HighOf(p, basis);
@@ -558,7 +558,7 @@ public static class Sawtooth
         return chain;
     }
 
-    private static SawtoothPivot Pivot(EnumPivotKind kind, List<Price> prices, int index, EnumPriceBasis basis)
+    internal static SawtoothPivot Pivot(EnumPivotKind kind, List<Price> prices, int index, EnumPriceBasis basis)
     {
         var price = prices[index];
         var value = kind switch
