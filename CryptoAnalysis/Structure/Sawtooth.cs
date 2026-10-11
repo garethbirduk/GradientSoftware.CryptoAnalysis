@@ -159,6 +159,38 @@ public static class Sawtooth
     /// </summary>
     public static List<StructurePoint> Points(List<Price> prices, SawtoothLevel level, EnumPriceBasis basis)
     {
+        // The incomplete leg's furthest point so far: the first candle to reach it, since an equal close does not extend it.
+        var pivots = level.Pivots;
+        int? furthest = null;
+        if (EndsInAnIncompleteLeg(pivots))
+        {
+            var up = pivots[^2].Kind == EnumPivotKind.Low;
+            var best = pivots[^2].Index + 1;
+            for (var i = best + 1; i < prices.Count; i++)
+            {
+                if (up ? HighOf(prices[i], basis) > HighOf(prices[best], basis) : LowOf(prices[i], basis) < LowOf(prices[best], basis))
+                    best = i;
+            }
+
+            if (best < prices.Count)
+                furthest = best;
+        }
+
+        return Points(prices, level, basis, furthest);
+    }
+
+    /// <summary>
+    /// Whether a level ends in a leg from a high or a low to the current price.
+    /// </summary>
+    internal static bool EndsInAnIncompleteLeg(IReadOnlyList<SawtoothPivot> pivots) =>
+        pivots.Count >= 2 && pivots[^1].Kind == EnumPivotKind.Current && pivots[^2].Kind is EnumPivotKind.High or EnumPivotKind.Low;
+
+    /// <summary>
+    /// A level's highs and lows, as <see cref="Points(List{Price}, SawtoothLevel, EnumPriceBasis)"/> gives them, with the
+    /// candle of the incomplete leg's furthest point so far already found, when it has one.
+    /// </summary>
+    internal static List<StructurePoint> Points(List<Price> prices, SawtoothLevel level, EnumPriceBasis basis, int? furthest)
+    {
         var pivots = level.Pivots;
         var extremes = new List<(EnumPivotKind Kind, DateTime Time, double Price, DateTime LegStart, bool Provisional)>();
         for (var i = 0; i < pivots.Count; i++)
@@ -168,21 +200,12 @@ public static class Sawtooth
                 extremes.Add((p.Kind, p.Time, p.Price, i > 0 ? pivots[i - 1].Time : p.Time, p.ConfirmedIndex == null));
         }
 
-        // The incomplete leg's furthest point so far: the first candle to reach it, since an equal close does not extend it.
-        if (pivots.Count >= 2 && pivots[^1].Kind == EnumPivotKind.Current && pivots[^2].Kind is EnumPivotKind.High or EnumPivotKind.Low)
+        if (furthest is int best)
         {
             var from = pivots[^2];
             var up = from.Kind == EnumPivotKind.Low;
-            var best = from.Index + 1;
-            for (var i = best + 1; i < prices.Count; i++)
-            {
-                if (up ? HighOf(prices[i], basis) > HighOf(prices[best], basis) : LowOf(prices[i], basis) < LowOf(prices[best], basis))
-                    best = i;
-            }
-
-            if (best < prices.Count)
-                extremes.Add((up ? EnumPivotKind.High : EnumPivotKind.Low, prices[best].DateTime,
-                    up ? HighOf(prices[best], basis) : LowOf(prices[best], basis), from.Time, true));
+            extremes.Add((up ? EnumPivotKind.High : EnumPivotKind.Low, prices[best].DateTime,
+                up ? HighOf(prices[best], basis) : LowOf(prices[best], basis), from.Time, true));
         }
 
         var points = new List<StructurePoint>();
@@ -297,28 +320,36 @@ public static class Sawtooth
             if (previous == null || previous.Direction != direction)
                 return;
 
-            var from = previous.Extreme;
-            var up = direction == EnumSwingDirection.Up;
-            var gap = up ? to.Price - from.Price : from.Price - to.Price;
-            var start = index[to.Time];
-            if (gap <= 0 || gap < Math.Abs(from.Price) * MinimumRetracementMovePercent / 100 || start >= end)
-                return;
-
-            var steps = new List<RetracementStep>();
-            double? best = null;
-            for (var i = start + 1; i <= end; i++)
-            {
-                var value = up ? LowOf(prices[i], basis) : HighOf(prices[i], basis);
-                if (best is double b && !(up ? value < b : value > b))
-                    continue;
-                best = value;
-                var back = up ? to.Price - value : value - to.Price;
-                steps.Add(new RetracementStep(new PricePoint(prices[i].DateTime, value), (int)Math.Floor(100 * back / gap)));
-            }
-
-            if (steps.Count > 0)
-                retracements.Add(new RetracementOutline(level, direction, from, to, steps, final));
+            if (Retracement(prices, basis, level, direction, previous.Extreme, to, index[to.Time], end, final) is { } retracement)
+                retracements.Add(retracement);
         }
+    }
+
+    /// <summary>
+    /// The retracement of the move from a point to another, read from the candle after the move ends to the candle end; null
+    /// when the move is too small to read against or there are no candles to read.
+    /// </summary>
+    internal static RetracementOutline? Retracement(List<Price> prices, EnumPriceBasis basis, int level, EnumSwingDirection direction, PricePoint from, PricePoint to,
+        int start, int end, bool final)
+    {
+        var up = direction == EnumSwingDirection.Up;
+        var gap = up ? to.Price - from.Price : from.Price - to.Price;
+        if (gap <= 0 || gap < Math.Abs(from.Price) * MinimumRetracementMovePercent / 100 || start >= end)
+            return null;
+
+        var steps = new List<RetracementStep>();
+        double? best = null;
+        for (var i = start + 1; i <= end; i++)
+        {
+            var value = up ? LowOf(prices[i], basis) : HighOf(prices[i], basis);
+            if (best is double b && !(up ? value < b : value > b))
+                continue;
+            best = value;
+            var back = up ? to.Price - value : value - to.Price;
+            steps.Add(new RetracementStep(new PricePoint(prices[i].DateTime, value), (int)Math.Floor(100 * back / gap)));
+        }
+
+        return steps.Count > 0 ? new RetracementOutline(level, direction, from, to, steps, final) : null;
     }
 
     /// <summary>

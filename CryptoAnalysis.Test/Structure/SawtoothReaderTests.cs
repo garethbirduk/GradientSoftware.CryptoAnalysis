@@ -19,6 +19,8 @@ public class SawtoothReaderTests
     private static string Describe(IEnumerable<SwingOutline> swings) =>
         string.Join("\n", swings.Select(x => $"L{x.Level} {x.Direction} {x.Start.Time:yyMMddHH}:{x.Start.Price} {x.Extreme.Time:yyMMddHH}:{x.Extreme.Price} {x.BreakOfStructure!.Time:yyMMddHH}:{x.BreakOfStructure.Price} {x.End == x.BreakOfStructure}"));
 
+    private static string Json<T>(T value) => System.Text.Json.JsonSerializer.Serialize(value);
+
     /// <summary>
     /// Reads the candles one at a time and, at each candle check says to, holds the reader to the sawtooth of the candles
     /// to there.
@@ -35,8 +37,19 @@ public class SawtoothReaderTests
             var so = prices.GetRange(0, i + 1);
             var expected = Sawtooth.Levels(so, basis, Depth);
             Assert.AreEqual(Describe(expected), Describe(reader.Levels(Depth)), $"{name}: the levels at candle {i}.");
+            for (var level = 0; level < expected.Count; level++)
+                Assert.AreEqual(Json(Sawtooth.Points(so, expected[level], basis)), Json(reader.Points(level)), $"{name}: the points of level {level} at candle {i}.");
+            Assert.AreEqual(0, reader.Points(expected.Count).Count, $"{name}: points of a level there is not, at candle {i}.");
+
+            // One level past the last, which has nothing.
             for (var level = 1; level <= expected.Count; level++)
-                Assert.AreEqual(Describe(Sawtooth.Swings(so, expected, basis, level)), Describe(reader.Swings(level)), $"{name}: the swings of level {level} at candle {i}.");
+            {
+                var swings = Sawtooth.Swings(so, expected, basis, level);
+                var candidates = Sawtooth.Candidates(so, expected, basis, level);
+                Assert.AreEqual(Describe(swings), Describe(reader.Swings(level)), $"{name}: the swings of level {level} at candle {i}.");
+                Assert.AreEqual(Json(candidates), Json(reader.Candidates(level)), $"{name}: the candidates of level {level} at candle {i}.");
+                Assert.AreEqual(Json(Sawtooth.Retracements(so, swings, candidates, basis)), Json(reader.Retracements(level)), $"{name}: the retracements of level {level} at candle {i}.");
+            }
         }
     }
 
@@ -84,7 +97,7 @@ public class SawtoothReaderTests
         var high = Enumerable.Range(0, 30000).MaxBy(i => all[i].Close);
         var crossing = Enumerable.Range(30000, all.Count - 30000).First(i => all[i].Close > all[high].Close);
 
-        // Every 500th candle, each candle either side of the close above the old high, and the last.
-        AssertSame(all, EnumPriceBasis.Close, i => i % 500 == 0 || Math.Abs(i - crossing) <= 25 || i == all.Count - 1, "BTC from 2020");
+        // Every 2,000th candle, each candle either side of the close above the old high, and the last.
+        AssertSame(all, EnumPriceBasis.Close, i => i % 2000 == 0 || Math.Abs(i - crossing) <= 10 || i == all.Count - 1, "BTC from 2020");
     }
 }

@@ -1,8 +1,8 @@
 namespace Gradient.CryptoAnalysis;
 
 /// <summary>
-/// Reads the sawtooth a candle at a time, and after each candle has what <see cref="Sawtooth.Levels"/> and
-/// <see cref="Sawtooth.Swings"/> would make of the candles so far, without reading them all again.
+/// Reads the sawtooth a candle at a time, and after each candle has what <see cref="Sawtooth"/> would make of the candles
+/// so far (its levels, swings, points, candidates and retracements) without reading them all again.
 /// A leg between two pivots that can no longer move is read once and kept: what is inside it does not change, only how deep
 /// it lies. What a new candle can change is the last leg of each level, the one still running to the current price, and
 /// each of those is followed a candle at a time. So a candle costs a step for each level, and the reading of a leg when it
@@ -14,6 +14,9 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
     private readonly List<Price> _prices = [];
     private readonly Dictionary<(int From, bool Start, int To), Leg> _settled = [];
     private Dictionary<(int From, bool Up), Run> _running = [];
+
+    // The legs running to the current price, level 0's first: each begins at the last pivot of the one before.
+    private List<Run> _spine = [];
     private Run? _first;
     private int _high;
 
@@ -39,8 +42,8 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
         _first ??= new Run(this, Start, up: true);
         _first.Advance(last);
 
-        // The leg running to the current price at each level: each begins at the last pivot of the one above.
         var running = new Dictionary<(int, bool), Run>();
+        var spine = new List<Run>();
         for (var from = HasCurrent ? High : null; from != null;)
         {
             var key = (from.Index, from.Kind == EnumPivotKind.Low);
@@ -48,10 +51,12 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
                 run = new Run(this, from, key.Item2);
             run.Advance(last);
             running[key] = run;
+            spine.Add(run);
             from = run.Seen.Count > 0 ? run.Seen[^1] : null;
         }
 
         _running = running;
+        _spine = spine;
     }
 
     /// <summary>
@@ -81,26 +86,73 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
     /// The confirmed swings at a level (1 or above) of the candles read so far: the same as <see cref="Sawtooth.Swings"/>
     /// makes of them.
     /// </summary>
-    public List<SwingOutline> Swings(int level)
+    public List<SwingOutline> Swings(int level) => SwingsAt(level).Select(swing =>
     {
-        var swings = new List<SwingOutline>();
-        if (level < 1 || _prices.Count == 0)
-            return swings;
+        var broke = Point(swing.Break, swing.Up);
+        return new SwingOutline(level, Direction(swing.Up), Point(swing.Start), broke, Point(swing.Counter), broke);
+    }).ToList();
 
-        // A swing lies inside a leg of the level above.
+    /// <summary>
+    /// A level's highs and lows as currently known, labelled against the previous one of their kind: the same as
+    /// <see cref="Sawtooth.Points(List{Price}, SawtoothLevel, EnumPriceBasis)"/> makes of that level. A level the candles do
+    /// not have has none.
+    /// </summary>
+    public List<StructurePoint> Points(int level)
+    {
+        if (level < 0 || _prices.Count == 0)
+            return [];
+
         var (pivots, legs) = LevelZero();
-        for (var l = 1; l < level; l++)
-            (pivots, legs) = Refine(pivots, legs);
-
-        foreach (var swing in legs.SelectMany(x => x.Swings))
+        for (var l = 0; l < level; l++)
         {
-            var candle = _prices[swing.Break];
-            var broke = new PricePoint(candle.DateTime, swing.Up ? Sawtooth.HighOf(candle, basis) : Sawtooth.LowOf(candle, basis));
-            swings.Add(new SwingOutline(level, swing.Up ? EnumSwingDirection.Up : EnumSwingDirection.Down, new PricePoint(swing.Start.Time, swing.Start.Price),
-                broke, new PricePoint(swing.Counter.Time, swing.Counter.Price), broke));
+            var (nextPivots, nextLegs) = Refine(pivots, legs);
+            if (nextPivots.Count == pivots.Count)
+                return [];
+            (pivots, legs) = (nextPivots, nextLegs);
         }
 
-        return swings;
+        // The furthest point of the leg still running is kept as the leg is followed.
+        int? furthest = Sawtooth.EndsInAnIncompleteLeg(pivots) && legs[^1].Following is { Furthest: >= 0 } run ? run.Furthest : null;
+        return Sawtooth.Points(_prices, new SawtoothLevel(level, pivots), basis, furthest);
+    }
+
+    /// <summary>
+    /// The candidate swings at a level (1 or above) of the candles read so far: the same as
+    /// <see cref="Sawtooth.Candidates"/> makes of them.
+    /// </summary>
+    public List<CandidateSwing> Candidates(int level) => CandidatesAt(level)
+        .Select(x => new CandidateSwing(level, Direction(x.Up), Point(x.Start), Point(x.Counter, !x.Up)))
+        .ToList();
+
+    /// <summary>
+    /// The retracements at a level (1 or above) of the candles read so far: the same as
+    /// <see cref="Sawtooth.Retracements"/> makes of that level's swings and candidates.
+    /// </summary>
+    public List<RetracementOutline> Retracements(int level)
+    {
+        // In the order they broke structure, which is the order they are met in.
+        var swings = SwingsAt(level).OrderBy(x => x.Break).ToList();
+        var retracements = new List<RetracementOutline>();
+        for (var i = 0; i < swings.Count; i++)
+            Add(swings[i].Up, swings[i].Start, swings[i].Counter.Index, final: true, before: i);
+        foreach (var candidate in CandidatesAt(level))
+            Add(candidate.Up, candidate.Start, _prices.Count - 1, final: false, before: swings.Count);
+
+        return retracements.OrderBy(x => x.To.Time).ToList();
+
+        void Add(bool up, SawtoothPivot to, int end, bool final, int before)
+        {
+            // The last swing to break structure before this one starts: nearly always the one just before it.
+            for (var i = before - 1; i >= 0; i--)
+            {
+                var previous = swings[i];
+                if (previous.Break > to.Index || previous.Start.Index >= to.Index)
+                    continue;
+                if (previous.Up == up && Sawtooth.Retracement(_prices, basis, level, Direction(up), Point(previous.Counter), Point(to), to.Index, end, final) is { } retracement)
+                    retracements.Add(retracement);
+                return;
+            }
+        }
     }
 
     private SawtoothPivot Start => Sawtooth.Pivot(EnumPivotKind.Start, _prices, 0, basis) with { ConfirmedIndex = 0 };
@@ -111,6 +163,15 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
 
     // Level 0 ends at the current price unless that is the highest high itself.
     private bool HasCurrent => !(_high == _prices.Count - 1 && Current.Price == High.Price);
+
+    private static EnumSwingDirection Direction(bool up) => up ? EnumSwingDirection.Up : EnumSwingDirection.Down;
+
+    private static PricePoint Point(SawtoothPivot pivot) => new(pivot.Time, pivot.Price);
+
+    private PricePoint Point(int index, bool high) => new(_prices[index].DateTime, Extreme(index, high));
+
+    // A candle's high or low, as the basis has it.
+    private double Extreme(int index, bool high) => high ? Sawtooth.HighOf(_prices[index], basis) : Sawtooth.LowOf(_prices[index], basis);
 
     // Level 0: the first price, the highest high and the current price, and the legs between them.
     private (List<SawtoothPivot> Pivots, List<Leg> Legs) LevelZero()
@@ -159,12 +220,46 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
         return (nextPivots, nextLegs);
     }
 
+    // A level's swings by their candles: a swing lies inside a leg of the level above.
+    private List<Swing> SwingsAt(int level)
+    {
+        if (level < 1 || _prices.Count == 0)
+            return [];
+
+        var (pivots, legs) = LevelZero();
+        for (var l = 1; l < level; l++)
+            (pivots, legs) = Refine(pivots, legs);
+        return legs.SelectMany(x => x.Swings).ToList();
+    }
+
+    // A level's candidates by their candles: where each starts, and the candle of the furthest price against it since.
+    private List<(bool Up, SawtoothPivot Start, int Counter)> CandidatesAt(int level)
+    {
+        var candidates = new List<(bool, SawtoothPivot, int)>();
+        if (level < 1 || _spine.Count == 0)
+            return candidates;
+
+        // The series high with the pullback since, which the leg running from it follows.
+        if (level == 1 && _high != 0 && _spine[0].Furthest >= 0)
+            candidates.Add((true, High, _spine[0].Furthest));
+
+        // The last extreme of the level above's running leg, when price has turned from it, with the counter-move since:
+        // the leg running from it at this level follows that.
+        if (level < _spine.Count && _spine[level - 1] is { Seen.Count: > 0 } run && run.Seen[^1].Kind == (run.Up ? EnumPivotKind.High : EnumPivotKind.Low)
+            && _spine[level].Furthest >= 0)
+            candidates.Add((run.Up, run.Seen[^1], _spine[level].Furthest));
+
+        return candidates;
+    }
+
     // The leg running from a pivot to the current price, as it is being followed.
     private Leg Running(SawtoothPivot from)
     {
-        if (!_running.TryGetValue((from.Index, from.Kind == EnumPivotKind.Low), out var run) || run.Seen.Count == 0)
-            return run == null ? Leg.None : new Leg([], [], run.Swings);
-        return new Leg(run.Seen, [.. run.Legs, Running(run.Seen[^1])], run.Swings);
+        if (!_running.TryGetValue((from.Index, from.Kind == EnumPivotKind.Low), out var run))
+            return Leg.None;
+        return run.Seen.Count == 0
+            ? new Leg([], [], run.Swings) { Following = run }
+            : new Leg(run.Seen, [.. run.Legs, Running(run.Seen[^1])], run.Swings) { Following = run };
     }
 
     // The leg between two pivots that can no longer move, read once and kept.
@@ -195,7 +290,7 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
                 continue;
             for (var c = turns[t + 1].Index + 1; c <= turns[t + 2].Index; c++)
             {
-                var value = up ? Sawtooth.HighOf(_prices[c], basis) : Sawtooth.LowOf(_prices[c], basis);
+                var value = Extreme(c, up);
                 if (up ? value > turns[t].Price : value < turns[t].Price)
                 {
                     swings.Add(new Swing(up, turns[t], turns[t + 1], c));
@@ -214,11 +309,13 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
 
     /// <summary>
     /// What is inside a leg: the pivots between its ends, the legs between those (one more than the pivots), and the swings
-    /// those pivots make.
+    /// those pivots make. Following is how a leg still running to the current price is being followed.
     /// </summary>
     private sealed record Leg(IReadOnlyList<SawtoothPivot> Inside, IReadOnlyList<Leg> Legs, IReadOnlyList<Swing> Swings)
     {
         public static readonly Leg None = new([], [], []);
+
+        public Run? Following { get; init; }
     }
 
     /// <summary>
@@ -233,6 +330,8 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
         private int _runs;
         private int _end;
 
+        public bool Up => up;
+
         /// <summary>
         /// The leg's pivots so far, but for an extreme on the last candle, which is still running.
         /// </summary>
@@ -246,6 +345,12 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
         public List<Swing> Swings { get; } = [];
 
         /// <summary>
+        /// The candle of the furthest price the leg's way since it began, the first to reach it; -1 before its first candle.
+        /// This is the leg's point while it runs, and the counter-move of a candidate that starts where the leg does.
+        /// </summary>
+        public int Furthest { get; private set; } = -1;
+
+        /// <summary>
         /// Follows the leg on to a candle.
         /// </summary>
         public void Advance(int last)
@@ -257,6 +362,9 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
         private void Step(int i)
         {
             var value = reader.Extreme(i, up);
+            if (Furthest < 0 || (up ? value > reader.Extreme(Furthest, true) : value < reader.Extreme(Furthest, false)))
+                Furthest = i;
+
             if (!(up ? value > _best : value < _best))
             {
                 // The run has ended: its extreme is a pivot, though a later run may still pass it.
@@ -302,7 +410,4 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
             Seen.Add(pivot);
         }
     }
-
-    // A candle's high or low, as the basis has it.
-    private double Extreme(int index, bool high) => high ? Sawtooth.HighOf(_prices[index], basis) : Sawtooth.LowOf(_prices[index], basis);
 }
