@@ -14,11 +14,22 @@ public static class CandleRuns
     /// <summary>
     /// Returns every maximal run of at least minLength candles of one colour, in time order.
     /// </summary>
-    public static List<CandleRun> Runs(List<Price> prices, int minLength = 3)
+    public static List<CandleRun> Runs(List<Price> prices, int minLength = 3) => RunsFrom(prices, minLength, 0);
+
+    /// <summary>
+    /// The runs that end at or after a candle, without reading the candles before the run that candle is in.
+    /// </summary>
+    internal static List<CandleRun> RunsFrom(List<Price> prices, int minLength, int from)
     {
         var runs = new List<CandleRun>();
-        var start = 0;
-        for (var i = 1; i <= prices.Count; i++)
+        if (prices.Count == 0)
+            return runs;
+
+        // Back to where the candle's own run begins.
+        var start = Math.Clamp(from, 0, prices.Count - 1);
+        while (start > 0 && Colour(prices[start]) != 0 && Colour(prices[start - 1]) == Colour(prices[start]))
+            start--;
+        for (var i = start + 1; i <= prices.Count; i++)
         {
             var sameColour = i < prices.Count && Colour(prices[i]) != 0 && Colour(prices[i]) == Colour(prices[start]);
             if (sameColour)

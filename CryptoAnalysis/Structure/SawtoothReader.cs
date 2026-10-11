@@ -193,11 +193,70 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
     /// The confirmed swings at a level (1 or above) of the candles read so far: the same as <see cref="Sawtooth.Swings"/>
     /// makes of them.
     /// </summary>
-    public List<SwingOutline> Swings(int level) => SwingsAt(level).Select(swing =>
+    public List<SwingOutline> Swings(int level) => SwingsAt(level).Select(swing => Outline(swing, level)).ToList();
+
+    // A swing as the sawtooth gives it at a level, made once for the level it lies at.
+    internal SwingOutline Outline(Swing swing, int level)
     {
+        if (swing.Outline?.Level == level)
+            return swing.Outline;
         var broke = Point(swing.Break, swing.Up);
-        return new SwingOutline(level, Direction(swing.Up), Point(swing.Start), broke, Point(swing.Counter), broke);
-    }).ToList();
+        return swing.Outline = new SwingOutline(level, Direction(swing.Up), Point(swing.Start), broke, Point(swing.Counter), broke);
+    }
+
+    /// <summary>
+    /// The candles read so far.
+    /// </summary>
+    internal List<Price> Read => _prices;
+
+    /// <summary>
+    /// What a replay needs of a level at the last candle: the end of its pivots, from a few before the first at or after a
+    /// candle (all of them when that is the first candle), the candle of the furthest point of its leg still running, when
+    /// it has one, and every swing of the level in the order they broke structure.
+    /// </summary>
+    internal sealed record LevelRead(List<SawtoothPivot> Pivots, int? Furthest, List<Swing> Swings);
+
+    /// <summary>
+    /// Levels 0 to maxLevel as <see cref="Levels"/> gives them, each as a replay needs it (see <see cref="LevelRead"/>):
+    /// the legs of every level are gone through, which is quick, but only the end of each level's pivots is listed.
+    /// </summary>
+    internal List<LevelRead> ReadLevels(int maxLevel, int from)
+    {
+        var read = new List<LevelRead>();
+        if (_prices.Count == 0)
+            return read;
+
+        // Enough pivots before the first to label it against the one before it of its kind.
+        const int before = 8;
+        var (pivots, legs) = LevelZero();
+        var all = legs;
+        var swings = new List<Swing>();
+        while (true)
+        {
+            int? furthest = Sawtooth.EndsInAnIncompleteLeg(pivots) && legs[^1].Following is { Furthest: >= 0 } run ? run.Furthest : null;
+            read.Add(new LevelRead(pivots, furthest, swings));
+            if (read.Count > maxLevel || !all.Any(x => x.Inside.Count > 0))
+                break;
+
+            swings = all.SelectMany(x => x.Swings).ToList();
+            var next = new List<Leg>(all.Count);
+            foreach (var leg in all)
+            {
+                if (leg.Inside.Count > 0)
+                    next.AddRange(leg.Legs);
+                else
+                    next.Add(leg);
+            }
+
+            all = next;
+
+            // The legs that end at or after the candle, and a few before them, with all inside them.
+            var first = from <= 0 ? 0 : Math.Max(0, Enumerable.Range(0, legs.Count).FirstOrDefault(i => pivots[i + 1].Index >= from, legs.Count - 1) - before);
+            (pivots, legs) = Refine(pivots.GetRange(first, pivots.Count - first), legs.GetRange(first, legs.Count - first));
+        }
+
+        return read;
+    }
 
     /// <summary>
     /// A level's highs and lows as currently known, labelled against the previous one of their kind: the same as
@@ -238,28 +297,52 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
     public List<RetracementOutline> Retracements(int level)
     {
         // In the order they broke structure, which is the order they are met in.
-        var swings = SwingsAt(level).OrderBy(x => x.Break).ToList();
+        return Retracements(level, SwingsAt(level).OrderBy(x => x.Break).ToList());
+    }
+
+    // The retracements of a level's swings, given in the order they broke structure, and of its candidates. A swing's is
+    // kept with it, and made again only when the swing before it or its level has changed.
+    internal List<RetracementOutline> Retracements(int level, List<Swing> swings)
+    {
         var retracements = new List<RetracementOutline>();
         for (var i = 0; i < swings.Count; i++)
-            Add(swings[i].Up, swings[i].Start, swings[i].Counter.Index, final: true, before: i);
+        {
+            var swing = swings[i];
+            var previous = Before(swing.Start, i);
+            if (!swing.Retraced || swing.RetracedFrom != previous || swing.RetracedLevel != level)
+            {
+                swing.Retracement = Read(previous, swing.Up, swing.Start, swing.Counter.Index, final: true);
+                (swing.Retraced, swing.RetracedFrom, swing.RetracedLevel) = (true, previous, level);
+            }
+
+            if (swing.Retracement != null)
+                retracements.Add(swing.Retracement);
+        }
+
         foreach (var candidate in CandidatesAt(level))
-            Add(candidate.Up, candidate.Start, _prices.Count - 1, final: false, before: swings.Count);
+        {
+            if (Read(Before(candidate.Start, swings.Count), candidate.Up, candidate.Start, _prices.Count - 1, final: false) is { } retracement)
+                retracements.Add(retracement);
+        }
 
         return retracements.OrderBy(x => x.To.Time).ToList();
 
-        void Add(bool up, SawtoothPivot to, int end, bool final, int before)
+        // The last swing to break structure before a pivot's candle that also starts before it: nearly always the one
+        // just before.
+        Swing? Before(SawtoothPivot to, int before)
         {
-            // The last swing to break structure before this one starts: nearly always the one just before it.
             for (var i = before - 1; i >= 0; i--)
             {
-                var previous = swings[i];
-                if (previous.Break > to.Index || previous.Start.Index >= to.Index)
-                    continue;
-                if (previous.Up == up && Sawtooth.Retracement(_prices, basis, level, Direction(up), Point(previous.Counter), Point(to), to.Index, end, final) is { } retracement)
-                    retracements.Add(retracement);
-                return;
+                if (swings[i].Break <= to.Index && swings[i].Start.Index < to.Index)
+                    return swings[i];
             }
+
+            return null;
         }
+
+        RetracementOutline? Read(Swing? previous, bool up, SawtoothPivot to, int end, bool final) => previous != null && previous.Up == up
+            ? Sawtooth.Retracement(_prices, basis, level, Direction(up), Point(previous.Counter), Point(to), to.Index, end, final)
+            : null;
     }
 
     private SawtoothPivot Start => Sawtooth.Pivot(EnumPivotKind.Start, _prices, 0, basis) with { ConfirmedIndex = 0 };
@@ -410,9 +493,37 @@ public sealed class SawtoothReader(EnumPriceBasis basis)
     }
 
     /// <summary>
-    /// A swing by its candles: the pivot it begins at, the pivot against it, and the candle that breaks structure.
+    /// A swing by its candles: the pivot it begins at, the pivot against it, and the candle that breaks structure. What has
+    /// been worked out of it is kept with it, to be used again while it holds: its outline at a level, the first close
+    /// beyond the pivot against it (a market structure break when it comes while the swing still protects that pivot) with
+    /// how far that has been looked for, and its retracement against the swing before it at a level.
     /// </summary>
-    private sealed record Swing(bool Up, SawtoothPivot Start, SawtoothPivot Counter, int Break);
+    internal sealed class Swing(bool up, SawtoothPivot start, SawtoothPivot counter, int @break)
+    {
+        public bool Up => up;
+
+        public SawtoothPivot Start => start;
+
+        public SawtoothPivot Counter => counter;
+
+        public int Break => @break;
+
+        public SwingOutline? Outline { get; set; }
+
+        public int BeyondAt { get; set; } = -1;
+
+        public int BeyondRead { get; set; } = -1;
+
+        public MarketStructureBreakOutline? Beyond { get; set; }
+
+        public bool Retraced { get; set; }
+
+        public Swing? RetracedFrom { get; set; }
+
+        public int RetracedLevel { get; set; }
+
+        public RetracementOutline? Retracement { get; set; }
+    }
 
     /// <summary>
     /// What is inside a leg: the pivots between its ends, the legs between those (one more than the pivots), and the swings

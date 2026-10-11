@@ -304,6 +304,7 @@ public static class Sawtooth
             index.TryAdd(prices[i].DateTime, i);
 
         var confirmed = swings.Where(x => x.BreakOfStructure != null).OrderBy(x => x.BreakOfStructure!.Time).ToList();
+        var broke = confirmed.Select(x => x.BreakOfStructure!.Time).ToList();
         var retracements = new List<RetracementOutline>();
 
         foreach (var swing in confirmed)
@@ -316,7 +317,14 @@ public static class Sawtooth
         void Add(int level, EnumSwingDirection direction, PricePoint to, int end, bool final)
         {
             // The last swing to break structure before this one starts; one the other way means this is the first swing of its leg.
-            var previous = confirmed.LastOrDefault(x => x.Level == level && x.BreakOfStructure!.Time <= to.Time && x.Start.Time < to.Time);
+            // They are in the order they broke structure, so it is looked for back from the last that had by then.
+            SwingOutline? previous = null;
+            for (var i = CountUpTo(broke, to.Time) - 1; i >= 0 && previous == null; i--)
+            {
+                if (confirmed[i].Level == level && confirmed[i].Start.Time < to.Time)
+                    previous = confirmed[i];
+            }
+
             if (previous == null || previous.Direction != direction)
                 return;
 
@@ -436,6 +444,10 @@ public static class Sawtooth
         var ordered = swings.Where(x => x.BreakOfStructure != null).OrderBy(x => x.BreakOfStructure!.Time).ToList();
         var trends = new List<TrendOutline>();
 
+        // The times of the breaks each way, in order, so those in a stretch are counted without reading them all.
+        var bullish = breaks.Where(b => b.Type == EnumAnnotationType.BullishMarketStructureBreak).Select(b => b.Break.Time).Order().ToList();
+        var bearish = breaks.Where(b => b.Type == EnumAnnotationType.BearishMarketStructureBreak).Select(b => b.Break.Time).Order().ToList();
+
         for (var i = 0; i < ordered.Count;)
         {
             var j = i;
@@ -446,10 +458,12 @@ public static class Sawtooth
             {
                 var first = ordered[i];
                 var end = j + 1 < ordered.Count ? ordered[j + 1].BreakOfStructure : null;
-                var against = first.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
-                var msbs = breaks.Count(b => b.Type == against && b.Break.Time > first.BreakOfStructure!.Time && (end == null || b.Break.Time <= end.Time));
+                // Those against the trend after its first break of structure, up to its end; and a swing is strong when none
+                // falls between its start and its break of structure.
+                var against = first.Direction == EnumSwingDirection.Up ? bearish : bullish;
+                var msbs = (end == null ? against.Count : CountUpTo(against, end.Time)) - CountUpTo(against, first.BreakOfStructure!.Time);
                 var parts = ordered.GetRange(i, j - i + 1)
-                    .Select(s => new TrendSwing(s.BreakOfStructure!, !breaks.Any(b => b.Type == against && b.Break.Time > s.Start.Time && b.Break.Time < s.BreakOfStructure!.Time)))
+                    .Select(s => new TrendSwing(s.BreakOfStructure!, CountBefore(against, s.BreakOfStructure!.Time) - CountUpTo(against, s.Start.Time) <= 0))
                     .ToList();
                 trends.Add(new TrendOutline(first.Level, first.Direction, first.Start, ordered[i + Math.Max(1, minSwings) - 1].BreakOfStructure!, end, j - i + 1, msbs, parts));
             }
@@ -458,6 +472,38 @@ public static class Sawtooth
         }
 
         return trends;
+    }
+
+    // How many of the times, which are in order, are at or before a time.
+    internal static int CountUpTo(List<DateTime> times, DateTime time)
+    {
+        var (low, high) = (0, times.Count);
+        while (low < high)
+        {
+            var middle = (low + high) / 2;
+            if (times[middle] <= time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
+    }
+
+    // How many of the times, which are in order, are before a time.
+    internal static int CountBefore(List<DateTime> times, DateTime time)
+    {
+        var (low, high) = (0, times.Count);
+        while (low < high)
+        {
+            var middle = (low + high) / 2;
+            if (times[middle] < time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
     }
 
     internal static double HighOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.High : price.Close;

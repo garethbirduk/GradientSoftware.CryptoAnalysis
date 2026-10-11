@@ -21,11 +21,55 @@ public static class Ranges
     /// </summary>
     public static List<RangeOutline> Find(List<Price> prices, EnumPriceBasis basis, IReadOnlyList<RetracementOutline> retracements,
         IReadOnlyList<SwingOutline> swings, IReadOnlyList<TrendOutline> trends, IReadOnlyList<MarketStructureBreakOutline> finerBreaks,
-        double minRetracement = DefaultMinRetracement, double band = DefaultBand)
+        double minRetracement = DefaultMinRetracement, double band = DefaultBand) =>
+        Find(prices, basis, retracements, swings, trends, finerBreaks, minRetracement, band, null, null);
+
+    /// <summary>
+    /// The ranges, as <see cref="Find(List{Price}, EnumPriceBasis, IReadOnlyList{RetracementOutline}, IReadOnlyList{SwingOutline}, IReadOnlyList{TrendOutline}, IReadOnlyList{MarketStructureBreakOutline}, double, double)"/>
+    /// gives them, with what a caller that asks candle after candle already has: the candle of each time, and where each
+    /// range it has met was read to when looking for its end, so that is read on from there and not from its start.
+    /// </summary>
+    internal static List<RangeOutline> Find(List<Price> prices, EnumPriceBasis basis, IReadOnlyList<RetracementOutline> retracements,
+        IReadOnlyList<SwingOutline> swings, IReadOnlyList<TrendOutline> trends, IReadOnlyList<MarketStructureBreakOutline> finerBreaks,
+        double minRetracement, double band, IReadOnlyDictionary<DateTime, int>? index, Dictionary<RangeOutline, (int Read, PricePoint? End)>? ends)
     {
-        var index = new Dictionary<DateTime, int>();
-        for (var i = 0; i < prices.Count; i++)
-            index.TryAdd(prices[i].DateTime, i);
+        Dictionary<DateTime, int>? made = null;
+        int IndexOf(DateTime time)
+        {
+            if (index != null)
+                return index[time];
+            if (made == null)
+            {
+                made = [];
+                for (var i = 0; i < prices.Count; i++)
+                    made.TryAdd(prices[i].DateTime, i);
+            }
+
+            return made[time];
+        }
+
+        // The trends follow one another, each ended before the next is confirmed, so the one holding at a time is the last
+        // confirmed by then; were they given in another order, each is looked at.
+        var inOrder = true;
+        for (var i = 1; i < trends.Count && inOrder; i++)
+            inOrder = trends[i - 1].Confirmed.Time <= trends[i].Confirmed.Time && trends[i - 1].End != null && trends[i - 1].End!.Time <= trends[i].Confirmed.Time;
+        var confirmed = trends.Select(x => x.Confirmed.Time).ToList();
+        bool Holds(EnumSwingDirection direction, DateTime time)
+        {
+            if (!inOrder)
+                return trends.Any(t => t.Direction == direction && t.Confirmed.Time <= time && (t.End == null || t.End.Time > time));
+            var at = Sawtooth.CountUpTo(confirmed, time) - 1;
+            return at >= 0 && trends[at].Direction == direction && (trends[at].End == null || trends[at].End!.Time > time);
+        }
+
+        // The first swing each way from each start, and the finer breaks each way in the order they broke.
+        var byStart = new Dictionary<(EnumSwingDirection, PricePoint), SwingOutline>();
+        foreach (var swing in swings)
+            byStart.TryAdd((swing.Direction, swing.Start), swing);
+        var bullish = finerBreaks.Where(b => b.Type == EnumAnnotationType.BullishMarketStructureBreak).OrderBy(b => b.Break.Time).ToList();
+        var bearish = finerBreaks.Where(b => b.Type == EnumAnnotationType.BearishMarketStructureBreak).OrderBy(b => b.Break.Time).ToList();
+        var bullishTimes = bullish.Select(b => b.Break.Time).ToList();
+        var bearishTimes = bearish.Select(b => b.Break.Time).ToList();
 
         var found = new List<RangeOutline>();
         foreach (var r in retracements.OrderBy(x => x.To.Time))
@@ -41,16 +85,20 @@ public static class Ranges
         RangeOutline? Identify(RetracementOutline r)
         {
             // The trend the range comes out of must hold where the retracement starts.
-            if (!trends.Any(t => t.Direction == r.Direction && t.Confirmed.Time <= r.To.Time && (t.End == null || t.End.Time > r.To.Time)))
+            if (!Holds(r.Direction, r.To.Time))
                 return null;
 
             // The counter-move lasts until this swing breaks structure, the close beyond its start that continues the trend.
-            var swing = r.Confirmed ? swings.FirstOrDefault(x => x.Direction == r.Direction && x.Start == r.To) : null;
+            var swing = r.Confirmed ? byStart.GetValueOrDefault((r.Direction, r.To)) : null;
             var limit = swing?.BreakOfStructure?.Time ?? DateTime.MaxValue;
-            var against = r.Direction == EnumSwingDirection.Down ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
+            var (against, times) = r.Direction == EnumSwingDirection.Down ? (bearish, bearishTimes) : (bullish, bullishTimes);
 
-            foreach (var msb in finerBreaks.Where(b => b.Type == against && b.Reference.Time > r.To.Time && b.Break.Time < limit).OrderBy(b => b.Break.Time))
+            // A break of a high or low made after the retracement starts is itself after it, so those before are passed over.
+            for (var i = Sawtooth.CountUpTo(times, r.To.Time); i < against.Count && against[i].Break.Time < limit; i++)
             {
+                var msb = against[i];
+                if (msb.Reference.Time <= r.To.Time)
+                    continue;
                 var deepest = r.Steps.LastOrDefault(s => s.Point.Time <= msb.Break.Time);
                 if (deepest == null || deepest.Percent < minRetracement)
                     continue;
@@ -59,7 +107,7 @@ public static class Ranges
 
                 var (low, high) = r.Direction == EnumSwingDirection.Down ? (r.To, deepest.Point) : (deepest.Point, r.To);
                 var range = new RangeOutline(r.Level, r.Direction, r.From, low, high, msb.Break, deepest.Percent, band, null);
-                return range with { End = EndOf(range, index[msb.Break.Time] + 1) };
+                return range with { End = EndOf(range, IndexOf(msb.Break.Time) + 1) };
             }
 
             return null;
@@ -67,20 +115,29 @@ public static class Ranges
 
         PricePoint? EndOf(RangeOutline range, int from)
         {
-            for (var i = from; i < prices.Count; i++)
+            if (ends != null && ends.TryGetValue(range, out var read))
+            {
+                if (read.End != null)
+                    return read.End;
+                from = Math.Max(from, read.Read + 1);
+            }
+
+            PricePoint? ended = null;
+            for (var i = from; i < prices.Count && ended == null; i++)
             {
                 var high = basis == EnumPriceBasis.Wick ? prices[i].High : prices[i].Close;
                 var low = basis == EnumPriceBasis.Wick ? prices[i].Low : prices[i].Close;
                 if (high > range.BandHigh)
-                    return new PricePoint(prices[i].DateTime, high);
-                if (low < range.BandLow)
-                    return new PricePoint(prices[i].DateTime, low);
+                    ended = new PricePoint(prices[i].DateTime, high);
+                else if (low < range.BandLow)
+                    ended = new PricePoint(prices[i].DateTime, low);
             }
 
-            return null;
+            if (ends != null)
+                ends[range] = (prices.Count - 1, ended);
+            return ended;
         }
     }
-
     /// <summary>
     /// Returns the ranges at a level from these prices alone, with hindsight: the sawtooth over the whole series.
     /// </summary>
