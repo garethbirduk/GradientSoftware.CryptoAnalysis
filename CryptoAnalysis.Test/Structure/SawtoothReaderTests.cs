@@ -28,14 +28,59 @@ public class SawtoothReaderTests
     private static void AssertSame(List<Price> prices, EnumPriceBasis basis, Func<int, bool> check, string name)
     {
         var reader = new SawtoothReader(basis);
+        // What the changes it reports add up to, candle by candle.
+        var pivots = new Dictionary<(int Candle, EnumPivotKind Kind), (double Price, int Level)>();
+        var held = new Dictionary<ReadSwing, int>();
         for (var i = 0; i < prices.Count; i++)
         {
             reader.Add(prices[i]);
+            foreach (var change in reader.Changes.Pivots)
+            {
+                Assert.AreNotEqual(change.Level, pivots.TryGetValue((change.Candle, change.Kind), out var was) ? was.Level : (int?)null, $"{name}: a change that changes nothing at candle {i}.");
+                if (change.Level is int level)
+                    pivots[(change.Candle, change.Kind)] = (change.Price, level);
+                else
+                    pivots.Remove((change.Candle, change.Kind));
+            }
+
+            foreach (var change in reader.Changes.Swings)
+            {
+                // A swing new to the structure is confirmed by this candle, and the leg it lies in begins where it always did.
+                // On wicks one can be found late: while the first candle's high stands, closes above its close are read under
+                // it, and once a higher high makes it the start they are read again from the first price.
+                if (!held.ContainsKey(change.Swing))
+                {
+                    if (basis == EnumPriceBasis.Close)
+                        Assert.AreEqual(i, change.Swing.Break, $"{name}: a swing found late, at candle {i}.");
+                    Assert.IsFalse(held.Keys.Any(x => x with { Leg = change.Swing.Leg } == change.Swing && x != change.Swing), $"{name}: a swing's leg moved at candle {i}.");
+                }
+
+                if (change.Level is int level)
+                    held[change.Swing] = level;
+                else
+                    held.Remove(change.Swing);
+            }
+
             if (!check(i))
                 continue;
 
             var so = prices.GetRange(0, i + 1);
             var expected = Sawtooth.Levels(so, basis, Depth);
+
+            // Each pivot that can no longer move, at the first level it is at, and each swing at its level.
+            var expectedPivots = expected.SelectMany(l => l.Pivots.Where(p => p.Kind is EnumPivotKind.High or EnumPivotKind.Low && p.ConfirmedIndex != null).Select(p => (l.Level, Pivot: p)))
+                .GroupBy(x => (x.Pivot.Index, x.Pivot.Kind)).Select(g => g.First()).OrderBy(x => x.Pivot.Index).ThenBy(x => x.Pivot.Kind)
+                .Select(x => $"{x.Pivot.Index} {x.Pivot.Kind} {x.Pivot.Price} L{x.Level}");
+            Assert.AreEqual(string.Join("\n", expectedPivots), string.Join("\n", pivots.OrderBy(x => x.Key.Candle).ThenBy(x => x.Key.Kind).Select(x => $"{x.Key.Candle} {x.Key.Kind} {x.Value.Price} L{x.Value.Level}")),
+                $"{name}: the pivots the changes add up to at candle {i}.");
+            Assert.AreEqual(pivots.Count, reader.PivotLevels.Count, $"{name}: the pivots held at candle {i}.");
+
+            var times = so.Select((p, at) => (p.DateTime, at)).ToDictionary(x => x.DateTime, x => x.at);
+            var expectedSwings = Enumerable.Range(1, expected.Count).SelectMany(l => Sawtooth.Swings(so, expected, basis, l))
+                .Select(x => $"{x.Direction} {times[x.Start.Time]} {times[x.Extreme.Time]} {times[x.BreakOfStructure!.Time]} L{x.Level}").Order();
+            Assert.AreEqual(string.Join("\n", expectedSwings), string.Join("\n", held.Select(x => $"{x.Key.Direction} {x.Key.Start} {x.Key.Extreme} {x.Key.Break} L{x.Value}").Order()),
+                $"{name}: the swings the changes add up to at candle {i}.");
+            Assert.AreEqual(held.Count, reader.SwingLevels.Count, $"{name}: the swings held at candle {i}.");
             Assert.AreEqual(Describe(expected), Describe(reader.Levels(Depth)), $"{name}: the levels at candle {i}.");
             for (var level = 0; level < expected.Count; level++)
                 Assert.AreEqual(Json(Sawtooth.Points(so, expected[level], basis)), Json(reader.Points(level)), $"{name}: the points of level {level} at candle {i}.");

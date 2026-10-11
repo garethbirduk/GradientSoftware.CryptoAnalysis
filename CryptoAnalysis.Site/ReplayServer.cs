@@ -95,6 +95,19 @@ public static class ReplayServer
         KnownStructure.CacheDirectory = Path.Combine(kept.Folder, "known");
         KnownRanges.CacheDirectory = Path.Combine(kept.Folder, "known");
 
+        // The structure of each dataset, read once and held: what was known at any candle is looked up in it. It is not
+        // kept on disk, as reading every candle of them all takes a second or two. A dataset whose candles have changed is
+        // read again, when a fetch ends or it is first asked for.
+        var structures = new ConcurrentDictionary<string, (List<Price> Prices, Lazy<StructureStore> Store)>();
+        StructureStore Structure(Dataset data)
+        {
+            (List<Price>, Lazy<StructureStore>) Make() => (data.Prices, new Lazy<StructureStore>(() => StructureStore.Read(data.Prices)));
+            return structures.AddOrUpdate(data.Id, _ => Make(), (_, had) => ReferenceEquals(had.Prices, data.Prices) ? had : Make()).Store.Value;
+        }
+
+        var held = datasets.ToList();
+        _ = Task.Run(() => held.ForEach(x => Structure(x)));
+
         // The static page, opened as a file, asks whether the server is running so it can link to it.
         app.MapGet("/api/health", (HttpContext context) =>
         {
@@ -115,6 +128,30 @@ public static class ReplayServer
                 C = data.Prices.Select(p => p.Close),
             }, Json)
             : Results.NotFound());
+
+        // The pivots and confirmed swings of a stretch of candles, from and to counted from the dataset's first (the last 720
+        // when neither is given), as known at the close of a candle (at; the last when not given), at levels up to maxLevel:
+        // looked up in the dataset's structure store, each with its id and the level it lay at then.
+        app.MapGet("/api/structure", (string dataset, int? from, int? to, int? at, int? maxLevel) =>
+        {
+            if (!byId.TryGetValue(dataset, out var data))
+                return Results.NotFound();
+
+            var store = Structure(data);
+            var last = store.Candles - 1;
+            var known = Math.Clamp(at ?? last, 0, last);
+            var end = Math.Clamp(to ?? known, 0, last);
+            var start = Math.Clamp(from ?? end - 719, 0, end);
+            return Results.Json(new
+            {
+                store.Candles,
+                From = start,
+                To = end,
+                At = known,
+                Pivots = store.Pivots(start, end, known, maxLevel ?? int.MaxValue).Select(x => new { x.Id, x.Candle, Time = data.Prices[x.Candle].DateTime, x.Kind, x.Price, x.Level, x.Known }),
+                Swings = store.Swings(start, end, known, maxLevel ?? int.MaxValue),
+            }, Json);
+        });
 
         // With an anchor, the replay is of the dataset from that candle on: from counts from it, and so does the batch. The
         // range settings (the least retracement and the band, as percentages) are the page's, so each pair has batches of its own.
@@ -386,6 +423,10 @@ public static class ReplayServer
                         nothing = kept.Count == 0 && year * 12 + month < oldest ? nothing + 1 : 0;
                         mine.Done++;
                     }
+
+                    // The structure of what is now held, read once here and not by the first page to ask for it.
+                    foreach (var changed in Markets.All.Where(x => x.Group == market.Group && byId.ContainsKey(x.Id)))
+                        Structure(byId[changed.Id]);
                 }
                 catch (Exception e)
                 {
