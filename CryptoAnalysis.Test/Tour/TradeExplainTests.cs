@@ -178,6 +178,36 @@ public class TradeExplainTests
     }
 
     [TestMethod]
+    public void Trade_OfTheRangeTrade_TellsTheRangeItsKillAndItsLines()
+    {
+        // The training's own Range (4-hour candles, November 2021): #72 reaches into the buy-low zone, then two green candles.
+        var prices = new Gradient.CryptoAnalysis.Csv.CsvReaderHelper()
+            .ReadData<Price, global::CryptoAnalysis.Csv.ClassMaps.PriceClassMap>(Path.Combine("TestData", "Terms", "Range", "04-the-training-example.csv")).ToList();
+        var strategy = JsonNode.Parse("""
+            { "id": "t", "name": "t", "direction": "Long",
+              "after": [ { "type": "RangeZone", "zone": "BuyLow", "level": 1, "depth": 25, "retracement": 75, "band": 20, "kill": [ { "type": "RangeEnd" } ] } ],
+              "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 2 },
+              "takeProfit": { "type": "RangeZone" }, "stopLoss": { "type": "RangeBand" } }
+            """)!;
+
+        var section = Explain.Trade(prices, 74, reached: 0, strategy, null, out var problem);
+
+        Assert.IsNotNull(section, problem);
+        var said = Texts(section, "summary");
+        CollectionAssert.IsSubsetOf(new[]
+        {
+            "Its bands are at 55160 and 60527.",
+            "At 25% of its height, the buy-low zone runs from the lower band up to 56885, and the sell-high zone from 58802 up to the upper band.",
+            "That meets the first step, so the strategy now looks for two Successive Green Candles. A close beyond a band of the Range, below 55160 or above 60527, would end the wait.",
+            "The bottom of the Range's sell-high zone is at 58802.",
+            "The Range's lower band is at 55160.",
+        }, said, string.Join("\n", said));
+        CollectionAssert.IsSubsetOf(new[] { "Trade.chain", "Trade.structure", "Trade.kill", "Range.what", "Range.box", "Range.holds", "Range.ends", "Range.zones" }, Cited(section));
+        CollectionAssert.Contains(Texts(section, "education"),
+            "This strategy's entry condition is a candle that reaches into the buy-low zone of a 1st order Range, then two Successive Green Candles. A run counts on the candle that makes its count, once a run, so a longer run does not count again. After the first step, a close beyond a band of the Range ends the wait.");
+    }
+
+    [TestMethod]
     public void Definition_OfHowStructureIsRead_NamesTheWindowItIsReadFrom()
     {
         StringAssert.Contains(Definitions.Text("Trade.structure"), $"last {Gradient.CryptoAnalysis.Research.KnownStructure.Window} candles");

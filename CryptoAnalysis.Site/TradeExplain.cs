@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Gradient.CryptoAnalysis.Conditions.PriceConditions;
 using Gradient.CryptoAnalysis.Research;
 using Gradient.CryptoAnalysis.Strategies;
 
@@ -142,8 +143,10 @@ public static partial class Explain
         var cues = new List<JsonObject> { Define(r.First, "Trade.entry") };
         if (steps.Count > 1)
             cues.Add(Define(r.First, "Trade.chain"));
-        if (steps.Any(x => x.IsStructure))
+        if (steps.Any(x => x.ReadsChart))
             cues.Add(Define(r.First, "Trade.structure"));
+        if (steps.Any(x => x.Kill is { Count: > 0 }))
+            cues.Add(Define(r.First, "Trade.kill"));
         cues.Add(Teach(r.First, ConditionText(r.Strategy)));
         var layers = new List<string> { "candles", "trade" };
         for (var k = 0; k < steps.Count; k++)
@@ -154,7 +157,7 @@ public static partial class Explain
             if (steps[k].IsStructure)
                 layers.AddRange([$"level{steps[k].Level}", "close", "sawtooth", .. told.SelectMany(x => x.Layers)]);
             if (k < steps.Count - 1)
-                cues.Add(Say(met[k], $"That meets the {Ordinal(k + 1)} step, so the strategy now looks for {StepWords(steps[k + 1])}{WithinWords(steps[k + 1])}."));
+                cues.Add(Say(met[k], $"That meets the {Ordinal(k + 1)} step, so the strategy now looks for {StepWords(steps[k + 1])}{WithinWords(steps[k + 1])}.{KillWords(steps[k], t.Range)}"));
         }
 
         cues.Add(Say(t.EntryIndex, $"That meets the entry condition, so the trade is entered at the close of the candle at {Clock(t.EntryTime, length)}, {buys} at {Money(t.EntryPrice)}."));
@@ -178,12 +181,25 @@ public static partial class Explain
     {
         var steps = strategy.Steps;
         // How a count is met, for the steps that count: a run of candles, and a Trend's Swings.
-        var counted = steps.Any(x => !x.IsStructure) ? "A run counts on the candle that makes its count, once a run, so a longer run does not count again."
+        var counted = steps.Any(x => x.Type == StrategyEntry.SuccessiveCandles) ? "A run counts on the candle that makes its count, once a run, so a longer run does not count again."
             : steps.Any(x => x.Type == StrategyEntry.Trend) ? "A Trend counts at the BoS that makes its count, once a Trend, so a longer Trend does not count again." : "";
         if (steps.Count == 1)
-            return $"This strategy's entry condition is {StepWords(steps[0])}. {(steps[0].IsStructure ? counted : $"It enters on the {Ordinal(steps[0].Length)} of them, once a run, so a longer run does not enter again.")}".TrimEnd();
+            return $"This strategy's entry condition is {StepWords(steps[0])}. {(steps[0].Type != StrategyEntry.SuccessiveCandles ? counted : $"It enters on the {Ordinal(steps[0].Length)} of them, once a run, so a longer run does not enter again.")}".TrimEnd();
         var chain = string.Join(", then ", steps.Select((x, k) => k == 0 ? StepWords(x) : StepWords(x) + WithinWords(x)));
-        return $"This strategy's entry condition is {chain}. {counted}".TrimEnd();
+        var kills = string.Join(" ", steps.Select((x, k) => KillWords(x, null, $"the {Ordinal(k + 1)} step")).Where(x => x != "").Select(x => x.Trim()));
+        return $"This strategy's entry condition is {chain}. {counted} {kills}".Replace("  ", " ").TrimEnd();
+    }
+
+    // What ends the wait a step begins, when it has kills: " A close beyond a band of the Range, below 55160 or above
+    // 60527, would end the wait." With a step named, as the condition says it: "After the first step, ... ends the wait."
+    private static string KillWords(StrategyEntry step, HeldRange? range, string? named = null)
+    {
+        if (step.Kill is not { Count: > 0 } kills)
+            return "";
+        var lines = range != null ? $", below {Money(range.BandLow)} or above {Money(range.BandHigh)}," : "";
+        var each = kills.Select(x => x.Type == StrategyEntry.RangeEnd ? $"a close beyond a band of the Range{lines}" : StepWords(x)).ToList();
+        var any = string.Join(" or ", each);
+        return named != null ? $" After {named}, {any} ends the wait." : $" {Capital(any)} would end the wait.";
     }
 
     // A step as the condition names it: "four Successive Green Candles", "a 2nd order Bullish BoS", "a Strong 2nd order
@@ -198,6 +214,8 @@ public static partial class Explain
             StrategyEntry.MarketStructureBreak => $"a {order} {(up ? "Bullish" : "Bearish")} MSB",
             StrategyEntry.Swing => $"a {(step.Strength == EnumSwingStrength.Any ? "" : $"{step.Strength} ")}{order} {SwingName(step.Direction)}",
             StrategyEntry.Trend => $"a {order} {TrendName(step.Direction)} of {Words(step.Swings)} {SwingName(step.Direction)}s",
+            StrategyEntry.RangeZone => $"a candle that reaches into the {ZoneName(step.Zone)} of a {order} Range",
+            StrategyEntry.RangeSweep => $"a liquidity sweep of the {(step.Zone == EnumRangeZone.BuyLow ? "low" : "high")} of a {order} Range",
             _ => $"{Words(step.Length)} Successive {(step.Colour == EnumCandleColour.Green ? "Green" : "Red")} Candles",
         };
     }
@@ -212,6 +230,8 @@ public static partial class Explain
     {
         if (step.IsStructure)
             return StructureBlocks(prices, step, at);
+        if (step.IsRange)
+            return StrategyBacktest.Held(prices, at, step) is { } held ? RangeBlocks(new RangeRead(prices, held, step.Zone, step.Depth, step.Type == StrategyEntry.RangeSweep)) : [];
         var colour = new Block([Define(Math.Max(0, at - step.Reads), "Candle.colour")], []);
         return RunAt(prices.GetRange(0, at + 1), at, step.Length) is { } run ? [colour, RunOf(new RunRead(prices, run, step.Colour == EnumCandleColour.Green))] : [colour];
     }
@@ -262,6 +282,63 @@ public static partial class Explain
         }
     }
 
+    private static string ZoneName(EnumRangeZone zone) => zone == EnumRangeZone.BuyLow ? "buy-low zone" : "sell-high zone";
+
+    // A Range a strategy holds, as its blocks tell it: the prices, its lines, and the zone a candle reached into, with how
+    // deep the zones are, as a percentage of the Range's height; or, swept, the side of it a candle's wick went beyond.
+    private sealed record RangeRead(List<Price> Prices, HeldRange Range, EnumRangeZone Zone, double Depth, bool Swept = false);
+
+    // The blocks that tell a Range by its lines: its box, its zones, and the candle that reached into one of them.
+    private static Block[] RangeBlocks(RangeRead r) => [RangeBox(r), RangeZones(r), RangeReached(r)];
+
+    // What a Range is and how it holds; then this one's box, from the candle that identified it.
+    private static Block RangeBox(RangeRead r)
+    {
+        var g = r.Range;
+        return new Block(
+        [
+            Define(g.Identified, "Range.what"),
+            Define(g.Identified, "Range.box"),
+            Say(g.Identified, $"A {Order(g.Level)} Range is identified at {Clock(r.Prices[g.Identified].DateTime, Length(r.Prices))}, on a Retracement of {g.Retracement}%: its box runs from {Money(g.Low)} to {Money(g.High)}."),
+            Define(g.Identified, "Range.holds"),
+            Define(g.Identified, "Range.ends"),
+            Say(g.Identified, $"Its bands are at {Money(g.BandLow)} and {Money(g.BandHigh)}."),
+        ], ["candles", "trade"]);
+    }
+
+    // What a Range's zones are; then where this one's are.
+    private static Block RangeZones(RangeRead r)
+    {
+        var g = r.Range;
+        var depth = r.Depth.ToString("0.##", CultureInfo.InvariantCulture);
+        return new Block(
+        [
+            Define(g.Identified, "Range.zones"),
+            Say(g.Identified, $"At {depth}% of its height, the buy-low zone runs from the lower band up to {Money(g.BuyLowTop)}, and the sell-high zone from {Money(g.SellHighBottom)} up to the upper band."),
+        ], ["candles", "trade"]);
+    }
+
+    // The candle that reached into a zone of the Range, or swept it, while the Range held.
+    private static Block RangeReached(RangeRead r)
+    {
+        var g = r.Range;
+        var candle = r.Prices[g.Met];
+        if (r.Swept)
+        {
+            var swept = r.Zone == EnumRangeZone.BuyLow
+                ? $"its low of {Money(candle.Low)} is below the Range's low of {Money(g.Low)}, and it closes back above it, at {Money(candle.Close)}"
+                : $"its high of {Money(candle.High)} is above the Range's high of {Money(g.High)}, and it closes back below it, at {Money(candle.Close)}";
+            return new Block(
+            [
+                Define(g.Met, "Range.sweep"),
+                Say(g.Met, $"The candle at {Clock(candle.DateTime, Length(r.Prices))} sweeps the Range's {(r.Zone == EnumRangeZone.BuyLow ? "low" : "high")}: {swept}."),
+            ], ["candles", "trade"]);
+        }
+
+        var reached = r.Zone == EnumRangeZone.BuyLow ? $"its low of {Money(candle.Low)} is at or below {Money(g.BuyLowTop)}" : $"its high of {Money(candle.High)} is at or above {Money(g.SellHighBottom)}";
+        return new Block([Say(g.Met, $"The candle at {Clock(candle.DateTime, Length(r.Prices))} reaches into the {ZoneName(r.Zone)}: {reached}, and it closes inside the bands, so the Range holds.")], ["candles", "trade"]);
+    }
+
     // What a Take Profit or a Stop Loss is; then where this trade's is, and how it was worked out from the candles up to the
     // entry. A Stop Loss worked out from the same measure as the Take Profit does not tell the measure again, and one set
     // from the risk leaves the rule to the Risk chapter before it.
@@ -286,6 +363,13 @@ public static partial class Explain
         // Set from the risk: the rule is the Risk chapter's, told before this one.
         if (target.Type == StrategyTarget.RiskRatio)
             return (Money(Math.Abs(price - t.EntryPrice)), null);
+
+        if (target.IsRange)
+        {
+            var above = price > t.EntryPrice;
+            var line = target.Type == StrategyTarget.RangeZone ? (above ? "bottom of the Range's sell-high zone" : "top of the Range's buy-low zone") : above ? "Range's upper band" : "Range's lower band";
+            return (Money(Math.Abs(price - t.EntryPrice)), $"The {line} is at {Money(price)}.");
+        }
 
         if (target.IsLevel)
         {

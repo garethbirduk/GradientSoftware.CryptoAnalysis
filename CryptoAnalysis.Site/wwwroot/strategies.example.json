@@ -21,6 +21,18 @@
       "slippagePercent": 0.05,
       "countFees": false,
       "countSlippage": false
+    },
+    {
+      "id": "range-trade",
+      "name": "Range trade",
+      "direction": "Long",
+      "after": [ { "type": "RangeSweep", "zone": "BuyLow", "level": 1, "depth": 25, "retracement": 75, "band": 20, "kill": [ { "type": "RangeEnd" } ] }, { "type": "Trend", "direction": "Up", "level": 2, "swings": 2 } ],
+      "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 2 },
+      "takeProfit": { "type": "RangeZone" },
+      "stopLoss": { "type": "RangeBand" },
+      "onePositionAtATime": true,
+      "feePercent": 0.1,
+      "slippagePercent": 0.05
     }
   ]
 }

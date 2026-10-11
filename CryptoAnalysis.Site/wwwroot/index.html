@@ -396,6 +396,13 @@
   .strat-steps .step-add { align-self: center; width: 24px; height: 24px; padding: 0; border: 1px dashed var(--border); border-radius: 50%; background: none;
     color: var(--muted); font: inherit; font-size: 15px; line-height: 1; cursor: pointer; }
   .strat-steps .step-add:hover { color: var(--accent); border-color: var(--accent); }
+  /* A step's kills sit under its own fields, each with its type and numbers. */
+  .strat-steps .step-kills { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+  .strat-steps .step-kills-head { align-self: center; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .strat-steps .step-kill { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; }
+  .strat-steps .kill-remove, .strat-steps .kill-add { padding: 2px 8px; border: 1px dashed var(--border); border-radius: 5px; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+  .strat-steps .kill-remove { border: 0; font-size: 16px; line-height: 1; padding: 2px 4px; }
+  .strat-steps .kill-remove:hover, .strat-steps .kill-add:hover { color: var(--accent); border-color: var(--accent); }
   .strat-says { margin: 12px 0 0; max-width: 80ch; font-size: 14px; }
   /* A number's sweep, To and Step, sits beside it, smaller, as it is optional. */
   .strat-fields label.strat-vary { margin-left: -6px; }
@@ -1046,27 +1053,33 @@ const rangeHover = g => `Range · level ${g.level} · out of ${rangeOrigin(g)}<b
 // high up to the upper band.
 function drawRanges(ex, traces) {
   if (!on('Range') && !on('rangeBands') && !on('rangeZones')) return;
-  const term = TERMS.get('Range'), last = ex.prices.t[ex.prices.t.length - 1], zone = setting('rangeZones') / 100;
-  const box = (g, until, a, b) => ({ x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [a, a, b, b, a] });
-  for (const g of shownRangeBoxes(ex)) {
-    const until = g.end?.time ?? last, height = g.high.price - g.low.price;
-    if (on('rangeZones')) {
-      const buyTop = g.low.price + height * zone, sellBottom = g.high.price - height * zone;
-      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Buy-low zone', ...box(g, until, g.bandLow, buyTop),
-        line: { width: 0 }, fillcolor: withAlpha(css('--up'), 0.12), hovertemplate: `Buy-low zone · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(buyTop)}: from the lower band to ${setting('rangeZones')}% up the range<extra></extra>` });
-      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Sell-high zone', ...box(g, until, sellBottom, g.bandHigh),
-        line: { width: 0 }, fillcolor: withAlpha(css('--down'), 0.12), hovertemplate: `Sell-high zone · level ${g.level}<br>${fmtPrice(sellBottom)} to ${fmtPrice(g.bandHigh)}: from ${setting('rangeZones')}% down the range to the upper band<extra></extra>` });
-      traces.push({ type: 'scatter', mode: 'lines', name: 'Range zone', x: [g.identified.time, until, null, g.identified.time, until], y: [sellBottom, sellBottom, null, buyTop, buyTop],
-        line: { color: term.color, width: 1, dash: 'dash' }, hoverinfo: 'skip' });
-    }
-    if (on('Range')) {
-      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: term.name, ...box(g, until, g.high.price, g.low.price),
-        line: { color: term.color, width: 1.5 }, fillcolor: withAlpha(term.color, 0.08), hovertemplate: `${rangeHover(g)}<extra></extra>` });
-    }
-    if (on('rangeBands') || on('rangeZones')) {
-      traces.push({ type: 'scatter', mode: 'lines', name: 'Range band', x: [g.identified.time, until, null, g.identified.time, until], y: [g.bandHigh, g.bandHigh, null, g.bandLow, g.bandLow],
-        line: { color: term.color, width: 1, dash: 'dash' }, hovertemplate: `Range band · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(g.bandHigh)}: a close beyond ends the range<extra></extra>` });
-    }
+  const last = ex.prices.t[ex.prices.t.length - 1];
+  for (const g of shownRangeBoxes(ex))
+    drawRange(traces, g, g.end?.time ?? last, { box: on('Range'), bands: on('rangeBands') || on('rangeZones'), zones: on('rangeZones') ? setting('rangeZones') : null });
+}
+
+// One Range's box, zones and bands, from the candle that identified it until a time: the parts asked for, the zones as
+// deep as given, as a percentage of the Range's height. The Ranges of a chart and the Range a trade's entry condition
+// held (see drawStrategies) are drawn by it alike.
+function drawRange(traces, g, until, { box: boxed, bands, zones, hover = rangeHover(g) }) {
+  const term = TERMS.get('Range'), height = g.high.price - g.low.price;
+  const box = (a, b) => ({ x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [a, a, b, b, a] });
+  if (zones != null) {
+    const depth = Math.round(zones * 100) / 100, buyTop = g.low.price + height * zones / 100, sellBottom = g.high.price - height * zones / 100;
+    traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Buy-low zone', ...box(g.bandLow, buyTop),
+      line: { width: 0 }, fillcolor: withAlpha(css('--up'), 0.12), hovertemplate: `Buy-low zone · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(buyTop)}: from the lower band to ${depth}% up the range<extra></extra>` });
+    traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Sell-high zone', ...box(sellBottom, g.bandHigh),
+      line: { width: 0 }, fillcolor: withAlpha(css('--down'), 0.12), hovertemplate: `Sell-high zone · level ${g.level}<br>${fmtPrice(sellBottom)} to ${fmtPrice(g.bandHigh)}: from ${depth}% down the range to the upper band<extra></extra>` });
+    traces.push({ type: 'scatter', mode: 'lines', name: 'Range zone', x: [g.identified.time, until, null, g.identified.time, until], y: [sellBottom, sellBottom, null, buyTop, buyTop],
+      line: { color: term.color, width: 1, dash: 'dash' }, hoverinfo: 'skip' });
+  }
+  if (boxed) {
+    traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: term.name, ...box(g.high.price, g.low.price),
+      line: { color: term.color, width: 1.5 }, fillcolor: withAlpha(term.color, 0.08), hovertemplate: `${hover}<extra></extra>` });
+  }
+  if (bands) {
+    traces.push({ type: 'scatter', mode: 'lines', name: 'Range band', x: [g.identified.time, until, null, g.identified.time, until], y: [g.bandHigh, g.bandHigh, null, g.bandLow, g.bandLow],
+      line: { color: term.color, width: 1, dash: 'dash' }, hovertemplate: `Range band · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(g.bandHigh)}: a close beyond ends the range<extra></extra>` });
   }
 }
 
@@ -1999,7 +2012,53 @@ function drawCandleRuns(ex, labels, traces) {
   }
 }
 
+// A whole dataset's chart is given only what is near its view: the candles and structure of the times shown and as much
+// again either side, so a pan has them there already. The chart draws everything it is given, in view or not, so the rest
+// of a long history would slow every move. A move near the edge of what is drawn draws the chart again (see moveView).
+const DRAWN_BESIDE = 1;
+function clipToView(ex) {
+  const whole = (ex.hindsight ?? ex).prices, n = whole.t.length;
+  if (!ex.complete || n < 2) return ex;
+  // The first candle at or after a time.
+  const at = ms => {
+    let lo = 0, hi = n;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (Date.parse(whole.t[mid]) < ms) lo = mid + 1; else hi = mid; }
+    return lo;
+  };
+  const zoom = zooms.get(ex.id)?.x, w = ex.window;
+  const [x0, x1] = zoom ? zoom.map(axisTime) : [Date.parse(whole.t[w?.from ?? 0]), Date.parse(whole.t[w?.to ?? n - 1])], beside = (x1 - x0) * DRAWN_BESIDE;
+  const from = Math.max(0, at(x0 - beside) - 1), to = Math.min(n - 1, at(x1 + beside));
+  const a = whole.t[from], b = whole.t[to], last = whole.t[n - 1];
+  const within = t => t >= a && t <= b, overlaps = (start, end) => start <= b && end >= a;
+  const cut = list => list.slice(from, to + 1), each = (lists, keep) => (lists ?? []).map(list => list.filter(keep));
+  // A line keeps the point either side of what is drawn, so it runs on to the edges.
+  const line = points => {
+    const first = points.findIndex(p => p.time >= a), end = points.findLastIndex(p => p.time <= b);
+    return first < 0 || end < 0 ? points.slice(Math.max(0, end), end + 2) : points.slice(Math.max(0, first - 1), end + 2);
+  };
+  return { ...ex, drawn: { from, to },
+    prices: { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) },
+    sawtooth: (ex.sawtooth ?? []).map(line),
+    swingsByLevel: each(ex.swingsByLevel, s => overlaps(s.start.time, s.end.time)),
+    pointsByLevel: each(ex.pointsByLevel, p => within(p.time)),
+    marketStructureBreaksByLevel: each(ex.marketStructureBreaksByLevel, m => overlaps(m.reference.time, m.break.time)),
+    trendsByLevel: each(ex.trendsByLevel, t => overlaps(t.start.time, t.end?.time ?? last)),
+    retracementsByLevel: each(ex.retracementsByLevel, r => overlaps(r.from.time, r.steps[r.steps.length - 1]?.point.time ?? r.to.time)),
+    rangesByLevel: each(ex.rangesByLevel, g => overlaps(g.identified.time, g.end?.time ?? last)),
+    candleRuns: (ex.candleRuns ?? []).filter(r => overlaps(r.start.time, r.end.time)) };
+}
+
+// Whether a chart that draws only what is near its view (see clipToView) is to be drawn again for a view: one that comes
+// within a quarter of its width of the edge of what is drawn, short of the dataset's own ends, or one so much narrower
+// than what is drawn that most of it is out of sight.
+function drawnAgainFor(view, x) {
+  if (!view.drawn) return false;
+  const [x0, x1] = x.map(axisTime), width = x1 - x0, d = view.drawn;
+  return (!d.first && x0 < d.from + width / 4) || (!d.last && x1 > d.to - width / 4) || d.to - d.from > width * (2 * DRAWN_BESIDE + 1) * 2;
+}
+
 function draw(el, ex, focus) {
+  ex = clipToView(ex);
   const p = ex.prices;
   const text = css('--text'), muted = css('--muted'), grid = css('--grid');
   const traces = [];
@@ -2158,7 +2217,9 @@ function draw(el, ex, focus) {
   const view = { t: times, h: span(full.h), l: span(full.l), candle, all, asCloses, candleMs, opensOn, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
     from: w?.from ?? 0, numbered: !!ex.tour, floor: ex.tour ? 0.01 : 0,
     until: ex.tour && !on('future') ? Date.parse(full.t[ex.cursor]) : undefined, now: ex.tour ? [full.l[ex.cursor], full.h[ex.cursor]] : null,
-    pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46) };
+    pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46),
+    // The times of what is drawn, when that is not the whole dataset, and whether it reaches the dataset's first and last candle.
+    drawn: ex.drawn ? { from: Date.parse(full.t[ex.drawn.from]), to: Date.parse(full.t[ex.drawn.to]), first: ex.drawn.from === 0, last: ex.drawn.to === full.t.length - 1 } : null };
   // The price axis fits everything drawn in view, not the candles alone.
   view.series = seriesOf(traces, shapes);
   view.y = fitPrices(view, view.x);
@@ -2283,7 +2344,9 @@ function moveView(el, zoom, { gliding = false } = {}) {
   const id = el.dataset.id, view = views.get(id);
   // Any other move stops a glide (see glideView).
   if (!gliding) glides.delete(id);
-  if (zoom?.x && view && !fitPrices(view, zoom.x)) zoom = { ...zoom, x: zooms.get(id)?.x };
+  // A chart that draws only what is near its view has candles wherever its dataset does, drawn or not yet.
+  const none = x => view.drawn && view.all ? axisTime(x[1]) < axisTime(view.all[0]) || axisTime(x[0]) > axisTime(view.all[1]) : !fitPrices(view, x);
+  if (zoom?.x && view && none(zoom.x)) zoom = { ...zoom, x: zooms.get(id)?.x };
   if (zoom?.x || zoom?.y) zooms.set(id, zoom); else zooms.delete(id);
   if (viewsToMove.has(el)) return;
   viewsToMove.add(el);
@@ -2294,6 +2357,8 @@ function moveView(el, zoom, { gliding = false } = {}) {
     // A zoom across the point where candles become closes, or back, draws the chart again in the other.
     const ex = view.all ? findExample(id) : null;
     if (ex && widerThanCandles(id, view.candleMs, view.opensOn) !== view.asCloses) return redrawExample(ex);
+    // A move towards the edge of what is drawn draws the chart again around where it now is.
+    if (ex && drawnAgainFor(view, zooms.get(id)?.x ?? view.x)) return redrawExample(ex);
     const { x, y, manual } = shownRanges(zooms.get(id), view);
     movingViews++;
     try { await Plotly.relayout(el, { 'xaxis.range': x, 'yaxis.range': y, 'yaxis.fixedrange': !manual }); }
@@ -5519,6 +5584,32 @@ const STRATEGY_TYPES = {
       says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} of ${e.swings} ${e.direction === 'Down' ? 'Downswings' : 'Upswings'}`,
       short: e => `L${e.level} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} ×${e.swings}`,
     },
+    // Met at the close of a candle that reaches into a zone of a Range holding at the level, read from the same chart: the
+    // buy-low zone, from the lower band to the depth above the Range's low, or the sell-high zone, as far below its high
+    // up to the upper band. The chain holds that Range from then on, by its lines, for its kills and the trade's exits.
+    RangeZone: {
+      label: 'Range zone',
+      structure: true,
+      defaults: { zone: 'BuyLow', level: 1, depth: 25, retracement: 75, band: 20 },
+      fields: [{ key: 'zone', label: 'Zone', options: [{ value: 'BuyLow', label: 'Buy-low' }, { value: 'SellHigh', label: 'Sell-high' }] }, stepLevel,
+        { key: 'depth', label: 'Zone depth %', number: true, min: 1, max: 50, step: 5 }, { key: 'retracement', label: 'Retracement %', number: true, min: 1, max: 99, step: 5 },
+        { key: 'band', label: 'Band %', number: true, min: 0, step: 5 }],
+      says: e => `a reach into the ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'} zone of a ${orderOf(e.level)} Range`,
+      short: e => `L${e.level} Range ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'}`,
+    },
+    // Met at the close of a candle that sweeps a Range holding at the level: its wick goes beyond the Range's low, or its
+    // high, and it closes back at or inside the box. It holds the Range as a Range zone step does; the zone depth is that
+    // of the zones the exits can be set on.
+    RangeSweep: {
+      label: 'Range liquidity sweep',
+      structure: true,
+      defaults: { zone: 'BuyLow', level: 1, depth: 25, retracement: 75, band: 20 },
+      fields: [{ key: 'zone', label: 'Sweeps', options: [{ value: 'BuyLow', label: 'The low' }, { value: 'SellHigh', label: 'The high' }] }, stepLevel,
+        { key: 'depth', label: 'Zone depth %', number: true, min: 1, max: 50, step: 5 }, { key: 'retracement', label: 'Retracement %', number: true, min: 1, max: 99, step: 5 },
+        { key: 'band', label: 'Band %', number: true, min: 0, step: 5 }],
+      says: e => `a liquidity sweep of the ${e.zone === 'SellHigh' ? 'high' : 'low'} of a ${orderOf(e.level)} Range`,
+      short: e => `L${e.level} Range sweep ${e.zone === 'SellHigh' ? 'high' : 'low'}`,
+    },
   },
   target: {
     AverageCandle: {
@@ -5558,8 +5649,29 @@ const STRATEGY_TYPES = {
       fields: [{ key: 'ratio', label: 'Target (R)', number: true, min: 0, step: 0.5 }],
       says: t => `${Number(t.ratio) === 1 ? 'as far as the Take Profit' : `the Take Profit's distance divided by ${t.ratio}`} (a ${t.ratio}R target)`,
     },
+    // Lines of the Range the entry condition holds, on the target's side of the entry: the near edge of the zone there, or
+    // the band there. No trade where the line is not beyond the entry on its side.
+    RangeZone: {
+      label: 'Range zone edge',
+      level: true,
+      defaults: {},
+      fields: [],
+      says: (t, above) => above ? 'the bottom of the Range\'s sell-high zone' : 'the top of the Range\'s buy-low zone',
+    },
+    RangeBand: {
+      label: 'Range band',
+      level: true,
+      defaults: {},
+      fields: [],
+      says: (t, above) => above ? 'the Range\'s upper band' : 'the Range\'s lower band',
+    },
   },
 };
+// A step's kills are conditions of the entry's own types, met at a close after the step is met and before the trade is
+// entered, which end the wait so the chain starts again; and a Range's end, the close beyond a band of the Range a Range
+// zone or sweep step holds, which is a kill of such a step alone.
+STRATEGY_TYPES.kill = { ...STRATEGY_TYPES.entry,
+  RangeEnd: { label: 'Range ends', of: ['RangeZone', 'RangeSweep'], defaults: {}, fields: [], says: () => 'a close beyond a band of the Range', short: () => 'Range ends' } };
 const STRATEGY_PARTS = [{ key: 'entry', title: 'Entry', kind: 'entry' }, { key: 'takeProfit', title: 'Take Profit', kind: 'target' }, { key: 'stopLoss', title: 'Stop Loss', kind: 'target' }];
 const TRADE_SHOWN = 1000;
 let strategies = null;
@@ -5641,16 +5753,17 @@ const strategySteps = s => [...(s.after ?? []), s.entry];
 
 // A strategy's entry condition in words: "3 Successive Red Candles, then 4 Successive Green Candles within 10 candles".
 function conditionSays(s) {
-  const step = e => STRATEGY_TYPES.entry[e?.type]?.says(e) ?? `an unknown entry type "${e?.type}"`;
+  const kills = e => e?.kill?.length ? ` (the wait ends at ${e.kill.map(x => STRATEGY_TYPES.kill[x?.type]?.says(x) ?? `an unknown kill type "${x?.type}"`).join(' or ')})` : '';
+  const step = e => (STRATEGY_TYPES.entry[e?.type]?.says(e) ?? `an unknown entry type "${e?.type}"`) + kills(e);
   return strategySteps(s).map((e, k) => k ? `then ${step(e)}${e.within ? ` within ${e.within} candles` : ''}` : step(e)).join(', ');
 }
 
 // A strategy in words, as the trades will be read.
 function strategySays(s) {
-  const part = (kind, p) => STRATEGY_TYPES[kind][p?.type]?.says(p) ?? `an unknown ${kind} type "${p?.type}"`;
+  const part = (kind, p, above) => STRATEGY_TYPES[kind][p?.type]?.says(p, above) ?? `an unknown ${kind} type "${p?.type}"`;
   const long = s.direction !== 'Short';
   // A level is where the target is; a distance is how far it is from the entry, and on which side.
-  const where = (t, side) => STRATEGY_TYPES.target[t?.type]?.level ? `at ${part('target', t)}, when that is ${side} the entry` : `${part('target', t)} ${side} the entry`;
+  const where = (t, side) => STRATEGY_TYPES.target[t?.type]?.level ? `at ${part('target', t, side === 'above')}, when that is ${side} the entry` : `${part('target', t)} ${side} the entry`;
   const fee = s.countFees !== false ? s.feePercent || 0 : 0, slip = s.countSlippage !== false ? s.slippagePercent || 0 : 0;
   const costs = fee && slip ? ` Costs: ${fee}% fee a side and ${slip}% slippage on the entry and a Stop Loss.`
     : fee ? ` Costs: ${fee}% fee a side; no slippage is counted.`
@@ -5825,13 +5938,21 @@ function renderStrategy() {
     ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => o.value ?? o).map((v, k) => `<option value="${esc(v)}" ${v === value ? 'selected' : ''}>${esc(f.options[k].label ?? v)}</option>`).join('')}</select></label>`
     : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" ${f.max != null ? `max="${f.max}" ` : ''}step="${f.step}" value="${esc(value)}"></label>${varyInputs(s, path, f.step)}`;
   const steps = strategySteps(s);
+  // A step's kills, under its own fields: each a condition of a type with its numbers, and a button to add one. The entry
+  // has none, as nothing is waited for after it.
+  const killsHtml = (key, p) => `<div class="step-kills"><span class="step-kills-head" title="A kill ends the wait this step begins: met at a close after the step is met and before the trade is entered, the chain starts again">Killed by</span>
+      ${(p.kill ?? []).map((kill, j) => `<span class="step-kill"><label>Type<select data-type="${key}.kill.${j}" data-kind="kill">${Object.entries(STRATEGY_TYPES.kill).filter(([, t]) => !t.of || t.of.includes(p.type)).map(([id, t]) => `<option value="${id}" ${id === kill.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
+        ${(STRATEGY_TYPES.kill[kill.type]?.fields ?? []).map(f => input(`${key}.kill.${j}.${f.key}`, f, kill[f.key])).join('')}
+        <button type="button" class="kill-remove" data-kill-remove="${key}.kill.${j}" title="Take this kill off the step" aria-label="Remove kill">×</button></span>`).join('')}
+      <button type="button" class="kill-add" data-kill-add="${key}" title="Add a condition that ends the wait this step begins">+ Kill</button></div>`;
   const part = ({ key, title, kind }) => {
     const p = key.split('.').reduce((o, k) => o?.[k], s), type = STRATEGY_TYPES[kind][p.type], step = kind === 'entry' ? steps.indexOf(p) : -1;
     return `<fieldset${step >= 0 ? ' class="step"' : ''}><legend>${title}</legend>
       ${step >= 0 && steps.length > 1 ? `<button type="button" class="step-remove" data-step-remove="${step}" title="Take this step out of the chain" aria-label="Remove ${esc(title)}">×</button>` : ''}
       <label>Type<select data-type="${key}" data-kind="${kind}">${Object.entries(STRATEGY_TYPES[kind]).filter(([, t]) => !t.only || t.only === key).map(([id, t]) => `<option value="${id}" ${id === p.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
       ${(type?.fields ?? []).map(f => input(`${key}.${f.key}`, f, p[f.key])).join('')}
-      ${step > 0 ? `<label title="The most candles from the candle that met the step before to the one that meets this. Blank for no limit.">Within (candles)<input type="number" data-path="${key}.within" data-number data-blank min="1" step="1" value="${esc(p.within ?? '')}" placeholder="no limit"></label>${varyInputs(s, `${key}.within`, 1)}` : ''}</fieldset>`;
+      ${step > 0 ? `<label title="The most candles from the candle that met the step before to the one that meets this. Blank for no limit.">Within (candles)<input type="number" data-path="${key}.within" data-number data-blank min="1" step="1" value="${esc(p.within ?? '')}" placeholder="no limit"></label>${varyInputs(s, `${key}.within`, 1)}` : ''}
+      ${step >= 0 && step < steps.length - 1 ? killsHtml(key, p) : ''}</fieldset>`;
   };
   // The steps of the entry condition, top to bottom, with a + above, between and below them to add a step there.
   const stepParts = steps.map((_, k) => ({ key: k < steps.length - 1 ? `after.${k}` : 'entry', title: steps.length > 1 ? `Step ${k + 1}${k === steps.length - 1 ? ': Entry' : ''}` : 'Entry', kind: 'entry' }));
@@ -5901,7 +6022,9 @@ function renderStrategy() {
   }));
   box.querySelectorAll('[data-type]').forEach(el => el.addEventListener('change', () => {
     const path = el.dataset.type.split('.'), key = path.pop(), target = path.reduce((o, k) => o[k], s), within = target[key]?.within;
-    target[key] = { type: el.value, ...STRATEGY_TYPES[el.dataset.kind][el.value].defaults, ...(within ? { within } : {}) };
+    // A step keeps its kills as its type changes, all but a Range's end when it is no longer a Range zone.
+    const kill = (target[key]?.kill ?? []).filter(k => k.type !== 'RangeEnd' || STRATEGY_TYPES.kill.RangeEnd.of.includes(el.value));
+    target[key] = { type: el.value, ...STRATEGY_TYPES[el.dataset.kind][el.value].defaults, ...(within ? { within } : {}), ...(kill.length ? { kill } : {}) };
     // The new type's numbers are not the old one's, all but Within.
     dropVary(s, k => k.startsWith(`${el.dataset.type}.`) && k !== `${el.dataset.type}.within`);
     renderStrategy();
@@ -5918,12 +6041,30 @@ function renderStrategy() {
     if (all.length) s.after = all;
     else delete s.after;
     delete strategySteps(s)[0].within;
+    // Nothing is waited for after the entry, so the step that becomes it has no kills.
+    delete s.entry.kill;
     renderStrategy();
     updateStrategyStatus();
   };
   box.querySelectorAll('[data-step-insert]').forEach(b => b.addEventListener('click', () =>
     changeSteps(all => all.splice(Number(b.dataset.stepInsert), 0, { type: 'SuccessiveCandles', ...STRATEGY_TYPES.entry.SuccessiveCandles.defaults }))));
   box.querySelectorAll('[data-step-remove]').forEach(b => b.addEventListener('click', () => changeSteps(all => all.splice(Number(b.dataset.stepRemove), 1))));
+  // A new kill of a Range zone step is the Range's end; of another, a run of candles to start from.
+  box.querySelectorAll('[data-kill-add]').forEach(b => b.addEventListener('click', () => {
+    const p = b.dataset.killAdd.split('.').reduce((o, k) => o[k], s), type = STRATEGY_TYPES.kill.RangeEnd.of.includes(p.type) && !p.kill?.some(k => k.type === 'RangeEnd') ? 'RangeEnd' : 'SuccessiveCandles';
+    (p.kill ??= []).push({ type, ...STRATEGY_TYPES.kill[type].defaults });
+    renderStrategy();
+    updateStrategyStatus();
+  }));
+  box.querySelectorAll('[data-kill-remove]').forEach(b => b.addEventListener('click', () => {
+    const path = b.dataset.killRemove.split('.'), j = Number(path.pop()), p = path.slice(0, -1).reduce((o, k) => o[k], s);
+    p.kill.splice(j, 1);
+    if (!p.kill.length) delete p.kill;
+    // A kill's numbers are varied by its place among the step's kills, which this changes.
+    dropVary(s, k => k.startsWith(`${path.join('.')}.`));
+    renderStrategy();
+    updateStrategyStatus();
+  }));
   wireStrategyActions(box);
   renderStrategyRun();
 }
@@ -6557,6 +6698,8 @@ const TRADE_COLUMNS = {
   entryPrice: { head: 'Price', num: true, cell: r => r.trade ? wholePrice(r.trade.entryPrice) : '', sort: r => r.trade?.entryPrice },
   takeProfit: { head: 'Take Profit', num: true, cell: r => r.trade ? wholePrice(r.trade.takeProfit) : '', sort: r => r.trade?.takeProfit },
   stopLoss: { head: 'Stop Loss', num: true, cell: r => r.trade ? wholePrice(r.trade.stopLoss) : '', sort: r => r.trade?.stopLoss },
+  // The trade's target in R as it was entered; blank for a run kept before trades said it.
+  r: { head: 'R', num: true, cell: r => r.trade?.r != null ? Number(r.trade.r).toFixed(2) : '', sort: r => r.trade?.r },
   exit: { head: 'Exit', cell: r => r.trade ? esc(fmtTime(r.trade.exitTime)) : '', sort: r => r.trade && minuteOf(r.trade.exitTime) },
   exitPrice: { head: 'Price', num: true, cell: r => r.trade ? wholePrice(r.trade.exitPrice) : '', sort: r => r.trade?.exitPrice },
   outcome: { head: 'Outcome', cell: r => !r.trade ? '' : r.trade.bothTouched
@@ -6832,6 +6975,7 @@ window.embed = {
 // A short name for a strategy on the charts: its run, its direction and its targets, as "4 Green Long · ±100% body".
 function chartStrategyName(s) {
   const target = t => t.type === 'Percent' ? `${t.percent}%` : t.type === 'HighestWick' ? `high of ${t.candles}` : t.type === 'LowestWick' ? `low of ${t.candles}` : t.type === 'RiskRatio' ? `${t.ratio}R target`
+    : t.type === 'RangeZone' ? 'Range zone' : t.type === 'RangeBand' ? 'Range band'
     : `${t.percent}% ${String(t.measure ?? 'Body').toLowerCase()}${t.candles !== s.entry?.length ? ` of ${t.candles}` : ''}`;
   const entry = strategySteps(s).map(e => STRATEGY_TYPES.entry[e?.type]?.short(e) ?? e?.type ?? '').join(' → ');
   const [tp, sl] = [target(s.takeProfit), target(s.stopLoss)];
@@ -6981,6 +7125,16 @@ function drawStrategies(ex, traces) {
     // A tour's scene starts its story at its first candle, so a trade entered before it is not shown.
     const shown = run.trades.filter(t => (!at || minuteOf(t.entryTime) === at) && minuteOf(t.entryTime) <= last && minuteOf(t.exitTime) >= first && (!ex.tour || minuteOf(t.entryTime) >= first))
       .map(t => ({ t, done: t.outcome !== 'Open' && minuteOf(t.exitTime) <= last }));
+    // The Range the analysed trade's entry condition held, by its lines, from the candle that identified it, once the chart
+    // has reached that candle, to where the trade's exits run to: the Range's own drawing (see drawRange), with the zones as
+    // deep as the strategy has them. It is there before the trade is, as the entry condition is told from it.
+    const held = at ? run.trades.find(t => minuteOf(t.entryTime) === at) : null, heldAt = held?.range ? whole.t.findIndex(x => minuteOf(x) === at) : -1;
+    if (heldAt >= 0) {
+      const r = held.range, identified = whole.t[Math.max(0, heldAt - (held.entryIndex - r.identified))];
+      if (minuteOf(identified) <= last) drawRange(traces, { level: r.level, identified: { time: identified }, low: { price: r.low }, high: { price: r.high }, bandLow: r.bandLow, bandHigh: r.bandHigh },
+        held.outcome !== 'Open' && minuteOf(held.exitTime) <= last ? held.exitTime : ahead, { box: true, bands: true, zones: 100 * (r.buyLowTop - r.low) / (r.high - r.low),
+          hover: `Range the entry condition held · level ${r.level}<br>${fmtPrice(r.low)} to ${fmtPrice(r.high)}<br>bands ${fmtPrice(r.bandLow)} to ${fmtPrice(r.bandHigh)}<br>identified ${fmtTime(identified)} at a ${r.retracement}% retracement` });
+    }
     if (!shown.length) continue;
     const end = s => s.done ? s.t.exitTime : ahead;
     // The candles each step of the entry condition read, boxed from their lowest low to their highest high: a run of
@@ -7002,6 +7156,7 @@ function drawStrategies(ex, traces) {
         line: { color: colour, width: 1, dash: 'dot' }, fillcolor: withAlpha(css(step.colour === 'Red' || (type.structure && step.direction === 'Down') ? '--down' : '--up'), 0.08),
         hovertemplate: `${label}: ${esc(type.says(step))}<extra></extra>` });
     });
+
     const level = (key, color) => traces.push({ type: 'scatter', mode: 'lines', name: `${name} ${key === 'takeProfit' ? 'Take Profit' : 'Stop Loss'}`, hoverinfo: 'skip',
       x: shown.flatMap(s => [s.t.entryTime, end(s), null]), y: shown.flatMap(s => [s.t[key], s.t[key], null]), line: { color, width: 1.25, dash: 'dash' } });
     level('takeProfit', up);

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Gradient.CryptoAnalysis.Research;
 using Gradient.CryptoAnalysis.Strategies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -87,6 +88,12 @@ public static class ReplayServer
 
         var byId = datasets.ToDictionary(x => x.Id);
         var batches = new ConcurrentDictionary<(string Dataset, int Anchor, int Start, (double Retracement, double Band) Settings), Lazy<string>>();
+        // What is slow to work out is kept on disk too, beside the site, so it is there after a restart: the replay's batches,
+        // and the market structure a strategy's steps read.
+        var kept = new StructureCache(Path.GetFullPath(Path.Combine(siteDir, "..", "cache")));
+        kept.Prune();
+        KnownStructure.CacheDirectory = Path.Combine(kept.Folder, "known");
+        KnownRanges.CacheDirectory = Path.Combine(kept.Folder, "known");
 
         // The static page, opened as a file, asks whether the server is running so it can link to it.
         app.MapGet("/api/health", (HttpContext context) =>
@@ -119,7 +126,8 @@ public static class ReplayServer
             var first = Math.Clamp(anchor ?? 0, 0, data.Prices.Count - 1);
             var start = Math.Clamp(from / BatchSize * BatchSize, 0, data.Prices.Count - first - 1);
             var settings = (Retracement: retracement ?? Ranges.DefaultMinRetracement, Band: band ?? Ranges.DefaultBand);
-            var json = batches.GetOrAdd((dataset, first, start, settings), key => new Lazy<string>(() => Batch(data, key.Anchor, key.Start, key.Settings))).Value;
+            var json = batches.GetOrAdd((dataset, first, start, settings), key => new Lazy<string>(() =>
+                kept.Text(BatchName(data, key.Anchor, key.Start, key.Settings), () => Batch(data, key.Anchor, key.Start, key.Settings)))).Value;
             return Results.Text(json, "application/json");
         });
 
@@ -454,7 +462,9 @@ public static class ReplayServer
             if (error != null)
                 return Results.BadRequest(error);
             var found = StrategyBacktest.Occurrences(data!.Prices, strategy!);
-            return Results.Json(new { Candles = found.Select(i => new { Index = i, Time = data.Prices[i].DateTime, Measurable = StrategyBacktest.Measurable(data.Prices, i, strategy) }) }, Json);
+            // A target on a Range's lines is set from the Range the entry condition held, which the steps' candles give.
+            var met = strategy!.TakeProfit.IsRange || strategy.StopLoss.IsRange ? StrategyBacktest.Signals(data.Prices, strategy).ToDictionary(x => x.Index, x => x.Met) : [];
+            return Results.Json(new { Candles = found.Select(i => new { Index = i, Time = data.Prices[i].DateTime, Measurable = StrategyBacktest.Measurable(data.Prices, i, strategy, met.GetValueOrDefault(i)) }) }, Json);
         });
 
         // The random-entry baseline of a strategy (see StrategyBaseline): { dataset, strategy, from, to, runs, seed, save },
@@ -809,6 +819,19 @@ public static class ReplayServer
         foreach (var unit in text)
             hash = unchecked((hash ^ unit) * 0x01000193u);
         return hash.ToString("x8");
+    }
+
+    /// <summary>
+    /// The name a batch is kept by: its dataset, anchor and range settings, the candles it is of, what the server keeps of
+    /// each (the levels and the window), and the fingerprint of every candle it was worked out from, the dataset's up to its
+    /// last. A batch stays good as candles are added after it, and is not found again once a candle before it has changed.
+    /// </summary>
+    public static string BatchName(Dataset data, int anchor, int start, (double Retracement, double Band) settings)
+    {
+        var to = Math.Min(start + BatchSize, data.Prices.Count - anchor);
+        var number = (double x) => x.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+        return Path.Combine("replay", data.Id, $"a{anchor}-r{number(settings.Retracement)}-b{number(settings.Band)}-l{MaxLevel}-w{Window}",
+            $"{start}-{to}-{PriceFingerprint.Of(data.Prices, anchor + to):x16}.json");
     }
 
     /// <summary>

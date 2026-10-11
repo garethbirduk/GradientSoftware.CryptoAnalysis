@@ -35,7 +35,103 @@ public static class KnownStructure
     private static readonly ConditionalWeakTable<IReadOnlyList<Price>, Lazy<(int[] Masks, IReadOnlyList<KnownBreak>[] Breaks)>> Known = [];
 
     private static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) Of(IReadOnlyList<Price> prices) =>
-        Known.GetValue(prices, p => new Lazy<(int[], IReadOnlyList<KnownBreak>[])>(() => Read(p, EnumPriceBasis.Close, Window, Levels))).Value;
+        Known.GetValue(prices, p => new Lazy<(int[], IReadOnlyList<KnownBreak>[])>(() => Kept(p))).Value;
+
+    /// <summary>
+    /// The folder each series' flags and breaks are also kept in, from one run to the next; null to keep them in memory
+    /// alone. What is kept for a series is used again while its candles are as they were, and when candles have been added
+    /// after them only the new ones are worked out. The folder is for one build of the rules: another build's must not be
+    /// read.
+    /// </summary>
+    public static string? CacheDirectory { get; set; }
+
+    private const int FileFormat = 1;
+
+    // A series' flags and breaks, from the folder they are kept in when that has them, and kept there once worked out.
+    private static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) Kept(IReadOnlyList<Price> prices)
+    {
+        if (CacheDirectory is not { } folder || prices.Count == 0)
+            return Read(prices, EnumPriceBasis.Close, Window, Levels);
+
+        // A series is known by its first candles, which stay as they are while candles are added after them.
+        var path = Path.Combine(folder, $"known-w{Window}-l{Levels}-{PriceFingerprint.Of(prices, Math.Min(prices.Count, Window)):x16}.bin");
+        var had = Load(path, prices);
+        if (had?.Masks.Length == prices.Count)
+            return had.Value;
+
+        var read = Read(prices, EnumPriceBasis.Close, Window, Levels, had);
+        Save(path, prices, read);
+        return read;
+    }
+
+    // What a file has of a series: the flags and breaks of its first candles, when those candles are still as they were.
+    private static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks)? Load(string path, IReadOnlyList<Price> prices)
+    {
+        try
+        {
+            if (!File.Exists(path))
+                return null;
+            using var reader = new BinaryReader(File.OpenRead(path));
+            if (reader.ReadInt32() != FileFormat)
+                return null;
+            var count = reader.ReadInt32();
+            if (count > prices.Count || reader.ReadUInt64() != PriceFingerprint.Of(prices, count))
+                return null;
+
+            var masks = new int[count];
+            var breaks = new IReadOnlyList<KnownBreak>[count];
+            for (var t = 0; t < count; t++)
+            {
+                masks[t] = reader.ReadInt32();
+                var made = reader.ReadByte();
+                breaks[t] = made == 0 ? None : Enumerable.Range(0, made).Select(_ => new KnownBreak(reader.ReadByte(), (EnumKnownBreak)reader.ReadByte(),
+                    (EnumSwingDirection)reader.ReadByte(), reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32(), reader.ReadBoolean())).ToArray();
+            }
+
+            return (masks, breaks);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    // Keeps a series' flags and breaks: written beside the file and moved over it, so a reader never has half of one. A
+    // folder that cannot be written to keeps nothing.
+    private static void Save(string path, IReadOnlyList<Price> prices, (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) read)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var writing = $"{path}.{Guid.NewGuid():N}.tmp";
+            using (var writer = new BinaryWriter(File.Create(writing)))
+            {
+                writer.Write(FileFormat);
+                writer.Write(prices.Count);
+                writer.Write(PriceFingerprint.Of(prices, prices.Count));
+                for (var t = 0; t < prices.Count; t++)
+                {
+                    writer.Write(read.Masks[t]);
+                    writer.Write((byte)read.Breaks[t].Count);
+                    foreach (var b in read.Breaks[t])
+                    {
+                        writer.Write((byte)b.Level);
+                        writer.Write((byte)b.Kind);
+                        writer.Write((byte)b.Direction);
+                        writer.Write(b.From);
+                        writer.Write(b.Begins);
+                        writer.Write(b.Run);
+                        writer.Write(b.Weak);
+                    }
+                }
+            }
+
+            File.Move(writing, path, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
 
     /// <summary>
     /// The candles at which a level shows a flag, worked out once a series and kept.
@@ -61,12 +157,24 @@ public static class KnownStructure
     /// Each candle's flags, as <see cref="Masks"/> gives them, and the breaks its close made, each from the window of candles
     /// to it.
     /// </summary>
-    public static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) Read(IReadOnlyList<Price> prices, EnumPriceBasis basis, int window, int levels)
+    public static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) Read(IReadOnlyList<Price> prices, EnumPriceBasis basis, int window, int levels) =>
+        Read(prices, basis, window, levels, null);
+
+    // With what is had of the series' first candles already, only the candles after them are worked out.
+    private static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) Read(IReadOnlyList<Price> prices, EnumPriceBasis basis, int window, int levels,
+        (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks)? had)
     {
         var list = prices as List<Price> ?? prices.ToList();
         var masks = new int[list.Count];
         var breaks = new IReadOnlyList<KnownBreak>[list.Count];
-        Parallel.For(0, list.Count, t =>
+        var done = had?.Masks.Length ?? 0;
+        if (had is { } kept)
+        {
+            Array.Copy(kept.Masks, masks, done);
+            Array.Copy(kept.Breaks, breaks, done);
+        }
+
+        Parallel.For(done, list.Count, t =>
         {
             var from = Math.Max(0, t + 1 - window);
             (masks[t], breaks[t]) = Seen(list.GetRange(from, t + 1 - from), from, basis, levels);

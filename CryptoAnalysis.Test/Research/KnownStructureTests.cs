@@ -82,6 +82,44 @@ public class KnownStructureTests
         Assert.IsTrue(breaks.Sum(x => x.Count(b => b.Run >= 3)) > 20, "A random walk has Trends of three Swings and more.");
     }
 
+    private static string Described(IReadOnlyList<KnownBreak>[] breaks) =>
+        string.Join(";", breaks.SelectMany((x, i) => x.Select(b => $"{i}:{b}")));
+
+    [TestMethod]
+    public void Breaks_KeptOnDisk_AreReadBackAndOnlyNewCandlesWorkedOut()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"known-{Guid.NewGuid():N}");
+        var all = Synthetic.Walk(7, Start, 1400);
+        var expected = Described(KnownStructure.Read(all, EnumPriceBasis.Close, KnownStructure.Window, KnownStructure.Levels).Breaks);
+        try
+        {
+            KnownStructure.CacheDirectory = folder;
+
+            // The first 1000 candles are worked out and kept; a list of the same candles reads them back.
+            var first = all.Take(1000).ToList();
+            var worked = Described(KnownStructure.Breaks(first));
+            var file = Directory.GetFiles(folder).Single();
+            var written = File.GetLastWriteTimeUtc(file);
+            Assert.AreEqual(worked, Described(KnownStructure.Breaks(all.Take(1000).ToList())));
+            Assert.AreEqual(written, File.GetLastWriteTimeUtc(file), "Nothing new is kept for the same candles.");
+
+            // With candles added, the file's are used and the rest worked out: the whole is as if worked out afresh.
+            Assert.AreEqual(expected, Described(KnownStructure.Breaks(all.ToList())));
+            Assert.AreEqual(1, Directory.GetFiles(folder).Length, "A series that grows keeps the one file.");
+
+            // A candle changed among those kept: what is kept is not used.
+            var changed = all.Select(p => new Price { DateTime = p.DateTime, Open = p.Open, High = p.High, Low = p.Low, Close = p.Close }).ToList();
+            changed[700].Close = changed[700].High = changed[700].Close * 1.2;
+            Assert.AreEqual(Described(KnownStructure.Read(changed, EnumPriceBasis.Close, KnownStructure.Window, KnownStructure.Levels).Breaks), Described(KnownStructure.Breaks(changed)));
+        }
+        finally
+        {
+            KnownStructure.CacheDirectory = null;
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, recursive: true);
+        }
+    }
+
     [TestMethod]
     public void Masks_OfACandleDoNotChangeWithTheCandlesAfterIt()
     {
