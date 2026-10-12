@@ -1117,31 +1117,45 @@ function trendRows(ex, direction) {
   });
 }
 
-function trendShapes(ex) {
+// The strips are drawn as traces against a price axis of their own that runs from the bottom of the chart to the top
+// (see TREND_AXIS), all the segments of one colour as one trace with a gap between each: a shape for each segment is
+// slow in the hundreds, as a long history zoomed out has, each being moved again at every pan and zoom. A segment's
+// strength is rounded to a twentieth, so there are only a few colours. They go in ahead of every other trace, so they
+// lie under them as the shapes did.
+const TREND_AXIS = { overlaying: 'y', range: [0, 1], fixedrange: true, visible: false };
+function drawTrendStrips(ex, traces) {
   const last = ex.prices.t[ex.prices.t.length - 1], gap = css('--panel');
-  return ['Up', 'Down'].flatMap(direction => {
+  const groups = new Map();
+  const add = (x0, x1, a, b, fillcolor, lined) => {
+    const key = `${fillcolor}|${lined}`;
+    if (!groups.has(key)) groups.set(key, { type: 'scatter', mode: lined ? 'lines' : 'none', fill: 'toself', yaxis: 'y2', name: 'Trend', hoverinfo: 'skip',
+      x: [], y: [], line: { width: lined ? 1 : 0, color: gap, simplify: false }, fillcolor });
+    const g = groups.get(key);
+    g.x.push(x0, x1, x1, x0, x0, null);
+    g.y.push(a, a, b, b, a, null);
+  };
+  for (const direction of ['Up', 'Down']) {
     const color = TERMS.get(direction === 'Up' ? 'Uptrend' : 'Downtrend').color;
-    return trendRows(ex, direction).flatMap(row => row.trends.flatMap(t => {
+    for (const row of trendRows(ex, direction)) for (const t of row.trends) {
       const parts = t.parts ?? [], end = t.end?.time ?? last;
       const from = parts.length ? parts[parts.length - 1].breakOfStructure.time : t.start.time;
-      const segment = (x0, x1, alpha) => trendStrip(x0, x1, row.edge, row.inner, withAlpha(color, alpha), { width: 1, color: gap });
+      const segment = (x0, x1, alpha) => add(x0, x1, row.edge, row.inner, withAlpha(color, Math.round(alpha * 20) / 20), true);
+      if (row.striped) add(t.start.time, end, row.outer, row.edge, levelColor(row.level), false);
       // A Swing's segment too narrow to draw (see wideEnough) is joined to those after it until they are wide enough
       // together, and the one segment is as strong as the share of them that are, so a long Trend zoomed out is a few
       // segments and not one for each of its Swings.
-      const segments = [];
       let begun = t.start.time, strong = 0, joined = 0;
       parts.forEach((p, k) => {
         strong += p.strong ? 1 : 0;
         joined++;
         if (k < parts.length - 1 && !wideEnough(ex, begun, p.breakOfStructure.time)) return;
-        segments.push(segment(begun, p.breakOfStructure.time, 0.25 + 0.35 * strong / joined));
+        segment(begun, p.breakOfStructure.time, 0.25 + 0.35 * strong / joined);
         [begun, strong, joined] = [p.breakOfStructure.time, 0, 0];
       });
-      return [...(row.striped ? [trendStrip(t.start.time, end, row.outer, row.edge, levelColor(row.level), { width: 0 })] : []),
-        ...segments,
-        ...(Date.parse(from) < Date.parse(end) ? [segment(from, end, 0.1)] : [])];
-    }));
-  });
+      if (Date.parse(from) < Date.parse(end)) segment(from, end, 0.1);
+    }
+  }
+  traces.unshift(...groups.values());
 }
 
 // A trend as an arrow in its level's colour, from where its first swing starts to its latest break of structure, with its
@@ -1969,6 +1983,9 @@ function drawSawtooth(ex, traces) {
     // Every level is drawn at the same width, with its pivots marked; a pivot shared by several levels shows the coarsest.
     const width = 2;
     const pivots = ex.sawtooth[level];
+    // A level with no high or low among the times drawn is one leg passing straight through, both its ends out of
+    // sight: it is left out, as a Swing with no edge in sight is (see edgeInSight).
+    if (ex.sight && !pivots.some(p => p.time >= ex.sight.a && p.time <= ex.sight.b)) continue;
     const turns = pivots.filter(p => p.kind !== 'Current');
     const current = pivots.find(p => p.kind === 'Current');
     const points = new Map(pointsFor(ex, level).map(p => [`${p.kind}|${p.time}`, p]));
@@ -2068,11 +2085,27 @@ function drawnStretch(ex, el) {
     across: el?._fullLayout?._size?.w ?? Math.max(100, (el?.clientWidth ?? 1000) - 80) };
 }
 
+// Whether any edge of a box can be seen on a whole dataset's chart: its start or end among the times drawn, or its top
+// or bottom among the prices of the candles drawn, which the price axis fits, and of a price range set by hand. Zoomed
+// in far enough, the chart lies wholly inside a Swing many times its size, and all there is of the Swing to draw is a
+// tint over everything; it is left out, and comes back as the chart is zoomed out to an edge of it. Its top and bottom
+// are prices that matter, its high and its pullback low, so one of those in view keeps it. Every other chart draws all
+// it has.
+function edgeInSight(ex, start, end, bottom, top) {
+  const s = ex.sight;
+  return !s || start >= s.a || end <= s.b || (top >= s.low && top <= s.high) || (bottom >= s.low && bottom <= s.high);
+}
+
 function clipToView(ex, el) {
   const whole = (ex.hindsight ?? ex).prices, n = whole.t.length;
   if (!ex.complete || n < 2) return ex;
   const { from, to, x0, x1, across } = drawnStretch(ex, el);
   const a = whole.t[from], b = whole.t[to], last = whole.t[n - 1];
+  // The prices in sight: those of the candles drawn with the room the price axis leaves around them (see fitPrices).
+  let low = Infinity, high = -Infinity;
+  for (let i = from; i <= to; i++) { if (whole.l[i] < low) low = whole.l[i]; if (whole.h[i] > high) high = whole.h[i]; }
+  const room = (high - low) * 0.06, byHand = zooms.get(ex.id)?.y;
+  const sight = { a, b, low: Math.min(low - room, byHand?.[0] ?? Infinity), high: Math.max(high + room, byHand?.[1] ?? -Infinity) };
   const within = t => t >= a && t <= b, overlaps = (start, end) => start <= b && end >= a;
   const cut = list => list.slice(from, to + 1), each = (lists, keep) => (lists ?? []).map(list => list.filter(keep));
   // A line keeps the point either side of what is drawn, so it runs on to the edges.
@@ -2080,7 +2113,7 @@ function clipToView(ex, el) {
     const first = points.findIndex(p => p.time >= a), end = points.findLastIndex(p => p.time <= b);
     return first < 0 || end < 0 ? points.slice(Math.max(0, end), end + 2) : points.slice(Math.max(0, first - 1), end + 2);
   };
-  return { ...ex, drawn: { from, to, span: x1 - x0 }, pixel: (x1 - x0) / across,
+  return { ...ex, drawn: { from, to, span: x1 - x0 }, pixel: (x1 - x0) / across, sight,
     prices: { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) },
     sawtooth: (ex.sawtooth ?? []).map(line),
     swingsByLevel: each(ex.swingsByLevel, s => overlaps(s.start.time, s.end.time)),
@@ -2128,7 +2161,8 @@ function draw(el, ex, focus) {
   // border shows where a finer one shares its edges.
   const levelsShown = [...swingLevels(ex)].sort((a, b) => a - b);
   for (const [depth, level] of [...levelsShown.entries()].reverse())
-    for (const w of (ex.swingsByLevel?.[level] ?? []).filter(w => w.confirmed && on(SWINGS[w.direction].layer) && wideEnough(ex, w.start.time, w.end.time))) traces.push(swingBox(w, depth || false));
+    for (const w of (ex.swingsByLevel?.[level] ?? []).filter(w => w.confirmed && on(SWINGS[w.direction].layer) && wideEnough(ex, w.start.time, w.end.time)
+        && edgeInSight(ex, w.start.time, w.end.time, Math.min(w.start.price, w.extreme.price), Math.max(w.start.price, w.extreme.price)))) traces.push(swingBox(w, depth || false));
   const allSwings = shownSwings(ex);
 
   // A whole dataset can be zoomed out to all of its history. With more candles across the chart than can be told apart,
@@ -2250,7 +2284,8 @@ function draw(el, ex, focus) {
     }
   }
 
-  const shapes = [...trendShapes(ex), ...highlight(ex, traces, labels)];
+  const shapes = highlight(ex, traces, labels);
+  drawTrendStrips(ex, traces);
   if (ex.hindsight) shapes.push(...drawReplayExtras(ex, traces, level));
   for (const pin of ex.pins ?? []) labels.push(pinLabel(pin));
 
@@ -2294,6 +2329,7 @@ function draw(el, ex, focus) {
     dragmode: 'pan',
     xaxis: { type: 'date', rangeslider: { visible: false }, gridcolor: grid, linecolor: grid, range: xRange },
     yaxis: { type: 'linear', gridcolor: grid, linecolor: grid, tickformat: ',.0f', side: 'right', range: yRange, fixedrange: !manual },
+    yaxis2: TREND_AXIS,
     annotations: [...shown, ...labels], shapes, hovermode: 'closest', showlegend: false,
   }, { responsive: true, displaylogo: false, doubleClick: false, modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d', 'resetScale2d'],
     modeBarButtonsToAdd: [{ name: 'Reset view', icon: Plotly.Icons.home, click: gd => moveView(gd, null) }] });
