@@ -989,7 +989,13 @@ function toggleSelection(row, type) {
 // The Levels filter says which sawtooth levels are looked at; on its own it draws nothing. The Sawtooth toggle draws the
 // sawtooth at those levels and the swing toggles draw their swings there. With no level chosen, a chart uses its own level.
 // The choice is kept as it is even where a level does not exist (yet, in a replay): that level simply has nothing to show.
+// An analysis's Levels buttons say which orders it tells of (see sectionLayers), but its chart draws only the order of the
+// chapter on show: the 8th order's chapters show the 8th order alone, not every order the analysis has a chapter for. A
+// chapter of no order, a Candle's, draws them all.
 function selectedLevels(ex) {
+  const own = ex.tour && currentPage === 'Analysis' && tour?.page === 'Analysis'
+    ? (tourSection()?.layers ?? []).filter(id => /^level\d+$/.test(id)).map(id => Number(id.slice(5))) : [];
+  if (own.length) return own;
   const chosen = LAYERS.filter(l => l.level !== undefined && on(l.id)).map(l => l.level);
   return chosen.length ? chosen : [ex.level ?? 1];
 }
@@ -1213,7 +1219,6 @@ function owningSwing(ex, a) {
   return at && shownSwings(ex).find(w => w.direction === a.direction && at(w)?.time === a.time);
 }
 
-let layoutMode = '';
 
 // Beside the chart, as tabs: Events, the replay's log, while the Event log layer is on; and the contents of the tour or
 // the analysis on show, named after it, on those pages. The tab last chosen stays chosen while it is there.
@@ -1251,13 +1256,7 @@ function drawAll(page) {
   document.body.classList.toggle('replaying', on('replay'));
   updateSide();
   if (!on('replay')) stopPlaying();
-  // Showing or hiding the panel beside the chart changes the chart's width, which Plotly only notices on a window resize.
-  const mode = `${on('replay')}|${document.body.classList.contains('side-open')}|${document.body.classList.contains('editing')}`, resized = mode !== layoutMode;
-  layoutMode = mode;
-  document.querySelectorAll('.chart').forEach(el => {
-    draw(el, viewFor(findExample(el.dataset.id)), focusOf(page));
-    if (resized) plotterOf(el).Plots.resize(el);
-  });
+  document.querySelectorAll('.chart').forEach(el => draw(el, viewFor(findExample(el.dataset.id)), focusOf(page)));
   renderEventLog(activeExample());
   updateReplayControls();
 }
@@ -1373,6 +1372,10 @@ function structureWindow(ex, t) {
 
 // The candles of an example from one of them on, as an example of its own: its replay is anchored there, so its structure
 // is that of a chart that begins there.
+// The times of an example's candles as numbers, read once: a chart given them with its candles (a trace's xms) does not
+// read each candle's time again at every draw, which counts when it has every candle of a dataset.
+const timesOf = ex => ex.timesMs ??= Float64Array.from(ex.prices.t, t => Date.parse(t));
+
 const windowExamples = new Map();
 function windowExample(ex, from) {
   const id = `${ex.id}@window${from}`;
@@ -1388,9 +1391,11 @@ function liveView(ex, t) {
   // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
   const window = ex.tour ? tourWindow(ex, t)
     : isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
-  // A tour's chart has the candles either side of its view as well, to pan to.
-  const cut = a => a.slice(ex.tour ? Math.max(0, window.from - TOUR_CONTEXT) : window?.from ?? 0, t + 1);
+  // A tour's chart has every candle of its scene before the cursor, to pan to, as only what is in view is painted.
+  const cut = a => a.slice(ex.tour ? 0 : window?.from ?? 0, t + 1);
   const prices = { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) };
+  // With every candle there, their times are read once for the dataset and not at every draw (see timesOf).
+  if (ex.tour) prices.ms =timesOf(ex).subarray(0, t + 1);
   if (!r) {
     if (win) fetchBatch(src, win.at - shift).then(batch => batch && redrawExample(ex));
     else prefetch(ex, t);
@@ -1442,8 +1447,8 @@ function drawReplayExtras(ex, traces, level) {
   const box = (start, end, a, b) => ({ x: [start, end, end, start, start], y: [a, a, b, b, a] });
 
   if (on('future') && t + 1 < full.prices.t.length) {
-    const rest = a => a.slice(t + 1, ex.window ? ex.window.to + 1 + (ex.tour ? TOUR_CONTEXT : 0) : undefined), grey = css('--close');
-    traces.push({ type: 'candlestick', name: 'Future', x: rest(full.prices.t), open: rest(full.prices.o), high: rest(full.prices.h), low: rest(full.prices.l), close: rest(full.prices.c),
+    const rest = a => a.slice(t + 1, ex.window && !ex.tour ? ex.window.to + 1 : undefined), grey = css('--close');
+    traces.push({ type: 'candlestick', name: 'Future', x: rest(full.prices.t), ...(ex.tour ? { xms: timesOf(full).subarray(t + 1) } : {}), open: rest(full.prices.o), high: rest(full.prices.h), low: rest(full.prices.l), close: rest(full.prices.c),
       opacity: 0.3, increasing: { line: { color: grey, width: 1 }, fillcolor: withAlpha(grey, 0.3) }, decreasing: { line: { color: grey, width: 1 }, fillcolor: withAlpha(grey, 0.6) }, hoverinfo: 'skip' });
   }
   if (!r) return shapes;
@@ -2185,10 +2190,8 @@ function drawnAgainFor(view, x) {
   return (!d.first && x0 < d.from + width / 4) || (!d.last && x1 > d.to - width / 4) || d.to - d.from > width * (2 * DRAWN_BESIDE + 1) * 2;
 }
 
-// What draws a chart. The Chart and Replay pages, whose charts hold the most and are moved about the most, are drawn on
-// a canvas (see canvas-chart.js), which paints only what is in view at each move; Plotly, which every other chart is
-// drawn by, moves everything it was given, in view or not. The Chart page's setting chooses Plotly for these too. An
-// element keeps what first drew it.
+// Every chart of candles and structure is drawn on a canvas (see canvas-chart.js), which paints only what is in view at
+// each move. The Strategies page's charts of results are Plotly's.
 // ---- Level in focus --------------------------------------------------------------------------------------------------
 // On a chart drawn on a canvas, one sawtooth level can be put in focus: everything of the other levels is drawn faint,
 // their labels left out, and the level's own drawn over them, so it can be read among the rest without turning them
@@ -2219,9 +2222,6 @@ document.addEventListener('mouseover', e => {
   showFocus();
 });
 
-const usesCanvas = () => state.plotter !== 'plotly' && (currentPage === 'Chart' || currentPage === 'Replay') && !!window.CanvasChart;
-const plotterFor = el => el._plotter ??= usesCanvas() ? CanvasChart : Plotly;
-const plotterOf = el => el._plotter ?? Plotly;
 
 function draw(el, ex, focus) {
   ex = clipToView(ex, el);
@@ -2260,7 +2260,7 @@ function draw(el, ex, focus) {
   const whole = (ex.hindsight ?? ex).prices.t, candleMs = whole.length > 1 ? Date.parse(whole[1]) - Date.parse(whole[0]) : 3600000;
   const opensOn = ex.window ? ex.window.to - ex.window.from : whole.length, asCloses = !!ex.complete && widerThanCandles(ex.id, candleMs, opensOn);
   if (on('price') && !asCloses) {
-    traces.push({ type: 'candlestick', name: 'Price', x: p.t, open: p.o, high: p.h, low: p.l, close: p.c,
+    traces.push({ type: 'candlestick', name: 'Price', x: p.t, xms: p.ms, open: p.o, high: p.h, low: p.l, close: p.c,
       increasing: { line: { color: css('--up'), width: 1 } }, decreasing: { line: { color: css('--down'), width: 1 } }, hoverinfo: 'x+y' });
   }
   if (on('price') && asCloses && !on('close')) {
@@ -2268,7 +2268,7 @@ function draw(el, ex, focus) {
       hovertemplate: '%{x}<br>close %{y}<extra></extra>' });
   }
   if (on('close')) {
-    traces.push({ type: 'scatter', mode: 'lines', name: 'Close', x: p.t, y: p.c, hoverinfo: 'skip',
+    traces.push({ type: 'scatter', mode: 'lines', name: 'Close', x: p.t, xms: p.ms, y: p.c, hoverinfo: 'skip',
       line: { color: on('price') ? css('--close') : text, width: on('price') ? 1 : 1.6 } });
   }
 
@@ -2406,8 +2406,10 @@ function draw(el, ex, focus) {
   // Room either side is a candle, or for a view of one candle just over half of one, so its neighbours stay out of frame.
   const pad = times.length > 1 ? candle : candle * 0.6;
   // The whole of a complete dataset's history, which its chart can be zoomed out to.
-  const all = ex.complete && full.t.length > 1 ? [new Date(Date.parse(full.t[0]) - oneCandle).toISOString(), new Date(Date.parse(full.t[full.t.length - 1]) + oneCandle).toISOString()] : null;
-  const view = { t: times, h: span(full.h), l: span(full.l), candle, all, asCloses, candleMs, opensOn, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
+  const history = full.t.length > 1 ? [new Date(Date.parse(full.t[0]) - oneCandle).toISOString(), new Date(Date.parse(full.t[full.t.length - 1]) + oneCandle).toISOString()] : null;
+  const all = ex.complete ? history : null;
+  // A tour's or an analysis's chart has every candle of its scene, and can be zoomed out to all of them too.
+  const view = { t: times, h: span(full.h), l: span(full.l), candle, all, widest: all ?? (ex.tour ? history : null), asCloses, candleMs, opensOn, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
     from: w?.from ?? 0, numbered: !!ex.tour, floor: ex.tour ? 0.01 : 0,
     until: ex.tour && !on('future') ? Date.parse(full.t[ex.cursor]) : undefined, now: ex.tour ? [full.l[ex.cursor], full.h[ex.cursor]] : null,
     pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46),
@@ -2428,7 +2430,7 @@ function draw(el, ex, focus) {
   const shown = shownBoxes(boxes, xRange);
   boxSets.set(ex.id, { boxes, shown: boxKey(shown) });
 
-  plotterFor(el).react(el, traces, {
+  CanvasChart.react(el, traces, {
     uirevision: ex.id,
     margin: { t: 10, r: 56, b: 36, l: 10 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
     font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
@@ -2437,8 +2439,7 @@ function draw(el, ex, focus) {
     yaxis: { type: 'linear', gridcolor: grid, linecolor: grid, tickformat: ',.0f', side: 'right', range: yRange, fixedrange: !manual },
     yaxis2: TREND_AXIS, focusLevel: levelInFocus(),
     annotations: [...shown, ...labels], shapes, hovermode: 'closest', showlegend: false,
-  }, { responsive: true, displaylogo: false, doubleClick: false, modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d', 'resetScale2d'],
-    modeBarButtonsToAdd: [{ name: 'Reset view', icon: Plotly.Icons.home, click: gd => moveView(gd, null) }] });
+  }, { modeBarButtonsToAdd: [{ name: 'Reset view', click: gd => moveView(gd, null) }] });
   wireZoom(el);
   showLevelsDrawn(ex);
 }
@@ -2472,14 +2473,21 @@ const axisTime = v => Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(String(v)) ? v : `$
 
 // Everything a chart draws against its price axis, for fitting it: the candles' highs and lows, and the points of every
 // line, marker and box, its traces' and its shapes'. A line counts where it crosses the times in view, not only at its ends.
+const seriesTimes = new Map();
 function seriesOf(traces, shapes) {
-  const ms = v => typeof v === 'number' ? v : v instanceof Date ? v.getTime() : v == null ? NaN : axisTime(v);
+  // A time is read once and kept, as a chart with every candle of its dataset asks for each of them at every draw.
+  const read = v => {
+    let t = seriesTimes.get(v);
+    if (t === undefined) { if (seriesTimes.size > 400000) seriesTimes.clear(); seriesTimes.set(v, t = axisTime(v)); }
+    return t;
+  };
+  const ms = v => typeof v === 'number' ? v : v instanceof Date ? v.getTime() : v == null ? NaN : read(v);
   const out = [];
   for (const tr of traces) {
     if (tr.visible === false || (tr.yaxis && tr.yaxis !== 'y') || !Array.isArray(tr.x)) continue;
-    if (tr.type === 'candlestick') out.push({ x: tr.x.map(ms), low: tr.low, high: tr.high });
+    if (tr.type === 'candlestick') out.push({ x: tr.xms ?? tr.x.map(ms), low: tr.low, high: tr.high });
     else if ((tr.type ?? 'scatter') === 'scatter' && Array.isArray(tr.y))
-      out.push({ x: tr.x.map(ms), y: tr.y, lines: !!tr.fill || /lines/.test(tr.mode ?? 'lines') });
+      out.push({ x: tr.xms ?? tr.x.map(ms), y: tr.y, lines: !!tr.fill || /lines/.test(tr.mode ?? 'lines'), rising: !!tr.xms });
   }
   for (const s of shapes ?? []) {
     if (s.yref !== 'y' || (s.xref ?? 'x') !== 'x' || s.visible === false) continue;
@@ -2496,12 +2504,16 @@ function fitPrices(view, x) {
   const [from, to] = x.map(axisTime), last = Math.min(to, view.until ?? Infinity);
   let low = Infinity, high = -Infinity;
   const take = v => { if (v != null && Number.isFinite(v)) { if (v < low) low = v; if (v > high) high = v; } };
+  // The first of a series' times at or after a time, for a series whose times only rise, as candles' do.
+  const firstAt = (x, t) => { let lo = 0, hi = x.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (x[mid] < t) lo = mid + 1; else hi = mid; } return lo; };
   for (const s of view.series ?? []) {
     if (s.low) {
-      for (let i = 0; i < s.x.length; i++) if (s.x[i] >= from && s.x[i] <= last) { take(s.low[i]); take(s.high[i]); }
+      for (let i = firstAt(s.x, from); i < s.x.length && s.x[i] <= last; i++) { take(s.low[i]); take(s.high[i]); }
       continue;
     }
-    for (let i = 0; i < s.x.length; i++) {
+    // A line of rising times is read from the point before the times in view to the point after them.
+    const start = s.rising ? Math.max(0, firstAt(s.x, from) - 1) : 0, end = s.rising ? Math.min(s.x.length, firstAt(s.x, last) + 2) : s.x.length;
+    for (let i = start; i < end; i++) {
       const xa = s.x[i], ya = s.y[i];
       if (xa >= from && xa <= last) take(ya);
       // A line from the point before: where it crosses into the times in view.
@@ -2573,7 +2585,7 @@ function moveView(el, zoom, { gliding = false } = {}) {
     if (ex && drawnAgainFor(view, zooms.get(id)?.x ?? view.x)) return redrawExample(ex);
     const { x, y, manual } = shownRanges(zooms.get(id), view);
     movingViews++;
-    try { await plotterOf(el).relayout(el, { 'xaxis.range': x, 'yaxis.range': y, 'yaxis.fixedrange': !manual }); }
+    try { await CanvasChart.relayout(el, { 'xaxis.range': x, 'yaxis.range': y, 'yaxis.fixedrange': !manual }); }
     finally { movingViews--; }
     refitBoxesSoon(el);
   });
@@ -2640,8 +2652,9 @@ function wireZoom(el) {
         const shift = width * e.deltaX * lines / p.w;
         zoom.x = [from + shift, to + shift].map(iso);
       } else {
-        // A whole dataset zooms out as far as all of its history, and no further; any other chart to four times its view.
-        const full = view.x.map(axisTime), all = view.all?.map(axisTime);
+        // A whole dataset, a tour or an analysis zooms out as far as all of its history, and no further; any other chart
+        // to four times its view.
+        const full = view.x.map(axisTime), all = view.widest?.map(axisTime);
         if (k < 1 ? width * k < view.candle * 5 : all ? width >= all[1] - all[0] : width * k > (full[1] - full[0]) * 4) return;
         const at = from + width * p.x / p.w;
         zoom.x = (all && k > 1 && width * k >= all[1] - all[0] ? all : [at - (at - from) * k, at + (to - at) * k]).map(iso);
@@ -2882,15 +2895,12 @@ async function renderChartPage() {
   show(`<div class="replay-setup">
       <label>Dataset<select data-dataset>${list.map(d => `<option value="${esc(d.id)}" ${d.id === info.id ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></label>
       <label>Opens on<select data-span>${CHART_SPANS.map(w => `<option value="${w.candles}" ${w.candles === chartSpan() ? 'selected' : ''}>${w.candles ? `the last ${w.label}` : 'every candle'}</option>`).join('')}</select></label>
-      <label>Drawn by<select data-plotter><option value="canvas" ${state.plotter !== 'plotly' ? 'selected' : ''}>Canvas</option><option value="plotly" ${state.plotter === 'plotly' ? 'selected' : ''}>Plotly</option></select></label>
     </div>
     <article class="example replay-big" id="ex-${esc(ex.id)}">
       <header><h3>${esc(info.name)}</h3><span class="id">${info.candles.toLocaleString()} candles · ${esc(fmtTime(info.first))} to ${esc(fmtTime(info.last))} UTC · as known at the last candle</span></header>
       ${chartRow(ex)}
     </article>`);
   main.querySelector('[data-dataset]').addEventListener('change', e => { state.chartDataset = e.target.value; save(state); renderChartPage(); });
-  // The page is made again, as an element keeps what first drew it.
-  main.querySelector('[data-plotter]').addEventListener('change', e => { state.plotter = e.target.value; save(state); renderChartPage(); });
   main.querySelector('[data-span]').addEventListener('change', e => {
     state.chartSpan = Number(e.target.value); save(state);
     // A new span is a new default view, so a zoom or pan made before it is dropped; the view moves there as views do.
@@ -2899,7 +2909,7 @@ async function renderChartPage() {
     redrawExample(ex);
     if (!was || !el._fullLayout) return;
     const to = el._fullLayout.xaxis.range.slice();
-    plotterOf(el).relayout(el, { 'xaxis.range': was }).then(() => glideView(el, to));
+    CanvasChart.relayout(el, { 'xaxis.range': was }).then(() => glideView(el, to));
   });
 }
 
@@ -4078,8 +4088,6 @@ function sectionView(t) {
 // A view that is not the one on show is not cut to: the chart eases from the one to the other, so it reads as the same
 // chart zooming or moving.
 const TOUR_ZOOM_MS = 1500;
-// Candles a tour's chart has either side of its view, to pan to.
-const TOUR_CONTEXT = 48;
 
 // The one way a view is moved for the reader, on every chart: out to hold both where it is and where it goes, then in to
 // where it goes, each leg eased over TOUR_ZOOM_MS. From 500–550 to 100–140, it goes out to 100–550, then in to 100–140.

@@ -28,8 +28,9 @@ window.CanvasChart = (() => {
   // A trace made ready to paint: its times and prices as numbers, the stretches between its gaps with the times each
   // spans, and whether its times only rise, when what is in view is found by halving and not by looking at every point.
   function prepare(trace) {
-    const n = trace.x?.length ?? 0, x = new Float64Array(n);
-    for (let i = 0; i < n; i++) x[i] = ms(trace.x[i]);
+    // A trace can come with its times already as numbers (xms), which are then not read again from its texts.
+    const n = trace.x?.length ?? 0, x = trace.xms?.length === n ? trace.xms : new Float64Array(n);
+    if (x !== trace.xms) for (let i = 0; i < n; i++) x[i] = ms(trace.x[i]);
     if (trace.type === 'candlestick') return { trace, kind: 'candles', x, n, rising: true };
     const y = new Float64Array(n);
     for (let i = 0; i < n; i++) { const v = trace.y?.[i]; y[i] = v == null ? NaN : +v; }
@@ -354,13 +355,28 @@ window.CanvasChart = (() => {
         if (a.hovertext) s.hits.push({ line: [tx, ty, px, py], text: a.hovertext, color: a.arrowcolor });
       }
     }
+    // An arrow whose tail is so many pixels from its point, as a pinned text's is: the text sits at the tail.
+    const pinned = a.showarrow && a.axref !== 'x' && (a.ax || a.ay), bx = pinned ? px + (a.ax ?? 0) : px, by = pinned ? py + (a.ay ?? 0) : py;
+    if (pinned && Math.max(px, bx) >= L && Math.min(px, bx) <= L + W) {
+      const width = a.arrowwidth ?? 1.5, head = (3 * width + 3) * (a.arrowsize ?? 1), angle = Math.atan2(py - by, px - bx);
+      ctx.setLineDash([]);
+      ctx.lineWidth = width;
+      ctx.strokeStyle = ctx.fillStyle = a.arrowcolor ?? '#888';
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(px, py); ctx.stroke();
+      if (a.arrowhead ?? 1) {
+        ctx.beginPath(); ctx.moveTo(px, py);
+        ctx.lineTo(px - head * Math.cos(angle - 0.42), py - head * Math.sin(angle - 0.42));
+        ctx.lineTo(px - head * Math.cos(angle + 0.42), py - head * Math.sin(angle + 0.42));
+        ctx.closePath(); ctx.fill();
+      }
+    }
     const text = lines(a.text).filter((line, i, all) => line || all.length > 1);
-    if (text.length && text.some(Boolean) && (onPaper || (px >= L - 60 && px <= L + W + 60))) {
+    if (text.length && text.some(Boolean) && (onPaper || (bx >= L - 60 && bx <= L + W + 60))) {
       const size = a.font?.size ?? base.size ?? 12, pad = (a.borderpad ?? 1) + (a.borderwidth ?? 0) + 2, height = size * 1.25;
       ctx.font = `${size}px ${family}`;
       const wide = Math.max(...text.map(line => ctx.measureText(line).width)), w = wide + pad * 2, h = text.length * height + pad * 2 - 2;
-      const cx = px + (a.xshift ?? 0) - (a.xanchor === 'left' ? 0 : a.xanchor === 'right' ? w : w / 2);
-      const cy = py - (a.yshift ?? 0) - (a.yanchor === 'top' ? 0 : a.yanchor === 'bottom' ? h : h / 2);
+      const cx = bx + (a.xshift ?? 0) - (a.xanchor === 'left' ? 0 : a.xanchor === 'right' ? w : w / 2);
+      const cy = by - (a.yshift ?? 0) - (a.yanchor === 'top' ? 0 : a.yanchor === 'bottom' ? h : h / 2);
       if (a.bgcolor) { ctx.fillStyle = a.bgcolor; ctx.fillRect(cx, cy, w, h); }
       if (a.bordercolor && (a.borderwidth ?? 1) > 0) { ctx.setLineDash([]); ctx.lineWidth = a.borderwidth ?? 1; ctx.strokeStyle = a.bordercolor; ctx.strokeRect(cx, cy, w, h); }
       ctx.fillStyle = a.font?.color ?? base.color ?? '#888';
@@ -461,8 +477,8 @@ window.CanvasChart = (() => {
       const b = document.createElement('button');
       b.type = 'button';
       b.title = b.textContent = button.name;
-      b.style.cssText = 'position:absolute;z-index:2;top:2px;right:60px;font:11px system-ui,sans-serif;padding:1px 6px;border:1px solid var(--border,#ccc);border-radius:4px;' +
-        'background:var(--panel,#fff);color:var(--muted,#666);cursor:pointer;opacity:.75';
+      b.style.cssText = 'position:absolute;z-index:2;top:2px;right:60px;font:600 12px system-ui,sans-serif;padding:3px 10px;border:1px solid var(--accent,#888);border-radius:5px;' +
+        'background:var(--panel,#fff);color:var(--accent,#444);cursor:pointer';
       b.addEventListener('click', () => button.click(el));
       el.append(b);
     }
