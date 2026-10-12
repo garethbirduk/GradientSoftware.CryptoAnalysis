@@ -15,7 +15,7 @@
     --up: #26a69a; --down: #ef5350; --close: #a8a29e; --grid: #eeeceb;
     --upswing: #16a34a; --downswing: #dc2626; --saw: #000000;
     /* Sawtooth levels: level 0 is --saw, then blue, yellow, magenta, sky, violet, pink, brown, slate. No red, green or orange, which would read as the swing fills and candles. Every pair of levels is at least 15 apart (OKLab x100) in both themes. */
-    --lv1: #3b82f6; --lv2: #f0b400; --lv3: #f01fd0; --lv4: #38bdf8; --lv5: #5b21b6; --lv6: #ff8fc7; --lv7: #854d0e; --lv8: #64748b;
+    --lv1: #3b82f6; --lv2: #f0b400; --lv3: #f01fd0; --lv4: #38bdf8; --lv5: #8b5cf6; --lv6: #ff8fc7; --lv7: #854d0e; --lv8: #64748b;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -109,6 +109,8 @@
   /* A level that is on with nothing of it drawn at the chart's zoom (see showLevelsDrawn). */
   .layer.unseen[aria-pressed="true"] { opacity: .62; }
   .layer.unseen[aria-pressed="true"] .name { font-style: italic; }
+  /* The level held in focus on the chart (see Level in focus). */
+  .layer.in-focus { border-color: var(--accent); background: var(--chip); }
   .layer svg { flex: none; }
   .layer.text { color: var(--muted); font-size: 12px; }
   .runmin { width: 3.4em; margin: 0 0 0 4px; padding: 1px 2px; font: inherit; font-size: 12px; color: var(--text);
@@ -1070,7 +1072,9 @@ function drawRanges(ex, traces) {
 // One Range's box, zones and bands, from the candle that identified it until a time: the parts asked for, the zones as
 // deep as given, as a percentage of the Range's height. The Ranges of a chart and the Range a trade's entry condition
 // held (see drawStrategies) are drawn by it alike.
-function drawRange(traces, g, until, { box: boxed, bands, zones, hover = rangeHover(g) }) {
+function drawRange(into, g, until, { box: boxed, bands, zones, hover = rangeHover(g) }) {
+  // Each of its traces says the Range's sawtooth level (see Level in focus).
+  const traces = { push: t => into.push({ lv: g.level, ...t }) };
   const term = TERMS.get('Range'), height = g.high.price - g.low.price;
   const box = (a, b) => ({ x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [a, a, b, b, a] });
   if (zones != null) {
@@ -1135,9 +1139,10 @@ const TREND_AXIS = { overlaying: 'y', range: [0, 1], fixedrange: true, visible: 
 function drawTrendStrips(ex, traces) {
   const last = ex.prices.t[ex.prices.t.length - 1], gap = css('--panel');
   const groups = new Map();
-  const add = (x0, x1, a, b, fillcolor, lined) => {
-    const key = `${fillcolor}|${lined}`;
-    if (!groups.has(key)) groups.set(key, { type: 'scatter', mode: lined ? 'lines' : 'none', fill: 'toself', yaxis: 'y2', name: 'Trend', hoverinfo: 'skip',
+  // A level's strips are traces of its own, so the level can be told from the others (see Level in focus).
+  const add = (x0, x1, a, b, fillcolor, lined, level) => {
+    const key = `${fillcolor}|${lined}|${level}`;
+    if (!groups.has(key)) groups.set(key, { type: 'scatter', mode: lined ? 'lines' : 'none', fill: 'toself', yaxis: 'y2', name: 'Trend', hoverinfo: 'skip', lv: level,
       x: [], y: [], line: { width: lined ? 1 : 0, color: gap, simplify: false }, fillcolor });
     const g = groups.get(key);
     g.x.push(x0, x1, x1, x0, x0, null);
@@ -1149,8 +1154,8 @@ function drawTrendStrips(ex, traces) {
       ex.levelsDrawn?.add(row.level);
       const parts = t.parts ?? [], end = t.end?.time ?? last;
       const from = parts.length ? parts[parts.length - 1].breakOfStructure.time : t.start.time;
-      const segment = (x0, x1, alpha) => add(x0, x1, row.edge, row.inner, withAlpha(color, Math.round(alpha * 20) / 20), true);
-      if (row.striped) add(t.start.time, end, row.outer, row.edge, levelColor(row.level), false);
+      const segment = (x0, x1, alpha) => add(x0, x1, row.edge, row.inner, withAlpha(color, Math.round(alpha * 20) / 20), true, row.level);
+      if (row.striped) add(t.start.time, end, row.outer, row.edge, levelColor(row.level), false, row.level);
       // A Swing's segment too narrow to draw (see wideEnough) is joined to those after it until they are wide enough
       // together, and the one segment is as strong as the share of them that are, so a long Trend zoomed out is a few
       // segments and not one for each of its Swings.
@@ -1172,12 +1177,12 @@ function drawTrendStrips(ex, traces) {
 // count of swings and its strength in a box: the share of its swings that are strong. Drawn at every level selected.
 // An arrow from one point to another with a text box along it: how candle runs, trend arrows and the tour's drawn lines
 // are shown. A head at either end is optional, the box sits the given way along, and the hover is on both.
-function arrowLabels(labels, { from, to, color, text = '', hover = '', along = 0.5, heads = { start: false, end: true }, width = 2, opacity = 0.9, size = 10 }) {
-  labels.push({ x: to.time, y: to.price, ax: from.time, ay: from.price, axref: 'x', ayref: 'y', text: '', showarrow: true,
+function arrowLabels(labels, { from, to, color, text = '', hover = '', along = 0.5, heads = { start: false, end: true }, width = 2, opacity = 0.9, size = 10, lv }) {
+  labels.push({ x: to.time, y: to.price, ax: from.time, ay: from.price, axref: 'x', ayref: 'y', text: '', showarrow: true, lv,
     arrowhead: heads.end ? 2 : 0, startarrowhead: heads.start ? 2 : 0, arrowsize: 1.2, startarrowsize: 1.2, arrowwidth: width, arrowcolor: color, hovertext: hover, opacity });
   if (!text) return;
   const t0 = Date.parse(from.time), at = new Date(t0 + (Date.parse(to.time) - t0) * along).toISOString();
-  labels.push({ x: at, y: from.price + (to.price - from.price) * along, text, showarrow: false, hovertext: hover,
+  labels.push({ x: at, y: from.price + (to.price - from.price) * along, text, showarrow: false, hovertext: hover, lv,
     bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: color, borderwidth: 1.5, borderpad: 2, font: { size, color: css('--text') } });
 }
 
@@ -1190,7 +1195,7 @@ function drawTrendArrows(ex, labels) {
       ex.levelsDrawn?.add(level);
       const hover = `${t.direction === 'Up' ? 'Uptrend' : 'Downtrend'} · level ${level}<br>${t.swings} swings, ${t.strong} strong · strength ${t.strength}%<br>${t.marketStructureBreaks} MSB against`;
       // The box sits towards the arrow's head, where a long trend is usually being looked at.
-      arrowLabels(labels, { from: t.start, to: tip, color: levelColor(level), text: `${t.swings} · ${t.strength}%`, hover, along: 0.8, size: 11 });
+      arrowLabels(labels, { from: t.start, to: tip, color: levelColor(level), text: `${t.swings} · ${t.strength}%`, hover, along: 0.8, size: 11, lv: level });
     }
   }
 }
@@ -1474,7 +1479,7 @@ function drawReplayExtras(ex, traces, level) {
       if (!latest || (ex.marketStructureBreaksByLevel?.[l] ?? []).some(m => m.reference.time === latest.extreme.time)) continue;
       if (partial && brokenSince(latest.breakOfStructure.time, latest.extreme.price, dir)) continue;
       referenceLines(traces, 'Protective level', TERMS.get(type).color, 'dot',
-        [{ from: latest.breakOfStructure, to: { time: now }, level: latest.extreme.price, what: `level ${l} ${dir === 'Up' ? 'pullback low' : 'bounce high'} not broken yet` }]);
+        [{ lv: l, from: latest.breakOfStructure, to: { time: now }, level: latest.extreme.price, what: `level ${l} ${dir === 'Up' ? 'pullback low' : 'bounce high'} not broken yet` }]);
     }
   }
 
@@ -1868,14 +1873,17 @@ function withAlpha(hex, a) {
   return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : hex;
 }
 
+// The lines of each sawtooth level (a line's lv) are a trace of their own, so the level can be told from the others
+// (see Level in focus).
 function referenceLines(traces, name, color, dash, refs) {
-  if (!refs.length) return;
-  const x = [], y = [], hover = [];
-  for (const r of refs) {
-    const h = `${name}: ${r.what}<br>${fmtPrice(r.level)} from ${fmtTime(r.from.time)} to ${fmtTime(r.to.time)}<extra></extra>`;
-    x.push(r.from.time, r.to.time, null); y.push(r.level, r.level, null); hover.push(h, h, '');
+  for (const lv of [...new Set(refs.map(r => r.lv))]) {
+    const x = [], y = [], hover = [];
+    for (const r of refs.filter(r => r.lv === lv)) {
+      const h = `${name}: ${r.what}<br>${fmtPrice(r.level)} from ${fmtTime(r.from.time)} to ${fmtTime(r.to.time)}<extra></extra>`;
+      x.push(r.from.time, r.to.time, null); y.push(r.level, r.level, null); hover.push(h, h, '');
+    }
+    traces.push({ type: 'scatter', mode: 'lines', name, lv, x, y, line: { color, width: 1.5, dash }, hovertemplate: hover });
   }
-  traces.push({ type: 'scatter', mode: 'lines', name, x, y, line: { color, width: 1.5, dash }, hovertemplate: hover });
 }
 
 // The selected swing as a bold box with its break level, and its interims (to the example's depth) inside it. Fills say up or
@@ -2032,7 +2040,7 @@ function drawSawtooth(ex, traces) {
     ex.levelsDrawn?.add(level);
 
     // Pivots are turning points, so the hover says when price turned away; the label does not wait for that.
-    traces.push({ type: 'scatter', mode: 'lines', name: `Level ${level}`,
+    traces.push({ type: 'scatter', mode: 'lines', name: `Level ${level}`, lv: level,
       x: kept.map(p => p?.time ?? null), y: kept.map(p => p?.price ?? null),
       line: { color, width },
       hovertemplate: kept.map(p => !p ? '' : `Level ${level} · ${name(p)}<br>${fmtTime(p.time)}<br>${fmtPrice(p.price)}` +
@@ -2040,7 +2048,7 @@ function drawSawtooth(ex, traces) {
 
     if (current && turns.length && fits(turns[turns.length - 1], current)) {
       const from = turns[turns.length - 1];
-      traces.push({ type: 'scatter', mode: 'lines', name: `Level ${level} incomplete`,
+      traces.push({ type: 'scatter', mode: 'lines', name: `Level ${level} incomplete`, lv: level,
         x: [from.time, current.time], y: [from.price, current.price], line: { color, width, dash: 'dash' },
         hovertemplate: `Incomplete leg, level ${level}<br>${fmtTime(from.time)} → ${fmtTime(current.time)}<br>now ${fmtPrice(current.price)}<extra></extra>` });
     }
@@ -2048,7 +2056,7 @@ function drawSawtooth(ex, traces) {
     // The incomplete leg's furthest point so far is already a high or low, though not a turning point yet.
     const latest = [...points.values()].filter(p => p.provisional && !turns.some(t => t.time === p.time && t.kind === p.kind));
     if (level === finest && latest.length) {
-      traces.push({ type: 'scatter', mode: 'markers', name: `Level ${level} so far`, x: latest.map(p => p.time), y: latest.map(p => p.price),
+      traces.push({ type: 'scatter', mode: 'markers', name: `Level ${level} so far`, lv: level, x: latest.map(p => p.time), y: latest.map(p => p.price),
         marker: { color, size: 8, symbol: 'circle-open', line: { width: 2, color } },
         hovertemplate: latest.map(p => `Level ${level} · ${p.label}<br>${fmtTime(p.time)}<br>${fmtPrice(p.price)}${PROVISIONAL_NOTE}<extra></extra>`) });
     }
@@ -2181,6 +2189,36 @@ function drawnAgainFor(view, x) {
 // a canvas (see canvas-chart.js), which paints only what is in view at each move; Plotly, which every other chart is
 // drawn by, moves everything it was given, in view or not. The Chart page's setting chooses Plotly for these too. An
 // element keeps what first drew it.
+// ---- Level in focus --------------------------------------------------------------------------------------------------
+// On a chart drawn on a canvas, one sawtooth level can be put in focus: everything of the other levels is drawn faint,
+// their labels left out, and the level's own drawn over them, so it can be read among the rest without turning them
+// off. The level one coarser, whose Swings the level's are the interims of, stays half as strong. Candles and candle
+// runs belong to no level and stay as they are.
+// A click on something of a level, its line, a box's edge, a marker or a label, holds that level in focus, and a click
+// on something of it again, or Esc, lets it go; a click anywhere else is the candle card's, as before. Pointing at a
+// level in the Levels filter shows it in focus for as long as the pointer is there.
+const levelFocus = { held: null, pointed: null };
+const levelInFocus = () => levelFocus.pointed ?? levelFocus.held;
+function showFocus() {
+  document.querySelectorAll('.chart').forEach(el => { if (el._canvasChart) CanvasChart.focus(el, levelInFocus()); });
+  document.querySelectorAll('.layer[data-layer^="level"]').forEach(b => b.classList.toggle('in-focus', Number(b.dataset.layer.slice('level'.length)) === levelFocus.held));
+}
+// A click on a chart, where it is on something of a level: holds the level in focus, or lets it go, and says it did.
+function focusClick(chart, e) {
+  const level = chart._canvasChart ? CanvasChart.levelAt(chart, e.clientX, e.clientY) : null;
+  if (level == null) return false;
+  levelFocus.held = levelFocus.held === level ? null : level;
+  showFocus();
+  return true;
+}
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && levelFocus.held != null) { levelFocus.held = null; showFocus(); } });
+document.addEventListener('mouseover', e => {
+  const b = e.target.closest?.('.layer[data-layer^="level"]'), level = b && on(b.dataset.layer) ? Number(b.dataset.layer.slice('level'.length)) : null;
+  if (level === levelFocus.pointed) return;
+  levelFocus.pointed = level;
+  showFocus();
+});
+
 const usesCanvas = () => state.plotter !== 'plotly' && (currentPage === 'Chart' || currentPage === 'Replay') && !!window.CanvasChart;
 const plotterFor = el => el._plotter ??= usesCanvas() ? CanvasChart : Plotly;
 const plotterOf = el => el._plotter ?? Plotly;
@@ -2196,7 +2234,8 @@ function draw(el, ex, focus) {
     const [startName, extremeName] = w.direction === 'Up' ? ['high', 'pullback low'] : ['low', 'bounce high'];
     const n = interimsOf(ex, w).length;
     return {
-      type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: s.name,
+      // On a canvas the box is left out while none of its edges is in view (see canvas-chart.js), asked at every move.
+      type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: s.name, lv: w.level, needsEdge: !!ex.complete,
       x: [w.start.time, w.end.time, w.end.time, w.start.time, w.start.time], y: [top, top, bottom, bottom, top],
       // The fill says up or down; the border is the swing's sawtooth level colour.
       line: { color: levelColor(w.level), width: interim ? 1.25 : 1.75 }, fillcolor: withAlpha(color, interim ? 0.06 / interim : 0.1),
@@ -2237,14 +2276,14 @@ function draw(el, ex, focus) {
     if (!on(`bosLevel${dir}`)) continue;
     referenceLines(traces, 'BoS level', TERMS.get(type).color, 'dash',
       allSwings.filter(w => w.direction === dir && w.breakOfStructure && wideEnough(ex, w.start.time, w.end.time) && narrowEnough(ex, w.start.time, w.breakOfStructure.time))
-        .map(w => (ex.levelsDrawn?.add(w.level), { from: w.start, to: w.breakOfStructure, level: w.start.price, what: `level ${w.level} ${dir === 'Up' ? 'high' : 'low'} broken` })));
+        .map(w => (ex.levelsDrawn?.add(w.level), { lv: w.level, from: w.start, to: w.breakOfStructure, level: w.start.price, what: `level ${w.level} ${dir === 'Up' ? 'high' : 'low'} broken` })));
   }
 
   for (const [layer, type] of [['msbLevelUp', 'BullishMarketStructureBreak'], ['msbLevelDown', 'BearishMarketStructureBreak']]) {
     if (!on(layer)) continue;
     referenceLines(traces, 'MSB level', TERMS.get(type).color, 'dot',
       shownMarketStructureBreaks(ex).filter(m => m.type === type && wideEnough(ex, m.reference.time, m.break.time) && narrowEnough(ex, m.reference.time, m.break.time))
-        .map(m => (ex.levelsDrawn?.add(m.level), { from: m.reference, to: m.break, level: m.reference.price, what: `level ${m.level} protective ${type.startsWith('Bullish') ? 'bounce high' : 'pullback low'} broken` })));
+        .map(m => (ex.levelsDrawn?.add(m.level), { lv: m.level, from: m.reference, to: m.break, level: m.reference.price, what: `level ${m.level} protective ${type.startsWith('Bullish') ? 'bounce high' : 'pullback low'} broken` })));
   }
 
   const labels = [], boxes = [];
@@ -2262,9 +2301,18 @@ function draw(el, ex, focus) {
   // Points are shown for every level selected that exists. A point that is the same at several levels shows once, as the
   // coarsest; where a pivot is a different point at different levels, each level's shows.
   const pointLevels = selectedLevels(ex).filter(l => l < (ex.pointsByLevel?.length ?? 0)).sort((a, b) => a - b);
+  // The point shown keeps every level it is that point at (levels), so it counts for each when one is in focus.
   const pointsOf = type => {
-    const seen = new Set();
-    return pointLevels.flatMap(l => pointsAt(ex, l).filter(a => a.type === type && !seen.has(a.time) && seen.add(a.time)));
+    const seen = new Map(), shown = [];
+    for (const l of pointLevels) for (const a of pointsAt(ex, l)) {
+      if (a.type !== type) continue;
+      const had = seen.get(a.time);
+      if (had) { had.levels.push(l); continue; }
+      a.levels = [l];
+      seen.set(a.time, a);
+      shown.push(a);
+    }
+    return shown;
   };
   // Each item says what it marks the end of, from and until, for its marker and label to be left out when that is too
   // narrow to see (see NARROWEST_MARKED); until is its own candle when not given.
@@ -2290,13 +2338,18 @@ function draw(el, ex, focus) {
   const points = markers.filter(m => m.term && isPointType(m.type)).flatMap(m => m.items.map(a => ({ a, m }))).sort((p, q) => p.a.level - q.a.level);
   for (const { a, m } of points) {
     const isFocus = m.type === focus;
-    if (labelled(a)) boxes.push(levelBox(stacks, a, m.term.position === 'Below', a.level, m.term.label, { size: isFocus ? 12 : 11, color: isFocus ? text : muted }));
+    if (labelled(a)) {
+      const box = levelBox(stacks, a, m.term.position === 'Below', a.level, m.term.label, { size: isFocus ? 12 : 11, color: isFocus ? text : muted });
+      box.label.lv = a.levels;
+      boxes.push(box);
+    }
   }
   for (const { type, term, items } of markers) {
     if (!term || !items.length) continue;
     const isFocus = type === focus, below = term.position === 'Below', isPoint = isPointType(type), asText = bulkLabels && !isPoint;
     traces.push({
       type: 'scatter', mode: asText ? 'markers+text' : 'markers', name: term.label, x: items.map(a => a.time), y: items.map(a => a.price),
+      lv: items.map(a => a.levels ?? a.level ?? a.of),
       marker: term.symbol.endsWith('-open')
         ? { color: term.color, symbol: term.symbol, size: isFocus ? 20 : 17, line: { width: 2, color: term.color } }
         : { color: term.color, symbol: term.symbol, size: isFocus ? 13 : 10,
@@ -2309,7 +2362,7 @@ function draw(el, ex, focus) {
     for (const a of items.filter(labelled)) {
       // With several levels shown, a market structure break's label is in a box of its level's colour, as a point's is.
       const boxed = severalLevels && a.level != null;
-      labels.push({ x: a.time, y: a.price, text: a.label ?? term.label, showarrow: false,
+      labels.push({ x: a.time, y: a.price, text: a.label ?? term.label, showarrow: false, lv: a.level ?? a.of,
         yshift: stackShift(stacks, a.time, below, boxed ? BOX_HEIGHT : undefined), font: { size: isFocus ? 12 : 11, color: isFocus ? text : muted },
         ...(boxed ? { bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: levelColor(a.level), borderwidth: 1.5, borderpad: 1 } : {}) });
     }
@@ -2382,7 +2435,7 @@ function draw(el, ex, focus) {
     dragmode: 'pan',
     xaxis: { type: 'date', rangeslider: { visible: false }, gridcolor: grid, linecolor: grid, range: xRange },
     yaxis: { type: 'linear', gridcolor: grid, linecolor: grid, tickformat: ',.0f', side: 'right', range: yRange, fixedrange: !manual },
-    yaxis2: TREND_AXIS,
+    yaxis2: TREND_AXIS, focusLevel: levelInFocus(),
     annotations: [...shown, ...labels], shapes, hovermode: 'closest', showlegend: false,
   }, { responsive: true, displaylogo: false, doubleClick: false, modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d', 'resetScale2d'],
     modeBarButtonsToAdd: [{ name: 'Reset view', icon: Plotly.Icons.home, click: gd => moveView(gd, null) }] });
@@ -2876,6 +2929,8 @@ const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ?
     const chart = document.querySelector('#main .chart'), from = down;
     down = null;
     if (!from || !chart || (currentPage !== 'Replay' && currentPage !== 'Chart') || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 4) return;
+    // A click on something of a sawtooth level puts the level in focus and opens no card (see Level in focus).
+    if (focusClick(chart, e)) return close();
     const ex = findExample(chart.dataset.id), i = ex && candleAt(chart, e), p = ex && (ex.hindsight ?? ex).prices;
     if (i == null || !p?.t[i] || i > cursorOf(ex)) return close();
     const time = p.t[i], up = p.c[i] > p.o[i], colour = p.c[i] === p.o[i] ? 'no body' : up ? 'green' : 'red';

@@ -222,10 +222,23 @@ public static partial class MarketStructure
             var first = keep == DateTime.MinValue ? 0 : Math.Max(0, held.FindLastIndex(turns - 1, turns, p => p.Time < keep));
             var end = held.FindIndex(0, turns, p => p.Index > upTo);
             end = end < 0 ? turns - 1 : end;
+            // Of the pivots left out as too narrow, the highest and the lowest of each stretch as wide as the narrowest
+            // seen are kept: a run of narrow legs can climb or fall a long way between them, and with all of its pivots
+            // gone the line would cut straight across from before it to after it, missing its highs and lows.
+            var furthestOf = new HashSet<int>();
+            if (narrowest > 1)
+            {
+                foreach (var stretch in Enumerable.Range(first, end - first + 1).GroupBy(i => held[i].Index / narrowest))
+                {
+                    furthestOf.Add(stretch.MaxBy(i => held[i].Price));
+                    furthestOf.Add(stretch.MinBy(i => held[i].Price));
+                }
+            }
+
             for (var i = first; i <= end; i++)
             {
                 // A pivot both of whose legs are too narrow to see is left out, but for the ends of the line.
-                if (narrowest <= 1 || i == first || i == end || held[i].Index - held[i - 1].Index >= narrowest || held[i + 1].Index - held[i].Index >= narrowest)
+                if (narrowest <= 1 || i == first || i == end || held[i].Index - held[i - 1].Index >= narrowest || held[i + 1].Index - held[i].Index >= narrowest || furthestOf.Contains(i))
                     pivots.Add(new LevelPivot(level, held[i]));
             }
 
