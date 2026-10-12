@@ -51,6 +51,91 @@ public class StructureStoreTests
         Assert.AreEqual(lastSwings, Describe(store.Swings(0, 2999)));
     }
 
+    private static string Lines(IEnumerable<string> lines) => string.Join("\n", lines.Order(StringComparer.Ordinal));
+
+    [TestMethod]
+    public void TheRestKnownAtACandle_IsWhatTheSawtoothMakesOfTheCandlesToIt()
+    {
+        const EnumPriceBasis basis = EnumPriceBasis.Close;
+        var prices = Btc.From2023().GetRange(0, 3000);
+        var store = StructureStore.Read(prices);
+
+        var found = 0;
+        foreach (var at in new[] { 2, 57, 500, 501, 1234, 1900, 2000, 2650, 2998, 2999 })
+        {
+            var so = prices.GetRange(0, at + 1);
+            var times = so.Select((p, i) => (p.DateTime, i)).ToDictionary(x => x.DateTime, x => x.i);
+            int? At(PricePoint? point) => point == null ? null : times[point.Time];
+            var levels = Sawtooth.Levels(so, basis, Depth);
+            var swings = Enumerable.Range(0, levels.Count + 2).Select(l => Sawtooth.Swings(so, levels, basis, l).OrderBy(x => x.Start.Time).ToList()).ToList();
+            var broken = swings.Select(x => Sawtooth.MarketStructureBreaks(so, x, basis)).ToList();
+            var (breaks, trends, retracements, candidates, ranges) = (new List<string>(), new List<string>(), new List<string>(), new List<string>(), new List<string>());
+            for (var level = 1; level <= levels.Count; level++)
+            {
+                var ofLevel = Sawtooth.Trends(swings[level], broken[level]);
+                var candidatesOfLevel = Sawtooth.Candidates(so, levels, basis, level);
+                var retracementsOfLevel = Sawtooth.Retracements(so, swings[level], candidatesOfLevel, basis);
+                breaks.AddRange(broken[level].Select(x => $"L{level} {x.Type} {At(x.Reference)} {At(x.Break)}"));
+                trends.AddRange(ofLevel.Select(x => $"L{level} {x.Direction} {At(x.Start)} {At(x.Confirmed)} {At(x.End)} {x.Swings} {x.MarketStructureBreaks} {x.Strong}"));
+                retracements.AddRange(retracementsOfLevel.Select(x => $"L{level} {x.Direction} {At(x.From)} {At(x.To)} {x.Confirmed} " + string.Join(" ", x.Steps.Select(s => $"{At(s.Point)}:{s.Percent}"))));
+                candidates.AddRange(candidatesOfLevel.Select(x => $"L{level} {x.Direction} {At(x.Start)} {At(x.Extreme)}"));
+                ranges.AddRange(Ranges.Find(so, basis, retracementsOfLevel, swings[level], ofLevel, broken[level + 1])
+                    .Select(x => $"L{level} {x.Direction} {At(x.From)} {At(x.Low)} {At(x.High)} {At(x.Identified)} {x.Retracement} {x.Band} {At(x.End)}"));
+            }
+
+            // Asked for to the last candle, what was known then is still only what lies up to that candle.
+            Assert.AreEqual(Lines(breaks), Lines(store.Breaks(0, 2999, at).Select(x => $"L{x.Level} {x.Type} {x.Reference} {x.Break}")), $"The market structure breaks known at candle {at}.");
+            Assert.AreEqual(Lines(trends), Lines(store.Trends(0, 2999, at).Select(x => $"L{x.Level} {x.Direction} {x.Start} {x.Confirmed} {x.End} {x.Swings} {x.MarketStructureBreaks} {x.Parts.Count(p => p.Strong)}")),
+                $"The trends known at candle {at}.");
+            Assert.AreEqual(Lines(retracements), Lines(store.Retracements(0, 2999, at).Select(x => $"L{x.Level} {x.Direction} {x.From} {x.To} {x.Confirmed} " + string.Join(" ", x.Steps.Select(s => $"{s.Candle}:{s.Percent}")))),
+                $"The retracements known at candle {at}.");
+            Assert.AreEqual(Lines(candidates), Lines(store.Candidates(at).Select(x => $"L{x.Level} {x.Direction} {x.Start} {x.Extreme}")), $"The candidates known at candle {at}.");
+            Assert.AreEqual(Lines(ranges), Lines(store.Ranges(0, 2999, at).Select(x => $"L{x.Level} {x.Direction} {x.From} {x.Low} {x.High} {x.Identified} {x.Retracement} {x.Band} {x.End}")),
+                $"The ranges known at candle {at}.");
+            found += Math.Min(1, breaks.Count) + Math.Min(1, trends.Count) + Math.Min(1, retracements.Count) + Math.Min(1, candidates.Count) + Math.Min(1, ranges.Count);
+        }
+
+        Assert.IsTrue(found >= 40, $"Too little to find: {found} of 50.");
+    }
+
+    [TestMethod]
+    public void AStretchAndALevelOfTheRest_GiveOnlyWhatIsInThem()
+    {
+        var store = StructureStore.Read(Btc.From2023().GetRange(0, 3000));
+        var breaks = store.Breaks(0, 2999);
+        var trends = store.Trends(0, 2999);
+        var retracements = store.Retracements(0, 2999);
+        var ranges = store.Ranges(0, 2999);
+
+        Assert.AreEqual(string.Join(" ", breaks.Where(x => x.Break is >= 1000 and <= 1500 && x.Level <= 3).Select(x => x.Id)), string.Join(" ", store.Breaks(1000, 1500, maxLevel: 3).Select(x => x.Id)));
+        Assert.AreEqual(string.Join(" ", trends.Where(x => x.Start <= 1500 && (x.End ?? 2999) >= 1000 && x.Level <= 3).Select(x => x.Id)), string.Join(" ", store.Trends(1000, 1500, maxLevel: 3).Select(x => x.Id)));
+        Assert.AreEqual(string.Join(" ", retracements.Where(x => x.From <= 1500 && x.Steps[^1].Candle >= 1000 && x.Level <= 3).Select(x => x.Id)), string.Join(" ", store.Retracements(1000, 1500, maxLevel: 3).Select(x => x.Id)));
+        Assert.AreEqual(string.Join(" ", ranges.Where(x => x.From <= 1500 && (x.End ?? 2999) >= 1000 && x.Level <= 5).Select(x => x.Id)), string.Join(" ", store.Ranges(1000, 1500, maxLevel: 5).Select(x => x.Id)));
+        Assert.IsTrue(store.Breaks(1000, 1500, maxLevel: 3).Count > 0 && store.Trends(1000, 1500, maxLevel: 3).Count > 0 && store.Retracements(1000, 1500, maxLevel: 3).Count > 0);
+
+        // Each break is of a swing the store has, and an id is of one item of its kind.
+        var swings = store.Swings(0, 2999).ToDictionary(x => x.Id);
+        Assert.IsTrue(breaks.All(x => swings[x.Swing].Extreme == x.Reference && swings[x.Swing].Level == x.Level));
+        Assert.AreEqual(breaks.Count, breaks.Select(x => x.Id).Distinct().Count());
+        Assert.AreEqual(trends.Count, trends.Select(x => x.Id).Distinct().Count());
+    }
+
+    [TestMethod]
+    public void MoreCandles_LeaveTheRestThereWasItsIds()
+    {
+        var all = Btc.From2023();
+        string Ids(StructureStore store) => string.Join(" ", store.Breaks(0, 599, at: 599).Select(x => $"b{x.Id}:{x.Break}")
+            .Concat(store.Trends(0, 599, at: 599).Select(x => $"t{x.Id}:{x.Start}"))
+            .Concat(store.Retracements(0, 599, at: 599).Select(x => $"r{x.Id}:{x.To}"))
+            .Concat(store.Candidates(at: 599).Select(x => $"c{x.Id}:{x.Start}"))
+            .Concat(store.Ranges(0, 599, at: 599).Select(x => $"g{x.Id}:{x.Identified}")));
+
+        var ids = Ids(StructureStore.Read(all.GetRange(0, 600)));
+
+        Assert.IsTrue(ids.Contains('b') && ids.Contains('t') && ids.Contains('r') && ids.Contains('c'), ids);
+        Assert.AreEqual(ids, Ids(StructureStore.Read(all.GetRange(0, 700))));
+    }
+
     [TestMethod]
     public void AStretchAndALevel_GiveOnlyWhatIsInThem()
     {

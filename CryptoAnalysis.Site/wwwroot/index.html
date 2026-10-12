@@ -2052,9 +2052,10 @@ function wideEnough(ex, start, end, pixels = NARROWEST_DRAWN) {
   return !ex.pixel || Date.parse(end ?? ex.prices.t[ex.prices.t.length - 1]) - Date.parse(start) >= ex.pixel * pixels;
 }
 
-function clipToView(ex, el) {
+// What a whole dataset's chart draws at its view: the candles from and to, the view's own times x0 and x1, and how many
+// pixels the plot is across, which says the time a pixel spans and so the least time a Swing or Trend must run to be drawn.
+function drawnStretch(ex, el) {
   const whole = (ex.hindsight ?? ex).prices, n = whole.t.length;
-  if (!ex.complete || n < 2) return ex;
   // The first candle at or after a time.
   const at = ms => {
     let lo = 0, hi = n;
@@ -2063,10 +2064,15 @@ function clipToView(ex, el) {
   };
   const zoom = zooms.get(ex.id)?.x, w = ex.window;
   const [x0, x1] = zoom ? zoom.map(axisTime) : [Date.parse(whole.t[w?.from ?? 0]), Date.parse(whole.t[w?.to ?? n - 1])], beside = (x1 - x0) * DRAWN_BESIDE;
-  const from = Math.max(0, at(x0 - beside) - 1), to = Math.min(n - 1, at(x1 + beside));
+  return { from: Math.max(0, at(x0 - beside) - 1), to: Math.min(n - 1, at(x1 + beside)), x0, x1,
+    across: el?._fullLayout?._size?.w ?? Math.max(100, (el?.clientWidth ?? 1000) - 80) };
+}
+
+function clipToView(ex, el) {
+  const whole = (ex.hindsight ?? ex).prices, n = whole.t.length;
+  if (!ex.complete || n < 2) return ex;
+  const { from, to, x0, x1, across } = drawnStretch(ex, el);
   const a = whole.t[from], b = whole.t[to], last = whole.t[n - 1];
-  // The time a pixel of the plot spans at this view, and so the least time a Swing or Trend must run to be drawn.
-  const across = el?._fullLayout?._size?.w ?? Math.max(100, (el?.clientWidth ?? 1000) - 80);
   const within = t => t >= a && t <= b, overlaps = (start, end) => start <= b && end >= a;
   const cut = list => list.slice(from, to + 1), each = (lists, keep) => (lists ?? []).map(list => list.filter(keep));
   // A line keeps the point either side of what is drawn, so it runs on to the edges.
@@ -2269,7 +2275,10 @@ function draw(el, ex, focus) {
   // The price axis fits everything drawn in view, not the candles alone. A whole dataset's chart fits its candles alone,
   // drawn or not: zoomed in there, the view is often inside the box of a Swing many times its size, which would hold the
   // price axis to the box's height however far in the view went.
-  view.series = ex.complete ? [{ x: view.t, low: view.l, high: view.h }] : seriesOf(traces, shapes);
+  // They are the candles it draws, wherever its view has been taken, not those it opens on alone: a view panned away
+  // from those would have no prices to fit, and be taken for one left without candles (see zoomedRanges).
+  const drawn = a => ex.drawn ? a.slice(ex.drawn.from, ex.drawn.to + 1) : span(a);
+  view.series = ex.complete ? [{ x: drawn(full.t).map(Date.parse), low: drawn(full.l), high: drawn(full.h) }] : seriesOf(traces, shapes);
   view.y = fitPrices(view, view.x);
   views.set(ex.id, view);
   const { x: xRange, y: yRange, manual } = shownRanges(zoomedRanges(ex, view), view);
@@ -2642,7 +2651,7 @@ async function renderReplayPage() {
 }
 
 // ---- Chart -----------------------------------------------------------------------------------------------------------
-// The home page: a whole dataset as if it were complete, its structure worked out once from every candle (api/complete), with
+// The home page: a whole dataset as if it were complete, its structure as known at its last candle (api/complete), with
 // the filters choosing what is drawn. It opens on the chosen span of the latest candles; drag or zoom for the rest.
 const chartDatasets = [];
 const CHART_SPANS = [...REPLAY_WINDOWS, { label: 'All', candles: 0 }];
@@ -2650,21 +2659,41 @@ const chartSpan = () => CHART_SPANS.find(w => w.candles === state.chartSpan)?.ca
 // How far on from a clicked candle the Chart's Analyse sees it (see the candle card).
 const CHART_SEEN = 168;
 
-// The structure at the dataset's last candle, fetched once for each range setting, shaped as a replay at that candle is.
+// How much more than the chart draws is fetched either side, as a share of what it draws, so a pan has it there already;
+// and how much narrower than the narrowest thing drawn is fetched, so a zoom in has it there already (see DRAWN_AGAIN_AT).
+const FETCHED_BESIDE = 0.5, FETCHED_NARROWER = 1.5;
+
+// The structure at the dataset's last candle, shaped as a replay at that candle is. A whole history's is far more than a
+// chart shows, so only what the chart draws at its view is fetched (see clipToView): the candles it draws and some
+// either side, leaving out what is too narrow to draw at its zoom (see NARROWEST_DRAWN). A view that goes beyond what was
+// fetched, or zooms in past what it left out, fetches again around where it now is, the chart drawing what it has until
+// that comes; and so does another range setting.
 function completeView(ex) {
   const last = ex.prices.t.length - 1, query = rangeQuery();
+  const window = { from: chartSpan() ? Math.max(0, last - chartSpan()) : 0, to: last };
+  const el = [...document.querySelectorAll('.chart')].find(e => e.dataset.id === ex.id);
+  const need = drawnStretch({ ...ex, window }, el), candle = last > 0 ? Date.parse(ex.prices.t[1]) - Date.parse(ex.prices.t[0]) : 3600000;
+  const narrowest = Math.floor((need.x1 - need.x0) / need.across * NARROWEST_DRAWN / candle);
   if (ex.completeQuery !== query) {
     ex.completeQuery = query;
-    ex.replay = null;
-    fetch(`api/complete?dataset=${encodeURIComponent(ex.dataset)}${query}`).then(r => r.ok ? r.json() : Promise.reject(new Error(r.statusText))).then(batch => {
-      if (ex.completeQuery !== query) return;
-      batch.timeline.retracements ??= [];
-      batch.timeline.ranges ??= [];
-      ex.replay = batch.timeline;
-      if (currentPage === 'Chart') redrawExample(ex);
-    }).catch(() => { });
+    ex.replay = ex.fetched = ex.fetching = null;
   }
-  const window = { from: chartSpan() ? Math.max(0, last - chartSpan()) : 0, to: last };
+  const has = ex.fetched;
+  if (!ex.fetching && !(has && has.from <= need.from && has.to >= need.to && has.narrowest <= narrowest)) {
+    const beside = Math.ceil((need.to - need.from) * FETCHED_BESIDE);
+    const asked = ex.fetching = { query, from: Math.max(0, need.from - beside), to: Math.min(last, need.to + beside), narrowest: Math.floor(narrowest / FETCHED_NARROWER) };
+    fetch(`api/complete?dataset=${encodeURIComponent(ex.dataset)}&from=${asked.from}&to=${asked.to}&narrowest=${asked.narrowest}${query}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(r.statusText))).then(batch => {
+        if (ex.fetching !== asked) return;
+        ex.fetching = null;
+        batch.timeline.retracements ??= [];
+        batch.timeline.ranges ??= [];
+        ex.replay = batch.timeline;
+        // A server from before stretches sends everything.
+        ex.fetched = batch.stretch ? asked : { ...asked, from: 0, to: last, narrowest: 0 };
+        if (currentPage === 'Chart') redrawExample(ex);
+      }).catch(() => { if (ex.fetching === asked) ex.fetching = null; });
+  }
   if (!ex.replay)
     return { ...ex, hindsight: ex, cursor: last, window, loading: true, timeline: null, sawtooth: [], swingsByLevel: [], pointsByLevel: [],
       marketStructureBreaksByLevel: [], trendsByLevel: [], candidatesByLevel: [], retracementsByLevel: [], rangesByLevel: [], candleRuns: [], liveByLevel: null };

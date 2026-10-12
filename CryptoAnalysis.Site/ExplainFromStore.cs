@@ -33,6 +33,8 @@ public static partial class Explain
 
         var highRunning = high == cursor && cursor > 0;
         var when = prices[index].DateTime;
+        // The Trends that have the candle, as known at the cursor: the last to come of a level is the one it is in.
+        var trends = store.Trends(index, index, cursor, maxLevel + 1).OrderBy(x => x.Confirmed).ToLookup(x => x.Level);
         for (var level = deepest; level >= 1; level--)
         {
             if (LabelAt(pivots, level, index, cursor, highRunning, prices) is { } label)
@@ -41,8 +43,7 @@ public static partial class Explain
             var ofLevel = swings[level].Select(x => Outline(x, prices)).OrderBy(x => x.Start.Time).ToList();
             if (ofLevel.LastOrDefault(x => x.Start.Time <= when && x.BreakOfStructure!.Time >= when) is { } swing)
                 things.Add(new Thing("Swing", level, $"{Order(level)} {SwingName(swing.Direction)}"));
-            // A Trend's start and end are its Swings' alone; the market structure breaks only count against it.
-            if (Sawtooth.Trends(ofLevel, []).LastOrDefault(x => x.Start.Time <= when && (x.End == null || x.End.Time >= when)) is { } trend)
+            if (trends[level].LastOrDefault() is { } trend)
                 things.Add(new Thing("Trend", level, $"{Order(level)} {TrendName(trend.Direction)}"));
         }
 

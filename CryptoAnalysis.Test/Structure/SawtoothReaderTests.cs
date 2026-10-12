@@ -29,16 +29,16 @@ public class SawtoothReaderTests
     {
         var reader = new SawtoothReader(basis);
         // What the changes it reports add up to, candle by candle.
-        var pivots = new Dictionary<(int Candle, EnumPivotKind Kind), (double Price, int Level)>();
+        var pivots = new Dictionary<(int Candle, EnumPivotKind Kind), (double Price, int Level, int Confirmed)>();
         var held = new Dictionary<ReadSwing, int>();
         for (var i = 0; i < prices.Count; i++)
         {
             reader.Add(prices[i]);
             foreach (var change in reader.Changes.Pivots)
             {
-                Assert.AreNotEqual(change.Level, pivots.TryGetValue((change.Candle, change.Kind), out var was) ? was.Level : (int?)null, $"{name}: a change that changes nothing at candle {i}.");
+                Assert.AreNotEqual((change.Level, change.Confirmed), pivots.TryGetValue((change.Candle, change.Kind), out var was) ? (was.Level, was.Confirmed) : ((int?)null, (int?)null), $"{name}: a change that changes nothing at candle {i}.");
                 if (change.Level is int level)
-                    pivots[(change.Candle, change.Kind)] = (change.Price, level);
+                    pivots[(change.Candle, change.Kind)] = (change.Price, level, change.Confirmed!.Value);
                 else
                     pivots.Remove((change.Candle, change.Kind));
             }
@@ -70,8 +70,8 @@ public class SawtoothReaderTests
             // Each pivot that can no longer move, at the first level it is at, and each swing at its level.
             var expectedPivots = expected.SelectMany(l => l.Pivots.Where(p => p.Kind is EnumPivotKind.High or EnumPivotKind.Low && p.ConfirmedIndex != null).Select(p => (l.Level, Pivot: p)))
                 .GroupBy(x => (x.Pivot.Index, x.Pivot.Kind)).Select(g => g.First()).OrderBy(x => x.Pivot.Index).ThenBy(x => x.Pivot.Kind)
-                .Select(x => $"{x.Pivot.Index} {x.Pivot.Kind} {x.Pivot.Price} L{x.Level}");
-            Assert.AreEqual(string.Join("\n", expectedPivots), string.Join("\n", pivots.OrderBy(x => x.Key.Candle).ThenBy(x => x.Key.Kind).Select(x => $"{x.Key.Candle} {x.Key.Kind} {x.Value.Price} L{x.Value.Level}")),
+                .Select(x => $"{x.Pivot.Index} {x.Pivot.Kind} {x.Pivot.Price} L{x.Level} /{x.Pivot.ConfirmedIndex}");
+            Assert.AreEqual(string.Join("\n", expectedPivots), string.Join("\n", pivots.OrderBy(x => x.Key.Candle).ThenBy(x => x.Key.Kind).Select(x => $"{x.Key.Candle} {x.Key.Kind} {x.Value.Price} L{x.Value.Level} /{x.Value.Confirmed}")),
                 $"{name}: the pivots the changes add up to at candle {i}.");
             Assert.AreEqual(pivots.Count, reader.PivotLevels.Count, $"{name}: the pivots held at candle {i}.");
 

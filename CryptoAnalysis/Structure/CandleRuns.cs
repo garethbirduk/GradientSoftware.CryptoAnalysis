@@ -17,9 +17,10 @@ public static class CandleRuns
     public static List<CandleRun> Runs(List<Price> prices, int minLength = 3) => RunsFrom(prices, minLength, 0);
 
     /// <summary>
-    /// The runs that end at or after a candle, without reading the candles before the run that candle is in.
+    /// The runs that end at or after a candle, without reading the candles before the run that candle is in; and, with a
+    /// candle to read up to, that begin at or before it, without reading the candles after the run that one is in.
     /// </summary>
-    internal static List<CandleRun> RunsFrom(List<Price> prices, int minLength, int from)
+    internal static List<CandleRun> RunsFrom(List<Price> prices, int minLength, int from, int? upTo = null)
     {
         var runs = new List<CandleRun>();
         if (prices.Count == 0)
@@ -44,6 +45,8 @@ public static class CandleRuns
                     new PricePoint(first.DateTime, first.Open), new PricePoint(last.DateTime, last.Close)));
             }
             start = i;
+            if (start > upTo)
+                break;
         }
 
         return runs;
