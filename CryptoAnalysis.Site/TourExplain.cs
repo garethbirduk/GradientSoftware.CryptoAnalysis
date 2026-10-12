@@ -465,10 +465,13 @@ public static partial class Explain
 
         // The whole dataset has hindsight the chart did not have at the time, so a tour, which shows the chart as it was,
         // can be written of a Trend only where the chart had the same Trend at its last Swing's BoS.
+        // With the store of the prices, the chart as it was at a candle is looked up and the candles to it not listed.
+        var store = StructureStores.Of(prices);
         Parallel.ForEach(rows, row =>
         {
             var at = Tours.AnchorOf(row["at"]!.GetValue<string>(), prices);
-            var then = TrendAt(prices.GetRange(0, at + 1), at, row["level"]!.GetValue<int>());
+            var then = store != null ? TrendAt(Read(store, at, row["level"]!.GetValue<int>()), prices[at].DateTime, at)
+                : TrendAt(prices.GetRange(0, at + 1), at, row["level"]!.GetValue<int>());
             row["tour"] = then != null && then.Start == row["index"]!.GetValue<int>() && TrendRow(then.Trend, 0, then.Index) is { } seen
                 && seen["direction"]!.GetValue<string>() == row["direction"]!.GetValue<string>()
                 && seen["swings"]!.GetValue<int>() == row["swings"]!.GetValue<int>() && seen["strength"]!.GetValue<int>() == row["strength"]!.GetValue<int>();
@@ -742,11 +745,8 @@ public static partial class Explain
     {
         if (Seen("Swing", prices, at, level, reached, runsTo, known, (p, a, d) => SwingAt(p, a, level, d), out var end, out problem) is not { } seen)
             return null;
-        var (swing, span, index) = (seen.Swing, seen.Span, seen.Index);
-        var against = swing.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
-        var msb = seen.Breaks.FirstOrDefault(b => b.Type == against && b.Break.Time > swing.Start.Time && b.Break.Time < swing.BreakOfStructure!.Time);
-        var s = new SwingRead(prices, swing, level, span.First, index[swing.Extreme.Time], span.Last,
-            LabelAt(seen.Points, swing.Start.Time), LabelAt(seen.Points, swing.Extreme.Time), msb != null ? index[msb.Break.Time] : null);
+        var span = seen.Span;
+        var s = SwingReadOf(prices, seen.Swing, level, seen.Breaks, seen.Points, seen.Index);
 
         // A block for each term a Swing is made of, each where it shows on this one; the MSB's only when it has one. The
         // view is the Swing, and on to where the replay runs when it runs on past the BoS.
@@ -764,6 +764,17 @@ public static partial class Explain
         public string Name => SwingName(Direction);
         public string Turn => Up ? "Swing Low" : "Swing High";
         public TimeSpan Period => Length(Prices);
+    }
+
+    // A Confirmed Swing read for its blocks, from the structure that has it: its breaks, points and candles by time. That
+    // structure may be read from the candles from first on alone, which its candles are then counted from.
+    private static SwingRead SwingReadOf(List<Price> prices, SwingOutline swing, int level, List<MarketStructureBreakOutline> breaks, List<StructurePoint> points,
+        Dictionary<DateTime, int> index, int first = 0)
+    {
+        var against = swing.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
+        var msb = breaks.FirstOrDefault(b => b.Type == against && b.Break.Time > swing.Start.Time && b.Break.Time < swing.BreakOfStructure!.Time);
+        return new SwingRead(prices, swing, level, first + index[swing.Start.Time], first + index[swing.Extreme.Time], first + index[swing.BreakOfStructure!.Time],
+            LabelAt(points, swing.Start.Time), LabelAt(points, swing.Extreme.Time), msb != null ? first + index[msb.Break.Time] : null);
     }
 
     // The Swing: what one is, then where this one begins and at what kind of high or low.
@@ -949,14 +960,64 @@ public static partial class Explain
     // The page's layer for a point's label, when it has one.
     private static string[] Labelled(string? label) => label != null ? [PointLayer(label)] : [];
 
-    // What the structure at a level has, read from these prices alone.
-    private sealed record Structure(List<SwingOutline> Swings, List<MarketStructureBreakOutline> Breaks, List<TrendOutline> Trends, List<StructurePoint> Points, Dictionary<DateTime, int> Index);
+    // What the structure at a level has, read from these prices alone: each part made when it is first asked for.
+    private sealed class Structure(Func<List<SwingOutline>> swings, Func<List<MarketStructureBreakOutline>> breaks, Func<List<TrendOutline>> trends,
+        Func<List<StructurePoint>> points, Func<Dictionary<DateTime, int>> index)
+    {
+        private readonly Lazy<List<SwingOutline>> _swings = new(swings);
+        private readonly Lazy<List<MarketStructureBreakOutline>> _breaks = new(breaks);
+        private readonly Lazy<List<TrendOutline>> _trends = new(trends);
+        private readonly Lazy<List<StructurePoint>> _points = new(points);
+        private readonly Lazy<Dictionary<DateTime, int>> _index = new(index);
+
+        public List<SwingOutline> Swings => _swings.Value;
+
+        public List<MarketStructureBreakOutline> Breaks => _breaks.Value;
+
+        public List<TrendOutline> Trends => _trends.Value;
+
+        public List<StructurePoint> Points => _points.Value;
+
+        public Dictionary<DateTime, int> Index => _index.Value;
+
+        /// <summary>
+        /// The swings and the trends that have a candle in them, when those can be had without listing every one.
+        /// </summary>
+        public Func<int, List<SwingOutline>>? SwingsOver { get; init; }
+
+        public Func<int, List<TrendOutline>>? TrendsOver { get; init; }
+    }
 
     private sealed record FoundSwing(SwingOutline Swing, (int First, int Last) Span, List<MarketStructureBreakOutline> Breaks, List<StructurePoint> Points, Dictionary<DateTime, int> Index);
 
     private sealed record FoundTrend(TrendOutline Trend, int Start, (int First, int Last) Span, Dictionary<DateTime, int> Index);
 
     private static Structure? Read(List<Price> prices, int level, IReadOnlyList<SawtoothLevel>? levels = null)
+    {
+        // With the store of the series these prices are the first candles of, each part is looked up as known at the last
+        // of them (see StructureStores).
+        if (levels == null && StructureStores.Of(prices) is { } store)
+            return Read(store, prices.Count - 1, level);
+        return ReadAgain(prices, level, levels);
+    }
+
+    // What the structure at a level has as known at a candle, each part looked up in the store of the series.
+    private static Structure? Read(StructureStore store, int at, int level)
+    {
+        {
+            if (level < 1 || !MarketStructure.HasLevel(store, level, at))
+                return null;
+            return new Structure(() => MarketStructure.SwingsAt(store, level, at), () => MarketStructure.BreaksAt(store, level, at),
+                () => MarketStructure.TrendsAt(store, level, at), () => MarketStructure.PointsAt(store, level, at), () => StructureStores.IndexOf(store))
+            {
+                SwingsOver = candle => MarketStructure.SwingsAt(store, level, at, candle, candle),
+                TrendsOver = candle => MarketStructure.TrendsAt(store, level, at, candle, candle),
+            };
+        }
+    }
+
+    // What the structure at a level has, worked out from every one of these prices.
+    private static Structure? ReadAgain(List<Price> prices, int level, IReadOnlyList<SawtoothLevel>? levels = null)
     {
         levels ??= Sawtooth.Levels(prices, Basis, level + 1);
         if (level < 1 || level >= levels.Count)
@@ -966,7 +1027,8 @@ public static partial class Explain
         var index = new Dictionary<DateTime, int>();
         for (var i = 0; i < prices.Count; i++)
             index.TryAdd(prices[i].DateTime, i);
-        return new Structure(swings, breaks, Sawtooth.Trends(swings, breaks), Sawtooth.Points(prices, levels[level], Basis), index);
+        var points = levels[level];
+        return new Structure(() => swings, () => breaks, () => Sawtooth.Trends(swings, breaks), () => Sawtooth.Points(prices, points, Basis), () => index);
     }
 
     // The Confirmed Swing at a level that has the candle: one that begins there, else the one it falls inside, from its
@@ -979,25 +1041,34 @@ public static partial class Explain
         return swing == null ? null : new FoundSwing(swing, (s.Index[swing.Start.Time], s.Index[swing.BreakOfStructure!.Time]), s.Breaks, s.Points, s.Index);
     }
 
-    private static SwingOutline? SwingIn(Structure s, DateTime time, EnumSwingDirection? direction = null) => direction != null
-        ? s.Swings.FirstOrDefault(x => x.Start.Time == time && x.Direction == direction && x.BreakOfStructure != null)
-        : s.Swings.Where(x => x.BreakOfStructure != null).LastOrDefault(x => x.Start.Time <= time && x.BreakOfStructure!.Time >= time);
+    private static SwingOutline? SwingIn(Structure s, DateTime time, EnumSwingDirection? direction = null)
+    {
+        var swings = s.SwingsOver != null && s.Index.TryGetValue(time, out var candle) ? s.SwingsOver(candle) : s.Swings;
+        return direction != null
+            ? swings.FirstOrDefault(x => x.Start.Time == time && x.Direction == direction && x.BreakOfStructure != null)
+            : swings.Where(x => x.BreakOfStructure != null).LastOrDefault(x => x.Start.Time <= time && x.BreakOfStructure!.Time >= time);
+    }
 
-    private static TrendOutline? TrendIn(Structure s, DateTime time, EnumSwingDirection? direction = null) => direction != null
-        ? s.Trends.FirstOrDefault(x => x.Start.Time == time && x.Direction == direction)
-        : s.Trends.LastOrDefault(x => x.Start.Time <= time && (x.End == null || x.End.Time >= time));
+    private static TrendOutline? TrendIn(Structure s, DateTime time, EnumSwingDirection? direction = null)
+    {
+        var trends = s.TrendsOver != null && s.Index.TryGetValue(time, out var candle) ? s.TrendsOver(candle) : s.Trends;
+        return direction != null
+            ? trends.FirstOrDefault(x => x.Start.Time == time && x.Direction == direction)
+            : trends.LastOrDefault(x => x.Start.Time <= time && (x.End == null || x.End.Time >= time));
+    }
 
     // The Trend at a level that has the candle: begun at or before it and not ended before it. With a direction, only a
     // Trend beginning at the candle that runs that way.
-    private static FoundTrend? TrendAt(List<Price> prices, int at, int level, EnumSwingDirection? direction = null)
+    private static FoundTrend? TrendAt(List<Price> prices, int at, int level, EnumSwingDirection? direction = null) =>
+        TrendAt(Read(prices, level), prices[at].DateTime, prices.Count - 1, direction);
+
+    // The Trend of a level's structure, read from the candles up to one, that has a time in it.
+    private static FoundTrend? TrendAt(Structure? s, DateTime time, int known, EnumSwingDirection? direction = null)
     {
-        if (Read(prices, level) is not { } s)
-            return null;
-        var trend = TrendIn(s, prices[at].DateTime, direction);
-        if (trend == null)
+        if (s == null || TrendIn(s, time, direction) is not { } trend)
             return null;
         var start = s.Index[trend.Start.Time];
-        var last = trend.End != null && s.Index.TryGetValue(trend.End.Time, out var end) ? end : Math.Max(s.Index[trend.Confirmed.Time], prices.Count - 1);
+        var last = trend.End != null && s.Index.TryGetValue(trend.End.Time, out var end) ? end : Math.Max(s.Index[trend.Confirmed.Time], known);
         return new FoundTrend(trend, start, (start, last), s.Index);
     }
 

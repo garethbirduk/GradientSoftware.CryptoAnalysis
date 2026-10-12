@@ -65,7 +65,7 @@ public sealed record ReplayTimeline(
 /// Computing from the prices up to a candle is what could have been seen live, so it is what backtests must use. The two can
 /// differ: a pullback that later proves to be inside an upleg is, until then, the presumed death-leg, with its own downswings.
 /// </summary>
-public static class MarketStructure
+public static partial class MarketStructure
 {
     /// <summary>
     /// Returns the swings, market structure breaks and trends at a level, from these prices alone.
@@ -123,11 +123,39 @@ public static class MarketStructure
     public static ReplayTimeline Timeline(List<Price> prices, EnumPriceBasis basis, int maxLevel = 8, int minTrendSwings = 2,
         int from = 0, int? to = null, int? keepFrom = null, double minRetracement = Ranges.DefaultMinRetracement, double band = Ranges.DefaultBand)
     {
+        // The candles are read once, one at a time, and what is known is taken at each candle replayed: see Replayer.
+        var end = Math.Min(to ?? prices.Count, prices.Count);
+        from = Math.Max(0, from);
+        var snapshots = new Snapshot[Math.Max(0, end - from)];
+        var replayer = new Replayer(basis, maxLevel, minTrendSwings, minRetracement, band);
+        for (var t = 0; t < end; t++)
+        {
+            replayer.Add(prices[t]);
+            if (t >= from)
+                snapshots[t - from] = replayer.Take(keepFrom);
+        }
+
+        return Track(snapshots, from);
+    }
+
+    /// <summary>
+    /// The timeline as <see cref="Timeline"/> gives it, worked out the plain way: at every candle replayed, everything is
+    /// read again from the first candle to that one. Slow on a long series, and kept to hold the quick way to.
+    /// </summary>
+    internal static ReplayTimeline TimelineReadingAgain(List<Price> prices, EnumPriceBasis basis, int maxLevel = 8, int minTrendSwings = 2,
+        int from = 0, int? to = null, int? keepFrom = null, double minRetracement = Ranges.DefaultMinRetracement, double band = Ranges.DefaultBand)
+    {
         var end = Math.Min(to ?? prices.Count, prices.Count);
         from = Math.Max(0, from);
         var snapshots = new Snapshot[Math.Max(0, end - from)];
         Parallel.For(from, end, t => snapshots[t - from] = TakeSnapshot(prices, basis, t, maxLevel, minTrendSwings, keepFrom, minRetracement, band));
+        return Track(snapshots, from);
+    }
 
+    // The entries of what each candle's snapshot has, the first snapshot being of the candle from.
+    private static ReplayTimeline Track(Snapshot[] snapshots, int from)
+    {
+        var end = from + snapshots.Length;
         var pivots = new Tracker<LevelPivot>(x => (x.Level, x.Pivot.Kind, x.Pivot.Index));
         var swings = new Tracker<SwingOutline>(x => (x.Level, x.Direction, x.Start.Time));
         var candidates = new Tracker<CandidateSwing>(x => (x.Level, x.Direction, x.Start.Time), x => (x.Direction, x.Start.Time));

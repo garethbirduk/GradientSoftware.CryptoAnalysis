@@ -159,6 +159,38 @@ public static class Sawtooth
     /// </summary>
     public static List<StructurePoint> Points(List<Price> prices, SawtoothLevel level, EnumPriceBasis basis)
     {
+        // The incomplete leg's furthest point so far: the first candle to reach it, since an equal close does not extend it.
+        var pivots = level.Pivots;
+        int? furthest = null;
+        if (EndsInAnIncompleteLeg(pivots))
+        {
+            var up = pivots[^2].Kind == EnumPivotKind.Low;
+            var best = pivots[^2].Index + 1;
+            for (var i = best + 1; i < prices.Count; i++)
+            {
+                if (up ? HighOf(prices[i], basis) > HighOf(prices[best], basis) : LowOf(prices[i], basis) < LowOf(prices[best], basis))
+                    best = i;
+            }
+
+            if (best < prices.Count)
+                furthest = best;
+        }
+
+        return Points(prices, level, basis, furthest);
+    }
+
+    /// <summary>
+    /// Whether a level ends in a leg from a high or a low to the current price.
+    /// </summary>
+    internal static bool EndsInAnIncompleteLeg(IReadOnlyList<SawtoothPivot> pivots) =>
+        pivots.Count >= 2 && pivots[^1].Kind == EnumPivotKind.Current && pivots[^2].Kind is EnumPivotKind.High or EnumPivotKind.Low;
+
+    /// <summary>
+    /// A level's highs and lows, as <see cref="Points(List{Price}, SawtoothLevel, EnumPriceBasis)"/> gives them, with the
+    /// candle of the incomplete leg's furthest point so far already found, when it has one.
+    /// </summary>
+    internal static List<StructurePoint> Points(List<Price> prices, SawtoothLevel level, EnumPriceBasis basis, int? furthest)
+    {
         var pivots = level.Pivots;
         var extremes = new List<(EnumPivotKind Kind, DateTime Time, double Price, DateTime LegStart, bool Provisional)>();
         for (var i = 0; i < pivots.Count; i++)
@@ -168,21 +200,12 @@ public static class Sawtooth
                 extremes.Add((p.Kind, p.Time, p.Price, i > 0 ? pivots[i - 1].Time : p.Time, p.ConfirmedIndex == null));
         }
 
-        // The incomplete leg's furthest point so far: the first candle to reach it, since an equal close does not extend it.
-        if (pivots.Count >= 2 && pivots[^1].Kind == EnumPivotKind.Current && pivots[^2].Kind is EnumPivotKind.High or EnumPivotKind.Low)
+        if (furthest is int best)
         {
             var from = pivots[^2];
             var up = from.Kind == EnumPivotKind.Low;
-            var best = from.Index + 1;
-            for (var i = best + 1; i < prices.Count; i++)
-            {
-                if (up ? HighOf(prices[i], basis) > HighOf(prices[best], basis) : LowOf(prices[i], basis) < LowOf(prices[best], basis))
-                    best = i;
-            }
-
-            if (best < prices.Count)
-                extremes.Add((up ? EnumPivotKind.High : EnumPivotKind.Low, prices[best].DateTime,
-                    up ? HighOf(prices[best], basis) : LowOf(prices[best], basis), from.Time, true));
+            extremes.Add((up ? EnumPivotKind.High : EnumPivotKind.Low, prices[best].DateTime,
+                up ? HighOf(prices[best], basis) : LowOf(prices[best], basis), from.Time, true));
         }
 
         var points = new List<StructurePoint>();
@@ -281,6 +304,7 @@ public static class Sawtooth
             index.TryAdd(prices[i].DateTime, i);
 
         var confirmed = swings.Where(x => x.BreakOfStructure != null).OrderBy(x => x.BreakOfStructure!.Time).ToList();
+        var broke = confirmed.Select(x => x.BreakOfStructure!.Time).ToList();
         var retracements = new List<RetracementOutline>();
 
         foreach (var swing in confirmed)
@@ -293,32 +317,47 @@ public static class Sawtooth
         void Add(int level, EnumSwingDirection direction, PricePoint to, int end, bool final)
         {
             // The last swing to break structure before this one starts; one the other way means this is the first swing of its leg.
-            var previous = confirmed.LastOrDefault(x => x.Level == level && x.BreakOfStructure!.Time <= to.Time && x.Start.Time < to.Time);
+            // They are in the order they broke structure, so it is looked for back from the last that had by then.
+            SwingOutline? previous = null;
+            for (var i = CountUpTo(broke, to.Time) - 1; i >= 0 && previous == null; i--)
+            {
+                if (confirmed[i].Level == level && confirmed[i].Start.Time < to.Time)
+                    previous = confirmed[i];
+            }
+
             if (previous == null || previous.Direction != direction)
                 return;
 
-            var from = previous.Extreme;
-            var up = direction == EnumSwingDirection.Up;
-            var gap = up ? to.Price - from.Price : from.Price - to.Price;
-            var start = index[to.Time];
-            if (gap <= 0 || gap < Math.Abs(from.Price) * MinimumRetracementMovePercent / 100 || start >= end)
-                return;
-
-            var steps = new List<RetracementStep>();
-            double? best = null;
-            for (var i = start + 1; i <= end; i++)
-            {
-                var value = up ? LowOf(prices[i], basis) : HighOf(prices[i], basis);
-                if (best is double b && !(up ? value < b : value > b))
-                    continue;
-                best = value;
-                var back = up ? to.Price - value : value - to.Price;
-                steps.Add(new RetracementStep(new PricePoint(prices[i].DateTime, value), (int)Math.Floor(100 * back / gap)));
-            }
-
-            if (steps.Count > 0)
-                retracements.Add(new RetracementOutline(level, direction, from, to, steps, final));
+            if (Retracement(prices, basis, level, direction, previous.Extreme, to, index[to.Time], end, final) is { } retracement)
+                retracements.Add(retracement);
         }
+    }
+
+    /// <summary>
+    /// The retracement of the move from a point to another, read from the candle after the move ends to the candle end; null
+    /// when the move is too small to read against or there are no candles to read.
+    /// </summary>
+    internal static RetracementOutline? Retracement(List<Price> prices, EnumPriceBasis basis, int level, EnumSwingDirection direction, PricePoint from, PricePoint to,
+        int start, int end, bool final)
+    {
+        var up = direction == EnumSwingDirection.Up;
+        var gap = up ? to.Price - from.Price : from.Price - to.Price;
+        if (gap <= 0 || gap < Math.Abs(from.Price) * MinimumRetracementMovePercent / 100 || start >= end)
+            return null;
+
+        var steps = new List<RetracementStep>();
+        double? best = null;
+        for (var i = start + 1; i <= end; i++)
+        {
+            var value = up ? LowOf(prices[i], basis) : HighOf(prices[i], basis);
+            if (best is double b && !(up ? value < b : value > b))
+                continue;
+            best = value;
+            var back = up ? to.Price - value : value - to.Price;
+            steps.Add(new RetracementStep(new PricePoint(prices[i].DateTime, value), (int)Math.Floor(100 * back / gap)));
+        }
+
+        return steps.Count > 0 ? new RetracementOutline(level, direction, from, to, steps, final) : null;
     }
 
     /// <summary>
@@ -405,6 +444,10 @@ public static class Sawtooth
         var ordered = swings.Where(x => x.BreakOfStructure != null).OrderBy(x => x.BreakOfStructure!.Time).ToList();
         var trends = new List<TrendOutline>();
 
+        // The times of the breaks each way, in order, so those in a stretch are counted without reading them all.
+        var bullish = breaks.Where(b => b.Type == EnumAnnotationType.BullishMarketStructureBreak).Select(b => b.Break.Time).Order().ToList();
+        var bearish = breaks.Where(b => b.Type == EnumAnnotationType.BearishMarketStructureBreak).Select(b => b.Break.Time).Order().ToList();
+
         for (var i = 0; i < ordered.Count;)
         {
             var j = i;
@@ -415,10 +458,12 @@ public static class Sawtooth
             {
                 var first = ordered[i];
                 var end = j + 1 < ordered.Count ? ordered[j + 1].BreakOfStructure : null;
-                var against = first.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
-                var msbs = breaks.Count(b => b.Type == against && b.Break.Time > first.BreakOfStructure!.Time && (end == null || b.Break.Time <= end.Time));
+                // Those against the trend after its first break of structure, up to its end; and a swing is strong when none
+                // falls between its start and its break of structure.
+                var against = first.Direction == EnumSwingDirection.Up ? bearish : bullish;
+                var msbs = (end == null ? against.Count : CountUpTo(against, end.Time)) - CountUpTo(against, first.BreakOfStructure!.Time);
                 var parts = ordered.GetRange(i, j - i + 1)
-                    .Select(s => new TrendSwing(s.BreakOfStructure!, !breaks.Any(b => b.Type == against && b.Break.Time > s.Start.Time && b.Break.Time < s.BreakOfStructure!.Time)))
+                    .Select(s => new TrendSwing(s.BreakOfStructure!, CountBefore(against, s.BreakOfStructure!.Time) - CountUpTo(against, s.Start.Time) <= 0))
                     .ToList();
                 trends.Add(new TrendOutline(first.Level, first.Direction, first.Start, ordered[i + Math.Max(1, minSwings) - 1].BreakOfStructure!, end, j - i + 1, msbs, parts));
             }
@@ -429,9 +474,41 @@ public static class Sawtooth
         return trends;
     }
 
-    private static double HighOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.High : price.Close;
+    // How many of the times, which are in order, are at or before a time.
+    internal static int CountUpTo(List<DateTime> times, DateTime time)
+    {
+        var (low, high) = (0, times.Count);
+        while (low < high)
+        {
+            var middle = (low + high) / 2;
+            if (times[middle] <= time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
 
-    private static double LowOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.Low : price.Close;
+        return low;
+    }
+
+    // How many of the times, which are in order, are before a time.
+    internal static int CountBefore(List<DateTime> times, DateTime time)
+    {
+        var (low, high) = (0, times.Count);
+        while (low < high)
+        {
+            var middle = (low + high) / 2;
+            if (times[middle] < time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
+    }
+
+    internal static double HighOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.High : price.Close;
+
+    internal static double LowOf(Price price, EnumPriceBasis basis) => basis == EnumPriceBasis.Wick ? price.Low : price.Close;
 
     private static List<SawtoothPivot> LevelZero(List<Price> prices, EnumPriceBasis basis)
     {
@@ -488,7 +565,7 @@ public static class Sawtooth
     /// Finds the alternating pivots inside a leg that starts at from and runs to candle end.
     /// For an upleg: the end of each run of new highs, and the first lowest price before the next new high.
     /// </summary>
-    private static List<SawtoothPivot> Chain(List<Price> prices, EnumPriceBasis basis, SawtoothPivot from, int end, bool up, bool includeLastExtreme)
+    internal static List<SawtoothPivot> Chain(List<Price> prices, EnumPriceBasis basis, SawtoothPivot from, int end, bool up, bool includeLastExtreme)
     {
         double Extreme(Price p) => up ? HighOf(p, basis) : LowOf(p, basis);
         double Counter(Price p) => up ? LowOf(p, basis) : HighOf(p, basis);
@@ -558,7 +635,7 @@ public static class Sawtooth
         return chain;
     }
 
-    private static SawtoothPivot Pivot(EnumPivotKind kind, List<Price> prices, int index, EnumPriceBasis basis)
+    internal static SawtoothPivot Pivot(EnumPivotKind kind, List<Price> prices, int index, EnumPriceBasis basis)
     {
         var price = prices[index];
         var value = kind switch

@@ -254,7 +254,8 @@ public class StrategyBacktestTests
 
         Assert.AreEqual(7, trade.EntryIndex);
         CollectionAssert.AreEqual(new[] { 4 }, trade.Met.Select(x => x.Index).ToArray());
-        Assert.AreEqual(3, trade.FirstRead(RedThenGreen()), "The chain reads from the first of the red.");
+        Assert.AreEqual(3, trade.FirstRead, "The chain reads from the first of the red.");
+        Assert.AreEqual((3, 5), (trade.Met[0].From, trade.EntryFrom), "Each step reads from the first candle of its run.");
     }
 
     [TestMethod]
@@ -408,6 +409,117 @@ public class StrategyBacktestTests
 
         CollectionAssert.AreEqual(StrategyBacktest.Occurrences(prices, strategy), entries);
         Assert.IsTrue(entries.Count > 10);
+    }
+
+    // Candles that close at each price, with no wicks.
+    private static List<Price> Closes(params double[] closes) =>
+        Candles(closes.Select((c, i) => (i == 0 ? c : closes[i - 1], Math.Max(c, i == 0 ? c : closes[i - 1]), Math.Min(c, i == 0 ? c : closes[i - 1]), c)).ToArray());
+
+    // A market structure step at the 1st order, with exits too far off to end a trade, so every candle that meets it enters.
+    private static Strategy Structure(string type, EnumSwingDirection direction = EnumSwingDirection.Up, int swings = 2, EnumSwingStrength strength = EnumSwingStrength.Any) => new()
+    {
+        Id = "structure",
+        Entry = new StrategyEntry { Type = type, Direction = direction, Level = 1, Swings = swings, Strength = strength },
+        TakeProfit = new StrategyTarget { Type = StrategyTarget.Percent, Percentage = 90 },
+        StopLoss = new StrategyTarget { Type = StrategyTarget.Percent, Percentage = 90 },
+        OnePositionAtATime = false,
+    };
+
+    private static string Entries(List<Price> prices, Strategy strategy) =>
+        string.Join(" ", StrategyBacktest.Run(prices, strategy).Trades.Select(t => $"{t.EntryIndex}<{t.EntryFrom}"));
+
+    [TestMethod]
+    public void Run_BreakOfStructure_EntersAtTheCloseThatBreaks()
+    {
+        // Upswings from the highs of 12 and 13, Confirmed by the closes of 13 and 15.
+        var prices = Closes(10, 12, 11, 13, 12, 15);
+
+        Assert.AreEqual("3<1 5<3", Entries(prices, Structure(StrategyEntry.BreakOfStructure)), "Each reads from where its Swing begins.");
+        Assert.AreEqual("3<1 5<3", Entries(prices, Structure(StrategyEntry.Swing)), "An Upswing is Confirmed at its BoS.");
+        Assert.AreEqual("", Entries(prices, Structure(StrategyEntry.BreakOfStructure, EnumSwingDirection.Down)));
+    }
+
+    [TestMethod]
+    public void Run_Trend_EntersAtTheBosThatMakesItsCountOfSwings()
+    {
+        var prices = Closes(10, 12, 11, 13, 12, 15, 14, 16);
+
+        Assert.AreEqual("5<1", Entries(prices, Structure(StrategyEntry.Trend)), "The second Upswing's BoS Confirms the Uptrend, which begins where the first does.");
+        Assert.AreEqual("7<1", Entries(prices, Structure(StrategyEntry.Trend, swings: 3)), "Once a Trend: the third Upswing, not the second or a fourth.");
+        Assert.AreEqual("", Entries(prices, Structure(StrategyEntry.Trend, EnumSwingDirection.Down)));
+    }
+
+    [TestMethod]
+    public void Run_MarketStructureBreak_EntersAtTheCloseBeyondTheSwingLow()
+    {
+        // An Upswing from 12 with its Swing Low at 11, Confirmed at 13; the close of 10.5 is below that Swing Low.
+        var prices = Closes(10, 12, 11, 13, 10.5, 12.5, 14);
+
+        Assert.AreEqual("4<2", Entries(prices, Structure(StrategyEntry.MarketStructureBreak, EnumSwingDirection.Down)), "A Bearish MSB reads from the Swing Low it closes below.");
+        Assert.AreEqual("", Entries(prices, Structure(StrategyEntry.MarketStructureBreak)));
+    }
+
+    [TestMethod]
+    public void Run_Swing_OfAStrength_EntersOnlyAtOneThatIs()
+    {
+        // The second Upswing, from 13, has the MSB at 10.5 inside it, so it is Weak; the first has none.
+        var prices = Closes(10, 12, 11, 13, 10.5, 12.5, 14);
+
+        Assert.AreEqual("3<1 6<3", Entries(prices, Structure(StrategyEntry.Swing)));
+        Assert.AreEqual("3<1", Entries(prices, Structure(StrategyEntry.Swing, strength: EnumSwingStrength.Strong)));
+        Assert.AreEqual("6<3", Entries(prices, Structure(StrategyEntry.Swing, strength: EnumSwingStrength.Weak)));
+    }
+
+    [TestMethod]
+    public void Run_Chain_AStructureStepThenARun()
+    {
+        // A Bullish BoS at #3, then two green candles, the second at #6.
+        var prices = Closes(10, 12, 11, 13, 12.5, 12.8, 12.9);
+        var strategy = Structure(StrategyEntry.BreakOfStructure);
+        strategy.After = [strategy.Entry];
+        strategy.Entry = new StrategyEntry { Colour = EnumCandleColour.Green, Length = 2, Within = 5 };
+
+        var trade = StrategyBacktest.Run(prices, strategy).Trades.Single();
+
+        Assert.AreEqual((6, 5, 3, 1, 1), (trade.EntryIndex, trade.EntryFrom, trade.Met[0].Index, trade.Met[0].From, trade.FirstRead));
+    }
+
+    [TestMethod]
+    [DataRow(StrategyEntry.BreakOfStructure)]
+    [DataRow(StrategyEntry.MarketStructureBreak)]
+    [DataRow(StrategyEntry.Trend)]
+    public void Occurrences_OfAChainWithStructure_AreTheEntriesWhenTradesMayOverlap(string type)
+    {
+        var prices = Btc.From2023().Take(4000).ToList();
+        var strategy = Structure(type, EnumSwingDirection.Down);
+        strategy.Entry.Level = 3;
+        strategy.After = [strategy.Entry];
+        strategy.Entry = new StrategyEntry { Colour = EnumCandleColour.Green, Length = 3, Within = 24 };
+        strategy.TakeProfit.Percentage = strategy.StopLoss.Percentage = 2;
+
+        var entries = StrategyBacktest.Run(prices, strategy).Trades.Select(t => t.EntryIndex).ToList();
+
+        CollectionAssert.AreEqual(StrategyBacktest.Occurrences(prices, strategy), entries);
+        Assert.IsTrue(entries.Count > 5, $"{entries.Count} entries");
+    }
+
+    [TestMethod]
+    public void Parse_ReadsAStructureStep()
+    {
+        var book = StrategyBook.Parse("""
+            { "strategies": [ { "id": "msb", "name": "MSB then Uptrend", "direction": "Long",
+              "after": [ { "type": "MarketStructureBreak", "direction": "Down", "level": 3 } ],
+              "entry": { "type": "Trend", "direction": "Up", "level": 2, "swings": 3, "within": 48 },
+              "takeProfit": { "type": "Percent", "percent": 2 }, "stopLoss": { "type": "Percent", "percent": 2 } } ] }
+            """);
+
+        var s = book.Strategies.Single();
+        Assert.AreEqual((StrategyEntry.MarketStructureBreak, EnumSwingDirection.Down, 3), (s.After[0].Type, s.After[0].Direction, s.After[0].Level));
+        Assert.AreEqual((StrategyEntry.Trend, EnumSwingDirection.Up, 2, 3, 48), (s.Entry.Type, s.Entry.Direction, s.Entry.Level, s.Entry.Swings, s.Entry.Within));
+        Assert.AreEqual(0, s.Validate().Count);
+        s.Entry.Swings = 1;
+        s.After[0].Level = 9;
+        CollectionAssert.AreEqual(new[] { "Step 1: Level must be from 1 to 4.", "Entry: Swings must be at least 2: a Trend is two or more Swings in a row." }, s.Validate());
     }
 
     [TestMethod]

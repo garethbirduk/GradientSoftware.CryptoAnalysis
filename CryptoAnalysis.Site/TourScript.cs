@@ -99,7 +99,7 @@ public static class Tours
     private static readonly string[] Places = ["above", "below", "left", "right"];
     private static readonly string[] Keeps = ["section", "chapter", "always"];
     private static readonly int[] DefaultView = [0, 168];
-    private const int EventSearchLimit = 3000;
+    internal const int EventSearchLimit = 3000;
 
     /// <summary>
     /// The datasets a tour's scenes play on: the markets of the one source of BTC candles (see <see cref="Markets.Btc"/>),
@@ -438,8 +438,18 @@ public static class Tours
     {
         if (time == null || !DateTime.TryParse(time, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var start))
             return 0;
-        var index = dataset.ToList().FindIndex(x => DateTime.SpecifyKind(x.DateTime, DateTimeKind.Utc) >= start);
-        return index < 0 ? dataset.Count - 1 : index;
+        // The candles are in the order of their times.
+        var (low, high) = (0, dataset.Count);
+        while (low < high)
+        {
+            var middle = (low + high) / 2;
+            if (DateTime.SpecifyKind(dataset[middle].DateTime, DateTimeKind.Utc) >= start)
+                high = middle;
+            else
+                low = middle + 1;
+        }
+
+        return low < dataset.Count ? low : dataset.Count - 1;
     }
 
     /// <summary>
@@ -452,7 +462,21 @@ public static class Tours
         var isPoint = Terms.Get(type).Category == TermCategories.StructurePoints;
         var seen = new HashSet<DateTime>();
         var count = 0;
-        for (var t = from + 1; t < prices.Count && t <= from + EventSearchLimit; t++)
+        // With the store of the series, what became known on each candle is looked up (see StructureStores).
+        var store = StructureStores.Of(prices.Count > from + EventSearchLimit + 1 ? prices.GetRange(0, Math.Max(0, from) + EventSearchLimit + 1) : prices);
+        for (var t = from + 1; store != null && t < prices.Count && t <= from + EventSearchLimit; t++)
+        {
+            var last = prices[t].DateTime;
+            var up = type is EnumAnnotationType.BullishBreakOfStructure or EnumAnnotationType.Uptrend ? EnumSwingDirection.Up : EnumSwingDirection.Down;
+            var known = isPoint ? MarketStructure.PointsAt(store, level, t, t).Any(x => x.Type == type && x.Time == last && seen.Add(x.LegStart))
+                : type is EnumAnnotationType.BullishBreakOfStructure or EnumAnnotationType.BearishBreakOfStructure ? store.Swings(t, t, t, level).Any(x => x.Level == level && x.Break == t && x.Direction == up)
+                : type is EnumAnnotationType.Uptrend or EnumAnnotationType.Downtrend ? store.Trends(t, t, t, level).Any(x => x.Level == level && x.Confirmed == t && x.Direction == up)
+                : store.Breaks(t, t, t, level).Any(x => x.Level == level && x.Type == type);
+            if (known && ++count == nth)
+                return t;
+        }
+
+        for (var t = from + 1; store == null && t < prices.Count && t <= from + EventSearchLimit; t++)
         {
             var prefix = prices.GetRange(0, t + 1);
             var last = prefix[^1].DateTime;

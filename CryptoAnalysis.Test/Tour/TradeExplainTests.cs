@@ -97,6 +97,122 @@ public class TradeExplainTests
             "This strategy's entry condition is two Successive Red Candles, then three Successive Green Candles within five candles. A run counts on the candle that makes its count, once a run, so a longer run does not count again.");
     }
 
+    // Candles that close at each price, with no wicks.
+    private static List<Price> Closes(params double[] closes) =>
+        Candles(closes.Select((c, i) => (i == 0 ? c : closes[i - 1], Math.Max(c, i == 0 ? c : closes[i - 1]), Math.Min(c, i == 0 ? c : closes[i - 1]), c)).ToArray());
+
+    private static JsonNode StructureStrategy(string entry, string after = "") => JsonNode.Parse($$"""
+        { "id": "s", "name": "s", "direction": "Long", {{(after.Length > 0 ? $"\"after\": [ {after} ]," : "")}} "entry": {{entry}},
+          "takeProfit": { "type": "Percent", "percent": 90 }, "stopLoss": { "type": "Percent", "percent": 90 } }
+        """)!;
+
+    private static List<string?> Cited(JsonObject section) =>
+        (section["cues"]?.AsArray() ?? []).Select(x => x!["definition"]?.GetValue<string>()).Where(x => x != null).ToList();
+
+    [TestMethod]
+    public void Trade_Entry_OfABreakOfStructure_IsToldByItsSwingsBlocks()
+    {
+        // An Upswing from the high of 12, Confirmed by the close of 13 at #3.
+        var prices = Closes(10, 12, 11, 13, 12, 12.5);
+        var strategy = StructureStrategy("""{ "type": "BreakOfStructure", "direction": "Up", "level": 1 }""");
+
+        var section = Explain.Trade(prices, 3, reached: 0, strategy, ["Entry"], out var problem);
+
+        Assert.IsNotNull(section, problem);
+        // With the Swing's own pins: where it begins, and its BoS.
+        CollectionAssert.AreEqual(new[]
+        {
+            "1st order Upswing, from a high at 12, at 01:00 on Monday 1 January 2024.",
+            "high: 12",
+            "BoS at 13.",
+            "BoS",
+            "That meets the entry condition, so the trade is entered at the close of the candle at 03:00, buying at 13.",
+        }, Texts(section, "summary"));
+        CollectionAssert.AreEqual(new[] { "Trade.entry", "Trade.structure", "Swing.what", "Swing.bos", "Swing.candidate" }, Cited(section));
+        CollectionAssert.Contains(Texts(section, "education"), "This strategy's entry condition is a 1st order Bullish BoS.");
+        Assert.AreEqual(1, section["view"]![0]!.GetValue<int>(), "The view begins where the Swing does.");
+        Assert.AreEqual("""[{"from":0,"at":3}]""", section["structure"]!.ToJsonString(), "The chart draws the structure the step read: that of the candles to the one that met it.");
+        CollectionAssert.IsSubsetOf(new[] { "level1", "sawtooth", "Upswing", "BullishBreakOfStructure" }, section["add"]!.AsArray().Select(x => x!.GetValue<string>()).ToList());
+
+        var tour = Explain.Tour([new Explain.Thing("Trade", null, "Trade")], "test", prices, prices[3].DateTime.ToString("yyyy-MM-ddTHH:mm"), null, out _,
+            strategy: Explain.StrategyOf(strategy, out _));
+        var compiled = Tours.Compile(tour!, prices);
+        Assert.AreEqual(0, compiled.Errors.Count, string.Join("\n", compiled.Errors));
+    }
+
+    [TestMethod]
+    public void Trade_Entry_OfARun_HasNoStructureToDraw()
+    {
+        var section = Explain.Trade(Prices, 4, reached: 0, StrategyJson, ["Entry"], out var problem);
+
+        Assert.IsNotNull(section, problem);
+        Assert.IsNull(section["structure"]);
+        CollectionAssert.AreEquivalent(new[] { "candles", "trade" }, section["add"]!.AsArray().Select(x => x!.GetValue<string>()).ToArray());
+    }
+
+    [TestMethod]
+    public void Trade_Entry_OfAChainOfStructure_TellsEachStepByItsTermsBlocks()
+    {
+        // A Bearish MSB at #4, below the Swing Low of 11; then the Upswing from 13 Confirmed at #6, the second in a row.
+        var prices = Closes(10, 12, 11, 13, 10.5, 12.5, 14, 13.5);
+        var strategy = StructureStrategy("""{ "type": "Trend", "direction": "Up", "level": 1, "swings": 2, "within": 6 }""",
+            """{ "type": "MarketStructureBreak", "direction": "Down", "level": 1 }""");
+
+        var section = Explain.Trade(prices, 6, reached: 0, strategy, ["Entry"], out var problem);
+
+        Assert.IsNotNull(section, problem);
+        var said = Texts(section, "summary");
+        CollectionAssert.IsSubsetOf(new[]
+        {
+            "Swing Low: a low at 11.",
+            "MSB at 10, below the Swing Low of the Upswing before.",
+            "That meets the first step, so the strategy now looks for a 1st order Uptrend of two Upswings within six candles.",
+            "1st order Uptrend, beginning at 01:00 on Monday 1 January 2024.",
+            "Confirmed at the second Upswing's BoS, at 06:00 on Monday 1 January 2024.",
+            "Two Upswings so far.",
+            "That meets the entry condition, so the trade is entered at the close of the candle at 06:00, buying at 14.",
+        }, said, string.Join("\n", said));
+        CollectionAssert.AreEqual(new[] { "Trade.entry", "Trade.chain", "Trade.structure", "Trend.what", "Swing.turn", "Swing.msb", "Swing.against", "Trend.confirmed" }, Cited(section));
+        CollectionAssert.Contains(Texts(section, "education"),
+            "This strategy's entry condition is a 1st order Bearish MSB, then a 1st order Uptrend of two Upswings within six candles. A Trend counts at the BoS that makes its count, once a Trend, so a longer Trend does not count again.");
+    }
+
+    [TestMethod]
+    public void Trade_OfTheRangeTrade_TellsTheRangeItsKillAndItsLines()
+    {
+        // The training's own Range (4-hour candles, November 2021): #72 reaches into the buy-low zone, then two green candles.
+        var prices = new Gradient.CryptoAnalysis.Csv.CsvReaderHelper()
+            .ReadData<Price, global::CryptoAnalysis.Csv.ClassMaps.PriceClassMap>(Path.Combine("TestData", "Terms", "Range", "04-the-training-example.csv")).ToList();
+        var strategy = JsonNode.Parse("""
+            { "id": "t", "name": "t", "direction": "Long",
+              "after": [ { "type": "RangeZone", "zone": "BuyLow", "level": 1, "depth": 25, "retracement": 75, "band": 20, "kill": [ { "type": "RangeEnd" } ] } ],
+              "entry": { "type": "SuccessiveCandles", "colour": "Green", "length": 2 },
+              "takeProfit": { "type": "RangeZone" }, "stopLoss": { "type": "RangeBand" } }
+            """)!;
+
+        var section = Explain.Trade(prices, 74, reached: 0, strategy, null, out var problem);
+
+        Assert.IsNotNull(section, problem);
+        var said = Texts(section, "summary");
+        CollectionAssert.IsSubsetOf(new[]
+        {
+            "Its bands are at 55160 and 60527.",
+            "At 25% of its height, the buy-low zone runs from the lower band up to 56885, and the sell-high zone from 58802 up to the upper band.",
+            "That meets the first step, so the strategy now looks for two Successive Green Candles. A close beyond a band of the Range, below 55160 or above 60527, would end the wait.",
+            "The bottom of the Range's sell-high zone is at 58802.",
+            "The Range's lower band is at 55160.",
+        }, said, string.Join("\n", said));
+        CollectionAssert.IsSubsetOf(new[] { "Trade.chain", "Trade.structure", "Trade.kill", "Range.what", "Range.box", "Range.holds", "Range.ends", "Range.zones" }, Cited(section));
+        CollectionAssert.Contains(Texts(section, "education"),
+            "This strategy's entry condition is a candle that reaches into the buy-low zone of a 1st order Range, then two Successive Green Candles. A run counts on the candle that makes its count, once a run, so a longer run does not count again. After the first step, a close beyond a band of the Range ends the wait.");
+    }
+
+    [TestMethod]
+    public void Definition_OfHowStructureIsRead_NamesTheWindowItIsReadFrom()
+    {
+        StringAssert.Contains(Definitions.Text("Trade.structure"), $"last {Gradient.CryptoAnalysis.Research.KnownStructure.Window} candles");
+    }
+
     [TestMethod]
     public void Trade_Exits_TellAWickLevelThenTheirOwnMeasure()
     {

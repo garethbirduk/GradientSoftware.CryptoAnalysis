@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Market Structure Terms</title>
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<script src="canvas-chart.js"></script>
 <script src="data.js"></script>
 <style>
   :root {
@@ -14,7 +15,7 @@
     --up: #26a69a; --down: #ef5350; --close: #a8a29e; --grid: #eeeceb;
     --upswing: #16a34a; --downswing: #dc2626; --saw: #000000;
     /* Sawtooth levels: level 0 is --saw, then blue, yellow, magenta, sky, violet, pink, brown, slate. No red, green or orange, which would read as the swing fills and candles. Every pair of levels is at least 15 apart (OKLab x100) in both themes. */
-    --lv1: #3b82f6; --lv2: #f0b400; --lv3: #f01fd0; --lv4: #38bdf8; --lv5: #5b21b6; --lv6: #ff8fc7; --lv7: #854d0e; --lv8: #64748b;
+    --lv1: #3b82f6; --lv2: #f0b400; --lv3: #f01fd0; --lv4: #38bdf8; --lv5: #8b5cf6; --lv6: #ff8fc7; --lv7: #854d0e; --lv8: #64748b;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -105,6 +106,11 @@
   .layer:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .layer[aria-pressed="false"] { opacity: .38; }
   .layer[aria-pressed="false"] .name { text-decoration: line-through; }
+  /* A level that is on with nothing of it drawn at the chart's zoom (see showLevelsDrawn). */
+  .layer.unseen[aria-pressed="true"] { opacity: .62; }
+  .layer.unseen[aria-pressed="true"] .name { font-style: italic; }
+  /* The level held in focus on the chart (see Level in focus). */
+  .layer.in-focus { border-color: var(--accent); background: var(--chip); }
   .layer svg { flex: none; }
   .layer.text { color: var(--muted); font-size: 12px; }
   .runmin { width: 3.4em; margin: 0 0 0 4px; padding: 1px 2px; font: inherit; font-size: 12px; color: var(--text);
@@ -396,6 +402,13 @@
   .strat-steps .step-add { align-self: center; width: 24px; height: 24px; padding: 0; border: 1px dashed var(--border); border-radius: 50%; background: none;
     color: var(--muted); font: inherit; font-size: 15px; line-height: 1; cursor: pointer; }
   .strat-steps .step-add:hover { color: var(--accent); border-color: var(--accent); }
+  /* A step's kills sit under its own fields, each with its type and numbers. */
+  .strat-steps .step-kills { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+  .strat-steps .step-kills-head { align-self: center; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .strat-steps .step-kill { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; }
+  .strat-steps .kill-remove, .strat-steps .kill-add { padding: 2px 8px; border: 1px dashed var(--border); border-radius: 5px; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+  .strat-steps .kill-remove { border: 0; font-size: 16px; line-height: 1; padding: 2px 4px; }
+  .strat-steps .kill-remove:hover, .strat-steps .kill-add:hover { color: var(--accent); border-color: var(--accent); }
   .strat-says { margin: 12px 0 0; max-width: 80ch; font-size: 14px; }
   /* A number's sweep, To and Step, sits beside it, smaller, as it is optional. */
   .strat-fields label.strat-vary { margin-left: -6px; }
@@ -685,7 +698,10 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const prose = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const fmtTime = t => String(t).slice(0, 16).replace('T', ' ');
-const fmtPrice = p => p.toLocaleString(undefined, { maximumFractionDigits: 2 });
+// One formatter for every price: a chart writes thousands of them into its hovers at each draw, and making a formatter
+// for each, as toLocaleString does, was most of the time a draw took.
+const priceFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+const fmtPrice = p => priceFormat.format(p);
 const key = a => `${a.type}|${a.direction}|${a.time}|${a.price}`;
 const levelColor = l => css(l === 0 ? '--saw' : `--lv${Math.min(l, 8)}`);
 
@@ -1046,27 +1062,37 @@ const rangeHover = g => `Range · level ${g.level} · out of ${rangeOrigin(g)}<b
 // high up to the upper band.
 function drawRanges(ex, traces) {
   if (!on('Range') && !on('rangeBands') && !on('rangeZones')) return;
-  const term = TERMS.get('Range'), last = ex.prices.t[ex.prices.t.length - 1], zone = setting('rangeZones') / 100;
-  const box = (g, until, a, b) => ({ x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [a, a, b, b, a] });
+  const last = ex.prices.t[ex.prices.t.length - 1];
   for (const g of shownRangeBoxes(ex)) {
-    const until = g.end?.time ?? last, height = g.high.price - g.low.price;
-    if (on('rangeZones')) {
-      const buyTop = g.low.price + height * zone, sellBottom = g.high.price - height * zone;
-      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Buy-low zone', ...box(g, until, g.bandLow, buyTop),
-        line: { width: 0 }, fillcolor: withAlpha(css('--up'), 0.12), hovertemplate: `Buy-low zone · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(buyTop)}: from the lower band to ${setting('rangeZones')}% up the range<extra></extra>` });
-      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Sell-high zone', ...box(g, until, sellBottom, g.bandHigh),
-        line: { width: 0 }, fillcolor: withAlpha(css('--down'), 0.12), hovertemplate: `Sell-high zone · level ${g.level}<br>${fmtPrice(sellBottom)} to ${fmtPrice(g.bandHigh)}: from ${setting('rangeZones')}% down the range to the upper band<extra></extra>` });
-      traces.push({ type: 'scatter', mode: 'lines', name: 'Range zone', x: [g.identified.time, until, null, g.identified.time, until], y: [sellBottom, sellBottom, null, buyTop, buyTop],
-        line: { color: term.color, width: 1, dash: 'dash' }, hoverinfo: 'skip' });
-    }
-    if (on('Range')) {
-      traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: term.name, ...box(g, until, g.high.price, g.low.price),
-        line: { color: term.color, width: 1.5 }, fillcolor: withAlpha(term.color, 0.08), hovertemplate: `${rangeHover(g)}<extra></extra>` });
-    }
-    if (on('rangeBands') || on('rangeZones')) {
-      traces.push({ type: 'scatter', mode: 'lines', name: 'Range band', x: [g.identified.time, until, null, g.identified.time, until], y: [g.bandHigh, g.bandHigh, null, g.bandLow, g.bandLow],
-        line: { color: term.color, width: 1, dash: 'dash' }, hovertemplate: `Range band · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(g.bandHigh)}: a close beyond ends the range<extra></extra>` });
-    }
+    ex.levelsDrawn?.add(g.level);
+    drawRange(traces, g, g.end?.time ?? last, { box: on('Range'), bands: on('rangeBands') || on('rangeZones'), zones: on('rangeZones') ? setting('rangeZones') : null });
+  }
+}
+
+// One Range's box, zones and bands, from the candle that identified it until a time: the parts asked for, the zones as
+// deep as given, as a percentage of the Range's height. The Ranges of a chart and the Range a trade's entry condition
+// held (see drawStrategies) are drawn by it alike.
+function drawRange(into, g, until, { box: boxed, bands, zones, hover = rangeHover(g) }) {
+  // Each of its traces says the Range's sawtooth level (see Level in focus).
+  const traces = { push: t => into.push({ lv: g.level, ...t }) };
+  const term = TERMS.get('Range'), height = g.high.price - g.low.price;
+  const box = (a, b) => ({ x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [a, a, b, b, a] });
+  if (zones != null) {
+    const depth = Math.round(zones * 100) / 100, buyTop = g.low.price + height * zones / 100, sellBottom = g.high.price - height * zones / 100;
+    traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Buy-low zone', ...box(g.bandLow, buyTop),
+      line: { width: 0 }, fillcolor: withAlpha(css('--up'), 0.12), hovertemplate: `Buy-low zone · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(buyTop)}: from the lower band to ${depth}% up the range<extra></extra>` });
+    traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills', name: 'Sell-high zone', ...box(sellBottom, g.bandHigh),
+      line: { width: 0 }, fillcolor: withAlpha(css('--down'), 0.12), hovertemplate: `Sell-high zone · level ${g.level}<br>${fmtPrice(sellBottom)} to ${fmtPrice(g.bandHigh)}: from ${depth}% down the range to the upper band<extra></extra>` });
+    traces.push({ type: 'scatter', mode: 'lines', name: 'Range zone', x: [g.identified.time, until, null, g.identified.time, until], y: [sellBottom, sellBottom, null, buyTop, buyTop],
+      line: { color: term.color, width: 1, dash: 'dash' }, hoverinfo: 'skip' });
+  }
+  if (boxed) {
+    traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: term.name, ...box(g.high.price, g.low.price),
+      line: { color: term.color, width: 1.5 }, fillcolor: withAlpha(term.color, 0.08), hovertemplate: `${hover}<extra></extra>` });
+  }
+  if (bands) {
+    traces.push({ type: 'scatter', mode: 'lines', name: 'Range band', x: [g.identified.time, until, null, g.identified.time, until], y: [g.bandHigh, g.bandHigh, null, g.bandLow, g.bandLow],
+      line: { color: term.color, width: 1, dash: 'dash' }, hovertemplate: `Range band · level ${g.level}<br>${fmtPrice(g.bandLow)} to ${fmtPrice(g.bandHigh)}: a close beyond ends the range<extra></extra>` });
   }
 }
 
@@ -1094,7 +1120,7 @@ function trendRows(ex, direction) {
   const up = direction === 'Up', levels = [...swingLevels(ex)].sort((a, b) => a - b);
   const live = on(up ? 'Uptrend' : 'Downtrend'), ghosts = ex.timeline && on('ghostTrends');
   const rows = levels.map(level => ({ level,
-    trends: live ? (ex.trendsByLevel?.[level] ?? []).filter(t => t.direction === direction) : [],
+    trends: live ? (ex.trendsByLevel?.[level] ?? []).filter(t => t.direction === direction && wideEnough(ex, t.start.time, t.end?.time)) : [],
     ghosts: ghosts ? ex.timeline.trends.filter(e => e.value.level === level && e.value.direction === direction && e.ended === 'Removed' && e.until <= ex.cursor) : [],
   })).filter(row => row.trends.length || row.ghosts.length);
   const height = Math.min(TREND_STRIP * rows.length, TREND_ROOM) / Math.max(1, rows.length), stripe = levels.length > 1 ? height * TREND_STRIPE : 0;
@@ -1104,31 +1130,59 @@ function trendRows(ex, direction) {
   });
 }
 
-function trendShapes(ex) {
+// The strips are drawn as traces against a price axis of their own that runs from the bottom of the chart to the top
+// (see TREND_AXIS), all the segments of one colour as one trace with a gap between each: a shape for each segment is
+// slow in the hundreds, as a long history zoomed out has, each being moved again at every pan and zoom. A segment's
+// strength is rounded to a twentieth, so there are only a few colours. They go in ahead of every other trace, so they
+// lie under them as the shapes did.
+const TREND_AXIS = { overlaying: 'y', range: [0, 1], fixedrange: true, visible: false };
+function drawTrendStrips(ex, traces) {
   const last = ex.prices.t[ex.prices.t.length - 1], gap = css('--panel');
-  return ['Up', 'Down'].flatMap(direction => {
+  const groups = new Map();
+  // A level's strips are traces of its own, so the level can be told from the others (see Level in focus).
+  const add = (x0, x1, a, b, fillcolor, lined, level) => {
+    const key = `${fillcolor}|${lined}|${level}`;
+    if (!groups.has(key)) groups.set(key, { type: 'scatter', mode: lined ? 'lines' : 'none', fill: 'toself', yaxis: 'y2', name: 'Trend', hoverinfo: 'skip', lv: level,
+      x: [], y: [], line: { width: lined ? 1 : 0, color: gap, simplify: false }, fillcolor });
+    const g = groups.get(key);
+    g.x.push(x0, x1, x1, x0, x0, null);
+    g.y.push(a, a, b, b, a, null);
+  };
+  for (const direction of ['Up', 'Down']) {
     const color = TERMS.get(direction === 'Up' ? 'Uptrend' : 'Downtrend').color;
-    return trendRows(ex, direction).flatMap(row => row.trends.flatMap(t => {
+    for (const row of trendRows(ex, direction)) for (const t of row.trends) {
+      ex.levelsDrawn?.add(row.level);
       const parts = t.parts ?? [], end = t.end?.time ?? last;
       const from = parts.length ? parts[parts.length - 1].breakOfStructure.time : t.start.time;
-      const segment = (x0, x1, alpha) => trendStrip(x0, x1, row.edge, row.inner, withAlpha(color, alpha), { width: 1, color: gap });
-      return [...(row.striped ? [trendStrip(t.start.time, end, row.outer, row.edge, levelColor(row.level), { width: 0 })] : []),
-        ...parts.map((p, k) => segment(k ? parts[k - 1].breakOfStructure.time : t.start.time, p.breakOfStructure.time, p.strong ? 0.6 : 0.25)),
-        ...(Date.parse(from) < Date.parse(end) ? [segment(from, end, 0.1)] : [])];
-    }));
-  });
+      const segment = (x0, x1, alpha) => add(x0, x1, row.edge, row.inner, withAlpha(color, Math.round(alpha * 20) / 20), true, row.level);
+      if (row.striped) add(t.start.time, end, row.outer, row.edge, levelColor(row.level), false, row.level);
+      // A Swing's segment too narrow to draw (see wideEnough) is joined to those after it until they are wide enough
+      // together, and the one segment is as strong as the share of them that are, so a long Trend zoomed out is a few
+      // segments and not one for each of its Swings.
+      let begun = t.start.time, strong = 0, joined = 0;
+      parts.forEach((p, k) => {
+        strong += p.strong ? 1 : 0;
+        joined++;
+        if (k < parts.length - 1 && !wideEnough(ex, begun, p.breakOfStructure.time)) return;
+        segment(begun, p.breakOfStructure.time, 0.25 + 0.35 * strong / joined);
+        [begun, strong, joined] = [p.breakOfStructure.time, 0, 0];
+      });
+      if (Date.parse(from) < Date.parse(end)) segment(from, end, 0.1);
+    }
+  }
+  traces.unshift(...groups.values());
 }
 
 // A trend as an arrow in its level's colour, from where its first swing starts to its latest break of structure, with its
 // count of swings and its strength in a box: the share of its swings that are strong. Drawn at every level selected.
 // An arrow from one point to another with a text box along it: how candle runs, trend arrows and the tour's drawn lines
 // are shown. A head at either end is optional, the box sits the given way along, and the hover is on both.
-function arrowLabels(labels, { from, to, color, text = '', hover = '', along = 0.5, heads = { start: false, end: true }, width = 2, opacity = 0.9, size = 10 }) {
-  labels.push({ x: to.time, y: to.price, ax: from.time, ay: from.price, axref: 'x', ayref: 'y', text: '', showarrow: true,
+function arrowLabels(labels, { from, to, color, text = '', hover = '', along = 0.5, heads = { start: false, end: true }, width = 2, opacity = 0.9, size = 10, lv }) {
+  labels.push({ x: to.time, y: to.price, ax: from.time, ay: from.price, axref: 'x', ayref: 'y', text: '', showarrow: true, lv,
     arrowhead: heads.end ? 2 : 0, startarrowhead: heads.start ? 2 : 0, arrowsize: 1.2, startarrowsize: 1.2, arrowwidth: width, arrowcolor: color, hovertext: hover, opacity });
   if (!text) return;
   const t0 = Date.parse(from.time), at = new Date(t0 + (Date.parse(to.time) - t0) * along).toISOString();
-  labels.push({ x: at, y: from.price + (to.price - from.price) * along, text, showarrow: false, hovertext: hover,
+  labels.push({ x: at, y: from.price + (to.price - from.price) * along, text, showarrow: false, hovertext: hover, lv,
     bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: color, borderwidth: 1.5, borderpad: 2, font: { size, color: css('--text') } });
 }
 
@@ -1137,10 +1191,11 @@ function drawTrendArrows(ex, labels) {
   for (const level of swingLevels(ex)) {
     for (const t of ex.trendsByLevel?.[level] ?? []) {
       const tip = t.parts?.[t.parts.length - 1]?.breakOfStructure;
-      if (!tip) continue;
+      if (!tip || !wideEnough(ex, t.start.time, t.end?.time, NARROWEST_LABELLED)) continue;
+      ex.levelsDrawn?.add(level);
       const hover = `${t.direction === 'Up' ? 'Uptrend' : 'Downtrend'} · level ${level}<br>${t.swings} swings, ${t.strong} strong · strength ${t.strength}%<br>${t.marketStructureBreaks} MSB against`;
       // The box sits towards the arrow's head, where a long trend is usually being looked at.
-      arrowLabels(labels, { from: t.start, to: tip, color: levelColor(level), text: `${t.swings} · ${t.strength}%`, hover, along: 0.8, size: 11 });
+      arrowLabels(labels, { from: t.start, to: tip, color: levelColor(level), text: `${t.swings} · ${t.strength}%`, hover, along: 0.8, size: 11, lv: level });
     }
   }
 }
@@ -1201,7 +1256,7 @@ function drawAll(page) {
   layoutMode = mode;
   document.querySelectorAll('.chart').forEach(el => {
     draw(el, viewFor(findExample(el.dataset.id)), focusOf(page));
-    if (resized) Plotly.Plots.resize(el);
+    if (resized) plotterOf(el).Plots.resize(el);
   });
   renderEventLog(activeExample());
   updateReplayControls();
@@ -1307,9 +1362,29 @@ function trendSoFar(tr, time) {
 // While a tour that has a known candle plays, as an analysis does, the structure is the one its texts are written from (as
 // known there), drawn a part at a time: each part once the cursor has reached its candle, so the sawtooth, points and Swings
 // come as the run goes.
+// A section that tells of a strategy's market structure steps shows the structure each was read from: that of a chart of
+// the last candles to the candle that met it (the section's "structure", a { from, at } for each such step), not of the
+// chart from its own first candle. The step the cursor has yet to reach is the one shown; null past the last, or when the
+// section has none.
+function structureWindow(ex, t) {
+  if (!ex.tour || tour?.ex !== ex) return null;
+  return (tourSection()?.structure ?? []).find(w => t <= w.at) ?? null;
+}
+
+// The candles of an example from one of them on, as an example of its own: its replay is anchored there, so its structure
+// is that of a chart that begins there.
+const windowExamples = new Map();
+function windowExample(ex, from) {
+  const id = `${ex.id}@window${from}`;
+  if (!windowExamples.has(id)) windowExamples.set(id, { id, dataset: ex.dataset, anchor: (ex.anchor ?? 0) + from, prices: { t: ex.prices.t.slice(from) } });
+  return windowExamples.get(id);
+}
+
 function liveView(ex, t) {
-  const told = tour?.ex === ex && tour.known != null && t <= tour.known && timelineAt(ex, tour.known) ? tour.known : null;
-  const reveal = told != null, r = timelineAt(ex, told ?? t), holds = holdsAt(told ?? t), time = ex.prices.t[t];
+  // A structure step's chart counts its candles from where it begins: shift on from the example's own.
+  const win = structureWindow(ex, t), src = win ? windowExample(ex, win.from) : ex, shift = win?.from ?? 0;
+  const told = win ? win.at : tour?.ex === ex && tour.known != null && t <= tour.known && timelineAt(ex, tour.known) ? tour.known : null;
+  const reveal = told != null, r = timelineAt(src, (told ?? t) - shift), holds = holdsAt((told ?? t) - shift), time = ex.prices.t[t];
   // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
   const window = ex.tour ? tourWindow(ex, t)
     : isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
@@ -1317,7 +1392,8 @@ function liveView(ex, t) {
   const cut = a => a.slice(ex.tour ? Math.max(0, window.from - TOUR_CONTEXT) : window?.from ?? 0, t + 1);
   const prices = { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) };
   if (!r) {
-    prefetch(ex, t);
+    if (win) fetchBatch(src, win.at - shift).then(batch => batch && redrawExample(ex));
+    else prefetch(ex, t);
     return { ...ex, hindsight: ex, cursor: t, window, loading: true, timeline: null, prices, sawtooth: [], swingsByLevel: [], pointsByLevel: [],
       marketStructureBreaksByLevel: [], trendsByLevel: [], candidatesByLevel: [], retracementsByLevel: [], rangesByLevel: [], candleRuns: [], liveByLevel: null };
   }
@@ -1329,12 +1405,12 @@ function liveView(ex, t) {
   const reached = (list, when) => reveal ? list.filter(v => when(v) <= time) : list;
   const open = v => reveal && v.end && v.end.time > time ? { ...v, end: null } : v;
   const sawtooth = byLevel(r.pivots, v => v.pivot).map(pivots => {
-    if (reveal) pivots = pivots.filter(p => p.index <= t);
+    if (reveal) pivots = pivots.filter(p => p.index + shift <= t);
     if (!pivots.length) return [];
     pivots.sort((a, b) => a.index - b.index);
-    const out = pivots.map(p => ({ kind: p.kind, time: p.time, price: p.price, confirmedTime: p.confirmedIndex != null ? ex.prices.t[p.confirmedIndex] : null }));
+    const out = pivots.map(p => ({ kind: p.kind, time: p.time, price: p.price, confirmedTime: p.confirmedIndex != null ? ex.prices.t[p.confirmedIndex + shift] : null }));
     // The timeline leaves out the current price: it is this candle's close, unless the level already ends here.
-    if (pivots[pivots.length - 1].index < t) out.push({ kind: 'Current', time, price: ex.prices.c[t], confirmedTime: null });
+    if (pivots[pivots.length - 1].index + shift < t) out.push({ kind: 'Current', time, price: ex.prices.c[t], confirmedTime: null });
     return out;
   });
   return {
@@ -1385,15 +1461,25 @@ function drawReplayExtras(ex, traces, level) {
   }
 
   // Protective levels that have not broken yet run on to the cursor, at every level selected.
-  const levels = selectedLevels(ex);
+  // A whole dataset's chart has only the Swings and breaks of the stretch it draws, and of those only what is wide enough
+  // to see, so the last Swing it has may not be the level's last, nor its break among the breaks it has. There a level
+  // is drawn only when the stretch reaches the last candle, and no close since has gone beyond it.
+  const levels = selectedLevels(ex), partial = !!ex.drawn, closes = full.prices.c;
+  const brokenSince = (time, price, dir) => {
+    let lo = 0, hi = full.prices.t.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (full.prices.t[mid] <= time) lo = mid + 1; else hi = mid; }
+    for (let i = lo; i <= t; i++) if (dir === 'Up' ? closes[i] < price : closes[i] > price) return true;
+    return false;
+  };
   for (const [layer, dir, type] of [['msbLevelDown', 'Up', 'BearishMarketStructureBreak'], ['msbLevelUp', 'Down', 'BullishMarketStructureBreak']]) {
-    if (!on(layer)) continue;
+    if (!on(layer) || (partial && ex.drawn.to < full.prices.t.length - 1)) continue;
     for (const l of levels) {
       const latest = (ex.swingsByLevel?.[l] ?? []).filter(w => w.direction === dir)
         .sort((a, b) => a.breakOfStructure.time.localeCompare(b.breakOfStructure.time)).pop();
       if (!latest || (ex.marketStructureBreaksByLevel?.[l] ?? []).some(m => m.reference.time === latest.extreme.time)) continue;
+      if (partial && brokenSince(latest.breakOfStructure.time, latest.extreme.price, dir)) continue;
       referenceLines(traces, 'Protective level', TERMS.get(type).color, 'dot',
-        [{ from: latest.breakOfStructure, to: { time: now }, level: latest.extreme.price, what: `level ${l} ${dir === 'Up' ? 'pullback low' : 'bounce high'} not broken yet` }]);
+        [{ lv: l, from: latest.breakOfStructure, to: { time: now }, level: latest.extreme.price, what: `level ${l} ${dir === 'Up' ? 'pullback low' : 'bounce high'} not broken yet` }]);
     }
   }
 
@@ -1787,14 +1873,17 @@ function withAlpha(hex, a) {
   return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : hex;
 }
 
+// The lines of each sawtooth level (a line's lv) are a trace of their own, so the level can be told from the others
+// (see Level in focus).
 function referenceLines(traces, name, color, dash, refs) {
-  if (!refs.length) return;
-  const x = [], y = [], hover = [];
-  for (const r of refs) {
-    const h = `${name}: ${r.what}<br>${fmtPrice(r.level)} from ${fmtTime(r.from.time)} to ${fmtTime(r.to.time)}<extra></extra>`;
-    x.push(r.from.time, r.to.time, null); y.push(r.level, r.level, null); hover.push(h, h, '');
+  for (const lv of [...new Set(refs.map(r => r.lv))]) {
+    const x = [], y = [], hover = [];
+    for (const r of refs.filter(r => r.lv === lv)) {
+      const h = `${name}: ${r.what}<br>${fmtPrice(r.level)} from ${fmtTime(r.from.time)} to ${fmtTime(r.to.time)}<extra></extra>`;
+      x.push(r.from.time, r.to.time, null); y.push(r.level, r.level, null); hover.push(h, h, '');
+    }
+    traces.push({ type: 'scatter', mode: 'lines', name, lv, x, y, line: { color, width: 1.5, dash }, hovertemplate: hover });
   }
-  traces.push({ type: 'scatter', mode: 'lines', name, x, y, line: { color, width: 1.5, dash }, hovertemplate: hover });
 }
 
 // The selected swing as a bold box with its break level, and its interims (to the example's depth) inside it. Fills say up or
@@ -1865,9 +1954,11 @@ function pointsFor(ex, level) {
 
 const PROVISIONAL_NOTE = '<br>so far: moves if price goes further';
 
+// Each says the leg it ends (from) and where the leg after it ends (next), as a point is where the two meet.
 function pointsAt(ex, level) {
-  return pointsFor(ex, level).filter(p => p.type).map(p => ({ type: p.type, direction: ['HigherHigh', 'HigherLow'].includes(p.type) ? 'Up' : 'Down',
-    level, time: p.time, price: p.price, detail: `<br>level ${level}${p.provisional ? PROVISIONAL_NOTE : ''}` }));
+  const all = pointsFor(ex, level);
+  return all.map((p, i) => ({ p, next: all[i + 1]?.time })).filter(x => x.p.type).map(({ p, next }) => ({ type: p.type, direction: ['HigherHigh', 'HigherLow'].includes(p.type) ? 'Up' : 'Down',
+    level, time: p.time, price: p.price, from: p.legStart, next, detail: `<br>level ${level}${p.provisional ? PROVISIONAL_NOTE : ''}` }));
 }
 
 // Labels at one spot stack away from the candle, each taking the height it needs.
@@ -1909,6 +2000,16 @@ function refitBoxesSoon(el) {
 }
 
 // The sawtooth draws its lines and pivots only: labels belong to the point layers, so the two toggle independently.
+// How many times the width of the view a sawtooth leg may be and still be drawn on a whole dataset's chart. Zoomed in,
+// the legs of the coarser levels are far longer than the view, and each is a line straight across it, over the Swings
+// being looked at, with at most one end in sight; they come back as the chart is zoomed out to them.
+const WIDEST_LEG = 1;
+// Whether a line from one time to another is no wider than that: a BoS level or an MSB level wider than the view is a
+// line across all of it with neither end to be seen, or one end and the rest trailing off, and is left out as a leg is.
+function narrowEnough(ex, start, end) {
+  return !ex.drawn?.span || Date.parse(end) - Date.parse(start) <= ex.drawn.span * WIDEST_LEG;
+}
+
 function drawSawtooth(ex, traces) {
   if (!on('sawtooth')) return;
   const levels = selectedLevels(ex).filter(l => l < (ex.sawtooth?.length ?? 0));
@@ -1918,24 +2019,36 @@ function drawSawtooth(ex, traces) {
   // Coarsest last, so it is drawn in front: a finer level shows only where its path leaves the coarser ones.
   for (const level of [...levels].reverse()) {
     const color = levelColor(level);
-    // Every level is drawn at the same width, with its pivots marked; a pivot shared by several levels shows the coarsest.
+    // Every level is drawn at the same width, as a line alone: a dot at each pivot is busy where the levels are many.
     const width = 2;
     const pivots = ex.sawtooth[level];
     const turns = pivots.filter(p => p.kind !== 'Current');
     const current = pivots.find(p => p.kind === 'Current');
     const points = new Map(pointsFor(ex, level).map(p => [`${p.kind}|${p.time}`, p]));
     const name = p => points.get(`${p.kind}|${p.time}`)?.label ?? (p.kind === 'Start' ? 'start' : p.kind.toLowerCase());
+    // On a whole dataset's chart a leg wider than the view is left out (see WIDEST_LEG), the line broken where it was,
+    // and a high or low is kept when a leg either side of it is drawn. Every other chart draws every leg.
+    const widest = ex.drawn?.span ? ex.drawn.span * WIDEST_LEG : Infinity;
+    const fits = (a, b) => Date.parse(b.time) - Date.parse(a.time) <= widest;
+    const kept = [];
+    turns.forEach((p, i) => {
+      const before = i > 0 && fits(turns[i - 1], p), after = i < turns.length - 1 ? fits(p, turns[i + 1]) : !!current && fits(p, current);
+      if (widest === Infinity || before || after) kept.push(p);
+      if (widest !== Infinity && i < turns.length - 1 && !after && kept.length && kept[kept.length - 1]) kept.push(null);
+    });
+    if (!kept.some(Boolean)) continue;
+    ex.levelsDrawn?.add(level);
 
     // Pivots are turning points, so the hover says when price turned away; the label does not wait for that.
-    traces.push({ type: 'scatter', mode: 'lines+markers', name: `Level ${level}`,
-      x: turns.map(p => p.time), y: turns.map(p => p.price),
-      line: { color, width }, marker: { color, size: 6 },
-      hovertemplate: turns.map(p => `Level ${level} · ${name(p)}<br>${fmtTime(p.time)}<br>${fmtPrice(p.price)}` +
+    traces.push({ type: 'scatter', mode: 'lines', name: `Level ${level}`, lv: level,
+      x: kept.map(p => p?.time ?? null), y: kept.map(p => p?.price ?? null),
+      line: { color, width },
+      hovertemplate: kept.map(p => !p ? '' : `Level ${level} · ${name(p)}<br>${fmtTime(p.time)}<br>${fmtPrice(p.price)}` +
         `<br>${p.confirmedTime ? `turned ${fmtTime(p.confirmedTime)}` : 'price has not turned away yet'}<extra></extra>`) });
 
-    if (current && turns.length) {
+    if (current && turns.length && fits(turns[turns.length - 1], current)) {
       const from = turns[turns.length - 1];
-      traces.push({ type: 'scatter', mode: 'lines', name: `Level ${level} incomplete`,
+      traces.push({ type: 'scatter', mode: 'lines', name: `Level ${level} incomplete`, lv: level,
         x: [from.time, current.time], y: [from.price, current.price], line: { color, width, dash: 'dash' },
         hovertemplate: `Incomplete leg, level ${level}<br>${fmtTime(from.time)} → ${fmtTime(current.time)}<br>now ${fmtPrice(current.price)}<extra></extra>` });
     }
@@ -1943,7 +2056,7 @@ function drawSawtooth(ex, traces) {
     // The incomplete leg's furthest point so far is already a high or low, though not a turning point yet.
     const latest = [...points.values()].filter(p => p.provisional && !turns.some(t => t.time === p.time && t.kind === p.kind));
     if (level === finest && latest.length) {
-      traces.push({ type: 'scatter', mode: 'markers', name: `Level ${level} so far`, x: latest.map(p => p.time), y: latest.map(p => p.price),
+      traces.push({ type: 'scatter', mode: 'markers', name: `Level ${level} so far`, lv: level, x: latest.map(p => p.time), y: latest.map(p => p.price),
         marker: { color, size: 8, symbol: 'circle-open', line: { width: 2, color } },
         hovertemplate: latest.map(p => `Level ${level} · ${p.label}<br>${fmtTime(p.time)}<br>${fmtPrice(p.price)}${PROVISIONAL_NOTE}<extra></extra>`) });
     }
@@ -1978,7 +2091,140 @@ function drawCandleRuns(ex, labels, traces) {
   }
 }
 
+// A whole dataset's chart is given only what is near its view: the candles and structure of the times shown and as much
+// again either side, so a pan has them there already. The chart draws everything it is given, in view or not, so the rest
+// of a long history would slow every move. A move near the edge of what is drawn draws the chart again (see moveView).
+const DRAWN_BESIDE = 1;
+
+// How many pixels wide a Swing or a Trend must be on a whole dataset's chart to be drawn. Zoomed out, most are slivers
+// narrower than this that say nothing and each cost a shape, so they are left out, and come back as the chart is zoomed in
+// on them (see drawnAgainFor). What sits on one candle, a high or low or a break, is not left out.
+const NARROWEST_DRAWN = 3;
+// A Trend's arrow carries its count and strength in a box, which is some forty pixels wide: on a Trend narrower than
+// that the boxes pile up unread, so the arrow is left out too, while the Trend's strip is still drawn.
+const NARROWEST_LABELLED = 40;
+// What sits on one candle marks the end of something with a width: a high or low its leg, a break of structure its
+// Swing, a market structure break the stretch from the high or low it broke, a Trend's mark its Trend, a retracement
+// the move it reads, a range its box. Its marker is drawn when that is this many pixels wide, and its label when it is
+// wide enough for a label (NARROWEST_LABELLED), so zoomed out the marks left are those of what can be seen. A high or low
+// is where two legs meet, and is drawn when either is wide enough: a pullback is short beside the move it pulls back
+// from, and by its own leg alone the higher lows would go while the higher highs between them stayed.
+const NARROWEST_MARKED = 10;
+
+// Whether something that runs from one time to another, or to the end of what is drawn, is so many pixels wide. Only a
+// whole dataset's chart knows the time a pixel spans (see clipToView); every other chart draws all it has.
+function wideEnough(ex, start, end, pixels = NARROWEST_DRAWN) {
+  return !ex.pixel || Date.parse(end ?? ex.prices.t[ex.prices.t.length - 1]) - Date.parse(start) >= ex.pixel * pixels;
+}
+
+// What a whole dataset's chart draws at its view: the candles from and to, the view's own times x0 and x1, and how many
+// pixels the plot is across, which says the time a pixel spans and so the least time a Swing or Trend must run to be drawn.
+function drawnStretch(ex, el) {
+  const whole = (ex.hindsight ?? ex).prices, n = whole.t.length;
+  // The first candle at or after a time.
+  const at = ms => {
+    let lo = 0, hi = n;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (Date.parse(whole.t[mid]) < ms) lo = mid + 1; else hi = mid; }
+    return lo;
+  };
+  const zoom = zooms.get(ex.id)?.x, w = ex.window;
+  const [x0, x1] = zoom ? zoom.map(axisTime) : [Date.parse(whole.t[w?.from ?? 0]), Date.parse(whole.t[w?.to ?? n - 1])], beside = (x1 - x0) * DRAWN_BESIDE;
+  return { from: Math.max(0, at(x0 - beside) - 1), to: Math.min(n - 1, at(x1 + beside)), x0, x1,
+    across: el?._fullLayout?._size?.w ?? Math.max(100, (el?.clientWidth ?? 1000) - 80) };
+}
+
+// Whether any edge of a box can be seen on a whole dataset's chart: its start or end among the times drawn, or its top
+// or bottom among the prices of the candles drawn, which the price axis fits, and of a price range set by hand. Zoomed
+// in far enough, the chart lies wholly inside a Swing many times its size, and all there is of the Swing to draw is a
+// tint over everything; it is left out, and comes back as the chart is zoomed out to an edge of it. Its top and bottom
+// are prices that matter, its high and its pullback low, so one of those in view keeps it. Every other chart draws all
+// it has.
+function edgeInSight(ex, start, end, bottom, top) {
+  const s = ex.sight;
+  return !s || start >= s.a || end <= s.b || (top >= s.low && top <= s.high) || (bottom >= s.low && bottom <= s.high);
+}
+
+function clipToView(ex, el) {
+  const whole = (ex.hindsight ?? ex).prices, n = whole.t.length;
+  if (!ex.complete || n < 2) return ex;
+  const { from, to, x0, x1, across } = drawnStretch(ex, el);
+  const a = whole.t[from], b = whole.t[to], last = whole.t[n - 1];
+  // The prices in sight: those of the candles drawn with the room the price axis leaves around them (see fitPrices).
+  let low = Infinity, high = -Infinity;
+  for (let i = from; i <= to; i++) { if (whole.l[i] < low) low = whole.l[i]; if (whole.h[i] > high) high = whole.h[i]; }
+  const room = (high - low) * 0.06, byHand = zooms.get(ex.id)?.y;
+  const sight = { a, b, low: Math.min(low - room, byHand?.[0] ?? Infinity), high: Math.max(high + room, byHand?.[1] ?? -Infinity) };
+  const within = t => t >= a && t <= b, overlaps = (start, end) => start <= b && end >= a;
+  const cut = list => list.slice(from, to + 1), each = (lists, keep) => (lists ?? []).map(list => list.filter(keep));
+  // A line keeps the point either side of what is drawn, so it runs on to the edges.
+  const line = points => {
+    const first = points.findIndex(p => p.time >= a), end = points.findLastIndex(p => p.time <= b);
+    return first < 0 || end < 0 ? points.slice(Math.max(0, end), end + 2) : points.slice(Math.max(0, first - 1), end + 2);
+  };
+  return { ...ex, drawn: { from, to, span: x1 - x0 }, pixel: (x1 - x0) / across, sight, levelsDrawn: new Set(),
+    prices: { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) },
+    sawtooth: (ex.sawtooth ?? []).map(line),
+    swingsByLevel: each(ex.swingsByLevel, s => overlaps(s.start.time, s.end.time)),
+    pointsByLevel: each(ex.pointsByLevel, p => within(p.time)),
+    marketStructureBreaksByLevel: each(ex.marketStructureBreaksByLevel, m => overlaps(m.reference.time, m.break.time)),
+    trendsByLevel: each(ex.trendsByLevel, t => overlaps(t.start.time, t.end?.time ?? last)),
+    retracementsByLevel: each(ex.retracementsByLevel, r => overlaps(r.from.time, r.steps[r.steps.length - 1]?.point.time ?? r.to.time)),
+    rangesByLevel: each(ex.rangesByLevel, g => overlaps(g.identified.time, g.end?.time ?? last)),
+    candleRuns: (ex.candleRuns ?? []).filter(r => overlaps(r.start.time, r.end.time)) };
+}
+
+// Whether a chart that draws only what is near its view (see clipToView) is to be drawn again for a view: one that comes
+// within a quarter of its width of the edge of what is drawn, short of the dataset's own ends, or one so much narrower
+// than what is drawn that most of it is out of sight; or one half as wide again, or as narrow, as the view it was drawn
+// for, as which Swings and Trends are wide enough to draw has then changed (see NARROWEST_DRAWN).
+const DRAWN_AGAIN_AT = 1.5;
+function drawnAgainFor(view, x) {
+  if (!view.drawn) return false;
+  const [x0, x1] = x.map(axisTime), width = x1 - x0, d = view.drawn;
+  if (d.span && (width > d.span * DRAWN_AGAIN_AT || width < d.span / DRAWN_AGAIN_AT)) return true;
+  return (!d.first && x0 < d.from + width / 4) || (!d.last && x1 > d.to - width / 4) || d.to - d.from > width * (2 * DRAWN_BESIDE + 1) * 2;
+}
+
+// What draws a chart. The Chart and Replay pages, whose charts hold the most and are moved about the most, are drawn on
+// a canvas (see canvas-chart.js), which paints only what is in view at each move; Plotly, which every other chart is
+// drawn by, moves everything it was given, in view or not. The Chart page's setting chooses Plotly for these too. An
+// element keeps what first drew it.
+// ---- Level in focus --------------------------------------------------------------------------------------------------
+// On a chart drawn on a canvas, one sawtooth level can be put in focus: everything of the other levels is drawn faint,
+// their labels left out, and the level's own drawn over them, so it can be read among the rest without turning them
+// off. The level one coarser, whose Swings the level's are the interims of, stays half as strong. Candles and candle
+// runs belong to no level and stay as they are.
+// A click on something of a level, its line, a box's edge, a marker or a label, holds that level in focus, and a click
+// on something of it again, or Esc, lets it go; a click anywhere else is the candle card's, as before. Pointing at a
+// level in the Levels filter shows it in focus for as long as the pointer is there.
+const levelFocus = { held: null, pointed: null };
+const levelInFocus = () => levelFocus.pointed ?? levelFocus.held;
+function showFocus() {
+  document.querySelectorAll('.chart').forEach(el => { if (el._canvasChart) CanvasChart.focus(el, levelInFocus()); });
+  document.querySelectorAll('.layer[data-layer^="level"]').forEach(b => b.classList.toggle('in-focus', Number(b.dataset.layer.slice('level'.length)) === levelFocus.held));
+}
+// A click on a chart, where it is on something of a level: holds the level in focus, or lets it go, and says it did.
+function focusClick(chart, e) {
+  const level = chart._canvasChart ? CanvasChart.levelAt(chart, e.clientX, e.clientY) : null;
+  if (level == null) return false;
+  levelFocus.held = levelFocus.held === level ? null : level;
+  showFocus();
+  return true;
+}
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && levelFocus.held != null) { levelFocus.held = null; showFocus(); } });
+document.addEventListener('mouseover', e => {
+  const b = e.target.closest?.('.layer[data-layer^="level"]'), level = b && on(b.dataset.layer) ? Number(b.dataset.layer.slice('level'.length)) : null;
+  if (level === levelFocus.pointed) return;
+  levelFocus.pointed = level;
+  showFocus();
+});
+
+const usesCanvas = () => state.plotter !== 'plotly' && (currentPage === 'Chart' || currentPage === 'Replay') && !!window.CanvasChart;
+const plotterFor = el => el._plotter ??= usesCanvas() ? CanvasChart : Plotly;
+const plotterOf = el => el._plotter ?? Plotly;
+
 function draw(el, ex, focus) {
+  ex = clipToView(ex, el);
   const p = ex.prices;
   const text = css('--text'), muted = css('--muted'), grid = css('--grid');
   const traces = [];
@@ -1988,7 +2234,8 @@ function draw(el, ex, focus) {
     const [startName, extremeName] = w.direction === 'Up' ? ['high', 'pullback low'] : ['low', 'bounce high'];
     const n = interimsOf(ex, w).length;
     return {
-      type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: s.name,
+      // On a canvas the box is left out while none of its edges is in view (see canvas-chart.js), asked at every move.
+      type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: s.name, lv: w.level, needsEdge: !!ex.complete,
       x: [w.start.time, w.end.time, w.end.time, w.start.time, w.start.time], y: [top, top, bottom, bottom, top],
       // The fill says up or down; the border is the swing's sawtooth level colour.
       line: { color: levelColor(w.level), width: interim ? 1.25 : 1.75 }, fillcolor: withAlpha(color, interim ? 0.06 / interim : 0.1),
@@ -2001,7 +2248,11 @@ function draw(el, ex, focus) {
   // border shows where a finer one shares its edges.
   const levelsShown = [...swingLevels(ex)].sort((a, b) => a - b);
   for (const [depth, level] of [...levelsShown.entries()].reverse())
-    for (const w of (ex.swingsByLevel?.[level] ?? []).filter(w => w.confirmed && on(SWINGS[w.direction].layer))) traces.push(swingBox(w, depth || false));
+    for (const w of (ex.swingsByLevel?.[level] ?? []).filter(w => w.confirmed && on(SWINGS[w.direction].layer) && wideEnough(ex, w.start.time, w.end.time)
+        && edgeInSight(ex, w.start.time, w.end.time, Math.min(w.start.price, w.extreme.price), Math.max(w.start.price, w.extreme.price)))) {
+      ex.levelsDrawn?.add(level);
+      traces.push(swingBox(w, depth || false));
+    }
   const allSwings = shownSwings(ex);
 
   // A whole dataset can be zoomed out to all of its history. With more candles across the chart than can be told apart,
@@ -2024,15 +2275,15 @@ function draw(el, ex, focus) {
   for (const [dir, type] of [['Up', 'BullishBreakOfStructure'], ['Down', 'BearishBreakOfStructure']]) {
     if (!on(`bosLevel${dir}`)) continue;
     referenceLines(traces, 'BoS level', TERMS.get(type).color, 'dash',
-      allSwings.filter(w => w.direction === dir && w.breakOfStructure)
-        .map(w => ({ from: w.start, to: w.breakOfStructure, level: w.start.price, what: `level ${w.level} ${dir === 'Up' ? 'high' : 'low'} broken` })));
+      allSwings.filter(w => w.direction === dir && w.breakOfStructure && wideEnough(ex, w.start.time, w.end.time) && narrowEnough(ex, w.start.time, w.breakOfStructure.time))
+        .map(w => (ex.levelsDrawn?.add(w.level), { lv: w.level, from: w.start, to: w.breakOfStructure, level: w.start.price, what: `level ${w.level} ${dir === 'Up' ? 'high' : 'low'} broken` })));
   }
 
   for (const [layer, type] of [['msbLevelUp', 'BullishMarketStructureBreak'], ['msbLevelDown', 'BearishMarketStructureBreak']]) {
     if (!on(layer)) continue;
     referenceLines(traces, 'MSB level', TERMS.get(type).color, 'dot',
-      shownMarketStructureBreaks(ex).filter(m => m.type === type)
-        .map(m => ({ from: m.reference, to: m.break, level: m.reference.price, what: `level ${m.level} protective ${type.startsWith('Bullish') ? 'bounce high' : 'pullback low'} broken` })));
+      shownMarketStructureBreaks(ex).filter(m => m.type === type && wideEnough(ex, m.reference.time, m.break.time) && narrowEnough(ex, m.reference.time, m.break.time))
+        .map(m => (ex.levelsDrawn?.add(m.level), { lv: m.level, from: m.reference, to: m.break, level: m.reference.price, what: `level ${m.level} protective ${type.startsWith('Bullish') ? 'bounce high' : 'pullback low'} broken` })));
   }
 
   const labels = [], boxes = [];
@@ -2050,20 +2301,36 @@ function draw(el, ex, focus) {
   // Points are shown for every level selected that exists. A point that is the same at several levels shows once, as the
   // coarsest; where a pivot is a different point at different levels, each level's shows.
   const pointLevels = selectedLevels(ex).filter(l => l < (ex.pointsByLevel?.length ?? 0)).sort((a, b) => a - b);
+  // The point shown keeps every level it is that point at (levels), so it counts for each when one is in focus.
   const pointsOf = type => {
-    const seen = new Set();
-    return pointLevels.flatMap(l => pointsAt(ex, l).filter(a => a.type === type && !seen.has(a.time) && seen.add(a.time)));
+    const seen = new Map(), shown = [];
+    for (const l of pointLevels) for (const a of pointsAt(ex, l)) {
+      if (a.type !== type) continue;
+      const had = seen.get(a.time);
+      if (had) { had.levels.push(l); continue; }
+      a.levels = [l];
+      seen.set(a.time, a);
+      shown.push(a);
+    }
+    return shown;
   };
-  const markers = markerTypes.map(type => ({ type, term: TERMS.get(type), items: POINT_LAYERS.includes(type) ? pointsOf(type)
-      : BOS_DIRECTION[type] ? allSwings.filter(w => w.direction === BOS_DIRECTION[type]).map(w => ({ type, direction: w.direction, time: w.breakOfStructure.time, price: w.breakOfStructure.price, detail: `<br>level ${w.level}` }))
-      : TREND_DIRECTION[type] ? trendsFor(ex).filter(t => t.direction === TREND_DIRECTION[type]).map(t => ({ type, time: t.confirmed.time, price: t.confirmed.price,
+  // Each item says what it marks the end of, from and until, for its marker and label to be left out when that is too
+  // narrow to see (see NARROWEST_MARKED); until is its own candle when not given.
+  const lastDrawn = p.t[p.t.length - 1];
+  const wide = (a, pixels) => a.from == null || wideEnough(ex, a.from, a.until ?? a.time, pixels) || (a.next != null && wideEnough(ex, a.time, a.next, pixels));
+  const marked = a => wide(a, NARROWEST_MARKED), labelled = a => wide(a, NARROWEST_LABELLED);
+  const markers = markerTypes.map(type => ({ type, term: TERMS.get(type), items: (POINT_LAYERS.includes(type) ? pointsOf(type)
+      : BOS_DIRECTION[type] ? allSwings.filter(w => w.direction === BOS_DIRECTION[type]).map(w => ({ type, direction: w.direction, time: w.breakOfStructure.time, price: w.breakOfStructure.price, from: w.start.time, of: w.level, detail: `<br>level ${w.level}` }))
+      : TREND_DIRECTION[type] ? trendsFor(ex).filter(t => t.direction === TREND_DIRECTION[type]).map(t => ({ type, time: t.confirmed.time, price: t.confirmed.price, from: t.start.time, until: t.end?.time ?? lastDrawn, of: level,
           detail: `<br>from ${fmtTime(t.start.time)} · ${t.end ? `ended ${fmtTime(t.end.time)}` : 'ongoing'}<br>${t.swings} swings · strength ${t.strength}% · ${t.marketStructureBreaks} MSB against` }))
       // A retracement is marked where it first read the setting, labelled with that reading; the hover has the deepest.
-      : type === 'Retracement' ? shownRetracements(ex).map(r => ({ type, level: r.level, time: r.reached.point.time, price: r.reached.point.price, label: `${r.reached.percent}%`,
+      : type === 'Retracement' ? shownRetracements(ex).map(r => ({ type, level: r.level, time: r.reached.point.time, price: r.reached.point.price, from: r.from.time, label: `${r.reached.percent}%`,
           detail: `<br>level ${r.level} · ${r.direction === 'Down' ? 'bounce' : 'pullback'} from ${fmtPrice(r.to.price)} back towards ${fmtPrice(r.from.price)}` +
             `<br>deepest ${r.deepest.percent}% at ${fmtTime(r.deepest.point.time)}${r.confirmed ? '' : ' so far'}` }))
-      : type === 'Range' ? shownRangeBoxes(ex).map(g => ({ type, level: g.level, time: g.identified.time, price: g.identified.price, detail: `<br>${rangeHover(g).split('<br>').slice(1).join('<br>')}` }))
-      : shownMarketStructureBreaks(ex).filter(m => m.type === type).map(m => ({ type, level: m.level, time: m.break.time, price: m.break.price, detail: `<br>level ${m.level}` })) }));
+      : type === 'Range' ? shownRangeBoxes(ex).map(g => ({ type, level: g.level, time: g.identified.time, price: g.identified.price, from: g.from.time, until: g.end?.time ?? lastDrawn, detail: `<br>${rangeHover(g).split('<br>').slice(1).join('<br>')}` }))
+      : shownMarketStructureBreaks(ex).filter(m => m.type === type).map(m => ({ type, level: m.level, time: m.break.time, price: m.break.price, from: m.reference.time, detail: `<br>level ${m.level}` }))).filter(marked) }));
+  // Each marker's level, its own or that of the Swing or Trend it marks (of), is one with something drawn (see showLevelsDrawn).
+  for (const m of markers) for (const a of m.items) ex.levelsDrawn?.add(a.level ?? a.of);
   const isPointType = type => POINT_LAYERS.includes(type), severalLevels = selectedLevels(ex).length > 1;
   const bulkLabels =markers.filter(m => !isPointType(m.type)).reduce((n, m) => n + m.items.length, 0) > ANNOTATION_LIMIT;
   // Point labels sit in a box of their level's colour, stacked with the coarsest level nearest the candle. The marker is
@@ -2071,26 +2338,31 @@ function draw(el, ex, focus) {
   const points = markers.filter(m => m.term && isPointType(m.type)).flatMap(m => m.items.map(a => ({ a, m }))).sort((p, q) => p.a.level - q.a.level);
   for (const { a, m } of points) {
     const isFocus = m.type === focus;
-    boxes.push(levelBox(stacks, a, m.term.position === 'Below', a.level, m.term.label, { size: isFocus ? 12 : 11, color: isFocus ? text : muted }));
+    if (labelled(a)) {
+      const box = levelBox(stacks, a, m.term.position === 'Below', a.level, m.term.label, { size: isFocus ? 12 : 11, color: isFocus ? text : muted });
+      box.label.lv = a.levels;
+      boxes.push(box);
+    }
   }
   for (const { type, term, items } of markers) {
     if (!term || !items.length) continue;
     const isFocus = type === focus, below = term.position === 'Below', isPoint = isPointType(type), asText = bulkLabels && !isPoint;
     traces.push({
       type: 'scatter', mode: asText ? 'markers+text' : 'markers', name: term.label, x: items.map(a => a.time), y: items.map(a => a.price),
+      lv: items.map(a => a.levels ?? a.level ?? a.of),
       marker: term.symbol.endsWith('-open')
         ? { color: term.color, symbol: term.symbol, size: isFocus ? 20 : 17, line: { width: 2, color: term.color } }
         : { color: term.color, symbol: term.symbol, size: isFocus ? 13 : 10,
             line: isPoint ? { width: 1.5, color: items.map(a => levelColor(a.level)) } : { width: 1, color: css('--panel') } },
       opacity: isFocus ? 1 : 0.85,
-      ...(asText ? { text: items.map(a => a.label ?? term.label), textposition: below ? 'bottom center' : 'top center', textfont: { size: 10, color: muted } } : {}),
+      ...(asText ? { text: items.map(a => labelled(a) ? a.label ?? term.label : ''), textposition: below ? 'bottom center' : 'top center', textfont: { size: 10, color: muted } } : {}),
       hovertemplate: items.map(a => `${term.name}${TREND_DIRECTION[type] ? ' confirmed' : ''}<br>${fmtTime(a.time)}<br>${fmtPrice(a.price)}${a.detail ?? ''}<extra></extra>`),
     });
     if (bulkLabels || isPoint) continue;
-    for (const a of items) {
+    for (const a of items.filter(labelled)) {
       // With several levels shown, a market structure break's label is in a box of its level's colour, as a point's is.
       const boxed = severalLevels && a.level != null;
-      labels.push({ x: a.time, y: a.price, text: a.label ?? term.label, showarrow: false,
+      labels.push({ x: a.time, y: a.price, text: a.label ?? term.label, showarrow: false, lv: a.level ?? a.of,
         yshift: stackShift(stacks, a.time, below, boxed ? BOX_HEIGHT : undefined), font: { size: isFocus ? 12 : 11, color: isFocus ? text : muted },
         ...(boxed ? { bgcolor: withAlpha(css('--panel'), 0.85), bordercolor: levelColor(a.level), borderwidth: 1.5, borderpad: 1 } : {}) });
     }
@@ -2118,7 +2390,8 @@ function draw(el, ex, focus) {
     }
   }
 
-  const shapes = [...trendShapes(ex), ...highlight(ex, traces, labels)];
+  const shapes = highlight(ex, traces, labels);
+  drawTrendStrips(ex, traces);
   if (ex.hindsight) shapes.push(...drawReplayExtras(ex, traces, level));
   for (const pin of ex.pins ?? []) labels.push(pinLabel(pin));
 
@@ -2137,9 +2410,16 @@ function draw(el, ex, focus) {
   const view = { t: times, h: span(full.h), l: span(full.l), candle, all, asCloses, candleMs, opensOn, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
     from: w?.from ?? 0, numbered: !!ex.tour, floor: ex.tour ? 0.01 : 0,
     until: ex.tour && !on('future') ? Date.parse(full.t[ex.cursor]) : undefined, now: ex.tour ? [full.l[ex.cursor], full.h[ex.cursor]] : null,
-    pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46) };
-  // The price axis fits everything drawn in view, not the candles alone.
-  view.series = seriesOf(traces, shapes);
+    pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46),
+    // The times of what is drawn, when that is not the whole dataset, and whether it reaches the dataset's first and last candle.
+    drawn: ex.drawn ? { from: Date.parse(full.t[ex.drawn.from]), to: Date.parse(full.t[ex.drawn.to]), first: ex.drawn.from === 0, last: ex.drawn.to === full.t.length - 1, span: ex.drawn.span } : null };
+  // The price axis fits everything drawn in view, not the candles alone. A whole dataset's chart fits its candles alone,
+  // drawn or not: zoomed in there, the view is often inside the box of a Swing many times its size, which would hold the
+  // price axis to the box's height however far in the view went.
+  // They are the candles it draws, wherever its view has been taken, not those it opens on alone: a view panned away
+  // from those would have no prices to fit, and be taken for one left without candles (see zoomedRanges).
+  const drawn = a => ex.drawn ? a.slice(ex.drawn.from, ex.drawn.to + 1) : span(a);
+  view.series = ex.complete ? [{ x: drawn(full.t).map(Date.parse), low: drawn(full.l), high: drawn(full.h) }] : seriesOf(traces, shapes);
   view.y = fitPrices(view, view.x);
   views.set(ex.id, view);
   const { x: xRange, y: yRange, manual } = shownRanges(zoomedRanges(ex, view), view);
@@ -2148,17 +2428,31 @@ function draw(el, ex, focus) {
   const shown = shownBoxes(boxes, xRange);
   boxSets.set(ex.id, { boxes, shown: boxKey(shown) });
 
-  Plotly.react(el, traces, {
+  plotterFor(el).react(el, traces, {
     uirevision: ex.id,
     margin: { t: 10, r: 56, b: 36, l: 10 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
     font: { color: muted, family: 'system-ui, sans-serif', size: 12 },
     dragmode: 'pan',
     xaxis: { type: 'date', rangeslider: { visible: false }, gridcolor: grid, linecolor: grid, range: xRange },
     yaxis: { type: 'linear', gridcolor: grid, linecolor: grid, tickformat: ',.0f', side: 'right', range: yRange, fixedrange: !manual },
+    yaxis2: TREND_AXIS, focusLevel: levelInFocus(),
     annotations: [...shown, ...labels], shapes, hovermode: 'closest', showlegend: false,
   }, { responsive: true, displaylogo: false, doubleClick: false, modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d', 'resetScale2d'],
     modeBarButtonsToAdd: [{ name: 'Reset view', icon: Plotly.Icons.home, click: gd => moveView(gd, null) }] });
   wireZoom(el);
+  showLevelsDrawn(ex);
+}
+
+// On a whole dataset's chart, what is too narrow to see at its zoom is left out, and so is what is too wide (see
+// wideEnough and edgeInSight), so a level that is on can have nothing drawn: its button in the Levels filter is then
+// dimmed, less than one that is off, until a zoom brings something of it back. Every other chart draws all it has.
+function showLevelsDrawn(ex) {
+  document.querySelectorAll('.layer[data-layer^="level"]').forEach(b => {
+    const level = Number(b.dataset.layer.slice('level'.length));
+    const unseen = !!ex.levelsDrawn && !ex.loading && on(b.dataset.layer) && !ex.levelsDrawn.has(level);
+    b.classList.toggle('unseen', unseen);
+    b.title = unseen ? `Level ${level}: nothing at this level is drawn at this zoom` : `${level}`;
+  });
 }
 
 // Charts navigate like a trading chart: dragging pans, the wheel zooms time around the pointer, and the price axis fits the
@@ -2262,7 +2556,9 @@ function moveView(el, zoom, { gliding = false } = {}) {
   const id = el.dataset.id, view = views.get(id);
   // Any other move stops a glide (see glideView).
   if (!gliding) glides.delete(id);
-  if (zoom?.x && view && !fitPrices(view, zoom.x)) zoom = { ...zoom, x: zooms.get(id)?.x };
+  // A chart that draws only what is near its view has candles wherever its dataset does, drawn or not yet.
+  const none = x => view.drawn && view.all ? axisTime(x[1]) < axisTime(view.all[0]) || axisTime(x[0]) > axisTime(view.all[1]) : !fitPrices(view, x);
+  if (zoom?.x && view && none(zoom.x)) zoom = { ...zoom, x: zooms.get(id)?.x };
   if (zoom?.x || zoom?.y) zooms.set(id, zoom); else zooms.delete(id);
   if (viewsToMove.has(el)) return;
   viewsToMove.add(el);
@@ -2273,9 +2569,11 @@ function moveView(el, zoom, { gliding = false } = {}) {
     // A zoom across the point where candles become closes, or back, draws the chart again in the other.
     const ex = view.all ? findExample(id) : null;
     if (ex && widerThanCandles(id, view.candleMs, view.opensOn) !== view.asCloses) return redrawExample(ex);
+    // A move towards the edge of what is drawn draws the chart again around where it now is.
+    if (ex && drawnAgainFor(view, zooms.get(id)?.x ?? view.x)) return redrawExample(ex);
     const { x, y, manual } = shownRanges(zooms.get(id), view);
     movingViews++;
-    try { await Plotly.relayout(el, { 'xaxis.range': x, 'yaxis.range': y, 'yaxis.fixedrange': !manual }); }
+    try { await plotterOf(el).relayout(el, { 'xaxis.range': x, 'yaxis.range': y, 'yaxis.fixedrange': !manual }); }
     finally { movingViews--; }
     refitBoxesSoon(el);
   });
@@ -2508,7 +2806,7 @@ async function renderReplayPage() {
 }
 
 // ---- Chart -----------------------------------------------------------------------------------------------------------
-// The home page: a whole dataset as if it were complete, its structure worked out once from every candle (api/complete), with
+// The home page: a whole dataset as if it were complete, its structure as known at its last candle (api/complete), with
 // the filters choosing what is drawn. It opens on the chosen span of the latest candles; drag or zoom for the rest.
 const chartDatasets = [];
 const CHART_SPANS = [...REPLAY_WINDOWS, { label: 'All', candles: 0 }];
@@ -2516,21 +2814,41 @@ const chartSpan = () => CHART_SPANS.find(w => w.candles === state.chartSpan)?.ca
 // How far on from a clicked candle the Chart's Analyse sees it (see the candle card).
 const CHART_SEEN = 168;
 
-// The structure at the dataset's last candle, fetched once for each range setting, shaped as a replay at that candle is.
+// How much more than the chart draws is fetched either side, as a share of what it draws, so a pan has it there already;
+// and how much narrower than the narrowest thing drawn is fetched, so a zoom in has it there already (see DRAWN_AGAIN_AT).
+const FETCHED_BESIDE = 0.5, FETCHED_NARROWER = 1.5;
+
+// The structure at the dataset's last candle, shaped as a replay at that candle is. A whole history's is far more than a
+// chart shows, so only what the chart draws at its view is fetched (see clipToView): the candles it draws and some
+// either side, leaving out what is too narrow to draw at its zoom (see NARROWEST_DRAWN). A view that goes beyond what was
+// fetched, or zooms in past what it left out, fetches again around where it now is, the chart drawing what it has until
+// that comes; and so does another range setting.
 function completeView(ex) {
   const last = ex.prices.t.length - 1, query = rangeQuery();
+  const window = { from: chartSpan() ? Math.max(0, last - chartSpan()) : 0, to: last };
+  const el = [...document.querySelectorAll('.chart')].find(e => e.dataset.id === ex.id);
+  const need = drawnStretch({ ...ex, window }, el), candle = last > 0 ? Date.parse(ex.prices.t[1]) - Date.parse(ex.prices.t[0]) : 3600000;
+  const narrowest = Math.floor((need.x1 - need.x0) / need.across * NARROWEST_DRAWN / candle);
   if (ex.completeQuery !== query) {
     ex.completeQuery = query;
-    ex.replay = null;
-    fetch(`api/complete?dataset=${encodeURIComponent(ex.dataset)}${query}`).then(r => r.ok ? r.json() : Promise.reject(new Error(r.statusText))).then(batch => {
-      if (ex.completeQuery !== query) return;
-      batch.timeline.retracements ??= [];
-      batch.timeline.ranges ??= [];
-      ex.replay = batch.timeline;
-      if (currentPage === 'Chart') redrawExample(ex);
-    }).catch(() => { });
+    ex.replay = ex.fetched = ex.fetching = null;
   }
-  const window = { from: chartSpan() ? Math.max(0, last - chartSpan()) : 0, to: last };
+  const has = ex.fetched;
+  if (!ex.fetching && !(has && has.from <= need.from && has.to >= need.to && has.narrowest <= narrowest)) {
+    const beside = Math.ceil((need.to - need.from) * FETCHED_BESIDE);
+    const asked = ex.fetching = { query, from: Math.max(0, need.from - beside), to: Math.min(last, need.to + beside), narrowest: Math.floor(narrowest / FETCHED_NARROWER) };
+    fetch(`api/complete?dataset=${encodeURIComponent(ex.dataset)}&from=${asked.from}&to=${asked.to}&narrowest=${asked.narrowest}${query}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(r.statusText))).then(batch => {
+        if (ex.fetching !== asked) return;
+        ex.fetching = null;
+        batch.timeline.retracements ??= [];
+        batch.timeline.ranges ??= [];
+        ex.replay = batch.timeline;
+        // A server from before stretches sends everything.
+        ex.fetched = batch.stretch ? asked : { ...asked, from: 0, to: last, narrowest: 0 };
+        if (currentPage === 'Chart') redrawExample(ex);
+      }).catch(() => { if (ex.fetching === asked) ex.fetching = null; });
+  }
   if (!ex.replay)
     return { ...ex, hindsight: ex, cursor: last, window, loading: true, timeline: null, sawtooth: [], swingsByLevel: [], pointsByLevel: [],
       marketStructureBreaksByLevel: [], trendsByLevel: [], candidatesByLevel: [], retracementsByLevel: [], rangesByLevel: [], candleRuns: [], liveByLevel: null };
@@ -2564,12 +2882,15 @@ async function renderChartPage() {
   show(`<div class="replay-setup">
       <label>Dataset<select data-dataset>${list.map(d => `<option value="${esc(d.id)}" ${d.id === info.id ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></label>
       <label>Opens on<select data-span>${CHART_SPANS.map(w => `<option value="${w.candles}" ${w.candles === chartSpan() ? 'selected' : ''}>${w.candles ? `the last ${w.label}` : 'every candle'}</option>`).join('')}</select></label>
+      <label>Drawn by<select data-plotter><option value="canvas" ${state.plotter !== 'plotly' ? 'selected' : ''}>Canvas</option><option value="plotly" ${state.plotter === 'plotly' ? 'selected' : ''}>Plotly</option></select></label>
     </div>
     <article class="example replay-big" id="ex-${esc(ex.id)}">
       <header><h3>${esc(info.name)}</h3><span class="id">${info.candles.toLocaleString()} candles · ${esc(fmtTime(info.first))} to ${esc(fmtTime(info.last))} UTC · as known at the last candle</span></header>
       ${chartRow(ex)}
     </article>`);
   main.querySelector('[data-dataset]').addEventListener('change', e => { state.chartDataset = e.target.value; save(state); renderChartPage(); });
+  // The page is made again, as an element keeps what first drew it.
+  main.querySelector('[data-plotter]').addEventListener('change', e => { state.plotter = e.target.value; save(state); renderChartPage(); });
   main.querySelector('[data-span]').addEventListener('change', e => {
     state.chartSpan = Number(e.target.value); save(state);
     // A new span is a new default view, so a zoom or pan made before it is dropped; the view moves there as views do.
@@ -2578,7 +2899,7 @@ async function renderChartPage() {
     redrawExample(ex);
     if (!was || !el._fullLayout) return;
     const to = el._fullLayout.xaxis.range.slice();
-    Plotly.relayout(el, { 'xaxis.range': was }).then(() => glideView(el, to));
+    plotterOf(el).relayout(el, { 'xaxis.range': was }).then(() => glideView(el, to));
   });
 }
 
@@ -2608,6 +2929,8 @@ const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ?
     const chart = document.querySelector('#main .chart'), from = down;
     down = null;
     if (!from || !chart || (currentPage !== 'Replay' && currentPage !== 'Chart') || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 4) return;
+    // A click on something of a sawtooth level puts the level in focus and opens no card (see Level in focus).
+    if (focusClick(chart, e)) return close();
     const ex = findExample(chart.dataset.id), i = ex && candleAt(chart, e), p = ex && (ex.hindsight ?? ex).prices;
     if (i == null || !p?.t[i] || i > cursorOf(ex)) return close();
     const time = p.t[i], up = p.c[i] > p.o[i], colour = p.c[i] === p.o[i] ? 'no body' : up ? 'green' : 'red';
@@ -2995,10 +3318,12 @@ const thingLevel = id => Number(id?.split(':')[1]) || null;
 
 // The layers a section shows: the section's own, beside the page's; on the Analysis page, the levels are every order the
 // analysis has a chapter on for, so the Levels buttons say which orders it tells of. While a candle is being picked, the
-// candles still to come are shown, to pick from.
+// candles still to come are shown, to pick from. A section that shows the structure a strategy's steps read (see
+// structureWindow) has its own levels alone there too: they are the orders of the steps' own charts, not the analysis's.
 function sectionLayers(s) {
   const analysis = tour.page === 'Analysis';
-  const levels = analysis ? [...new Set(tour.chapters.flatMap((c, i) => tour.chaptersOff.has(i) ? [] : [thingLevel(tour.sections[c.section].thing)]).filter(Boolean))].map(l => `level${l}`) : [];
+  const levels = !analysis ? [] : s.structure ? s.layers.filter(id => /^level\d+$/.test(id))
+    : [...new Set(tour.chapters.flatMap((c, i) => tour.chaptersOff.has(i) ? [] : [thingLevel(tour.sections[c.section].thing)]).filter(Boolean))].map(l => `level${l}`);
   return [...new Set(['replay', ...(tour.extraLayers ?? []), ...s.layers.filter(id => !analysis || !/^level\d+$/.test(id)), ...levels, ...(tour.picking ? ['future'] : [])])];
 }
 
@@ -3544,7 +3869,7 @@ function compileTour(def, scenes, resolved = new Map(), audio = {}, detail = 'ed
         clip: !(c.hold >= 0) && clip?.seconds > 0 ? clip.seconds : 0, given: c.hold >= 0 ? c.hold : null,
         hold: c.hold >= 0 ? c.hold : clip?.seconds > 0 ? clip.seconds + NORMAL_PACE.gap : readingSeconds(text ?? '') };
     });
-    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, detail: given.detail ?? null, trade, page, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
+    return { index: i, chapter: chapters.length - 1, scene, thing: given.thing ?? null, explains: given.explains === true, repeat: given.repeat === true, detail: given.detail ?? null, trade, structure: s.structure ?? null, page, layers, view, speed, journey, from, fromSpec: fromGiven.spec, until: at, untilSpec: untilGiven.spec, cues };
   });
   return { chapters, sections, errors, startLayers, startView, wanted };
 }
@@ -5445,6 +5770,12 @@ function renderInterims() {
 // each of a type; STRATEGY_TYPES says what each type's fields are and how it reads, so a new type is added there and in
 // the server's Strategy.cs. The entry condition can be a chain: the steps of "after", in order, then "entry", each looked
 // for once the one before it is met, within its "within" candles of it when that is set.
+// A market structure step is read at a sawtooth level as a chart of the last STRUCTURE_WINDOW candles shows it (the
+// server's KnownStructure), so its levels are that chart's, up to STRUCTURE_LEVELS. Its direction is Up or Down, named as
+// the term names it: a Bullish or Bearish break, an Upswing or Downswing, an Uptrend or Downtrend.
+const STRUCTURE_WINDOW = 500, STRUCTURE_LEVELS = 4;
+const stepLevel = { key: 'level', label: 'Level', number: true, min: 1, max: STRUCTURE_LEVELS, step: 1 };
+const stepDirection = (label, up, down) => ({ key: 'direction', label, options: [{ value: 'Up', label: up }, { value: 'Down', label: down }] });
 const STRATEGY_TYPES = {
   entry: {
     SuccessiveCandles: {
@@ -5452,6 +5783,69 @@ const STRATEGY_TYPES = {
       defaults: { colour: 'Green', length: 4 },
       fields: [{ key: 'colour', label: 'Colour', options: ['Green', 'Red'] }, { key: 'length', label: 'Length', number: true, min: 1, step: 1 }],
       says: e => `${e.length} Successive ${e.colour} Candles`,
+      short: e => `${e.length} ${e.colour}`,
+    },
+    // Met at the close that breaks structure, which Confirms a Swing.
+    BreakOfStructure: {
+      label: 'Break of Structure',
+      structure: true,
+      defaults: { direction: 'Up', level: 2 },
+      fields: [stepDirection('BoS', 'Bullish', 'Bearish'), stepLevel],
+      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
+      short: e => `L${e.level} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
+    },
+    // Met at the close beyond the Swing Low or Swing High of a Confirmed Swing.
+    MarketStructureBreak: {
+      label: 'Market Structure Break',
+      structure: true,
+      defaults: { direction: 'Up', level: 2 },
+      fields: [stepDirection('MSB', 'Bullish', 'Bearish'), stepLevel],
+      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
+      short: e => `L${e.level} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
+    },
+    // Met at the BoS that Confirms the Swing: any, or only a Strong one (no MSB inside it) or a Weak one.
+    Swing: {
+      label: 'Swing',
+      structure: true,
+      defaults: { direction: 'Up', level: 2, strength: 'Any' },
+      fields: [stepDirection('Swing', 'Upswing', 'Downswing'), stepLevel, { key: 'strength', label: 'Strength', options: ['Any', 'Strong', 'Weak'] }],
+      says: e => `a ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${orderOf(e.level)} ${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
+      short: e => `L${e.level} ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
+    },
+    // Met at the BoS that makes so many Swings in a row, once a Trend: two is the Trend being Confirmed.
+    Trend: {
+      label: 'Trend',
+      structure: true,
+      defaults: { direction: 'Up', level: 2, swings: 2 },
+      fields: [stepDirection('Trend', 'Uptrend', 'Downtrend'), stepLevel, { key: 'swings', label: 'Swings', number: true, min: 2, step: 1 }],
+      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} of ${e.swings} ${e.direction === 'Down' ? 'Downswings' : 'Upswings'}`,
+      short: e => `L${e.level} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} ×${e.swings}`,
+    },
+    // Met at the close of a candle that reaches into a zone of a Range holding at the level, read from the same chart: the
+    // buy-low zone, from the lower band to the depth above the Range's low, or the sell-high zone, as far below its high
+    // up to the upper band. The chain holds that Range from then on, by its lines, for its kills and the trade's exits.
+    RangeZone: {
+      label: 'Range zone',
+      structure: true,
+      defaults: { zone: 'BuyLow', level: 1, depth: 25, retracement: 75, band: 20 },
+      fields: [{ key: 'zone', label: 'Zone', options: [{ value: 'BuyLow', label: 'Buy-low' }, { value: 'SellHigh', label: 'Sell-high' }] }, stepLevel,
+        { key: 'depth', label: 'Zone depth %', number: true, min: 1, max: 50, step: 5 }, { key: 'retracement', label: 'Retracement %', number: true, min: 1, max: 99, step: 5 },
+        { key: 'band', label: 'Band %', number: true, min: 0, step: 5 }],
+      says: e => `a reach into the ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'} zone of a ${orderOf(e.level)} Range`,
+      short: e => `L${e.level} Range ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'}`,
+    },
+    // Met at the close of a candle that sweeps a Range holding at the level: its wick goes beyond the Range's low, or its
+    // high, and it closes back at or inside the box. It holds the Range as a Range zone step does; the zone depth is that
+    // of the zones the exits can be set on.
+    RangeSweep: {
+      label: 'Range liquidity sweep',
+      structure: true,
+      defaults: { zone: 'BuyLow', level: 1, depth: 25, retracement: 75, band: 20 },
+      fields: [{ key: 'zone', label: 'Sweeps', options: [{ value: 'BuyLow', label: 'The low' }, { value: 'SellHigh', label: 'The high' }] }, stepLevel,
+        { key: 'depth', label: 'Zone depth %', number: true, min: 1, max: 50, step: 5 }, { key: 'retracement', label: 'Retracement %', number: true, min: 1, max: 99, step: 5 },
+        { key: 'band', label: 'Band %', number: true, min: 0, step: 5 }],
+      says: e => `a liquidity sweep of the ${e.zone === 'SellHigh' ? 'high' : 'low'} of a ${orderOf(e.level)} Range`,
+      short: e => `L${e.level} Range sweep ${e.zone === 'SellHigh' ? 'high' : 'low'}`,
     },
   },
   target: {
@@ -5492,8 +5886,29 @@ const STRATEGY_TYPES = {
       fields: [{ key: 'ratio', label: 'Target (R)', number: true, min: 0, step: 0.5 }],
       says: t => `${Number(t.ratio) === 1 ? 'as far as the Take Profit' : `the Take Profit's distance divided by ${t.ratio}`} (a ${t.ratio}R target)`,
     },
+    // Lines of the Range the entry condition holds, on the target's side of the entry: the near edge of the zone there, or
+    // the band there. No trade where the line is not beyond the entry on its side.
+    RangeZone: {
+      label: 'Range zone edge',
+      level: true,
+      defaults: {},
+      fields: [],
+      says: (t, above) => above ? 'the bottom of the Range\'s sell-high zone' : 'the top of the Range\'s buy-low zone',
+    },
+    RangeBand: {
+      label: 'Range band',
+      level: true,
+      defaults: {},
+      fields: [],
+      says: (t, above) => above ? 'the Range\'s upper band' : 'the Range\'s lower band',
+    },
   },
 };
+// A step's kills are conditions of the entry's own types, met at a close after the step is met and before the trade is
+// entered, which end the wait so the chain starts again; and a Range's end, the close beyond a band of the Range a Range
+// zone or sweep step holds, which is a kill of such a step alone.
+STRATEGY_TYPES.kill = { ...STRATEGY_TYPES.entry,
+  RangeEnd: { label: 'Range ends', of: ['RangeZone', 'RangeSweep'], defaults: {}, fields: [], says: () => 'a close beyond a band of the Range', short: () => 'Range ends' } };
 const STRATEGY_PARTS = [{ key: 'entry', title: 'Entry', kind: 'entry' }, { key: 'takeProfit', title: 'Take Profit', kind: 'target' }, { key: 'stopLoss', title: 'Stop Loss', kind: 'target' }];
 const TRADE_SHOWN = 1000;
 let strategies = null;
@@ -5575,21 +5990,23 @@ const strategySteps = s => [...(s.after ?? []), s.entry];
 
 // A strategy's entry condition in words: "3 Successive Red Candles, then 4 Successive Green Candles within 10 candles".
 function conditionSays(s) {
-  const step = e => STRATEGY_TYPES.entry[e?.type]?.says(e) ?? `an unknown entry type "${e?.type}"`;
+  const kills = e => e?.kill?.length ? ` (the wait ends at ${e.kill.map(x => STRATEGY_TYPES.kill[x?.type]?.says(x) ?? `an unknown kill type "${x?.type}"`).join(' or ')})` : '';
+  const step = e => (STRATEGY_TYPES.entry[e?.type]?.says(e) ?? `an unknown entry type "${e?.type}"`) + kills(e);
   return strategySteps(s).map((e, k) => k ? `then ${step(e)}${e.within ? ` within ${e.within} candles` : ''}` : step(e)).join(', ');
 }
 
 // A strategy in words, as the trades will be read.
 function strategySays(s) {
-  const part = (kind, p) => STRATEGY_TYPES[kind][p?.type]?.says(p) ?? `an unknown ${kind} type "${p?.type}"`;
+  const part = (kind, p, above) => STRATEGY_TYPES[kind][p?.type]?.says(p, above) ?? `an unknown ${kind} type "${p?.type}"`;
   const long = s.direction !== 'Short';
   // A level is where the target is; a distance is how far it is from the entry, and on which side.
-  const where = (t, side) => STRATEGY_TYPES.target[t?.type]?.level ? `at ${part('target', t)}, when that is ${side} the entry` : `${part('target', t)} ${side} the entry`;
+  const where = (t, side) => STRATEGY_TYPES.target[t?.type]?.level ? `at ${part('target', t, side === 'above')}, when that is ${side} the entry` : `${part('target', t)} ${side} the entry`;
   const fee = s.countFees !== false ? s.feePercent || 0 : 0, slip = s.countSlippage !== false ? s.slippagePercent || 0 : 0;
   const costs = fee && slip ? ` Costs: ${fee}% fee a side and ${slip}% slippage on the entry and a Stop Loss.`
     : fee ? ` Costs: ${fee}% fee a side; no slippage is counted.`
     : slip ? ` Costs: ${slip}% slippage on the entry and a Stop Loss; no fees are counted.` : ' No fees or slippage are counted.';
-  return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}. Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}${costs}`;
+  const structure = strategySteps(s).some(e => STRATEGY_TYPES.entry[e?.type]?.structure) ? ` Market structure is read as a chart of the last ${STRUCTURE_WINDOW} candles shows it, so an order is that chart's.` : '';
+  return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}.${structure} Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}${costs}`;
 }
 
 // The default costs strategies.json starts with when it has none: about an exchange's taker fee and a liquid market's
@@ -5753,17 +6170,26 @@ function renderStrategy() {
     return wireStrategyActions(box);
   }
   if (!s) { box.innerHTML = `<div class="strat-card">No strategies yet: add one with New strategy.</div>${strategyActions()}`; return wireStrategyActions(box); }
+  // An option is its value, or { value, label } when the page names it otherwise than strategies.json keeps it.
   const input = (path, f, value) => f.options
-    ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => `<option ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`
-    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" step="${f.step}" value="${esc(value)}"></label>${varyInputs(s, path, f.step)}`;
+    ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => o.value ?? o).map((v, k) => `<option value="${esc(v)}" ${v === value ? 'selected' : ''}>${esc(f.options[k].label ?? v)}</option>`).join('')}</select></label>`
+    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" ${f.max != null ? `max="${f.max}" ` : ''}step="${f.step}" value="${esc(value)}"></label>${varyInputs(s, path, f.step)}`;
   const steps = strategySteps(s);
+  // A step's kills, under its own fields: each a condition of a type with its numbers, and a button to add one. The entry
+  // has none, as nothing is waited for after it.
+  const killsHtml = (key, p) => `<div class="step-kills"><span class="step-kills-head" title="A kill ends the wait this step begins: met at a close after the step is met and before the trade is entered, the chain starts again">Killed by</span>
+      ${(p.kill ?? []).map((kill, j) => `<span class="step-kill"><label>Type<select data-type="${key}.kill.${j}" data-kind="kill">${Object.entries(STRATEGY_TYPES.kill).filter(([, t]) => !t.of || t.of.includes(p.type)).map(([id, t]) => `<option value="${id}" ${id === kill.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
+        ${(STRATEGY_TYPES.kill[kill.type]?.fields ?? []).map(f => input(`${key}.kill.${j}.${f.key}`, f, kill[f.key])).join('')}
+        <button type="button" class="kill-remove" data-kill-remove="${key}.kill.${j}" title="Take this kill off the step" aria-label="Remove kill">×</button></span>`).join('')}
+      <button type="button" class="kill-add" data-kill-add="${key}" title="Add a condition that ends the wait this step begins">+ Kill</button></div>`;
   const part = ({ key, title, kind }) => {
     const p = key.split('.').reduce((o, k) => o?.[k], s), type = STRATEGY_TYPES[kind][p.type], step = kind === 'entry' ? steps.indexOf(p) : -1;
     return `<fieldset${step >= 0 ? ' class="step"' : ''}><legend>${title}</legend>
       ${step >= 0 && steps.length > 1 ? `<button type="button" class="step-remove" data-step-remove="${step}" title="Take this step out of the chain" aria-label="Remove ${esc(title)}">×</button>` : ''}
       <label>Type<select data-type="${key}" data-kind="${kind}">${Object.entries(STRATEGY_TYPES[kind]).filter(([, t]) => !t.only || t.only === key).map(([id, t]) => `<option value="${id}" ${id === p.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
       ${(type?.fields ?? []).map(f => input(`${key}.${f.key}`, f, p[f.key])).join('')}
-      ${step > 0 ? `<label title="The most candles from the candle that met the step before to the one that meets this. Blank for no limit.">Within (candles)<input type="number" data-path="${key}.within" data-number data-blank min="1" step="1" value="${esc(p.within ?? '')}" placeholder="no limit"></label>${varyInputs(s, `${key}.within`, 1)}` : ''}</fieldset>`;
+      ${step > 0 ? `<label title="The most candles from the candle that met the step before to the one that meets this. Blank for no limit.">Within (candles)<input type="number" data-path="${key}.within" data-number data-blank min="1" step="1" value="${esc(p.within ?? '')}" placeholder="no limit"></label>${varyInputs(s, `${key}.within`, 1)}` : ''}
+      ${step >= 0 && step < steps.length - 1 ? killsHtml(key, p) : ''}</fieldset>`;
   };
   // The steps of the entry condition, top to bottom, with a + above, between and below them to add a step there.
   const stepParts = steps.map((_, k) => ({ key: k < steps.length - 1 ? `after.${k}` : 'entry', title: steps.length > 1 ? `Step ${k + 1}${k === steps.length - 1 ? ': Entry' : ''}` : 'Entry', kind: 'entry' }));
@@ -5833,7 +6259,9 @@ function renderStrategy() {
   }));
   box.querySelectorAll('[data-type]').forEach(el => el.addEventListener('change', () => {
     const path = el.dataset.type.split('.'), key = path.pop(), target = path.reduce((o, k) => o[k], s), within = target[key]?.within;
-    target[key] = { type: el.value, ...STRATEGY_TYPES[el.dataset.kind][el.value].defaults, ...(within ? { within } : {}) };
+    // A step keeps its kills as its type changes, all but a Range's end when it is no longer a Range zone.
+    const kill = (target[key]?.kill ?? []).filter(k => k.type !== 'RangeEnd' || STRATEGY_TYPES.kill.RangeEnd.of.includes(el.value));
+    target[key] = { type: el.value, ...STRATEGY_TYPES[el.dataset.kind][el.value].defaults, ...(within ? { within } : {}), ...(kill.length ? { kill } : {}) };
     // The new type's numbers are not the old one's, all but Within.
     dropVary(s, k => k.startsWith(`${el.dataset.type}.`) && k !== `${el.dataset.type}.within`);
     renderStrategy();
@@ -5850,12 +6278,30 @@ function renderStrategy() {
     if (all.length) s.after = all;
     else delete s.after;
     delete strategySteps(s)[0].within;
+    // Nothing is waited for after the entry, so the step that becomes it has no kills.
+    delete s.entry.kill;
     renderStrategy();
     updateStrategyStatus();
   };
   box.querySelectorAll('[data-step-insert]').forEach(b => b.addEventListener('click', () =>
     changeSteps(all => all.splice(Number(b.dataset.stepInsert), 0, { type: 'SuccessiveCandles', ...STRATEGY_TYPES.entry.SuccessiveCandles.defaults }))));
   box.querySelectorAll('[data-step-remove]').forEach(b => b.addEventListener('click', () => changeSteps(all => all.splice(Number(b.dataset.stepRemove), 1))));
+  // A new kill of a Range zone step is the Range's end; of another, a run of candles to start from.
+  box.querySelectorAll('[data-kill-add]').forEach(b => b.addEventListener('click', () => {
+    const p = b.dataset.killAdd.split('.').reduce((o, k) => o[k], s), type = STRATEGY_TYPES.kill.RangeEnd.of.includes(p.type) && !p.kill?.some(k => k.type === 'RangeEnd') ? 'RangeEnd' : 'SuccessiveCandles';
+    (p.kill ??= []).push({ type, ...STRATEGY_TYPES.kill[type].defaults });
+    renderStrategy();
+    updateStrategyStatus();
+  }));
+  box.querySelectorAll('[data-kill-remove]').forEach(b => b.addEventListener('click', () => {
+    const path = b.dataset.killRemove.split('.'), j = Number(path.pop()), p = path.slice(0, -1).reduce((o, k) => o[k], s);
+    p.kill.splice(j, 1);
+    if (!p.kill.length) delete p.kill;
+    // A kill's numbers are varied by its place among the step's kills, which this changes.
+    dropVary(s, k => k.startsWith(`${path.join('.')}.`));
+    renderStrategy();
+    updateStrategyStatus();
+  }));
   wireStrategyActions(box);
   renderStrategyRun();
 }
@@ -6489,6 +6935,8 @@ const TRADE_COLUMNS = {
   entryPrice: { head: 'Price', num: true, cell: r => r.trade ? wholePrice(r.trade.entryPrice) : '', sort: r => r.trade?.entryPrice },
   takeProfit: { head: 'Take Profit', num: true, cell: r => r.trade ? wholePrice(r.trade.takeProfit) : '', sort: r => r.trade?.takeProfit },
   stopLoss: { head: 'Stop Loss', num: true, cell: r => r.trade ? wholePrice(r.trade.stopLoss) : '', sort: r => r.trade?.stopLoss },
+  // The trade's target in R as it was entered; blank for a run kept before trades said it.
+  r: { head: 'R', num: true, cell: r => r.trade?.r != null ? Number(r.trade.r).toFixed(2) : '', sort: r => r.trade?.r },
   exit: { head: 'Exit', cell: r => r.trade ? esc(fmtTime(r.trade.exitTime)) : '', sort: r => r.trade && minuteOf(r.trade.exitTime) },
   exitPrice: { head: 'Price', num: true, cell: r => r.trade ? wholePrice(r.trade.exitPrice) : '', sort: r => r.trade?.exitPrice },
   outcome: { head: 'Outcome', cell: r => !r.trade ? '' : r.trade.bothTouched
@@ -6764,8 +7212,9 @@ window.embed = {
 // A short name for a strategy on the charts: its run, its direction and its targets, as "4 Green Long · ±100% body".
 function chartStrategyName(s) {
   const target = t => t.type === 'Percent' ? `${t.percent}%` : t.type === 'HighestWick' ? `high of ${t.candles}` : t.type === 'LowestWick' ? `low of ${t.candles}` : t.type === 'RiskRatio' ? `${t.ratio}R target`
+    : t.type === 'RangeZone' ? 'Range zone' : t.type === 'RangeBand' ? 'Range band'
     : `${t.percent}% ${String(t.measure ?? 'Body').toLowerCase()}${t.candles !== s.entry?.length ? ` of ${t.candles}` : ''}`;
-  const entry = strategySteps(s).map(e => e?.type === 'SuccessiveCandles' ? `${e.length} ${e.colour}` : e?.type ?? '').join(' → ');
+  const entry = strategySteps(s).map(e => STRATEGY_TYPES.entry[e?.type]?.short(e) ?? e?.type ?? '').join(' → ');
   const [tp, sl] = [target(s.takeProfit), target(s.stopLoss)];
   return `${entry} ${s.direction} · ${tp === sl ? `±${tp}` : `+${tp} / −${sl}`}`;
 }
@@ -6848,9 +7297,10 @@ const minuteOf = t => String(t).slice(0, 16);
 
 // How many candles before the candle that meets it a step reads (StrategyEntry.Reads): a run's candles before its last.
 const entryReads = e => e?.type === 'SuccessiveCandles' ? Math.max(0, e.length - 1) : 0;
-// How many candles before its entry a trade's entry condition read (StrategyTrade.FirstRead): from the first candle its first
-// step read, the candle that met that step being the first of the trade's "met" when the condition is a chain.
-const tradeReads = (strategy, t) => t.entryIndex - Math.max(0, (t.met?.[0]?.index ?? t.entryIndex) - entryReads(strategySteps(strategy)[0]));
+// How many candles before its entry a trade's entry condition read (StrategyTrade.FirstRead): from the earliest candle any
+// of its steps read. A run kept before trades said so has it worked out here: from the first candle its first step read,
+// the candle that met that step being the first of the trade's "met" when the condition is a chain.
+const tradeReads = (strategy, t) => t.entryIndex - (t.firstRead ?? Math.max(0, (t.met?.[0]?.index ?? t.entryIndex) - entryReads(strategySteps(strategy)[0])));
 
 // The trades of the strategies on that a candle is part of: entered there, open there, or with the candle among those its
 // entry condition read. Those entered there come first.
@@ -6912,23 +7362,38 @@ function drawStrategies(ex, traces) {
     // A tour's scene starts its story at its first candle, so a trade entered before it is not shown.
     const shown = run.trades.filter(t => (!at || minuteOf(t.entryTime) === at) && minuteOf(t.entryTime) <= last && minuteOf(t.exitTime) >= first && (!ex.tour || minuteOf(t.entryTime) >= first))
       .map(t => ({ t, done: t.outcome !== 'Open' && minuteOf(t.exitTime) <= last }));
+    // The Range the analysed trade's entry condition held, by its lines, from the candle that identified it, once the chart
+    // has reached that candle, to where the trade's exits run to: the Range's own drawing (see drawRange), with the zones as
+    // deep as the strategy has them. It is there before the trade is, as the entry condition is told from it.
+    const held = at ? run.trades.find(t => minuteOf(t.entryTime) === at) : null, heldAt = held?.range ? whole.t.findIndex(x => minuteOf(x) === at) : -1;
+    if (heldAt >= 0) {
+      const r = held.range, identified = whole.t[Math.max(0, heldAt - (held.entryIndex - r.identified))];
+      if (minuteOf(identified) <= last) drawRange(traces, { level: r.level, identified: { time: identified }, low: { price: r.low }, high: { price: r.high }, bandLow: r.bandLow, bandHigh: r.bandHigh },
+        held.outcome !== 'Open' && minuteOf(held.exitTime) <= last ? held.exitTime : ahead, { box: true, bands: true, zones: 100 * (r.buyLowTop - r.low) / (r.high - r.low),
+          hover: `Range the entry condition held · level ${r.level}<br>${fmtPrice(r.low)} to ${fmtPrice(r.high)}<br>bands ${fmtPrice(r.bandLow)} to ${fmtPrice(r.bandHigh)}<br>identified ${fmtTime(identified)} at a ${r.retracement}% retracement` });
+    }
     if (!shown.length) continue;
     const end = s => s.done ? s.t.exitTime : ahead;
-    // The run of candles that met each Successive Candles step of the entry condition, boxed from its first candle's low to
-    // its highest high: the entry's own run, and those of the steps before it, at the candles the trade says met them.
+    // The candles each step of the entry condition read, boxed from their lowest low to their highest high: a run of
+    // candles, or the Swing or Trend a break was read from, for the entry's own step and those before it, at the candles the
+    // trade says met them. A trade says where each step read from; one kept before trades did has only its runs boxed.
     const trade = at && shown.find(x => minuteOf(x.t.entryTime) === at)?.t, steps = strategySteps(strategy);
     const metAt = trade ? [...(trade.met ?? []).map(m => minuteOf(m.time)), at] : [];
+    // How many candles back from the one that met it each step read.
+    const readBack = trade ? [...(trade.met ?? []).map(m => m.index - m.from), trade.entryIndex - trade.entryFrom] : [];
     steps.forEach((step, k) => {
-      if (step?.type !== 'SuccessiveCandles' || !metAt[k]) return;
-      const i = whole.t.findIndex(x => minuteOf(x) === metAt[k]), from = Math.max(0, i - step.length + 1);
+      const type = STRATEGY_TYPES.entry[step?.type];
+      if (!type || !metAt[k] || (type.structure && !(readBack[k] >= 0))) return;
+      const i = whole.t.findIndex(x => minuteOf(x) === metAt[k]), from = Math.max(0, i - (readBack[k] >= 0 ? readBack[k] : step.length - 1));
       if (i < 0) return;
       const hi = Math.max(...whole.h.slice(from, i + 1)), lo = Math.min(...whole.l.slice(from, i + 1)), half = (Date.parse(whole.t[1]) - Date.parse(whole.t[0])) / 2;
       const [x0, x1] = [new Date(Date.parse(whole.t[from]) - half).toISOString(), new Date(Date.parse(whole.t[i]) + half).toISOString()];
       const label = steps.length > 1 ? `Entry condition, step ${k + 1}` : 'Entry condition';
       traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', name: label, x: [x0, x1, x1, x0, x0], y: [lo, lo, hi, hi, lo],
-        line: { color: colour, width: 1, dash: 'dot' }, fillcolor: withAlpha(css(step.colour === 'Red' ? '--down' : '--up'), 0.08),
-        hovertemplate: `${label}: ${step.length} ${step.colour.toLowerCase()} candles in a row<extra></extra>` });
+        line: { color: colour, width: 1, dash: 'dot' }, fillcolor: withAlpha(css(step.colour === 'Red' || (type.structure && step.direction === 'Down') ? '--down' : '--up'), 0.08),
+        hovertemplate: `${label}: ${esc(type.says(step))}<extra></extra>` });
     });
+
     const level = (key, color) => traces.push({ type: 'scatter', mode: 'lines', name: `${name} ${key === 'takeProfit' ? 'Take Profit' : 'Stop Loss'}`, hoverinfo: 'skip',
       x: shown.flatMap(s => [s.t.entryTime, end(s), null]), y: shown.flatMap(s => [s.t[key], s.t[key], null]), line: { color, width: 1.25, dash: 'dash' } });
     level('takeProfit', up);
