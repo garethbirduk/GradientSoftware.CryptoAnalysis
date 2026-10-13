@@ -1383,11 +1383,39 @@ function windowExample(ex, from) {
   return windowExamples.get(id);
 }
 
+// The structure an analysis's chapter draws, as known at the analysis's cursor: the candles from where the chapter begins
+// to that cursor, at the levels to the chapter's own. A replay's batch keeps only what is near its own candles, so a
+// Trend that began months before the cursor would have none of its Swings or highs and lows to draw. Asked for once for
+// each stretch and kept with the analysis; null until it has come, or for a chapter of no level.
+function knownStretch(ex) {
+  if (tour?.ex !== ex || tour.page !== 'Analysis' || tour.known == null || !isRemote(ex)) return null;
+  const s = tourSection(), level = revealLevel();
+  if (!s || !Number.isFinite(level) || s.structure) return null;
+  const from = Math.max(0, Math.floor((Math.min(s.from, s.view[0]) - 48) / 500) * 500), key = `${from}|${level}${rangeQuery()}`;
+  const kept = tour.stretches ??= new Map();
+  if (!kept.has(key)) {
+    const mine = tour;
+    kept.set(key, null);
+    fetch(`api/complete?dataset=${encodeURIComponent(ex.dataset)}&from=${from}&to=${mine.known}&at=${mine.known}&maxLevel=${level}&narrowest=0${rangeQuery()}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(r.statusText))).then(batch => {
+        // A server from before stretches as known at a candle gives the whole dataset's in hindsight: not this one's.
+        if (batch.from !== mine.known) return;
+        batch.timeline.retracements ??= [];
+        batch.timeline.ranges ??= [];
+        kept.set(key, batch.timeline);
+        if (tour === mine && currentPage === 'Analysis') redrawExample(ex);
+      }).catch(() => { });
+  }
+  return kept.get(key);
+}
+
 function liveView(ex, t) {
   // A structure step's chart counts its candles from where it begins: shift on from the example's own.
   const win = structureWindow(ex, t), src = win ? windowExample(ex, win.from) : ex, shift = win?.from ?? 0;
   const told = win ? win.at : tour?.ex === ex && tour.known != null && t <= tour.known && timelineAt(ex, tour.known) ? tour.known : null;
-  const reveal = told != null, r = timelineAt(src, (told ?? t) - shift), holds = holdsAt((told ?? t) - shift), time = ex.prices.t[t];
+  // A thing an analysis tells of can have begun long before the candles a replay's batch goes back to: its stretch is
+  // then asked for as known at the analysis's cursor (see knownStretch), the batch's drawn until it has come.
+  const reveal = told != null, r = (!win && reveal ? knownStretch(ex) : null) ?? timelineAt(src, (told ?? t) - shift), holds = holdsAt((told ?? t) - shift), time = ex.prices.t[t];
   // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
   const window = ex.tour ? tourWindow(ex, t)
     : isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
@@ -3270,9 +3298,13 @@ function splitExplanations(def) {
   const named = s => { if (s.explainChapter) return s.explainChapter; const w = word(s); return w === 'Successive Candles' ? 'What are Successive Candles?' : `What is ${/^[AEIOU]|^(HH|HL|LH|LL|MSB)$/.test(w) ? 'an' : 'a'} ${w}?`; };
   // A kind of thing is explained once: a second Downtrend's explanation is there, but off, one tick away.
   const told = new Set(), explains = (s, name) => { const repeat = told.has(name); told.add(name); return { ...s, chapter: name, detail: 'education', explains: true, ...(repeat ? { repeat } : {}) }; };
-  def.sections = (def.sections ?? []).flatMap(s => {
+  def.sections = (def.sections ?? []).flatMap((s, i, all) => {
+    // A section that follows another of the same thing in its chapter (a Trend that still runs has one, for the candles
+    // after its last Swing) is of this one alone: what a thing of its kind is, is told whole before the first of them.
+    if (s.follows) return [{ ...s, detail: 'summary' }];
+    const { blocks, ...whole } = s, told = all[i + 1]?.follows && all[i + 1].thing === s.thing ? whole : s;
     const after = AFTER_CHAPTERS[s.explain] ?? [], own = after.length ? { blocks: BLOCKS[s.explain].filter(b => !after.some(a => a.blocks.includes(b))) } : {};
-    return [explains({ ...s, ...own }, named(s)), { ...s, ...own, detail: 'summary' }, ...after.map(a => explains({ ...s, blocks: a.blocks }, a.chapter))];
+    return [explains({ ...told, ...own }, named(s)), { ...s, ...own, detail: 'summary' }, ...after.map(a => explains({ ...s, blocks: a.blocks }, a.chapter))];
   });
   return def;
 }
@@ -4222,8 +4254,22 @@ function readAloud(cue) {
   tour.player.playbackRate = tourPace().voice;
   tour.player.addEventListener('ended', done);
   tour.player.addEventListener('error', done);
-  tour.player.play().catch(done);
+  tour.player.play().catch(e => {
+    // A browser plays no sound on a page nobody has clicked or typed on yet, as one opened by its address is.
+    if (e?.name === 'NotAllowedError' && !voiceBlocked) { voiceBlocked = true; updateTourPanel(); }
+    done();
+  });
 }
+
+// Whether the browser has refused to play a clip because the page has not been clicked or typed on. The Voice button says
+// so, and the first click or key anywhere reads the text on show aloud from there.
+let voiceBlocked = false;
+for (const name of ['pointerdown', 'keydown']) window.addEventListener(name, () => {
+  if (!voiceBlocked) return;
+  voiceBlocked = false;
+  if (tour?.active && tour.timer && voiced(tour.active) && !tour.voice.now) readAloud(tour.active);
+  updateTourPanel();
+}, true);
 
 function hush() {
   tour.player?.pause();
@@ -4303,9 +4349,14 @@ function openSection(i, { journey = false } = {}) {
   if (changed) zoomTour(shown);
 }
 
+// Whether the next text of a playing analysis has no clip yet while Voice is on: it then waits for the server to read it
+// rather than being shown unread (see tourTick).
+const awaitsClip = () => !!tour.timer && tour.waitForClips && voiceOn() && !!tour.queue[0] && !tour.queue[0].silent && !tour.audio[textKey(tour.queue[0].text)];
+
 function enterSection(i, how) {
   openSection(i, how);
-  showNextCue();
+  // A text still to be read aloud is left for the next beat, which waits for its clip.
+  if (!awaitsClip()) showNextCue();
   refreshTour();
 }
 
@@ -4429,7 +4480,8 @@ function updateTourPanel() {
   if (go('tradeSimilar')) go('tradeSimilar').hidden = !(tour.page === 'Analysis' && tour.params?.strategy);
   const voice = go('voice'), clips = Object.keys(tour.audio ?? {}).length;
   voice.setAttribute('aria-pressed', voiceOn());
-  if (!clips) voice.title = 'No clips yet: the local server reads the texts aloud when Voice is on';
+  voice.textContent = voiceBlocked && voiceOn() ? 'Voice: click anywhere to hear it' : 'Voice';
+  if (!clips) voice.title ='No clips yet: the local server reads the texts aloud when Voice is on';
   const pace = TOUR_PACES.indexOf(tourPace());
   part('pace').value = pace;
   part('pace-name').textContent = TOUR_PACES[pace].name;
@@ -4454,13 +4506,23 @@ function tourTick() {
   const s = tourSection(), ex = tour.ex, now = performance.now(), t = cursorOf(ex);
   // A section that shows a page reads on once the page is where the tour is.
   if (tourPage.pending) return;
+  // The text that was on show as the analysis began to play, before its clip was read: it stays, unread, for as long as
+  // a text still to come waits for its clip, and is read aloud from its start once the clip is there.
+  if (tour.unread && tour.unread === tour.active) {
+    if (tour.audio[textKey(tour.unread.text)]) { tour.unread = tour.waitingSince = null; speak(tour.active); }
+    else if (tour.reading || now - (tour.waitingSince ??= now) < 20000) {
+      tour.activeUntil = now + 1000;
+      if (now - (tour.audioAt ?? 0) > 1000) loadPlayerAudio();
+      return;
+    } else tour.unread = tour.waitingSince = null;
+  }
   // A text still waiting for the voice has not begun its time on show.
   const reading = tour.active && (now < tour.activeUntil || tour.voice.waiting.includes(tour.active));
   if (!reading && tour.queue.length) {
-    // An analysis's texts are read aloud by the server as it is written: with Voice on, a text waits for its clip,
-    // twenty seconds at most, looking for it again every second.
-    const next = tour.queue[0];
-    if (tour.waitForClips && voiceOn() && !next.silent && !tour.audio[textKey(next.text)] && now - (tour.waitingSince ??= now) < 20000) {
+    // An analysis's texts are read aloud by the server as it is written: with Voice on, a text waits for its clip for
+    // as long as the server is still reading (see makeAnalysisVideo), and twenty seconds at most once it is not, looking
+    // for it again every second.
+    if (awaitsClip() && (tour.reading || now - (tour.waitingSince ??= now) < 20000)) {
       if (now - (tour.audioAt ?? 0) > 1000) loadPlayerAudio();
       return;
     }
@@ -4691,6 +4753,9 @@ function playTour() {
   tour.nextCandle = 0;
   tour.timer = setInterval(tourTick, TOUR_TICK);
   if (tour.active) speak(tour.active);
+  // A text on show whose clip the server has yet to read stays on show until it can be read (see tourTick).
+  const a = tour.active;
+  tour.unread = a && tour.waitForClips && voiceOn() && !a.silent && !tour.audio[textKey(a.text)] ? a : null;
   updateTourPanel();
 }
 
@@ -4843,6 +4908,8 @@ async function makeAnalysisVideo(start = true) {
     : { error: response?.status === 404 || response?.status === 405 ? 'the local server was started before it could make one; restart ./build-site.ps1 -Serve' : 'the local server did not answer' };
   clearTimeout(analysisVideoPoll);
   if (v.running && currentPage === 'Analysis') analysisVideoPoll = setTimeout(() => makeAnalysisVideo(false), 2000);
+  // While the server is reading, a text with no clip yet waits for it and is not shown unread (see tourTick).
+  tour.reading = !!v.running;
   const status = document.querySelector('[data-tour="video"]');
   if (!status || currentPage !== 'Analysis') return;
   const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;

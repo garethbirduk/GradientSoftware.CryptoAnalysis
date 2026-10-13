@@ -23,7 +23,7 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
     private readonly SemaphoreSlim reading = new(1, 1);
     private readonly List<string> lines = [];
     private Process? worker;
-    private string? pending;
+    private readonly Queue<string> pending = new();
     private string? pendingAnalysis;
     private string? analysisAddress;
     private bool analysis;
@@ -60,7 +60,7 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
     /// <summary>
     /// Reads the texts of a tour aloud in the background, so its clips are there by the time its Voice button is pressed:
     /// those with no clip yet, or whose clip was read from other words. While a run is under way the tour waits its turn,
-    /// the latest asked for taking the place of any waiting before it.
+    /// behind any waiting before it, so none asked for is left unread.
     /// </summary>
     public void Narrate(string tourJson)
     {
@@ -68,7 +68,8 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
         {
             if (running)
             {
-                pending = tourJson;
+                if (!pending.Contains(tourJson))
+                    pending.Enqueue(tourJson);
                 return;
             }
         }
@@ -146,7 +147,8 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
             var recorded = new FileInfo(AnalysisVideoPath);
             DateTime? analysisMade = recorded.Exists && !(running && analysis) ? recorded.LastWriteTimeUtc : null;
             var waiting = pendingAnalysis != null;
-            return new TourVideoStatus(running || waiting, audioOnly && !waiting, waiting && !running ? "Waiting" : stage, running ? (int)(DateTime.UtcNow - started).TotalSeconds : 0, error, made,
+            // A reading waiting its turn is under way too, so the page keeps waiting for its clips between one and the next.
+            return new TourVideoStatus(running || waiting || pending.Count > 0, audioOnly && !waiting, waiting && !running ? "Waiting" : stage, running ? (int)(DateTime.UtcNow - started).TotalSeconds : 0, error, made,
                 made != null ? file.Length : 0, made != null && File.GetLastWriteTimeUtc(tourPath) > made, analysis || waiting, analysisMade, analysisAddress);
         }
     }
@@ -195,8 +197,7 @@ public sealed class TourVideo(string toolDir, string videoPath, string tourPath,
         {
             running = false;
             error = failure;
-            next = pending;
-            pending = null;
+            next = pending.Count > 0 ? pending.Dequeue() : null;
         }
 
         // The reading asked for while busy goes first, as an analysis waiting to be recorded needs its clips.

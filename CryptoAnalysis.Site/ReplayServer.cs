@@ -221,7 +221,9 @@ public static class ReplayServer
         // stretch it draws and what can be seen at its zoom; looked up each time. With neither, everything in it, which is
         // kept as UTF-8, as a long dataset's comes to tens of megabytes.
         var completes = new ConcurrentDictionary<(string Dataset, (double Retracement, double Band) Settings), Lazy<byte[]>>();
-        app.MapGet("/api/complete", (string dataset, double? retracement, double? band, int? from, int? to, int? narrowest) =>
+        // With at, the stretch is as known at that candle, and with maxLevel only the levels to that one: what an analysis
+        // seen from a candle shows of a thing that began long before it, which the replay's batches do not go back to.
+        app.MapGet("/api/complete", (string dataset, double? retracement, double? band, int? from, int? to, int? narrowest, int? at, int? maxLevel) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
@@ -230,9 +232,9 @@ public static class ReplayServer
             if (from != null || to != null || narrowest != null)
             {
                 var store = Structure(data, 0, settings);
-                var last = store.Candles - 1;
+                var last = Math.Clamp(at ?? store.Candles - 1, 0, store.Candles - 1);
                 var (first, end) = (Math.Clamp(from ?? 0, 0, last), Math.Clamp(to ?? last, 0, last));
-                var timeline = MarketStructure.Complete(store, MaxLevel, first, end, Math.Max(0, narrowest ?? 0));
+                var timeline = MarketStructure.Complete(store, Math.Clamp(maxLevel ?? MaxLevel, 0, MaxLevel), first, end, Math.Max(0, narrowest ?? 0), last);
                 return Results.Bytes(JsonSerializer.SerializeToUtf8Bytes(new { Anchor = 0, From = last, To = last + 1, Stretch = new { From = first, To = end, Narrowest = Math.Max(0, narrowest ?? 0) }, Timeline = timeline }, Json), "application/json");
             }
 

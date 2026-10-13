@@ -116,6 +116,7 @@ public static partial class Explain
         result.Remove("omit");
         result.Remove("strategy");
         result.Remove("risk");
+        result.Remove("follows");
         var term = node["explain"]?.GetValue<string>() ?? "";
         var detail = node["detail"]?.GetValue<string>();
         if (detail != null && Details.Parse(detail) == null)
@@ -314,7 +315,7 @@ public static partial class Explain
                 continue;
             }
 
-            var chapter = Chapter(thing, prices, known, index, cursor, inPlace, options, out var keeps);
+            var chapter = Chapter(thing, prices, known, index, cursor, inPlace, options, out var keeps, out var then);
             if (chapter == null)
             {
                 missing.Add(thing.Name);
@@ -327,6 +328,12 @@ public static partial class Explain
             // The thing a chapter tells of, by id, so the page can leave out the chapters of what is unticked.
             chapter["thing"] = thing.Id;
             sections.Add(chapter);
+            // What follows in the same chapter: the candles after a Trend that still runs.
+            if (then != null)
+            {
+                then["thing"] = thing.Id;
+                sections.Add(then);
+            }
         }
 
         if (sections.Count == 0)
@@ -356,10 +363,12 @@ public static partial class Explain
     }
 
     // One chapter of a tour: a section that explains the thing, to be written out, with the layers that draw it and the
-    // candle it runs from. Null when the thing is not at the candle. keeps is the candle the chart keeps history from.
-    private static JsonObject? Chapter(Thing thing, List<Price> prices, List<Price> known, int index, int cursor, bool inPlace, ExplainOptions options, out int? keeps)
+    // candle it runs from. Null when the thing is not at the candle. keeps is the candle the chart keeps history from;
+    // then is a section that follows in the same chapter, when the thing is told in two.
+    private static JsonObject? Chapter(Thing thing, List<Price> prices, List<Price> known, int index, int cursor, bool inPlace, ExplainOptions options, out int? keeps, out JsonObject? then)
     {
         keeps = null;
+        then = null;
         var level = thing.Level ?? 1;
         switch (thing.Kind)
         {
@@ -378,18 +387,27 @@ public static partial class Explain
                 return new JsonObject { ["chapter"] = $"{Order(level)} {point.Point.Label}", ["explain"] = thing.Kind, ["at"] = index, ["level"] = level, ["from"] = Math.Max(0, point.PreviousAt - 1), ["known"] = cursor, ["layers"] = Layers($"level{level}", "close", "sawtooth"), ["speed"] = 8.0 };
             }
             default:
-                return SwingOrTrend(thing.Kind, prices, known, index, level, cursor, inPlace, out keeps);
+                return SwingOrTrend(thing.Kind, prices, known, index, level, cursor, inPlace, out keeps, out then);
         }
     }
+
+    // How many candles after the last BoS of a Trend that still runs are shown, to tell that nothing has been Confirmed since.
+    private const int CandlesSince = 10;
+
+    // The blocks of a Trend told after its last Swing, when it is told in two sections: whether it has ended.
+    private static readonly string[] TrendSince = ["Ends", "IsACount"];
 
     // The chapter of a Swing or a Trend: the one at the level that has the candle, as the chart had it at the cursor. The
     // section runs to the thing's own end when the chart has it there too (a Swing's BoS, a Trend's second BoS or the
     // candle), else on to the cursor, as the finer levels can be anchored afresh by the candles between. Played in place,
     // the thing is read at the cursor, as the page showed it, and the run stops on its own last candle whatever the chart
-    // had there at the time.
-    private static JsonObject? SwingOrTrend(string term, List<Price> prices, List<Price> known, int index, int level, int cursor, bool inPlace, out int? keeps)
+    // had there at the time. A Trend that still runs has no last candle of its own: nothing of it is there after its last
+    // Swing's BoS, so played in place its section stops on that candle, the view ending there, and a section that follows
+    // (then) runs a few candles on, the view widened to hold them, to tell that nothing has been Confirmed since.
+    private static JsonObject? SwingOrTrend(string term, List<Price> prices, List<Price> known, int index, int level, int cursor, bool inPlace, out int? keeps, out JsonObject? then)
     {
         keeps = null;
+        then = null;
         // The chart's own layers mark what the texts speak of: the sawtooth, and for a Trend the points that make it.
         var layers = new List<string> { $"level{level}", "close", "sawtooth" };
         if (Locate(term, known, index, level) is not { } found)
@@ -417,6 +435,21 @@ public static partial class Explain
         };
         if (inPlace)
             section["known"] = readAt;
+        if (inPlace && term == "Trend" && TrendAt(known, index, level) is { Trend: { End: null, Parts.Count: > 0 } } open
+            && open.Index.TryGetValue(open.Trend.Parts[^1].BreakOfStructure.Time, out var lastBos) && lastBos < until)
+        {
+            var since = Math.Min(until, lastBos + CandlesSince);
+            section["until"] = lastBos;
+            section["view"] = new JsonArray(first, lastBos + 1);
+            section["speed"] = Pace(lastBos - first);
+            section["blocks"] = Layers(TrendBlocks.Select(x => x.Name).Except(TrendSince).ToArray());
+            then = new JsonObject
+            {
+                ["explain"] = term, ["at"] = index, ["level"] = level, ["from"] = lastBos, ["until"] = since,
+                ["view"] = new JsonArray(first, since + 1), ["speed"] = 8.0, ["known"] = readAt, ["blocks"] = Layers(TrendSince), ["follows"] = true,
+            };
+        }
+
         return section;
     }
 
@@ -935,7 +968,7 @@ public static partial class Explain
             return new Block(
             [
                 Define(t.Until, "Trend.ends", t.Direction),
-                Say(t.Until, $"Still running: no {t.Other} Confirmed since."),
+                Say(t.Until, $"Still running: no further {t.Swing} and no {t.Other} Confirmed since."),
             ], []);
         return new Block(
         [

@@ -279,7 +279,7 @@ public class ExplainTests
             "Twelve Upswings so far.",
             "Four Weak: the fourth, seventh, tenth and twelfth.",
             "Strength 66%: eight of twelve.",
-            "Still running: no Downswing Confirmed since.",
+            "Still running: no further Upswing and no Downswing Confirmed since.",
         }, texts);
     }
 
@@ -317,7 +317,7 @@ public class ExplainTests
         var trend = Tours.Compile(Explain.Tour("Trend", "btc-coinbase-1h", prices, "2023-01-02T12:00", seen: "2023-01-03T16:00")!, prices);
         Assert.AreEqual(0, trend.Errors.Count, string.Join("\n", trend.Errors));
         Assert.AreEqual(36, trend.Sections[0].Until, "The candle clicked.");
-        Assert.IsTrue(trend.Sections[0].Cues.Any(c => c.Text == "Still running: no Downswing Confirmed since."), "Seen from #36 the Uptrend still runs.");
+        Assert.IsTrue(trend.Sections[0].Cues.Any(c => c.Text == "Still running: no further Upswing and no Downswing Confirmed since."), "Seen from #36 the Uptrend still runs.");
         Assert.IsNull(Explain.Tour("Swing", "btc-coinbase-1h", prices, "2023-01-03T12:00", seen: "2023-01-03T13:00"), "At #61 the Upswing from #45 has no BoS yet, so the page did not show it.");
 
         // A 2nd order Swing the page showed at #100 is not on the chart at its own BoS, so the tour runs on to the cursor.
@@ -330,6 +330,26 @@ public class ExplainTests
         var ghosted = Tours.Compile(Explain.Tour("Trend", "btc-coinbase-1h", prices, "2023-01-13T02:00", seen: "2023-01-14T00:00")!, prices);
         Assert.AreEqual(0, ghosted.Errors.Count, string.Join("\n", ghosted.Errors));
         Assert.AreEqual(312, ghosted.Sections[0].Until);
+    }
+
+    [TestMethod]
+    public void Tour_OfATrendStillRunning_PlayedInPlace_StopsAtItsLastBosThenShowsTheCandlesSince()
+    {
+        var prices = Btc.From2023();
+
+        var def = Explain.Tour("Trend", "btc-coinbase-1h", prices, "2023-01-13T02:00", seen: "2023-01-14T00:00", inPlace: true)!;
+        var tour = Tours.Compile(def, prices);
+
+        Assert.AreEqual(0, tour.Errors.Count, string.Join("\n", tour.Errors));
+        Assert.AreEqual(2, tour.Sections.Count, "The Trend to its last BoS, then the candles since.");
+        var (trend, since) = (tour.Sections[0], tour.Sections[1]);
+        Assert.IsTrue(trend.Until < 312, "The Trend's section stops at its last Swing's BoS, before the cursor.");
+        Assert.AreEqual(trend.Until + 1, trend.View[1], "The view ends on the candle of the BoS.");
+        Assert.IsFalse(trend.Cues.Any(c => c.Text.StartsWith("Still running")), "Whether it has ended is told after.");
+        Assert.AreEqual(trend.Until, since.From, "The section that follows runs on from the BoS.");
+        Assert.AreEqual(Math.Min(312, trend.Until + 10), since.Until, "Ten candles on, or to the cursor.");
+        Assert.AreEqual(since.Until + 1, since.View[1], "The view widened to hold them.");
+        Assert.IsTrue(since.Cues.Any(c => c.Text == "Still running: no further Upswing and no Downswing Confirmed since."));
     }
 
     [TestMethod]
