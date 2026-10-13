@@ -36,44 +36,44 @@ public class KnownRangesTests
     {
         var prices = Training();
 
-        var all = KnownRanges.Read(prices, EnumPriceBasis.Close, 500, 2, Ranges.DefaultMinRetracement, Ranges.DefaultBand);
-        var before = KnownRanges.Read(prices.Take(80).ToList(), EnumPriceBasis.Close, 500, 2, Ranges.DefaultMinRetracement, Ranges.DefaultBand);
+        var all = KnownRanges.Holding(prices);
+        var before = KnownRanges.Holding(prices.Take(80).ToList());
 
         for (var i = 0; i < before.Length; i++)
             CollectionAssert.AreEqual(all[i].ToList(), before[i].ToList(), $"#{i}");
     }
 
     [TestMethod]
-    public void Holding_KeptOnDisk_IsReadBackAndOnlyNewCandlesWorkedOut()
+    public void Holding_IsTheRangeOfEveryCandleToEachReadAgain()
     {
-        var folder = Path.Combine(Path.GetTempPath(), $"ranges-{Guid.NewGuid():N}");
-        var all = Training();
-        string Described(IReadOnlyList<KnownRange>[] held) => string.Join(";", held.SelectMany((x, i) => x.Select(r => $"{i}:{r}")));
-        var expected = Described(KnownRanges.Read(all, EnumPriceBasis.Close, KnownStructure.Window, KnownStructure.Levels, Ranges.DefaultMinRetracement, Ranges.DefaultBand));
-        try
+        var prices = Btc.From2023().Take(2000).ToList();
+
+        var held = KnownRanges.Holding(prices);
+
+        Assert.IsTrue(held.Count(x => x.Count > 0) > 100, "Ranges hold over many of the candles.");
+        foreach (var t in Enumerable.Range(0, prices.Count).Where(t => t % 53 == 0 || t > prices.Count - 100))
         {
-            KnownRanges.CacheDirectory = folder;
+            // Each level's Range that holds at the candle, the last identified, as the Sawtooth and Ranges read the candles to it.
+            var read = prices.GetRange(0, t + 1);
+            var sawtooth = Sawtooth.Levels(read, EnumPriceBasis.Close, 64);
+            var plain = new List<string>();
+            for (var level = 1; level + 1 < sawtooth.Count; level++)
+            {
+                List<SwingOutline> Swings(int l) => Sawtooth.Swings(read, sawtooth, EnumPriceBasis.Close, l).OrderBy(x => x.Start.Time).ToList();
+                var swings = Swings(level);
+                var breaks = Sawtooth.MarketStructureBreaks(read, swings, EnumPriceBasis.Close);
+                var trends = Sawtooth.Trends(swings, breaks);
+                if (trends.Count == 0)
+                    continue;
+                var retracements = Sawtooth.Retracements(read, swings, Sawtooth.Candidates(read, sawtooth, EnumPriceBasis.Close, level), EnumPriceBasis.Close);
+                var finer = Sawtooth.MarketStructureBreaks(read, Swings(level + 1), EnumPriceBasis.Close);
+                if (Ranges.Find(read, EnumPriceBasis.Close, retracements, swings, trends, finer, Ranges.DefaultMinRetracement, Ranges.DefaultBand)
+                    .Where(x => x.End == null).MaxBy(x => x.Identified.Time) is { } range)
+                    plain.Add($"{level} {range.Direction} {range.Low.Price} {range.High.Price} {range.Retracement}% at {read.FindIndex(x => x.DateTime == range.Identified.Time)}");
+            }
 
-            // The first 1000 candles are worked out and kept; a list of the same candles reads them back.
-            var worked = Described(KnownRanges.Holding(all.Take(1000).ToList()));
-            var file = Directory.GetFiles(folder).Single();
-            var written = File.GetLastWriteTimeUtc(file);
-            Assert.AreEqual(worked, Described(KnownRanges.Holding(all.Take(1000).ToList())));
-            Assert.AreEqual(written, File.GetLastWriteTimeUtc(file), "Nothing new is kept for the same candles.");
-
-            // With candles added, the file's are used and the rest worked out: the whole is as if worked out afresh.
-            Assert.AreEqual(expected, Described(KnownRanges.Holding(all.ToList())));
-            Assert.AreEqual(1, Directory.GetFiles(folder).Length, "A series that grows keeps the one file.");
-
-            // Other settings are kept in a file of their own.
-            KnownRanges.Holding(all.ToList(), minRetracement: 60);
-            Assert.AreEqual(2, Directory.GetFiles(folder).Length);
-        }
-        finally
-        {
-            KnownRanges.CacheDirectory = null;
-            if (Directory.Exists(folder))
-                Directory.Delete(folder, recursive: true);
+            Assert.AreEqual(string.Join("; ", plain),
+                string.Join("; ", held[t].OrderBy(x => x.Level).Select(x => $"{x.Level} {x.Direction} {x.Low} {x.High} {x.Retracement}% at {x.Identified}")), $"#{t}");
         }
     }
 

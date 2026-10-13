@@ -1,17 +1,21 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
 namespace Gradient.CryptoAnalysis.Research;
 
 /// <summary>
-/// What market structure showed at each candle's close, as a chart of the last Window candles to that one would show it:
-/// worked out from those candles alone, so it is what could have been known then. A level is that chart's level, so level 1
-/// is the structure of the window as a whole and each level after it finer. Working from a window rather than every candle
-/// before keeps the cost of a candle the same however long the series, where the replay's grows with it.
+/// What market structure showed at each candle's close, as it was known then: looked up in the structure store of the
+/// series (see <see cref="StructureStore"/>), which reads every candle from the first once and holds how each thing stood
+/// from candle to candle. So it is what could have been known at the candle, and the same structure the pages draw. A
+/// level is the store's at that candle: level 1 is the structure of all the candles to it and each level after it finer,
+/// and a thing's level can be another at a later candle.
 /// </summary>
 public static class KnownStructure
 {
-    public const int Window = 500;
-    public const int Levels = 4;
+    /// <summary>
+    /// The finest level a step or a condition can name.
+    /// </summary>
+    public const int Levels = 16;
 
     /// <summary>
     /// What a level can show at a candle: a break of structure up or down on it, a market structure break up or down on it
@@ -27,119 +31,62 @@ public static class KnownStructure
         Downtrend,
     }
 
-    private static readonly int Flags = Enum.GetValues<EnumFlag>().Length;
-
     private static readonly IReadOnlyList<KnownBreak> None = [];
 
-    // Each series' flags and breaks once, kept while the series is.
-    private static readonly ConditionalWeakTable<IReadOnlyList<Price>, Lazy<(int[] Masks, IReadOnlyList<KnownBreak>[] Breaks)>> Known = [];
+    // The breaks each candle's close made, and the levels a trend held at there each way, a bit a level.
+    private sealed record Known(IReadOnlyList<KnownBreak>[] Breaks, int[] Uptrends, int[] Downtrends);
 
-    private static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) Of(IReadOnlyList<Price> prices) =>
-        Known.GetValue(prices, p => new Lazy<(int[], IReadOnlyList<KnownBreak>[])>(() => Kept(p))).Value;
+    // Each series' breaks and trends once, kept while the series is.
+    private static readonly ConditionalWeakTable<IReadOnlyList<Price>, Lazy<Known>> Kept = [];
+
+    private static Known Of(IReadOnlyList<Price> prices) =>
+        Kept.GetValue(prices, p => new Lazy<Known>(() => Of(Store(p, Ranges.DefaultMinRetracement, Ranges.DefaultBand)))).Value;
 
     /// <summary>
-    /// The folder each series' flags and breaks are also kept in, from one run to the next; null to keep them in memory
-    /// alone. What is kept for a series is used again while its candles are as they were, and when candles have been added
-    /// after them only the new ones are worked out. The folder is for one build of the rules: another build's must not be
-    /// read.
+    /// Where the structure store of a series is had from when something holds one already, as the server does its
+    /// datasets': given the series and the range settings, the least retracement and the band. Null, or a null answer,
+    /// to read the series here.
     /// </summary>
-    public static string? CacheDirectory { get; set; }
+    public static Func<IReadOnlyList<Price>, double, double, StructureStore?>? Stores { get; set; }
 
-    private const int FileFormat = 1;
+    // The stores read here, each for as long as something still has it: what is worked out of one is kept, not the store.
+    private static readonly ConditionalWeakTable<IReadOnlyList<Price>, ConcurrentDictionary<(double, double), WeakReference<StructureStore>>> Read = [];
 
-    // A series' flags and breaks, from the folder they are kept in when that has them, and kept there once worked out.
-    private static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) Kept(IReadOnlyList<Price> prices)
+    /// <summary>
+    /// The structure store of a series on its closes, with ranges of a least retracement and a band: the one held for it
+    /// (see <see cref="Stores"/>), or else read from its candles.
+    /// </summary>
+    public static StructureStore Store(IReadOnlyList<Price> prices, double minRetracement, double band)
     {
-        if (CacheDirectory is not { } folder || prices.Count == 0)
-            return Read(prices, EnumPriceBasis.Close, Window, Levels);
+        if (Stores?.Invoke(prices, minRetracement, band) is { } held)
+            return held;
 
-        // A series is known by its first candles, which stay as they are while candles are added after them.
-        var path = Path.Combine(folder, $"known-w{Window}-l{Levels}-{PriceFingerprint.Of(prices, Math.Min(prices.Count, Window)):x16}.bin");
-        var had = Load(path, prices);
-        if (had?.Masks.Length == prices.Count)
-            return had.Value;
-
-        var read = Read(prices, EnumPriceBasis.Close, Window, Levels, had);
-        Save(path, prices, read);
-        return read;
-    }
-
-    // What a file has of a series: the flags and breaks of its first candles, when those candles are still as they were.
-    private static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks)? Load(string path, IReadOnlyList<Price> prices)
-    {
-        try
+        var read = Read.GetValue(prices, _ => new());
+        lock (read)
         {
-            if (!File.Exists(path))
-                return null;
-            using var reader = new BinaryReader(File.OpenRead(path));
-            if (reader.ReadInt32() != FileFormat)
-                return null;
-            var count = reader.ReadInt32();
-            if (count > prices.Count || reader.ReadUInt64() != PriceFingerprint.Of(prices, count))
-                return null;
-
-            var masks = new int[count];
-            var breaks = new IReadOnlyList<KnownBreak>[count];
-            for (var t = 0; t < count; t++)
-            {
-                masks[t] = reader.ReadInt32();
-                var made = reader.ReadByte();
-                breaks[t] = made == 0 ? None : Enumerable.Range(0, made).Select(_ => new KnownBreak(reader.ReadByte(), (EnumKnownBreak)reader.ReadByte(),
-                    (EnumSwingDirection)reader.ReadByte(), reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32(), reader.ReadBoolean())).ToArray();
-            }
-
-            return (masks, breaks);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
-
-    // Keeps a series' flags and breaks: written beside the file and moved over it, so a reader never has half of one. A
-    // folder that cannot be written to keeps nothing.
-    private static void Save(string path, IReadOnlyList<Price> prices, (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) read)
-    {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var writing = $"{path}.{Guid.NewGuid():N}.tmp";
-            using (var writer = new BinaryWriter(File.Create(writing)))
-            {
-                writer.Write(FileFormat);
-                writer.Write(prices.Count);
-                writer.Write(PriceFingerprint.Of(prices, prices.Count));
-                for (var t = 0; t < prices.Count; t++)
-                {
-                    writer.Write(read.Masks[t]);
-                    writer.Write((byte)read.Breaks[t].Count);
-                    foreach (var b in read.Breaks[t])
-                    {
-                        writer.Write((byte)b.Level);
-                        writer.Write((byte)b.Kind);
-                        writer.Write((byte)b.Direction);
-                        writer.Write(b.From);
-                        writer.Write(b.Begins);
-                        writer.Write(b.Run);
-                        writer.Write(b.Weak);
-                    }
-                }
-            }
-
-            File.Move(writing, path, overwrite: true);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
+            if (read.TryGetValue((minRetracement, band), out var had) && had.TryGetTarget(out var store))
+                return store;
+            store = StructureStore.Read(prices as List<Price> ?? prices.ToList(), EnumPriceBasis.Close, minRetracement, band);
+            read[(minRetracement, band)] = new WeakReference<StructureStore>(store);
+            return store;
         }
     }
 
     /// <summary>
-    /// The candles at which a level shows a flag, worked out once a series and kept.
+    /// The candles at which a level shows a flag, as known at each; worked out once a series and kept.
     /// </summary>
     public static bool[] Met(IReadOnlyList<Price> prices, int level, EnumFlag flag)
     {
-        var bit = 1 << Bit(level, flag);
-        return Of(prices).Masks.Select(x => (x & bit) != 0).ToArray();
+        var known = Of(prices);
+        if (flag is EnumFlag.Uptrend or EnumFlag.Downtrend)
+        {
+            var bit = level is >= 1 and <= Levels ? 1 << (level - 1) : 0;
+            return (flag == EnumFlag.Uptrend ? known.Uptrends : known.Downtrends).Select(x => (x & bit) != 0).ToArray();
+        }
+
+        var kind = flag is EnumFlag.BreakUp or EnumFlag.BreakDown ? EnumKnownBreak.BreakOfStructure : EnumKnownBreak.MarketStructureBreak;
+        var direction = flag is EnumFlag.BreakUp or EnumFlag.BullishMarketStructureBreak ? EnumSwingDirection.Up : EnumSwingDirection.Down;
+        return known.Breaks.Select(x => x.Any(b => b.Level == level && b.Kind == kind && b.Direction == direction)).ToArray();
     }
 
     /// <summary>
@@ -148,96 +95,47 @@ public static class KnownStructure
     /// </summary>
     public static IReadOnlyList<KnownBreak>[] Breaks(IReadOnlyList<Price> prices) => Of(prices).Breaks;
 
-    /// <summary>
-    /// Each candle's flags at levels 1 to levels, a bit a level and flag (see Bit), each from the window of candles to it.
-    /// </summary>
-    public static int[] Masks(IReadOnlyList<Price> prices, EnumPriceBasis basis, int window, int levels) => Read(prices, basis, window, levels).Masks;
-
-    /// <summary>
-    /// Each candle's flags, as <see cref="Masks"/> gives them, and the breaks its close made, each from the window of candles
-    /// to it.
-    /// </summary>
-    public static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) Read(IReadOnlyList<Price> prices, EnumPriceBasis basis, int window, int levels) =>
-        Read(prices, basis, window, levels, null);
-
-    // With what is had of the series' first candles already, only the candles after them are worked out.
-    private static (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks) Read(IReadOnlyList<Price> prices, EnumPriceBasis basis, int window, int levels,
-        (int[] Masks, IReadOnlyList<KnownBreak>[] Breaks)? had)
+    // What each candle of a store's shows, as known at it.
+    private static Known Of(StructureStore store)
     {
-        var list = prices as List<Price> ?? prices.ToList();
-        var masks = new int[list.Count];
-        var breaks = new IReadOnlyList<KnownBreak>[list.Count];
-        var done = had?.Masks.Length ?? 0;
-        if (had is { } kept)
+        var breaks = new IReadOnlyList<KnownBreak>[store.Candles];
+        var (uptrends, downtrends) = (new int[store.Candles], new int[store.Candles]);
+
+        // A trend's count and where it begins, at each break of structure that adds a swing to it.
+        var runs = new Dictionary<(int At, int Level, EnumSwingDirection Direction), (int Run, int Begins)>();
+        foreach (var (trend, from, to) in store.TrendStretches())
         {
-            Array.Copy(kept.Masks, masks, done);
-            Array.Copy(kept.Breaks, breaks, done);
+            if (trend.Parts.Count > 0 && trend.Parts[^1].Break == from)
+                runs[(from, trend.Level, trend.Direction)] = (trend.Swings, trend.Start);
+            if (trend.End != null || trend.Level > Levels)
+                continue;
+            var (held, bit) = (trend.Direction == EnumSwingDirection.Up ? uptrends : downtrends, 1 << (trend.Level - 1));
+            for (var t = from; t <= to; t++)
+                held[t] |= bit;
         }
 
-        Parallel.For(done, list.Count, t =>
+        for (var t = 0; t < store.Candles; t++)
         {
-            var from = Math.Max(0, t + 1 - window);
-            (masks[t], breaks[t]) = Seen(list.GetRange(from, t + 1 - from), from, basis, levels);
-        });
-        return (masks, breaks);
-    }
-
-    /// <summary>
-    /// The bit of a level's flag in a candle's mask.
-    /// </summary>
-    public static int Bit(int level, EnumFlag flag) => (level - 1) * Flags + (int)flag;
-
-    // What the last of these candles shows, read from them alone; first is where they begin in the series, which a break's
-    // From counts from.
-    private static (int Mask, IReadOnlyList<KnownBreak> Breaks) Seen(List<Price> prices, int first, EnumPriceBasis basis, int levels)
-    {
-        var last = prices[^1].DateTime;
-        var sawtooth = Sawtooth.Levels(prices, basis, levels);
-        var mask = 0;
-        List<KnownBreak>? made = null;
-        for (var level = 1; level <= levels && level < sawtooth.Count; level++)
-        {
-            var swings = Sawtooth.Swings(prices, sawtooth, basis, level);
-            var breaks = Sawtooth.MarketStructureBreaks(prices, swings, basis);
-            var trends = Sawtooth.Trends(swings, breaks);
-            void Set(EnumFlag flag, bool on) => mask |= on ? 1 << Bit(level, flag) : 0;
-
-            Set(EnumFlag.BreakUp, swings.Any(x => x.Direction == EnumSwingDirection.Up && x.BreakOfStructure?.Time == last));
-            Set(EnumFlag.BreakDown, swings.Any(x => x.Direction == EnumSwingDirection.Down && x.BreakOfStructure?.Time == last));
-            Set(EnumFlag.BullishMarketStructureBreak, breaks.Any(x => x.Type == EnumAnnotationType.BullishMarketStructureBreak && x.Break.Time == last));
-            Set(EnumFlag.BearishMarketStructureBreak, breaks.Any(x => x.Type == EnumAnnotationType.BearishMarketStructureBreak && x.Break.Time == last));
-            Set(EnumFlag.Uptrend, trends.Any(x => x.Direction == EnumSwingDirection.Up && x.End == null));
-            Set(EnumFlag.Downtrend, trends.Any(x => x.Direction == EnumSwingDirection.Down && x.End == null));
-
-            if (!swings.Any(x => x.BreakOfStructure?.Time == last) && !breaks.Any(x => x.Break.Time == last))
-                continue;
-
-            int At(DateTime time) => first + prices.FindIndex(x => x.DateTime == time);
-            // The Swings in the order they were Confirmed, as a Trend counts them.
-            var ordered = swings.Where(x => x.BreakOfStructure != null).OrderBy(x => x.BreakOfStructure!.Time).ToList();
-            for (var i = 0; i < ordered.Count; i++)
+            List<KnownBreak>? made = null;
+            // The swings whose break of structure is this candle's close.
+            foreach (var swing in store.Swings(t, t, t))
             {
-                var swing = ordered[i];
-                if (swing.BreakOfStructure!.Time != last)
-                    continue;
-                var run = 1;
-                while (i - run >= 0 && ordered[i - run].Direction == swing.Direction)
-                    run++;
                 var against = swing.Direction == EnumSwingDirection.Up ? EnumAnnotationType.BearishMarketStructureBreak : EnumAnnotationType.BullishMarketStructureBreak;
-                var weak = breaks.Any(b => b.Type == against && b.Break.Time > swing.Start.Time && b.Break.Time < last);
-                (made ??= []).Add(new KnownBreak(level, EnumKnownBreak.BreakOfStructure, swing.Direction, At(swing.Start.Time),
-                    At(ordered[i - run + 1].Start.Time), run, weak));
+                var weak = store.Breaks(swing.Start + 1, t - 1, t).Any(x => x.Level == swing.Level && x.Type == against);
+                var (run, begins) = runs.TryGetValue((t, swing.Level, swing.Direction), out var counted) ? counted : (1, swing.Start);
+                (made ??= []).Add(new KnownBreak(swing.Level, EnumKnownBreak.BreakOfStructure, swing.Direction, swing.Start, begins, run, weak));
             }
 
-            foreach (var b in breaks.Where(x => x.Break.Time == last))
+            foreach (var b in store.Breaks(t, t, t))
             {
                 var direction = b.Type == EnumAnnotationType.BullishMarketStructureBreak ? EnumSwingDirection.Up : EnumSwingDirection.Down;
-                var from = At(b.Reference.Time);
-                (made ??= []).Add(new KnownBreak(level, EnumKnownBreak.MarketStructureBreak, direction, from, from));
+                (made ??= []).Add(new KnownBreak(b.Level, EnumKnownBreak.MarketStructureBreak, direction, b.Reference, b.Reference));
             }
+
+            breaks[t] = made?.OrderBy(x => x.Level).ThenBy(x => x.Kind).ToList() ?? None;
         }
 
-        return (mask, made ?? None);
+        return new Known(breaks, uptrends, downtrends);
     }
 }
 
@@ -249,9 +147,9 @@ public enum EnumKnownBreak
 
 /// <summary>
 /// A break a level shows on a candle's close, with what it was read from. A break of structure Confirms a Swing: Direction
-/// is the Swing's, From the candle the Swing begins at, Run how many Swings in a row that way it makes, as the chart of the
-/// window counts them (two or more are a Trend), Begins the candle the first of those begins at, and Weak whether the Swing
-/// has a market structure break inside it. A market structure break has the direction it breaks in, up for a bullish one,
-/// and From and Begins are the candle of the Swing Low or Swing High it closes beyond.
+/// is the Swing's, From the candle the Swing begins at, Run how many Swings in a row that way it makes, as known at that
+/// candle (two or more are a Trend), Begins the candle the first of those begins at, and Weak whether the Swing has a
+/// market structure break inside it. A market structure break has the direction it breaks in, up for a bullish one, and
+/// From and Begins are the candle of the Swing Low or Swing High it closes beyond.
 /// </summary>
 public sealed record KnownBreak(int Level, EnumKnownBreak Kind, EnumSwingDirection Direction, int From, int Begins, int Run = 0, bool Weak = false);

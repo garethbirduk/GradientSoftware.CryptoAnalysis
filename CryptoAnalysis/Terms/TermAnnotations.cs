@@ -140,6 +140,37 @@ public sealed record RangeOutline(
     double Band,
     PricePoint? End)
 {
+    /// <summary>
+    /// For a range found by swings (see <see cref="SwingRanges"/>), which has no retracement or band: how many swings one
+    /// level finer are confirmed inside it, and how many of those are weak. Both 0 for a range found by its retracement.
+    /// Its From is then the end of the leg it came from, and Low and High are the leg's two ends.
+    /// </summary>
+    public int Swings { get; init; }
+
+    public int Weak { get; init; }
+
+    /// <summary>
+    /// For a range found by swings, the swings counted: those one level finer confirmed inside its leg, in the order they
+    /// broke structure.
+    /// </summary>
+    public IReadOnlyList<SwingOutline> Inner { get; init; } = [];
+
+    /// <summary>
+    /// Compares the ranges by value, the swings inside included, so a replay can tell when one has changed.
+    /// </summary>
+    public bool Equals(RangeOutline? other)
+    {
+        return other is not null && Level == other.Level && Direction == other.Direction && From == other.From && Low == other.Low && High == other.High
+            && Identified == other.Identified && Retracement == other.Retracement && Band == other.Band && End == other.End && Swings == other.Swings
+            && Weak == other.Weak && Inner.SequenceEqual(other.Inner);
+    }
+
+    /// <inheritdoc/>
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Level, Direction, Low, High, Identified, End, Swings, Inner.Count);
+    }
+
     public double Height => High.Price - Low.Price;
 
     public double BandLow => Low.Price - Height * Band / 100;

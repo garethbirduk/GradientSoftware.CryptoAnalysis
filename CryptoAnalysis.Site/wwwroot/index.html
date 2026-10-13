@@ -251,22 +251,22 @@
   /* Explain, pressed while any explanation is on, in the explanations' purple. */
   #tour-editor button[data-ed="explain"] { color: #8b5cf6; border-color: #8b5cf6; }
   #tour-editor button[data-ed="explain"][aria-pressed="true"] { background: #8b5cf6; color: #fff; }
-  :is(#similar, #similar-trades) { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
-  :is(#similar, #similar-trades)::backdrop { background: rgba(0, 0, 0, .35); }
-  :is(#similar, #similar-trades) h4 { margin: 0 0 4px; font-size: 15px; }
-  :is(#similar, #similar-trades) p { margin: 0 0 10px; color: var(--muted); }
-  :is(#similar, #similar-trades) .sim-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 12px; }
-  :is(#similar, #similar-trades) .sim-checks label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-  :is(#similar, #similar-trades) .sim-foot { display: flex; align-items: center; gap: 8px; }
-  :is(#similar, #similar-trades) button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
-  :is(#similar, #similar-trades) button:hover { background: var(--chip); }
-  :is(#similar, #similar-trades) button.go { background: var(--accent); border-color: var(--accent); color: #fff; }
-  :is(#similar, #similar-trades) .sim-count { margin: 12px 0 6px; color: var(--muted); }
-  :is(#similar, #similar-trades) ol { margin: 0; padding: 0; list-style: none; max-height: 44vh; overflow-y: auto; border-top: 1px solid var(--border); }
-  :is(#similar, #similar-trades) li a { display: grid; grid-template-columns: 5.5em 10.5em 1fr; gap: 10px; padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--text); text-decoration: none; font-variant-numeric: tabular-nums; }
-  :is(#similar, #similar-trades) li a[href]:hover { background: var(--chip); }
-  :is(#similar, #similar-trades) li a:not([href]) { color: var(--muted); }
-  :is(#similar, #similar-trades) li.current a { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
+  :is(#similar, #similar-trades, #occurrences) { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
+  :is(#similar, #similar-trades, #occurrences)::backdrop { background: rgba(0, 0, 0, .35); }
+  :is(#similar, #similar-trades, #occurrences) h4 { margin: 0 0 4px; font-size: 15px; }
+  :is(#similar, #similar-trades, #occurrences) p { margin: 0 0 10px; color: var(--muted); }
+  :is(#similar, #similar-trades, #occurrences) .sim-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 12px; }
+  :is(#similar, #similar-trades, #occurrences) .sim-checks label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  :is(#similar, #similar-trades, #occurrences) .sim-foot { display: flex; align-items: center; gap: 8px; }
+  :is(#similar, #similar-trades, #occurrences) button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+  :is(#similar, #similar-trades, #occurrences) button:hover { background: var(--chip); }
+  :is(#similar, #similar-trades, #occurrences) button.go { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :is(#similar, #similar-trades, #occurrences) .sim-count { margin: 12px 0 6px; color: var(--muted); }
+  :is(#similar, #similar-trades, #occurrences) ol { margin: 0; padding: 0; list-style: none; max-height: 44vh; overflow-y: auto; border-top: 1px solid var(--border); }
+  :is(#similar, #similar-trades, #occurrences) li a { display: grid; grid-template-columns: 5.5em 10.5em 1fr; gap: 10px; padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--text); text-decoration: none; font-variant-numeric: tabular-nums; }
+  :is(#similar, #similar-trades, #occurrences) li a[href]:hover { background: var(--chip); }
+  :is(#similar, #similar-trades, #occurrences) li a:not([href]) { color: var(--muted); }
+  :is(#similar, #similar-trades, #occurrences) li.current a { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
   .tour-errors ul { margin: 6px 0 0; padding-left: 20px; }
   body.picking .chart .nsewdrag { cursor: cell !important; }
   body.video .topnav, body.video aside, body.video #replaybar, body.video .term-head, body.video .tour-controls,
@@ -512,8 +512,8 @@
   .strat-trades tr.bad td { color: var(--bad); }
   .strat-trades td.act { white-space: nowrap; text-align: right; }
   .strat-trades tr.out td:not(.inc) { opacity: .4; }
-  .strat-trades th button.sort, :is(#similar, #similar-trades) .strat-trades th button.sort { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
-  .strat-trades th button.sort:hover, :is(#similar, #similar-trades) .strat-trades th button.sort:hover { color: var(--accent); background: none; }
+  .strat-trades th button.sort, :is(#similar, #similar-trades, #occurrences) .strat-trades th button.sort { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+  .strat-trades th button.sort:hover, :is(#similar, #similar-trades, #occurrences) .strat-trades th button.sort:hover { color: var(--accent); background: none; }
   .strat-trades th[aria-sort] button.sort { color: var(--accent); }
   .strat-trades .inc { width: 1.5em; padding-right: 6px; }
   .strat-trades button.inc { padding: 0; border: 0; background: none; color: var(--accent); font-size: 15px; line-height: 1; cursor: pointer; }
@@ -566,11 +566,16 @@
   .strat-trades td.act button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; margin-left: 4px; cursor: pointer; }
   .strat-trades td.act button:hover { background: var(--chip); }
   #similar-trades { width: min(900px, calc(100vw - 32px)); }
-  :is(#similar, #similar-trades) .strat-trades { max-height: 50vh; }
+  :is(#similar, #similar-trades, #occurrences) .strat-trades { max-height: 50vh; }
   #similar { width: min(760px, calc(100vw - 32px)); }
-  #similar .strat-trades td.act { color: var(--muted); }
-  #similar .strat-trades td.act a { padding: 2px 10px; border: 1px solid var(--accent); border-radius: 5px; color: var(--accent); font-weight: 600; text-decoration: none; }
-  #similar .strat-trades td.act a:hover { background: var(--chip); }
+  #occurrences { width: min(980px, calc(100vw - 32px)); }
+  :is(#similar, #occurrences) .strat-trades td.act { color: var(--muted); white-space: nowrap; }
+  :is(#similar, #occurrences) .strat-trades td.act a { padding: 2px 10px; border: 1px solid var(--accent); border-radius: 5px; color: var(--accent); font-weight: 600; text-decoration: none; }
+  :is(#similar, #occurrences) .strat-trades td.act a:hover { background: var(--chip); }
+  #occurrences .strat-trades td.act button { padding: 2px 10px; margin-right: 6px; }
+  /* The List button: on, the next layer clicked is listed and not turned on or off. */
+  .layerbar .all-none button[data-list][aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .layout.listing .layer[data-layer] { cursor: help; }
   .won { color: var(--up); } .lost { color: var(--down); }
   @media (max-width: 760px) { .strat { grid-template-columns: 1fr; } }
   /* Strategies on charts: the section's add form, each strategy's remove button, and Find similar. */
@@ -645,7 +650,10 @@ const SECTIONS = [
   { name: 'Indicators', layers: [{ id: 'BullishMarketStructureBreak' }, { id: 'msbLevelUp', label: 'MSB↑ level', term: 'BullishMarketStructureBreak' },
     { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' },
     { id: 'Retracement', label: 'Retracement' }, { id: 'Range', label: 'Range' }, { id: 'rangeBands', label: 'Range bands', term: 'Range' },
-    { id: 'rangeZones', label: 'Range zones', term: 'Range' }] },
+    { id: 'rangeZones', label: 'Range zones', term: 'Range' },
+    // A Range found by Swings: the price inside the last leg of an order while the order after it Confirms a count of
+    // Swings. With the second on, only those with so many Weak Swings among them.
+    { id: 'SwingRange', label: 'Range by Swings', term: 'Range' }, { id: 'swingRangeWeak', label: 'Weak Swings in it', term: 'Range' }] },
 ].map(s => ({ ...s, layers: s.layers.map(l => ({ ...l, label: l.label ?? TERMS.get(l.id)?.label ?? l.id })) }));
 // The strategies added to the charts (see Strategies on charts), a layer each, filled in once the page's settings are read.
 const STRATEGY_SECTION = { name: 'Strategies', strategies: true, layers: [] };
@@ -659,7 +667,11 @@ const SETTINGS = {
   Retracement: { key: 'retracement', min: 1, max: 99, fallback: 75, title: 'Least retracement to mark, as a percentage of the move it comes back along', unit: '%', remote: true },
   Range: { key: 'band', min: 0, max: 99, fallback: 20, title: 'Band either side of a range, as a percentage of its height: a close beyond it ends the range', unit: '%', remote: true },
   rangeZones: { key: 'zone', min: 1, max: 49, fallback: 25, title: 'Depth of the buy-low and sell-high zones from the range\'s edges, as a percentage of its height; each zone reaches out to the band', unit: '%' },
+  SwingRange: { key: 'rangeSwings', min: 1, max: 99, fallback: 4, title: 'How many Swings one order finer must be Confirmed inside a leg, with the price between its two ends, for a Range to be found there', unit: '', remote: true },
+  swingRangeWeak: { key: 'rangeWeak', min: 1, max: 99, fallback: 2, title: 'With this on, a Range by Swings is shown only once this many of the Swings inside it are Weak', unit: '' },
 };
+// The colour of a Range found by Swings, apart from the Range found by its Retracement.
+const SWING_RANGE_COLOR = '#0e7490';
 const LAYERS = SECTIONS.flatMap(s => s.layers);
 const LEVEL_IDS = LAYERS.filter(l => l.level !== undefined).map(l => l.id);
 const POINT_LAYERS = ['HigherHigh', 'HigherLow', 'LowerHigh', 'LowerLow'];
@@ -814,6 +826,8 @@ function swatch(layer) {
   if (layer.id.startsWith('msbLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="1.5 2.5"/>`);
   if (layer.id === 'rangeBands') return svg(`<line x1="1" y1="3" x2="21" y2="3" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/><line x1="1" y1="11" x2="21" y2="11" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/>`);
   if (layer.id === 'rangeZones') return svg(`<rect x="1" y="1" width="20" height="5" fill="${withAlpha(css('--down'), 0.25)}"/><rect x="1" y="8" width="20" height="5" fill="${withAlpha(css('--up'), 0.25)}"/><line x1="1" y1="6" x2="21" y2="6" stroke="${TERMS.get('Range')?.color}" stroke-width="1" stroke-dasharray="3 2"/><line x1="1" y1="8" x2="21" y2="8" stroke="${TERMS.get('Range')?.color}" stroke-width="1" stroke-dasharray="3 2"/>`);
+  if (layer.id === 'SwingRange') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(SWING_RANGE_COLOR, 0.12)}" stroke="${SWING_RANGE_COLOR}" stroke-width="1.5"/>`);
+  if (layer.id === 'swingRangeWeak') return svg(`<rect x="2" y="2" width="18" height="10" fill="none" stroke="${SWING_RANGE_COLOR}" stroke-width="1.5"/><path d="M5 9 L9 5 L13 9 L17 5" fill="none" stroke="${SWING_RANGE_COLOR}" stroke-width="1.3"/>`);
   if (layer.id === 'ghostRanges') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(css('--close'), 0.1)}" stroke="${css('--close')}" stroke-dasharray="1.5 2"/>`);
   if (layer.id.startsWith('bosLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="4 3"/>`);
   const term = TERMS.get(layer.term ?? layer.id);
@@ -823,7 +837,7 @@ function swatch(layer) {
 const setting = id => state.runMin?.[SETTINGS[id].key] ?? SETTINGS[id].fallback;
 const runMin = setting;
 // The range settings the local server is asked for, as part of every replay request.
-const rangeQuery = () => `&retracement=${setting('Retracement')}&band=${setting('Range')}`;
+const rangeQuery = () => `&retracement=${setting('Retracement')}&band=${setting('Range')}&rangeSwings=${setting('SwingRange')}`;
 
 // One section of the layer bar. Its heading turns the whole section on, or off when it is all on already; the arrow
 // beside it folds the section away, leaving the heading and its count. Folded sections are remembered across pages.
@@ -853,7 +867,8 @@ function layerSection(s, i, foldable = true) {
 function layerBar() {
   return `<div class="layerbar" role="toolbar" aria-orientation="vertical" aria-label="Chart layers">
     <div class="all-none"><button type="button" data-all="all" title="Show every chart layer (the replay settings, the levels and the price stay as they are)">All</button>
-      <button type="button" data-all="none" title="Hide every chart layer (the replay settings, the levels and the price stay as they are)">None</button></div>
+      <button type="button" data-all="none" title="Hide every chart layer (the replay settings, the levels and the price stay as they are)">None</button>
+      <button type="button" data-list aria-pressed="false" title="List where something occurs: click List, then a layer, for every place it is found in the dataset, each with a button to show it on the chart and one to analyse it">List</button></div>
     ${SECTIONS.map((s, i) => s.levels || (currentPage === 'Chart' && (s.name === 'Replay' || s.name === 'Ghosts')) ? '' : layerSection(s, i)).join('')}</div>`;
 }
 
@@ -951,7 +966,17 @@ function wireLayerBar(root) {
     };
     for (const name of ['input', 'change', 'click']) slide.addEventListener(name, move);
   });
+  // With List on, the next layer clicked is listed (see openOccurrences) and stays as it was.
+  const listing = value => {
+    root.classList.toggle('listing', value);
+    root.querySelectorAll('[data-list]').forEach(b => b.setAttribute('aria-pressed', value));
+  };
+  root.querySelectorAll('[data-list]').forEach(b => b.addEventListener('click', () => listing(!root.classList.contains('listing'))));
   root.querySelectorAll('.layer[data-layer]').forEach(b => b.addEventListener('click', () => {
+    if (root.classList.contains('listing')) {
+      listing(false);
+      return openOccurrences(b.dataset.layer);
+    }
     const id = b.dataset.layer, layers = layersOf(currentPage);
     if (LEVEL_IDS.includes(id)) analysisSlide = null;
     sync(on(id) ? layers.filter(x => x !== id) : [...layers, id]);
@@ -1125,9 +1150,22 @@ function shownRetracements(ex) {
     .map(r => ({ ...r, level, reached: r.steps.find(s => s.percent >= min) })).filter(r => r.reached));
 }
 
+// The Ranges found by their Retracement; those found by Swings, which have a count of Swings, are shown by a layer of
+// their own (see shownSwingRanges).
 function shownRangeBoxes(ex) {
-  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.rangesByLevel?.[level] ?? []).map(g => ({ ...g, level })));
+  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.rangesByLevel?.[level] ?? []).filter(g => !g.swings).map(g => ({ ...g, level })));
 }
+
+// The Ranges found by Swings at the levels selected: with Weak Swings in it on, only those with so many Weak Swings.
+function shownSwingRanges(ex) {
+  const weak = on('swingRangeWeak') ? setting('swingRangeWeak') : 0;
+  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.rangesByLevel?.[level] ?? []).filter(g => g.swings && g.weak >= weak).map(g => ({ ...g, level })));
+}
+
+const swingRangeHover = g => `Range by Swings · level ${g.level}<br>${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}: the two ends of the leg` +
+  `<br>identified ${fmtTime(g.identified.time)}` +
+  `<br>${g.swings} ${g.direction === 'Up' ? 'Downswings' : 'Upswings'} one order finer inside it, ${g.weak} Weak` +
+  `<br>${g.end ? `ended ${fmtTime(g.end.time)}, close ${fmtPrice(g.end.price)} ${g.endedAbove ? 'above its high' : 'below its low'}` : 'holds'}`;
 
 const rangeOrigin = g => g.direction === 'Down' ? 'a downtrend' : 'an uptrend';
 const rangeHover = g => `Range · level ${g.level} · out of ${rangeOrigin(g)}<br>${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}` +
@@ -1139,9 +1177,16 @@ const rangeHover = g => `Range · level ${g.level} · out of ${rangeOrigin(g)}<b
 // between its low and high, with its bands as dashed lines beyond. The zones are the training's discount and premium:
 // the buy-low zone from the lower band up to the zone setting above the low, the sell-high zone from as far below the
 // high up to the upper band.
-function drawRanges(ex, traces) {
-  if (!on('Range') && !on('rangeBands') && !on('rangeZones')) return;
+function drawRanges(ex, traces, swingBox) {
   const last = ex.prices.t[ex.prices.t.length - 1];
+  // A Range found by Swings is its box alone: it has no band, and ends at a close beyond the box. The Swings one order
+  // finer that it was found by are drawn with it, those inside its leg and no others, whether or not their level is on.
+  for (const g of on('SwingRange') ? shownSwingRanges(ex) : []) {
+    ex.levelsDrawn?.add(g.level);
+    drawRange(traces, g, g.end?.time ?? last, { box: true, bands: false, zones: null, hover: swingRangeHover(g), color: SWING_RANGE_COLOR, name: 'Range by Swings' });
+    for (const w of swingBox ? g.inner ?? [] : []) traces.push({ ...swingBox(w, false), lv: g.level });
+  }
+  if (!on('Range') && !on('rangeBands') && !on('rangeZones')) return;
   for (const g of shownRangeBoxes(ex)) {
     ex.levelsDrawn?.add(g.level);
     drawRange(traces, g, g.end?.time ?? last, { box: on('Range'), bands: on('rangeBands') || on('rangeZones'), zones: on('rangeZones') ? setting('rangeZones') : null });
@@ -1151,10 +1196,11 @@ function drawRanges(ex, traces) {
 // One Range's box, zones and bands, from the candle that identified it until a time: the parts asked for, the zones as
 // deep as given, as a percentage of the Range's height. The Ranges of a chart and the Range a trade's entry condition
 // held (see drawStrategies) are drawn by it alike.
-function drawRange(into, g, until, { box: boxed, bands, zones, hover = rangeHover(g) }) {
+function drawRange(into, g, until, { box: boxed, bands, zones, hover, color, name }) {
+  hover ??= rangeHover(g);
   // Each of its traces says the Range's sawtooth level (see Level in focus).
   const traces = { push: t => into.push({ lv: g.level, ...t }) };
-  const term = TERMS.get('Range'), height = g.high.price - g.low.price;
+  const term = { ...TERMS.get('Range'), ...(color ? { color } : {}), ...(name ? { name } : {}) }, height = g.high.price - g.low.price;
   const box = (a, b) => ({ x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [a, a, b, b, a] });
   if (zones != null) {
     const depth = Math.round(zones * 100) / 100, buyTop = g.low.price + height * zones / 100, sellBottom = g.high.price - height * zones / 100;
@@ -1435,9 +1481,9 @@ function trendSoFar(tr, time) {
 // While a tour that has a known candle plays, as an analysis does, the structure is the one its texts are written from (as
 // known there), drawn a part at a time: each part once the cursor has reached its candle, so the sawtooth, points and Swings
 // come as the run goes.
-// A section that tells of a strategy's market structure steps shows the structure each was read from: that of a chart of
-// the last candles to the candle that met it (the section's "structure", a { from, at } for each such step), not of the
-// chart from its own first candle. The step the cursor has yet to reach is the one shown; null past the last, or when the
+// A section that tells of a strategy's market structure steps shows the structure each was read from: that known at the
+// candle that met it (the section's "structure", a { from, at } for each such step, from being the first candle its chart
+// has, 0 for the example's own). The step the cursor has yet to reach is the one shown; null past the last, or when the
 // section has none.
 function structureWindow(ex, t) {
   if (!ex.tour || tour?.ex !== ex) return null;
@@ -1547,7 +1593,7 @@ function withOlder(older, lists, key) {
 
 function liveView(ex, t) {
   // A structure step's chart counts its candles from where it begins: shift on from the example's own.
-  const win = structureWindow(ex, t), src = win ? windowExample(ex, win.from) : ex, shift = win?.from ?? 0;
+  const win = structureWindow(ex, t), src = win?.from ? windowExample(ex, win.from) : ex, shift = win?.from ?? 0;
   // A whole dataset replayed, as the Replay page does: its chart is drawn as the Chart's is, around its view wherever
   // that is taken (see clipToView), with every candle to the cursor.
   const whole = !ex.tour && isRemote(ex);
@@ -1615,7 +1661,7 @@ function liveView(ex, t) {
     marketStructureBreaksByLevel: withOlder(older.marketStructureBreaks, view.marketStructureBreaksByLevel, m => `${m.type}|${m.break.time}`),
     trendsByLevel: withOlder(older.trends, view.trendsByLevel, started),
     retracementsByLevel: withOlder(older.retracements, view.retracementsByLevel, v => `${v.direction}|${v.from.time}|${v.to.time}`),
-    rangesByLevel: withOlder(older.ranges, view.rangesByLevel, g => `${g.direction}|${g.identified.time}`),
+    rangesByLevel: withOlder(older.ranges, view.rangesByLevel, g => `${g.swings ? 'swings|' : ''}${g.direction}|${g.identified.time}`),
     candleRuns: withOlder([older.candleRuns], [view.candleRuns], run => `${run.green}|${run.start.time}`)[0] };
 }
 
@@ -1817,6 +1863,13 @@ function timelineEvents(ex, r, cacheId, level) {
   }
   for (const e of (r.ranges ?? []).filter(at(level))) {
     const g = e.value;
+    // A Range found by Swings says so, and only while its layer is on.
+    if (g.swings) {
+      if (!on('SwingRange')) continue;
+      if (!e.continued) add({ at: e.from, ...tag('Range'), text: `range by Swings: ${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}, the leg's two ends, with ${g.swings} Swings one order finer inside it`, times: [g.identified.time] }, e);
+      else if (g.end && g.end.time === T(e.from)) add({ at: e.from, ...tag('Range'), text: `range by Swings ended: close ${fmtPrice(g.end.price)} ${g.endedAbove ? 'above its high' : 'below its low'}`, times: [g.identified.time, g.end.time] }, e);
+      continue;
+    }
     if (!e.continued) add({ at: e.from, ...tag('Range'), text: `range out of ${rangeOrigin(g)}: ${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}, after a ${g.retracement}% retracement broke structure`, times: [g.identified.time] }, e);
     else if (g.end && g.end.time === T(e.from)) add({ at: e.from, ...tag('Range'), text: `range ended: close ${fmtPrice(g.end.price)} ${g.endedAbove ? 'above' : 'below'} the band`, times: [g.identified.time, g.end.time] }, e);
   }
@@ -2489,7 +2542,7 @@ function draw(el, ex, focus) {
   drawCandleRuns(ex, labels, traces);
   drawTrendArrows(ex, labels);
   drawTourLines(ex, labels);
-  drawRanges(ex, traces);
+  drawRanges(ex, traces, swingBox);
   drawSawtooth(ex, traces);
   drawStrategies(ex, traces);
 
@@ -3126,7 +3179,7 @@ async function renderChartPage() {
 const BASIC_KINDS = new Set(['Candle', 'SuccessiveCandles', 'Point']);
 const isBasic = id => BASIC_KINDS.has(String(id ?? '').split(':')[0]);
 const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ? on('SuccessiveGreenCandles') || on('SuccessiveRedCandles')
-  : on(`level${t.level}`) && (t.kind === 'Point' ? POINT_LAYERS.some(on) : t.kind === 'Swing' ? on('Upswing') || on('Downswing') : on('Uptrend') || on('Downtrend')));
+  : on(`level${t.level}`) && (t.kind === 'Point' ? POINT_LAYERS.some(on) : t.kind === 'Swing' ? on('Upswing') || on('Downswing') : t.kind === 'SwingRange' ? on('SwingRange') : on('Uptrend') || on('Downtrend')));
 {
   let down = null, asked = 0;
   const card = document.createElement('div');
@@ -3334,7 +3387,8 @@ let wantedAnalysis = null;
 // The order things are told in, as the server tells them: the candle, its run, then each order's from the finest.
 const thingRank = id => { const [kind, level] = String(id).split(':'); return [{ Trade: -1, Candle: 0, SuccessiveCandles: 1 }[kind] ?? 2, -(Number(level) || 0), ['Point', 'Swing', 'Trend'].indexOf(kind)]; };
 const byThing = (a, b) => { const x = thingRank(a), y = thingRank(b); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; };
-const runsOf = p => p.greenRuns != null ? { greenRuns: p.greenRuns, redRuns: p.redRuns } : {};
+// The count of Swings a Range by Swings is found by is carried with them, when the analysis is of one.
+const runsOf = p => ({ ...(p.greenRuns != null ? { greenRuns: p.greenRuns, redRuns: p.redRuns } : {}), ...(p.rangeSwings != null ? { rangeSwings: p.rangeSwings } : {}) });
 // What defines an analysis's content: the address without the detail, which only says which of its chapters are on.
 // A Trade is a strategy's: the address carries the strategy, as strategies.json has it.
 const strategyOf = p => p.strategy ? { strategy: p.strategy } : {};
@@ -3355,7 +3409,8 @@ async function renderAnalysisPage(query) {
     ?? (explain ? [explain === 'Candle' ? 'Candle' : `${explain}:${Number(query.get('level')) || 1}`] : null);
   if (things?.length && query.get('dataset') && query.get('at')) {
     const detail = DETAILS.includes(query.get('detail')) ? query.get('detail') : detailOf('Analysis');
-    const runs = Number(query.get('greenRuns')) > 0 ? { greenRuns: Number(query.get('greenRuns')), redRuns: Number(query.get('redRuns')) || Number(query.get('greenRuns')) } : {};
+    const runs = { ...(Number(query.get('greenRuns')) > 0 ? { greenRuns: Number(query.get('greenRuns')), redRuns: Number(query.get('redRuns')) || Number(query.get('greenRuns')) } : {}),
+      ...(Number(query.get('rangeSwings')) > 0 ? { rangeSwings: Number(query.get('rangeSwings')) } : {}) };
     const asked = { dataset: query.get('dataset'), at: query.get('at'), ...(query.get('seen') ? { seen: query.get('seen') } : {}), things, ...runs, ...(query.get('strategy') ? { strategy: query.get('strategy') } : {}), detail };
     if (!wantedAnalysis || analysisHash(wantedAnalysis) !== analysisHash(asked)) wantedAnalysis = asked;
     if (`#Analysis?${query}` !== analysisHash(asked)) history.replaceState(null, '', analysisHash(asked));
@@ -3413,7 +3468,7 @@ async function renderAnalysisPage(query) {
 // scene on the dataset from its first candle, and the structure as known at the cursor it was seen from, fetched.
 async function loadAnalysis(params) {
   // How long a run must be to count: as the address says, else the page's Successive Candles settings.
-  const runs = params.greenRuns != null ? runsOf(params) : { greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') };
+  const runs = { greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles'), ...runsOf(params) };
   const where = { dataset: params.dataset, at: params.at, ...(params.seen ? { seen: params.seen } : {}) };
   const found = await fetch(`api/explain/at?${new URLSearchParams({ ...where, ...runs })}`, { cache: 'no-store' }).then(x => x.ok ? x.json() : null).catch(() => null);
   // A strategy's trade is not one of the things the chart has at the candle, so its chapters are listed with them here.
@@ -3931,9 +3986,9 @@ const TOUR_TICK = 40;
 // The Speed slider's paces: how fast the voice reads (its clips are played that much faster or slower, at the same pitch),
 // how fast a text is read without the voice (against about 240 words a minute), how fast the candles run against the
 // section's speed, and the seconds a text stays after it has been read.
-const TOUR_PACES = [{ name: 'Slowest', voice: 0.8, reading: 0.6, candles: 0.35, gap: 0.8 }, { name: 'Slower', voice: 0.9, reading: 0.8, candles: 0.6, gap: 0.4 },
-  { name: 'Normal', voice: 1, reading: 1, candles: 1, gap: 0.15 }, { name: 'Faster', voice: 1.1, reading: 1.3, candles: 1.6, gap: 0.05 },
-  { name: 'Fastest', voice: 1.2, reading: 1.7, candles: 2.6, gap: 0 }];
+const TOUR_PACES = [{ name: 'Slowest', voice: 0.7, reading: 0.45, candles: 0.2, gap: 1.2 }, { name: 'Slower', voice: 0.8, reading: 0.6, candles: 0.35, gap: 0.8 },
+  { name: 'Normal', voice: 1, reading: 1, candles: 1, gap: 0.15 }, { name: 'Faster', voice: 1.2, reading: 1.7, candles: 2.6, gap: 0 },
+  { name: 'Fastest', voice: 1.4, reading: 2.3, candles: 4.2, gap: 0 }];
 const NORMAL_PACE = TOUR_PACES.find(p => p.name === 'Normal');
 // The player on the page shown, and each page's own, kept while another page is shown.
 let tour = null, tourLoading = null;
@@ -5249,6 +5304,102 @@ const TREND_COLUMNS = {
   ends: { head: 'Ends', cell: t => t.end ? esc(fmtTime(t.end)) : 'still runs', sort: t => t.end },
 };
 
+// ---- List -------------------------------------------------------------------------------------------------------------
+// Where a kind of thing the chart shows occurs in the whole dataset, as known at its last candle (api/occurrences): the
+// List button over the layers, then a layer. Each place is a row, listed as the Trends of Find similar are, with Show,
+// which takes the Chart to it with its layer and level on, and Analyse, which opens an analysis at it. A layer that draws
+// part of a thing lists the thing: a Range's bands list Ranges.
+const LISTED = ['SwingRange', 'Range', 'Uptrend', 'Downtrend', 'Upswing', 'Downswing', 'BullishBreakOfStructure', 'BearishBreakOfStructure', 'BullishMarketStructureBreak', 'BearishMarketStructureBreak'];
+const LISTED_AS = { swingRangeWeak: 'SwingRange', rangeBands: 'Range', rangeZones: 'Range', bosLevelUp: 'BullishBreakOfStructure', bosLevelDown: 'BearishBreakOfStructure',
+  msbLevelUp: 'BullishMarketStructureBreak', msbLevelDown: 'BearishMarketStructureBreak' };
+const OCCURRENCE_COLUMNS = {
+  begins: { head: 'Begins', cell: r => esc(fmtTime(r.start)), sort: r => r.index },
+  level: { head: 'Level', cell: r => orderOf(r.level), sort: r => r.level },
+  low: { head: 'Low', num: true, cell: r => wholePrice(r.low), sort: r => r.low },
+  high: { head: 'High', num: true, cell: r => wholePrice(r.high), sort: r => r.high },
+  height: { head: 'Height', num: true, cell: r => `${r.height.toFixed(1)}%`, sort: r => r.height },
+  retracement: { head: 'Retracement', num: true, cell: r => `${r.retracement}%`, sort: r => r.retracement },
+  swings: { head: 'Swings', num: true, cell: r => r.swings, sort: r => r.swings },
+  weak: { head: 'Weak', num: true, cell: r => r.weak, sort: r => r.weak },
+  strength: { head: 'Strength', num: true, cell: r => `${r.strength}%`, sort: r => r.strength },
+  candles: { head: 'Candles', num: true, cell: r => r.candles.toLocaleString(), sort: r => r.candles },
+  ends: { head: 'Ends', cell: r => r.end ? esc(fmtTime(r.end)) : 'not yet', sort: r => r.end },
+};
+const occurrenceColumns = kind => kind === 'SwingRange' ? ['begins', 'level', 'low', 'high', 'height', 'swings', 'weak', 'candles', 'ends']
+  : kind === 'Range' ? ['begins', 'level', 'low', 'high', 'height', 'retracement', 'candles', 'ends']
+  : kind.endsWith('trend') ? ['begins', 'level', 'swings', 'strength', 'candles', 'ends']
+  : kind.endsWith('MarketStructureBreak') ? ['begins', 'level'] : ['begins', 'level', 'candles', 'ends'];
+let occurrences = null;
+
+async function openOccurrences(layerId) {
+  let dialog = document.getElementById('occurrences');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'occurrences';
+    dialog.setAttribute('aria-label', 'Where it occurs');
+    document.body.append(dialog);
+    dialog.addEventListener('click', e => {
+      if (e.target === dialog || e.target.closest('[data-occ="close"]') || e.target.closest('a[data-occ="analyse"]')) return dialog.close();
+      const order = e.target.closest('[data-sort]'), shown = e.target.closest('[data-occ-show]');
+      if (order) {
+        occurrences.sort = nextTradeSort(occurrences.sort, order.dataset.sort);
+        renderOccurrences(dialog);
+      } else if (shown) {
+        dialog.close();
+        showOccurrence(occurrences.found[Number(shown.dataset.occShow)]);
+      }
+    });
+    dialog.addEventListener('change', e => {
+      if (!e.target.matches('[data-occ-levels]')) return;
+      occurrences.only = e.target.checked;
+      renderOccurrences(dialog);
+    });
+  }
+  const kind = LISTED.includes(layerId) ? layerId : LISTED_AS[layerId], label = LAYERS.find(l => l.id === (kind ?? layerId))?.label ?? layerId;
+  const chart = document.querySelector('#main .chart'), dataset = chart && findExample(chart.dataset.id)?.dataset;
+  const say = text => { dialog.innerHTML = `<h4>List: ${esc(label)}</h4><p${text.warn ? ' class="warn"' : ''}>${esc(text.warn ?? text)}</p><div class="sim-foot"><button type="button" data-occ="close">Close</button></div>`; };
+  say('Reading the dataset…');
+  dialog.showModal();
+  if (!kind) return say(`There is no list of this layer yet. These can be listed: ${LISTED.map(id => LAYERS.find(l => l.id === id)?.label ?? id).join(', ')}.`);
+  if (!dataset || !serverOn) return say('A list is of a whole dataset: open the Chart or the Replay page, then List.');
+  try {
+    const r = await fetch(`api/occurrences?dataset=${encodeURIComponent(dataset)}&kind=${kind}${rangeQuery()}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status === 404 ? 'the local server is older than this page: restart ./build-site.ps1 -Serve' : await r.text() || `the server answered ${r.status}`);
+    occurrences = { ...await r.json(), label, dataset, sort: null, only: LEVEL_IDS.some(on) };
+  } catch (e) {
+    return say({ warn: e.message });
+  }
+  renderOccurrences(dialog);
+}
+
+function renderOccurrences(dialog) {
+  const o = occurrences, levels = LEVEL_IDS.filter(on).map(id => Number(id.slice('level'.length)));
+  // A Range by Swings is listed as its layer shows it: with Weak Swings in it on, only those with so many.
+  const weak = o.kind === 'SwingRange' && on('swingRangeWeak') ? setting('swingRangeWeak') : 0;
+  const rows = o.rows.filter(r => (!o.only || levels.includes(r.level)) && (r.weak ?? 0) >= weak);
+  o.found = sortTradeRows(rows, o.sort, OCCURRENCE_COLUMNS).slice(0, SIMILAR_SHOWN);
+  const link = r => `./${analysisHash({ dataset: o.dataset, at: r.at, things: [r.thing], ...(o.kind === 'SwingRange' ? { rangeSwings: setting('SwingRange') } : {}), detail: detailOf('Analysis') })}`;
+  const act = r => `<button type="button" data-occ-show="${o.found.indexOf(r)}" title="Take the Chart to it, with its layer and level on">Show</button>` +
+    `<a href="${esc(link(r))}" data-occ="analyse" title="An analysis of it, from where it begins to its end">Analyse</a>`;
+  dialog.innerHTML = `<h4>List: ${esc(o.label)}</h4><p>Every one in the dataset, as known at its last candle${weak ? `, with ${weak} Weak Swings or more` : ''}. A heading orders the list by it.</p>
+    <div class="sim-checks"><label><input type="checkbox" data-occ-levels ${o.only ? 'checked' : ''}>Only the levels shown (${levels.length ? levels.join(', ') : 'none'})</label></div>
+    <div class="sim-count">${rows.length.toLocaleString()} found${rows.length > SIMILAR_SHOWN ? `: the first ${SIMILAR_SHOWN} as ordered are listed` : ''}.</div>
+    ${tradeTable(o.found, { columns: occurrenceColumns(o.kind), defs: OCCURRENCE_COLUMNS, sort: o.sort, act })}
+    <div class="sim-foot" style="margin-top: 10px"><button type="button" data-occ="close">Close</button></div>`;
+}
+
+// Takes the Chart to an occurrence: its dataset, with the layer listed and its level on, and the view from a little
+// before it to a little after it.
+function showOccurrence(r) {
+  const o = occurrences, at = t => Date.parse(`${String(t).slice(0, 16)}Z`), from = at(r.start), to = at(r.until);
+  const beside = Math.max((to - from) * 0.4, (r.candles ? (to - from) / r.candles : 3600000) * 48);
+  state.chartDataset = o.dataset;
+  state.pages = { ...state.pages, Chart: [...new Set([...layersOf('Chart'), o.kind, `level${r.level}`])] };
+  save(state);
+  zooms.set(`Chart/${o.dataset}`, { x: [new Date(from - beside).toISOString(), new Date(to + beside).toISOString()] });
+  if (currentPage === 'Chart') renderChartPage(); else location.hash = '#Chart';
+}
+
 // ---- Tour glossary ---------------------------------------------------------------------------------------------------
 // What the voice says in place of what is written, edited in a panel of its own under the controls, which the Glossary
 // button opens. The boxes are the glossary as it is being written, and the tour's definition follows them: an entry with
@@ -6111,11 +6262,23 @@ function renderInterims() {
 // each of a type; STRATEGY_TYPES says what each type's fields are and how it reads, so a new type is added there and in
 // the server's Strategy.cs. The entry condition can be a chain: the steps of "after", in order, then "entry", each looked
 // for once the one before it is met, within its "within" candles of it when that is set.
-// A market structure step is read at a sawtooth level as a chart of the last STRUCTURE_WINDOW candles shows it (the
-// server's KnownStructure), so its levels are that chart's, up to STRUCTURE_LEVELS. Its direction is Up or Down, named as
+// A market structure step is read at a sawtooth level as known at each candle, from every candle to it (the server's
+// KnownStructure), so its levels are the dataset's then, up to STRUCTURE_LEVELS. Its direction is Up or Down, named as
 // the term names it: a Bullish or Bearish break, an Upswing or Downswing, an Uptrend or Downtrend.
-const STRUCTURE_WINDOW = 500, STRUCTURE_LEVELS = 4;
+const STRUCTURE_LEVELS = 16;
 const stepLevel = { key: 'level', label: 'Level', number: true, min: 1, max: STRUCTURE_LEVELS, step: 1 };
+// A step after a Range step can name its level by the Range the chain holds, so many levels finer than it, in place of a
+// level of its own; a kill cannot. A Range step at level 0 is met by a Range of any level, and can ask for one of a size.
+const stepFiner = { key: 'finer', label: 'Finer than the Range', number: true, min: 0, max: STRUCTURE_LEVELS, step: 1, blank: 'own level', chain: true };
+const rangeLevel = { ...stepLevel, min: 0, label: 'Level (0: any)' };
+const rangeSize = [{ key: 'minHeight', label: 'Height from %', number: true, min: 0, step: 0.5, blank: 'any' }, { key: 'maxHeight', label: 'Height to %', number: true, min: 0, step: 0.5, blank: 'any' },
+  { key: 'minCandles', label: 'Held (candles)', number: true, min: 0, step: 1, blank: 'any' }];
+const an = named => `${/^[aeiou]/i.test(named) ? 'an' : 'a'} ${named}`;
+const orderSays = e => e.finer == null ? `${orderOf(e.level)} ` : '';
+const finerSays = e => e.finer == null ? '' : e.finer === 0 ? ' of the Range\'s order' : e.finer === 1 ? ' one order finer than the Range' : ` ${e.finer} orders finer than the Range`;
+const levelShort = e => e.finer == null ? `L${e.level}` : `Range+${e.finer}`;
+const rangeSays = e => `${e.level ? `a ${orderOf(e.level)} Range` : 'a Range of any order'}${e.minHeight != null && e.maxHeight != null ? `, from ${e.minHeight}% to ${e.maxHeight}% high` : e.minHeight != null ? `, at least ${e.minHeight}% high` : e.maxHeight != null ? `, at most ${e.maxHeight}% high` : ''}${e.minCandles ? `, that has held for ${e.minCandles} candles or more` : ''}`;
+const rangeShort = e => e.level ? `L${e.level}` : 'Any';
 const stepDirection = (label, up, down) => ({ key: 'direction', label, options: [{ value: 'Up', label: up }, { value: 'Down', label: down }] });
 const STRATEGY_TYPES = {
   entry: {
@@ -6131,36 +6294,36 @@ const STRATEGY_TYPES = {
       label: 'Break of Structure',
       structure: true,
       defaults: { direction: 'Up', level: 2 },
-      fields: [stepDirection('BoS', 'Bullish', 'Bearish'), stepLevel],
-      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
-      short: e => `L${e.level} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
+      fields: [stepDirection('BoS', 'Bullish', 'Bearish'), stepLevel, stepFiner],
+      says: e => an(`${orderSays(e)}${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS${finerSays(e)}`),
+      short: e => `${levelShort(e)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
     },
     // Met at the close beyond the Swing Low or Swing High of a Confirmed Swing.
     MarketStructureBreak: {
       label: 'Market Structure Break',
       structure: true,
       defaults: { direction: 'Up', level: 2 },
-      fields: [stepDirection('MSB', 'Bullish', 'Bearish'), stepLevel],
-      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
-      short: e => `L${e.level} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
+      fields: [stepDirection('MSB', 'Bullish', 'Bearish'), stepLevel, stepFiner],
+      says: e => an(`${orderSays(e)}${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB${finerSays(e)}`),
+      short: e => `${levelShort(e)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
     },
     // Met at the BoS that Confirms the Swing: any, or only a Strong one (no MSB inside it) or a Weak one.
     Swing: {
       label: 'Swing',
       structure: true,
       defaults: { direction: 'Up', level: 2, strength: 'Any' },
-      fields: [stepDirection('Swing', 'Upswing', 'Downswing'), stepLevel, { key: 'strength', label: 'Strength', options: ['Any', 'Strong', 'Weak'] }],
-      says: e => `a ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${orderOf(e.level)} ${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
-      short: e => `L${e.level} ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
+      fields: [stepDirection('Swing', 'Upswing', 'Downswing'), stepLevel, stepFiner, { key: 'strength', label: 'Strength', options: ['Any', 'Strong', 'Weak'] }],
+      says: e => an(`${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${orderSays(e)}${e.direction === 'Down' ? 'Downswing' : 'Upswing'}${finerSays(e)}`),
+      short: e => `${levelShort(e)} ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
     },
     // Met at the BoS that makes so many Swings in a row, once a Trend: two is the Trend being Confirmed.
     Trend: {
       label: 'Trend',
       structure: true,
       defaults: { direction: 'Up', level: 2, swings: 2 },
-      fields: [stepDirection('Trend', 'Uptrend', 'Downtrend'), stepLevel, { key: 'swings', label: 'Swings', number: true, min: 2, step: 1 }],
-      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} of ${e.swings} ${e.direction === 'Down' ? 'Downswings' : 'Upswings'}`,
-      short: e => `L${e.level} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} ×${e.swings}`,
+      fields: [stepDirection('Trend', 'Uptrend', 'Downtrend'), stepLevel, stepFiner, { key: 'swings', label: 'Swings', number: true, min: 2, step: 1 }],
+      says: e => an(`${orderSays(e)}${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} of ${e.swings} ${e.direction === 'Down' ? 'Downswings' : 'Upswings'}${finerSays(e)}`),
+      short: e => `${levelShort(e)} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} ×${e.swings}`,
     },
     // Met at the close of a candle that reaches into a zone of a Range holding at the level, read from the same chart: the
     // buy-low zone, from the lower band to the depth above the Range's low, or the sell-high zone, as far below its high
@@ -6169,11 +6332,11 @@ const STRATEGY_TYPES = {
       label: 'Range zone',
       structure: true,
       defaults: { zone: 'BuyLow', level: 1, depth: 25, retracement: 75, band: 20 },
-      fields: [{ key: 'zone', label: 'Zone', options: [{ value: 'BuyLow', label: 'Buy-low' }, { value: 'SellHigh', label: 'Sell-high' }] }, stepLevel,
+      fields: [{ key: 'zone', label: 'Zone', options: [{ value: 'BuyLow', label: 'Buy-low' }, { value: 'SellHigh', label: 'Sell-high' }] }, rangeLevel, ...rangeSize,
         { key: 'depth', label: 'Zone depth %', number: true, min: 1, max: 50, step: 5 }, { key: 'retracement', label: 'Retracement %', number: true, min: 1, max: 99, step: 5 },
         { key: 'band', label: 'Band %', number: true, min: 0, step: 5 }],
-      says: e => `a reach into the ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'} zone of a ${orderOf(e.level)} Range`,
-      short: e => `L${e.level} Range ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'}`,
+      says: e => `a reach into the ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'} zone of ${rangeSays(e)}`,
+      short: e => `${rangeShort(e)} Range ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'}`,
     },
     // Met at the close of a candle that sweeps a Range holding at the level: its wick goes beyond the Range's low, or its
     // high, and it closes back at or inside the box. It holds the Range as a Range zone step does; the zone depth is that
@@ -6182,11 +6345,11 @@ const STRATEGY_TYPES = {
       label: 'Range liquidity sweep',
       structure: true,
       defaults: { zone: 'BuyLow', level: 1, depth: 25, retracement: 75, band: 20 },
-      fields: [{ key: 'zone', label: 'Sweeps', options: [{ value: 'BuyLow', label: 'The low' }, { value: 'SellHigh', label: 'The high' }] }, stepLevel,
+      fields: [{ key: 'zone', label: 'Sweeps', options: [{ value: 'BuyLow', label: 'The low' }, { value: 'SellHigh', label: 'The high' }] }, rangeLevel, ...rangeSize,
         { key: 'depth', label: 'Zone depth %', number: true, min: 1, max: 50, step: 5 }, { key: 'retracement', label: 'Retracement %', number: true, min: 1, max: 99, step: 5 },
         { key: 'band', label: 'Band %', number: true, min: 0, step: 5 }],
-      says: e => `a liquidity sweep of the ${e.zone === 'SellHigh' ? 'high' : 'low'} of a ${orderOf(e.level)} Range`,
-      short: e => `L${e.level} Range sweep ${e.zone === 'SellHigh' ? 'high' : 'low'}`,
+      says: e => `a liquidity sweep of the ${e.zone === 'SellHigh' ? 'high' : 'low'} of ${rangeSays(e)}`,
+      short: e => `${rangeShort(e)} Range sweep ${e.zone === 'SellHigh' ? 'high' : 'low'}`,
     },
   },
   target: {
@@ -6346,7 +6509,7 @@ function strategySays(s) {
   const costs = fee && slip ? ` Costs: ${fee}% fee a side and ${slip}% slippage on the entry and a Stop Loss.`
     : fee ? ` Costs: ${fee}% fee a side; no slippage is counted.`
     : slip ? ` Costs: ${slip}% slippage on the entry and a Stop Loss; no fees are counted.` : ' No fees or slippage are counted.';
-  const structure = strategySteps(s).some(e => STRATEGY_TYPES.entry[e?.type]?.structure) ? ` Market structure is read as a chart of the last ${STRUCTURE_WINDOW} candles shows it, so an order is that chart's.` : '';
+  const structure = strategySteps(s).some(e => STRATEGY_TYPES.entry[e?.type]?.structure) ? ` Market structure is read as known at each candle, from every candle to it, so an order is the one it has then.` : '';
   return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}.${structure} Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}${costs}`;
 }
 
@@ -6514,13 +6677,13 @@ function renderStrategy() {
   // An option is its value, or { value, label } when the page names it otherwise than strategies.json keeps it.
   const input = (path, f, value) => f.options
     ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => o.value ?? o).map((v, k) => `<option value="${esc(v)}" ${v === value ? 'selected' : ''}>${esc(f.options[k].label ?? v)}</option>`).join('')}</select></label>`
-    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" ${f.max != null ? `max="${f.max}" ` : ''}step="${f.step}" value="${esc(value)}"></label>${varyInputs(s, path, f.step)}`;
+    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number ${f.blank ? `data-blank placeholder="${esc(f.blank)}" ` : ''}min="${f.min}" ${f.max != null ? `max="${f.max}" ` : ''}step="${f.step}" value="${esc(value ?? '')}"></label>${varyInputs(s, path, f.step)}`;
   const steps = strategySteps(s);
   // A step's kills, under its own fields: each a condition of a type with its numbers, and a button to add one. The entry
   // has none, as nothing is waited for after it.
   const killsHtml = (key, p) => `<div class="step-kills"><span class="step-kills-head" title="A kill ends the wait this step begins: met at a close after the step is met and before the trade is entered, the chain starts again">Killed by</span>
       ${(p.kill ?? []).map((kill, j) => `<span class="step-kill"><label>Type<select data-type="${key}.kill.${j}" data-kind="kill">${Object.entries(STRATEGY_TYPES.kill).filter(([, t]) => !t.of || t.of.includes(p.type)).map(([id, t]) => `<option value="${id}" ${id === kill.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
-        ${(STRATEGY_TYPES.kill[kill.type]?.fields ?? []).map(f => input(`${key}.kill.${j}.${f.key}`, f, kill[f.key])).join('')}
+        ${(STRATEGY_TYPES.kill[kill.type]?.fields ?? []).filter(f => !f.chain).map(f => input(`${key}.kill.${j}.${f.key}`, f, kill[f.key])).join('')}
         <button type="button" class="kill-remove" data-kill-remove="${key}.kill.${j}" title="Take this kill off the step" aria-label="Remove kill">×</button></span>`).join('')}
       <button type="button" class="kill-add" data-kill-add="${key}" title="Add a condition that ends the wait this step begins">+ Kill</button></div>`;
   const part = ({ key, title, kind }) => {

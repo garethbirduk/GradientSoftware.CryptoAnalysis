@@ -7,7 +7,7 @@ public static partial class MarketStructure
     /// gives it for them, looked up in the store and not worked out: what was known at each candle replayed is what the
     /// store has as known then. The ranges are those of the least retracement and band the store was read with.
     /// </summary>
-    public static ReplayTimeline Timeline(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int? keepFrom = null)
+    public static ReplayTimeline Timeline(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int? keepFrom = null, int rangeSwings = 0)
     {
         var end = Math.Min(to ?? store.Candles, store.Candles);
         from = Math.Max(0, from);
@@ -27,7 +27,7 @@ public static partial class MarketStructure
             var kept = keepFrom is int k && k > 0 ? Math.Min(k, t) : 0;
             if (read == null || read.Kept != kept || store.PivotsChanged(t))
                 read = ReadPivots(store, t, kept, maxLevel);
-            snapshots[t - from] = Take(store, t, high, maxLevel, kept, read, t, 0);
+            snapshots[t - from] = Take(store, t, high, maxLevel, kept, read, t, 0, rangeSwings);
         }
 
         return Track(snapshots, from);
@@ -40,7 +40,7 @@ public static partial class MarketStructure
     /// high or low it broke, a trend, a retracement, a run of candles, and a high or low both of whose legs are.
     /// With at, the stretch is as known at that candle and not the last, as an analysis seen from it has it.
     /// </summary>
-    public static ReplayTimeline Complete(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int narrowest = 0, int? at = null)
+    public static ReplayTimeline Complete(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int narrowest = 0, int? at = null, int rangeSwings = 0)
     {
         var last = Math.Min(at ?? store.Candles - 1, store.Candles - 1);
         if (last < 0)
@@ -48,7 +48,7 @@ public static partial class MarketStructure
 
         var kept = Math.Clamp(from, 0, last);
         var read = ReadPivots(store, last, kept, maxLevel);
-        return Track([Take(store, last, HighOf(read, last), maxLevel, kept, read, Math.Clamp(to ?? last, kept, last), narrowest)], last);
+        return Track([Take(store, last, HighOf(read, last), maxLevel, kept, read, Math.Clamp(to ?? last, kept, last), narrowest, rangeSwings)], last);
     }
 
     /// <summary>
@@ -204,7 +204,7 @@ public static partial class MarketStructure
     // Everything the replay tracks at a candle, as the store has it known then, leaving out what ended before the candle
     // kept from: what TakeSnapshot works out from the candles to there. With a candle before it to read up to, what
     // begins after that is left out too, and with a narrowest width, what is narrower (see Complete).
-    private static Snapshot Take(StructureStore store, int t, int high, int maxLevel, int kept, PivotsRead read, int upTo, int narrowest)
+    private static Snapshot Take(StructureStore store, int t, int high, int maxLevel, int kept, PivotsRead read, int upTo, int narrowest, int rangeSwings = 0)
     {
         var prices = store.Prices;
         var keep = kept > 0 ? prices[kept].DateTime : DateTime.MinValue;
@@ -276,6 +276,22 @@ public static partial class MarketStructure
             var range = new RangeOutline(x.Level, x.Direction, Point(x.From, !up), Point(x.Low, false), Point(x.High, true), Point(x.Identified, up), x.Retracement, x.Band, null);
             return x.End is int end ? range with { End = Point(end, store.Price(end, true) > range.BandHigh) } : range;
         }).ToList();
+        // With a count of swings, the ranges found by swings are among them (see SwingRanges).
+        if (rangeSwings > 0)
+        {
+            ranges.AddRange(SwingRanges.Over(store, rangeSwings, kept, upTo, t).Where(x => x.Level <= top && (x.End ?? t) - x.Identified >= narrowest).Select(x =>
+            {
+                var up = x.LegKind == EnumPivotKind.High;
+                var (low, high) = up ? (x.Other, x.Leg) : (x.Leg, x.Other);
+                return new RangeOutline(x.Level, up ? EnumSwingDirection.Up : EnumSwingDirection.Down, Point(x.Other, !up), Point(low, false), Point(high, true),
+                    new PricePoint(prices[x.Identified].DateTime, prices[x.Identified].Close), 0, 0, x.End is int end ? new PricePoint(prices[end].DateTime, prices[end].Close) : null)
+                {
+                    Swings = x.Swings,
+                    Weak = x.Weak,
+                    Inner = SwingRanges.Inner(store, x, t).Select(s => Outline(store, s)).ToList(),
+                };
+            }));
+        }
 
         var runs = CandleRuns.RunsFrom(t == prices.Count - 1 ? prices : prices.GetRange(0, t + 1), minLength: Math.Max(2, narrowest), kept, upTo);
         return new Snapshot(pivots, points, runs.Where(x => x.End.Time >= keep).ToList(), swings, candidates, breaks, trends, retracements, ranges);

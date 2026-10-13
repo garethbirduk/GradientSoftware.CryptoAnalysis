@@ -130,8 +130,9 @@ public static class StrategyBacktest
             if (strategy.OnePositionAtATime && i < free)
                 continue;
 
-            var trade = Trade(prices, i, strategy, trades.Count + 1, met.Select((x, k) => new StrategyStep(x, prices[x].DateTime, ReadFrom(prices, x, steps[k]))).ToList(),
-                RangeOf(prices, strategy, i, met));
+            var range = RangeOf(prices, strategy, i, met);
+            var trade = Trade(prices, i, strategy, trades.Count + 1,
+                met.Select((x, k) => new StrategyStep(x, prices[x].DateTime, ReadFrom(prices, x, StepAt(prices, steps, k, x, range) ?? steps[k]))).ToList(), range);
             if (trade == null)
                 continue;
             trades.Add(trade);
@@ -167,11 +168,25 @@ public static class StrategyBacktest
             for (var k = steps.Count - 1; k >= 0; k--)
             {
                 var step = steps[k];
-                if (!Enters(prices, i, step))
-                    continue;
-                var held = Held(prices, i, step);
-                List<Arming> made = k == 0 ? [new Arming(i, [i], held)]
-                    : Follows(met[k - 1], i - step.Reads, i, step.Within).Select(x => new Arming(i, [.. x.Chain, i], held ?? x.Range)).ToList();
+                HeldRange? held = null;
+                List<Arming> made;
+                if (step.Finer != null)
+                {
+                    // A step read finer than the Range a chain holds is read for each chain it could follow, at that
+                    // chain's own level.
+                    made = k == 0 ? [] : Follows(met[k - 1], i - step.Reads, i, step.Within)
+                        .Where(x => StepAt(prices, steps, k, i, x.Range) is { } read && Enters(prices, i, read))
+                        .Select(x => new Arming(i, [.. x.Chain, i], x.Range)).ToList();
+                }
+                else
+                {
+                    if (!Enters(prices, i, step))
+                        continue;
+                    held = Held(prices, i, step);
+                    made = k == 0 ? [new Arming(i, [i], held)]
+                        : Follows(met[k - 1], i - step.Reads, i, step.Within).Select(x => new Arming(i, [.. x.Chain, i], held ?? x.Range)).ToList();
+                }
+
                 if (made.Count == 0)
                     continue;
                 if (k < steps.Count - 1)
@@ -279,20 +294,43 @@ public static class StrategyBacktest
 
     /// <summary>
     /// The Range a Range step holds when it is met at the close of candle index: the one holding at the step's Level
-    /// there, as a chart of the last candles to it shows (see <see cref="KnownRanges"/>), when the candle reaches into the
+    /// there, as known at that candle (see <see cref="KnownRanges"/>), when the candle reaches into the
     /// step's zone of it, for a RangeZone, or sweeps it, for a RangeSweep: a wick beyond its low or high and a close back
     /// at or inside it. Null when the step is not met there, or is not a Range step.
     /// </summary>
     public static HeldRange? Held(IReadOnlyList<Price> prices, int index, StrategyEntry entry)
     {
-        if (!entry.IsRange || KnownRanges.Holding(prices, entry.Retracement, entry.Band)[index].FirstOrDefault(x => x.Level == entry.Level) is not { } range)
+        if (!entry.IsRange)
             return null;
-        var (top, bottom) = (range.BuyLowTop(entry.Depth), range.SellHighBottom(entry.Depth));
         var candle = prices[index];
-        var reached = entry.Type == StrategyEntry.RangeSweep
-            ? entry.Zone == EnumRangeZone.BuyLow ? candle.Low < range.Low && candle.Close >= range.Low : candle.High > range.High && candle.Close <= range.High
-            : entry.Zone == EnumRangeZone.BuyLow ? candle.Low <= top : candle.High >= bottom;
-        return reached ? new HeldRange(range.Level, range.Direction, range.Low, range.High, range.BandLow, range.BandHigh, top, bottom, range.Retracement, range.From, range.Identified, index) : null;
+        // The Ranges of the step's level and size that the candle reaches into or sweeps: of those of any level, the tallest.
+        var range = KnownRanges.Holding(prices, entry.Retracement, entry.Band)[index]
+            .Where(x => (entry.Level == StrategyEntry.AnyLevel || x.Level == entry.Level)
+                && 100 * x.Height / x.Low is var height && height >= (entry.MinHeight ?? 0) && height <= (entry.MaxHeight ?? double.MaxValue)
+                && index - x.Identified >= (entry.MinCandles ?? 0)
+                && (entry.Type == StrategyEntry.RangeSweep
+                    ? entry.Zone == EnumRangeZone.BuyLow ? candle.Low < x.Low && candle.Close >= x.Low : candle.High > x.High && candle.Close <= x.High
+                    : entry.Zone == EnumRangeZone.BuyLow ? candle.Low <= x.BuyLowTop(entry.Depth) : candle.High >= x.SellHighBottom(entry.Depth)))
+            .MaxBy(x => x.Height);
+        return range == null ? null : new HeldRange(range.Level, range.Direction, range.Low, range.High, range.BandLow, range.BandHigh,
+            range.BuyLowTop(entry.Depth), range.SellHighBottom(entry.Depth), range.Retracement, range.From, range.Identified, index);
+    }
+
+    /// <summary>
+    /// Step k of a chain as it is read at the close of candle index: the step itself, or, for one read finer than the
+    /// Range the chain holds (see <see cref="StrategyEntry.Finer"/>), the step at the level that many after the Range's
+    /// at that candle. The Range's level there is looked up while it still holds, and is otherwise the one it had when its
+    /// step was met. Null for such a step when the chain holds no Range.
+    /// </summary>
+    public static StrategyEntry? StepAt(IReadOnlyList<Price> prices, IReadOnlyList<StrategyEntry> steps, int k, int index, HeldRange? range)
+    {
+        var step = steps[k];
+        if (step.Finer is not int finer)
+            return step;
+        if (range == null || steps.Take(k).LastOrDefault(x => x.IsRange) is not { } of)
+            return null;
+        var now = KnownRanges.Holding(prices, of.Retracement, of.Band)[index].FirstOrDefault(x => x.Identified == range.Identified && x.From == range.From);
+        return step.AtLevel((now?.Level ?? range.Level) + finer);
     }
 
     /// <summary>
@@ -329,6 +367,10 @@ public static class StrategyBacktest
     public static List<int> Occurrences(List<Price> prices, Strategy strategy)
     {
         var steps = strategy.Steps;
+        // A step read finer than a Range has no candles of its own to trace a chain from: its level is each chain's.
+        if (steps.Any(x => x.Finer != null))
+            return Signals(prices, strategy).Select(x => x.Index).ToList();
+
         var each = steps.Select(x => Occurrences(prices, x)).ToList();
         // The candles each step's kills are met at, but for a Range's end, which is of the Range each candle holds.
         var kills = steps.Select(x => (x.Kill ?? []).Where(k => k.Type != StrategyEntry.RangeEnd).SelectMany(k => Occurrences(prices, k)).Distinct().Order().ToList()).ToList();

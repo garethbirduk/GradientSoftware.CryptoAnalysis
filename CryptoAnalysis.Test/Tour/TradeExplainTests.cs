@@ -210,7 +210,7 @@ public class TradeExplainTests
     [TestMethod]
     public void Definition_OfHowStructureIsRead_NamesTheWindowItIsReadFrom()
     {
-        StringAssert.Contains(Definitions.Text("Trade.structure"), $"last {Gradient.CryptoAnalysis.Research.KnownStructure.Window} candles");
+        StringAssert.Contains(Definitions.Text("Trade.structure"), "from every candle up to it");
     }
 
     [TestMethod]

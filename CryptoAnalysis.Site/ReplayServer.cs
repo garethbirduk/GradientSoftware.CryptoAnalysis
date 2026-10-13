@@ -92,13 +92,11 @@ public static class ReplayServer
         });
 
         var byId = datasets.ToDictionary(x => x.Id);
-        var batches = new ConcurrentDictionary<(string Dataset, int Anchor, int Start, (double Retracement, double Band) Settings), Lazy<string>>();
+        var batches = new ConcurrentDictionary<(string Dataset, int Anchor, int Start, (double Retracement, double Band) Settings, int RangeSwings), Lazy<string>>();
         // What is slow to work out is kept on disk too, beside the site, so it is there after a restart: the replay's batches,
-        // and the market structure a strategy's steps read.
+        // and the datasets' structure.
         var kept = new StructureCache(Path.GetFullPath(Path.Combine(siteDir, "..", "cache")));
         kept.Prune();
-        KnownStructure.CacheDirectory = Path.Combine(kept.Folder, "known");
-        KnownRanges.CacheDirectory = Path.Combine(kept.Folder, "known");
 
         // The structure of each series replayed, read once and held: what was known at any candle is looked up in it, and
         // the Replay and Chart pages' timelines are made from it. A series is a dataset from an anchor on, with the range
@@ -146,6 +144,10 @@ public static class ReplayServer
 
         var held = datasets.ToList();
         _ = Task.Run(() => held.ForEach(x => Structure(x)));
+
+        // A strategy's steps and the explorer's conditions read a dataset's structure from the same store.
+        KnownStructure.Stores = (prices, retracement, band) =>
+            datasets.FirstOrDefault(x => ReferenceEquals(x.Prices, prices)) is { } data ? Structure(data, 0, (retracement, band)) : null;
 
         // The static page, opened as a file, asks whether the server is running so it can link to it.
         app.MapGet("/api/health", (HttpContext context) =>
@@ -199,7 +201,7 @@ public static class ReplayServer
 
         // With an anchor, the replay is of the dataset from that candle on: from counts from it, and so does the batch. The
         // range settings (the least retracement and the band, as percentages) are the page's, so each pair has batches of its own.
-        app.MapGet("/api/replay", (string dataset, int from, int? anchor, double? retracement, double? band) =>
+        app.MapGet("/api/replay", (string dataset, int from, int? anchor, double? retracement, double? band, int? rangeSwings) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
@@ -207,11 +209,11 @@ public static class ReplayServer
             var first = Math.Clamp(anchor ?? 0, 0, data.Prices.Count - 1);
             var start = Math.Clamp(from / BatchSize * BatchSize, 0, data.Prices.Count - first - 1);
             var settings = (Retracement: retracement ?? Ranges.DefaultMinRetracement, Band: band ?? Ranges.DefaultBand);
-            var json = batches.GetOrAdd((dataset, first, start, settings), key => new Lazy<string>(() =>
-                kept.Text(BatchName(data, key.Anchor, key.Start, key.Settings), () =>
+            var json = batches.GetOrAdd((dataset, first, start, settings, Math.Clamp(rangeSwings ?? 0, 0, 99)), key => new Lazy<string>(() =>
+                kept.Text(BatchName(data, key.Anchor, key.Start, key.Settings, key.RangeSwings), () =>
                 {
                     var to = Math.Min(key.Start + BatchSize, data.Prices.Count - key.Anchor);
-                    return Batch(Structure(data, key.Anchor, key.Settings, to), key.Anchor, key.Start, to);
+                    return Batch(Structure(data, key.Anchor, key.Settings, to), key.Anchor, key.Start, to, key.RangeSwings);
                 }))).Value;
             return Results.Text(json, "application/json");
         });
@@ -220,10 +222,10 @@ public static class ReplayServer
         // candles, and with narrowest, leaving out what is narrower than that many candles, as the page asks for the
         // stretch it draws and what can be seen at its zoom; looked up each time. With neither, everything in it, which is
         // kept as UTF-8, as a long dataset's comes to tens of megabytes.
-        var completes = new ConcurrentDictionary<(string Dataset, (double Retracement, double Band) Settings), Lazy<byte[]>>();
+        var completes = new ConcurrentDictionary<(string Dataset, (double Retracement, double Band) Settings, int RangeSwings), Lazy<byte[]>>();
         // With at, the stretch is as known at that candle, and with maxLevel only the levels to that one: what an analysis
         // seen from a candle shows of a thing that began long before it, which the replay's batches do not go back to.
-        app.MapGet("/api/complete", (string dataset, double? retracement, double? band, int? from, int? to, int? narrowest, int? at, int? maxLevel) =>
+        app.MapGet("/api/complete", (string dataset, double? retracement, double? band, int? from, int? to, int? narrowest, int? at, int? maxLevel, int? rangeSwings) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
@@ -234,11 +236,11 @@ public static class ReplayServer
                 var store = Structure(data, 0, settings);
                 var last = Math.Clamp(at ?? store.Candles - 1, 0, store.Candles - 1);
                 var (first, end) = (Math.Clamp(from ?? 0, 0, last), Math.Clamp(to ?? last, 0, last));
-                var timeline = MarketStructure.Complete(store, Math.Clamp(maxLevel ?? MaxLevel, 0, MaxLevel), first, end, Math.Max(0, narrowest ?? 0), last);
+                var timeline = MarketStructure.Complete(store, Math.Clamp(maxLevel ?? MaxLevel, 0, MaxLevel), first, end, Math.Max(0, narrowest ?? 0), last, Math.Clamp(rangeSwings ?? 0, 0, 99));
                 return Results.Bytes(JsonSerializer.SerializeToUtf8Bytes(new { Anchor = 0, From = last, To = last + 1, Stretch = new { From = first, To = end, Narrowest = Math.Max(0, narrowest ?? 0) }, Timeline = timeline }, Json), "application/json");
             }
 
-            var json = completes.GetOrAdd((dataset, settings), key => new Lazy<byte[]>(() => Complete(Structure(data, 0, key.Settings)))).Value;
+            var json = completes.GetOrAdd((dataset, settings, Math.Clamp(rangeSwings ?? 0, 0, 99)), key => new Lazy<byte[]>(() => Complete(Structure(data, 0, key.Settings), key.RangeSwings))).Value;
             return Results.Bytes(json, "application/json");
         });
 
@@ -263,6 +265,7 @@ public static class ReplayServer
 
         // A scene's prices, a dataset's from its anchor on, are kept as one list for each: what is worked out once for a
         // series and kept with it, as a strategy's market structure is (see KnownStructure), is then worked out once a scene.
+        // A scene's own structure store is read by KnownStructure, as the server holds only the datasets' for it.
         var scenes = new ConcurrentDictionary<(string, int), List<Price>>();
         List<Price> SceneOf(Dataset data, int first) => first == 0 ? data.Prices : scenes.GetOrAdd((data.Id, first), k => data.Prices.GetRange(k.Item2, data.Prices.Count - k.Item2));
 
@@ -315,7 +318,7 @@ public static class ReplayServer
 
         // things lists what to explain, by id as /api/explain/at gives them ("Candle,SuccessiveCandles,Swing:1"), a chapter
         // each; explain and level name one thing the old way. A thing not at the candle is left out and named in missing.
-        app.MapGet("/api/explain/tour", (string dataset, string at, string? things, string? explain, int? level, string? seen, bool? expanded, bool? inPlace, int? greenRuns, int? redRuns, string? strategy) =>
+        app.MapGet("/api/explain/tour", (string dataset, string at, string? things, string? explain, int? level, string? seen, bool? expanded, bool? inPlace, int? greenRuns, int? redRuns, string? strategy, int? rangeSwings) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
@@ -323,7 +326,7 @@ public static class ReplayServer
             var unknown = ids.Where(x => Explain.Thing.Parse(x) == null).ToList();
             if (unknown.Count > 0)
                 return Results.BadRequest($"\"{string.Join(", ", unknown)}\" is not a thing the tour can explain: {string.Join(", ", Explain.Terms)}.");
-            var options = new ExplainOptions(greenRuns ?? ExplainOptions.Default.GreenRuns, redRuns ?? ExplainOptions.Default.RedRuns);
+            var options = new ExplainOptions(greenRuns ?? ExplainOptions.Default.GreenRuns, redRuns ?? ExplainOptions.Default.RedRuns, Math.Clamp(rangeSwings ?? ExplainOptions.Default.RangeSwings, 1, 99));
             // A Trade is a strategy's, which the address gives as JSON.
             Strategy? traded = null;
             if (strategy != null && (traded = Explain.StrategyOf(JsonNode.Parse(strategy), out var wrong)) == null)
@@ -354,6 +357,18 @@ public static class ReplayServer
                 return Results.BadRequest($"No Trend at level {level ?? 1} has the candle at {at} in it.");
             var trends = allTrends.GetOrAdd(data.Id, _ => new Lazy<string>(() => Explain.AllTrends(data.Prices, MaxLevel).ToJsonString())).Value;
             return Results.Text($"{{\"shown\":{shown.ToJsonString()},\"trends\":{trends}}}", "application/json");
+        });
+
+        // The page's List: where a kind of thing occurs in the whole dataset, as known at its last candle (see Occurrences),
+        // with the range settings the page has.
+        app.MapGet("/api/occurrences", (string dataset, string kind, double? retracement, double? band, int? rangeSwings) =>
+        {
+            if (!byId.TryGetValue(dataset, out var data))
+                return Results.NotFound();
+            var store = Structure(data, 0, (retracement ?? Ranges.DefaultMinRetracement, band ?? Ranges.DefaultBand));
+            return Occurrences.Of(store, kind, MaxLevel, Math.Clamp(rangeSwings ?? SwingRanges.DefaultSwings, 1, 99)) is { } rows
+                ? Results.Text($"{{\"kind\":{JsonSerializer.Serialize(kind)},\"rows\":{rows.ToJsonString()}}}", "application/json")
+                : Results.BadRequest($"\"{kind}\" is not listed: {string.Join(", ", Occurrences.Kinds)}.");
         });
 
         // A strategy run over a whole dataset, as the Strategies page sends it with the dataset's id: every trade it made and
@@ -977,15 +992,15 @@ public static class ReplayServer
     }
 
     /// <summary>
-    /// The name a batch is kept by: its dataset, anchor and range settings, the candles it is of, what the server keeps of
+    /// The name a batch is kept by: its dataset, anchor and range settings (with the count of swings, when ranges are found by swings too), the candles it is of, what the server keeps of
     /// each (the levels and the window), and the fingerprint of every candle it was worked out from, the dataset's up to its
     /// last. A batch stays good as candles are added after it, and is not found again once a candle before it has changed.
     /// </summary>
-    public static string BatchName(Dataset data, int anchor, int start, (double Retracement, double Band) settings)
+    public static string BatchName(Dataset data, int anchor, int start, (double Retracement, double Band) settings, int rangeSwings = 0)
     {
         var to = Math.Min(start + BatchSize, data.Prices.Count - anchor);
         var number = (double x) => x.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
-        return Path.Combine("replay", data.Id, $"a{anchor}-r{number(settings.Retracement)}-b{number(settings.Band)}-l{MaxLevel}-w{Window}",
+        return Path.Combine("replay", data.Id, $"a{anchor}-r{number(settings.Retracement)}-b{number(settings.Band)}-l{MaxLevel}-w{Window}{(rangeSwings > 0 ? $"-s{rangeSwings}" : "")}",
             $"{start}-{to}-{PriceFingerprint.Of(data.Prices, anchor + to):x16}.json");
     }
 
@@ -994,9 +1009,9 @@ public static class ReplayServer
     /// known to be carried over rather than new, looked up in the structure store of the series. The candles are counted
     /// from the anchor, which the store's are read from.
     /// </summary>
-    private static string Batch(StructureStore store, int anchor, int start, int to)
+    private static string Batch(StructureStore store, int anchor, int start, int to, int rangeSwings = 0)
     {
-        var timeline = MarketStructure.Timeline(store, MaxLevel, from: Math.Max(0, start - 1), to: to, keepFrom: Math.Max(0, start - Window));
+        var timeline = MarketStructure.Timeline(store, MaxLevel, from: Math.Max(0, start - 1), to: to, keepFrom: Math.Max(0, start - Window), rangeSwings: rangeSwings);
         return JsonSerializer.Serialize(new { Anchor = anchor, From = start, To = to, Timeline = timeline }, Json);
     }
 
@@ -1004,10 +1019,10 @@ public static class ReplayServer
     /// The timeline of the last candle alone, keeping everything from the first: the structure of the whole dataset in
     /// hindsight, looked up in its structure store.
     /// </summary>
-    private static byte[] Complete(StructureStore store)
+    private static byte[] Complete(StructureStore store, int rangeSwings = 0)
     {
         var last = store.Candles - 1;
-        var timeline = MarketStructure.Timeline(store, MaxLevel, from: last, to: last + 1, keepFrom: 0);
+        var timeline = MarketStructure.Timeline(store, MaxLevel, from: last, to: last + 1, keepFrom: 0, rangeSwings: rangeSwings);
         return JsonSerializer.SerializeToUtf8Bytes(new { Anchor = 0, From = last, To = last + 1, Timeline = timeline }, Json);
     }
 
