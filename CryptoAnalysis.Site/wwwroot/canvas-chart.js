@@ -253,8 +253,16 @@ window.CanvasChart = (() => {
         const o = trace.open[i], c = trace.close[i];
         if ((c >= o) !== rising) continue;
         const cx = Math.round(X(x[i])) + 0.5;
-        ctx.moveTo(cx, Y(trace.high[i])); ctx.lineTo(cx, Y(trace.low[i]));
-        if (body >= 2) boxes.push(cx - body / 2, Math.min(Y(o), Y(c)), body, Math.max(1, Math.abs(Y(o) - Y(c))));
+        // A wick runs from the high to the body and from the body to the low, not through the body, which is drawn
+        // half clear; a candle too narrow for a body is the one line from its high to its low.
+        if (body >= 2) {
+          const top = Math.min(Y(o), Y(c)), tall = Math.max(1, Math.abs(Y(o) - Y(c)));
+          ctx.moveTo(cx, Y(trace.high[i])); ctx.lineTo(cx, top);
+          ctx.moveTo(cx, top + tall); ctx.lineTo(cx, Y(trace.low[i]));
+          boxes.push(cx - body / 2, top, body, tall);
+        } else {
+          ctx.moveTo(cx, Y(trace.high[i])); ctx.lineTo(cx, Y(trace.low[i]));
+        }
       }
       ctx.stroke();
       ctx.globalAlpha = alpha * 0.5;
