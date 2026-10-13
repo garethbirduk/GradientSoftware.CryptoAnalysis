@@ -38,10 +38,11 @@ public static partial class MarketStructure
     /// candles from to to of the whole in hindsight, for a chart that shows that stretch. What is narrower than narrowest
     /// candles is left out, as on a chart zoomed far out it could not be seen: a swing, a market structure break from the
     /// high or low it broke, a trend, a retracement, a run of candles, and a high or low both of whose legs are.
+    /// With at, the stretch is as known at that candle and not the last, as an analysis seen from it has it.
     /// </summary>
-    public static ReplayTimeline Complete(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int narrowest = 0)
+    public static ReplayTimeline Complete(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int narrowest = 0, int? at = null)
     {
-        var last = store.Candles - 1;
+        var last = Math.Min(at ?? store.Candles - 1, store.Candles - 1);
         if (last < 0)
             return Track([], 0);
 
