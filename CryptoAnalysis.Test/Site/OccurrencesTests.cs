@@ -28,7 +28,8 @@ public class OccurrencesTests
                 Assert.IsTrue(index >= 0 && index + candles <= last && level is >= 1 and <= 8, $"{kind}: {row.ToJsonString()}");
                 Assert.AreEqual(store.Prices[index].DateTime.ToString("yyyy-MM-ddTHH:mm"), row["start"]!.GetValue<string>());
                 Assert.AreEqual(store.Prices[index + candles].DateTime.ToString("yyyy-MM-ddTHH:mm"), row["until"]!.GetValue<string>());
-                StringAssert.Matches(row["thing"]!.GetValue<string>(), new System.Text.RegularExpressions.Regex("^(Swing|Trend|SwingRange):[0-9]+$"));
+                if (kind != "DeepMsb")
+                    StringAssert.Matches(row["thing"]!.GetValue<string>(), new System.Text.RegularExpressions.Regex("^(Swing|Trend|SwingRange):[0-9]+$"));
             }
         }
     }

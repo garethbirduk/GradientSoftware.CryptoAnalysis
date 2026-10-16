@@ -30,6 +30,8 @@
   "MSB.before": "An MSB refers to the prior {turn}, and so can be observed before a new Swing is Confirmed.",
   "MSB.close": "A wick beyond a level is not an MSB. An MSB needs a close beyond it.",
   "MSB.alias": "A Market Structure Break is sometimes called a Change of Character.",
+  "MsbBack.what": "An MSB closes {beyond} the {turn} of the last {swing}. When the price goes on to close {beyond} the {turn} of the {swing} before it too, the MSB reaches further back.",
+  "MsbBack.count": "It is counted in Swings: to take back the last few, a close must be {beyond} the {extreme} of their {turn}s, so one close can take back several at once.",
   "Ghost.what": "Something we observed in real time that later disappears with new data is called a Ghost.",
   "Trend.what": "A Trend is two or more Swings in a row in one direction: {a trend} is a run of {swing}s, and begins where its first {swing} begins.",
   "Trend.confirmed": "The BoS of the second {swing} makes two in a row: that Confirms the {trend}.",

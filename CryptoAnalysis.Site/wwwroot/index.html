@@ -577,6 +577,18 @@
   .layerbar .all-none button[data-list][aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
   .layout.listing .layer[data-layer] { cursor: help; }
   .won { color: var(--up); } .lost { color: var(--down); }
+.game-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 14px; align-items: start; }
+.game-card h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.game-card > .remarks { color: var(--muted); font-size: 13px; margin: 6px 0 10px; }
+.game-card.picked { border-color: var(--accent); }
+.game-card.best { box-shadow: inset 0 0 0 1px var(--up); }
+.game-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.game-total { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.game-total b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.game-tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
+.game-tag.best { color: var(--up); border-color: var(--up); }
+.game-chart .chart { height: 420px; }
+.game-card .strat-trades { max-height: 280px; overflow: auto; }
   @media (max-width: 760px) { .strat { grid-template-columns: 1fr; } }
   /* Strategies on charts: the section's add form, each strategy's remove button, and Find similar. */
   .layerbar .strat-remove { flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); font-size: 11px; cursor: pointer; }
@@ -626,8 +638,7 @@ const TERMS = new Map(DATA.terms.map(t => [t.type, t]));
 const ARROW = { Up: '↑', Down: '↓' };
 const STORE_KEY = 'terms-site:v8';
 const LEVELS = 9;
-const SWINGS = { Up: { name: 'Upswings', layer: 'Upswing', color: '--upswing' }, Down: { name: 'Downswings', layer: 'Downswing', color: '--downswing' } };
-const SWING_DIRECTION = { Upswing: 'Up', Downswing: 'Down' };
+const SWINGS = { Up: { name: 'Upswings', layer: 'Upswing', color: '--upswing' }, Down: { name: 'Downswings', layer: 'Downswing', color: '--downswing' } };const SWING_DIRECTION = { Upswing: 'Up', Downswing: 'Down' };
 const TREND_DIRECTION = { Uptrend: 'Up', Downtrend: 'Down' };
 const STRUCTURE_PAGES = ['Sawtooth', 'InterimSwings', 'Replay', 'Analysis', 'Tour'];
 
@@ -644,8 +655,12 @@ const SECTIONS = [
   { name: 'Candles', layers: [{ id: 'SuccessiveGreenCandles', label: 'Green runs' }, { id: 'SuccessiveRedCandles', label: 'Red runs' }] },
   { name: 'Sawtooth', layers: [{ id: 'sawtooth', label: 'Sawtooth' }] },
   { name: 'Points', layers: ['HigherHigh', 'LowerHigh', 'LowerLow', 'HigherLow'].map(id => ({ id })) },
-  { name: 'Upswings', layers: [{ id: 'Upswing', label: 'Upswing' }, { id: 'BullishBreakOfStructure' }, { id: 'bosLevelUp', label: 'BoS level', term: 'BullishBreakOfStructure' }] },
-  { name: 'Downswings', layers: [{ id: 'Downswing', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' }] },
+  // Overlapping: a Swing against the leg of the level above (see drawOverlapSwings). Narrow, those that run from one of
+  // its legs into the next; general, those inside one leg too.
+  { name: 'Upswings', layers: [{ id: 'Upswing', label: 'Upswing' }, { id: 'BullishBreakOfStructure' }, { id: 'bosLevelUp', label: 'BoS level', term: 'BullishBreakOfStructure' },
+    { id: 'OverlapUp', label: 'Overlapping Upswing (narrow)' }, { id: 'OverlapUpInside', label: 'Overlapping Upswing (general)' }] },
+  { name: 'Downswings', layers: [{ id: 'Downswing', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' },
+    { id: 'OverlapDown', label: 'Overlapping Downswing (narrow)' }, { id: 'OverlapDownInside', label: 'Overlapping Downswing (general)' }] },
   { name: 'Trends', layers: [{ id: 'Uptrend', label: 'Uptrend' }, { id: 'Downtrend', label: 'Downtrend' }, { id: 'trendArrows', label: 'Trend arrows' }] },
   { name: 'Indicators', layers: [{ id: 'BullishMarketStructureBreak' }, { id: 'msbLevelUp', label: 'MSB↑ level', term: 'BullishMarketStructureBreak' },
     { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' },
@@ -653,7 +668,9 @@ const SECTIONS = [
     { id: 'rangeZones', label: 'Range zones', term: 'Range' },
     // A Range found by Swings: the price inside the last leg of an order while the order after it Confirms a count of
     // Swings. With the second on, only those with so many Weak Swings among them.
-    { id: 'SwingRange', label: 'Range by Swings', term: 'Range' }, { id: 'swingRangeWeak', label: 'Weak Swings in it', term: 'Range' }] },
+    { id: 'SwingRange', label: 'Range by Swings', term: 'Range' }, { id: 'swingRangeWeak', label: 'Weak Swings in it', term: 'Range' },
+    // An MSB that closes beyond the turn of a Swing before the last: its box, from so many Swings back.
+    { id: 'DeepMsb', label: 'MSB further back', term: 'BullishMarketStructureBreak' }] },
 ].map(s => ({ ...s, layers: s.layers.map(l => ({ ...l, label: l.label ?? TERMS.get(l.id)?.label ?? l.id })) }));
 // The strategies added to the charts (see Strategies on charts), a layer each, filled in once the page's settings are read.
 const STRATEGY_SECTION = { name: 'Strategies', strategies: true, layers: [] };
@@ -670,6 +687,7 @@ const SETTINGS = {
   SwingRange: { key: 'rangeSwings', min: 1, max: 99, fallback: 4, title: 'How many Swings one order finer must be Confirmed inside a leg, with the price between its two ends, for a Range to be found there', unit: '', remote: true },
   swingRangeWeak: { key: 'rangeWeak', min: 1, max: 99, fallback: 2, title: 'With this on, a Range by Swings is shown only once this many of the Swings inside it are Weak', unit: '' },
 };
+SETTINGS.DeepMsb = { key: 'msbBack', min: 2, max: 64, fallback: 2, title: 'The fewest Swings back an MSB must reach to be shown: 2 is the turn of the Swing before the last', unit: '' };
 // The colour of a Range found by Swings, apart from the Range found by its Retracement.
 const SWING_RANGE_COLOR = '#0e7490';
 const LAYERS = SECTIONS.flatMap(s => s.layers);
@@ -757,7 +775,7 @@ function renderNav(active) {
   const nav = document.getElementById('nav');
   // The term pages and their examples are no longer in the bar; their addresses still open them.
   nav.innerHTML = `<h1>Market structure</h1>
-    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}${link('Explore')}${link('Data')}
+    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}${link('Explore')}${link('Game')}${link('Data')}
     <span class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC</span>`;
   document.documentElement.style.setProperty('--nav-h', `${nav.offsetHeight}px`);
 }
@@ -827,6 +845,11 @@ function swatch(layer) {
   if (layer.id === 'rangeBands') return svg(`<line x1="1" y1="3" x2="21" y2="3" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/><line x1="1" y1="11" x2="21" y2="11" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/>`);
   if (layer.id === 'rangeZones') return svg(`<rect x="1" y="1" width="20" height="5" fill="${withAlpha(css('--down'), 0.25)}"/><rect x="1" y="8" width="20" height="5" fill="${withAlpha(css('--up'), 0.25)}"/><line x1="1" y1="6" x2="21" y2="6" stroke="${TERMS.get('Range')?.color}" stroke-width="1" stroke-dasharray="3 2"/><line x1="1" y1="8" x2="21" y2="8" stroke="${TERMS.get('Range')?.color}" stroke-width="1" stroke-dasharray="3 2"/>`);
   if (layer.id === 'SwingRange') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(SWING_RANGE_COLOR, 0.12)}" stroke="${SWING_RANGE_COLOR}" stroke-width="1.5"/>`);
+  if (layer.id.startsWith('Overlap')) {
+    const color = css(layer.id.startsWith('OverlapUp') ? '--upswing' : '--downswing');
+    return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(color, 0.18)}" stroke="${color}" stroke-width="1.5" stroke-dasharray="${layer.id.endsWith('Inside') ? '1.5 2' : '5 2'}"/>`);
+  }
+  if (layer.id === 'DeepMsb') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(css('--upswing'), 0.15)}" stroke="${css('--upswing')}" stroke-width="1.5" stroke-dasharray="5 2"/>`);
   if (layer.id === 'swingRangeWeak') return svg(`<rect x="2" y="2" width="18" height="10" fill="none" stroke="${SWING_RANGE_COLOR}" stroke-width="1.5"/><path d="M5 9 L9 5 L13 9 L17 5" fill="none" stroke="${SWING_RANGE_COLOR}" stroke-width="1.3"/>`);
   if (layer.id === 'ghostRanges') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(css('--close'), 0.1)}" stroke="${css('--close')}" stroke-dasharray="1.5 2"/>`);
   if (layer.id.startsWith('bosLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="4 3"/>`);
@@ -837,7 +860,13 @@ function swatch(layer) {
 const setting = id => state.runMin?.[SETTINGS[id].key] ?? SETTINGS[id].fallback;
 const runMin = setting;
 // The range settings the local server is asked for, as part of every replay request.
-const rangeQuery = () => `&retracement=${setting('Retracement')}&band=${setting('Range')}&rangeSwings=${setting('SwingRange')}`;
+const rangeQuery = () => `&retracement=${setting('Retracement')}&band=${setting('Range')}&rangeSwings=${setting('SwingRange')}&deepBreaks=true&overlaps=true`;
+// A timeline's market structure breaks apart: those of the last Swing's turn, as every part of the page knows them, and
+// those that go further back (see drawDeepBreaks), which have a layer of their own.
+const splitBreaks = r => r.splitBreaks ??= { plain: (r.marketStructureBreaks ?? []).filter(e => !(e.value.break.back > 1)), deep: (r.marketStructureBreaks ?? []).filter(e => e.value.break.back > 1) };
+// A timeline's Swings apart in the same way: those every part of the page knows, and those against the leg of the level
+// above (see drawOverlapSwings), which have layers of their own and count for nothing else.
+const splitSwings = r => r.splitSwings ??= { plain: (r.swings ?? []).filter(e => !e.value.overlap), overlap: (r.swings ?? []).filter(e => e.value.overlap) };
 
 // One section of the layer bar. Its heading turns the whole section on, or off when it is all on already; the arrow
 // beside it folds the section away, leaving the heading and its count. Folded sections are remembered across pages.
@@ -1190,6 +1219,51 @@ function drawRanges(ex, traces, swingBox) {
   for (const g of shownRangeBoxes(ex)) {
     ex.levelsDrawn?.add(g.level);
     drawRange(traces, g, g.end?.time ?? last, { box: on('Range'), bands: on('rangeBands') || on('rangeZones'), zones: on('rangeZones') ? setting('rangeZones') : null });
+  }
+}
+
+// A market structure break that goes further back than the last Swing: the counter-move after a run of Swings has closed
+// beyond the turns of the last so many of them. Shown from as many Swings back as the layer's number.
+const DEEP_BREAK_COLOR = '#ca8a04';
+function shownDeepBreaks(ex) {
+  const least = setting('DeepMsb');
+  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.deepBreaksByLevel?.[level] ?? []).filter(m => m.back >= least).map(m => ({ ...m, level })));
+}
+
+const deepBreakSays = m => `${m.type === 'BullishMarketStructureBreak' ? 'Bullish' : 'Bearish'} MSB, ${m.back} of ${m.of} ${m.type === 'BullishMarketStructureBreak' ? 'Downswings' : 'Upswings'} back`;
+
+// It is drawn as the Swing it has the shape of: from the turn it closed beyond, to where the counter-move began, to the
+// close, which is where a Swing that began at that turn would have its BoS. An Upswing for a Bullish one.
+function drawDeepBreaks(ex, traces, swingBox) {
+  if (!on('DeepMsb') || !swingBox) return;
+  for (const m of shownDeepBreaks(ex)) {
+    ex.levelsDrawn?.add(m.level);
+    const bullish = m.type === 'BullishMarketStructureBreak', bos = TERMS.get(bullish ? 'BullishBreakOfStructure' : 'BearishBreakOfStructure');
+    const hover = `${deepBreakSays(m)} · level ${m.level}<br>close ${fmtPrice(m.break.price)} at ${fmtTime(m.break.time)}, ${bullish ? 'above' : 'below'} the turn of ${fmtPrice(m.reference.price)} at ${fmtTime(m.reference.time)}` +
+      `<br>the counter-move began at ${fmtPrice(m.far.price)}, ${fmtTime(m.far.time)}<br>the earliest Swing taken back starts ${fmtTime(m.from.time)}<extra></extra>`;
+    traces.push({ ...swingBox({ level: m.level, direction: bullish ? 'Up' : 'Down', start: m.reference, end: m.break, extreme: m.far }, false), name: 'MSB further back', hovertemplate: hover });
+    if (bos) traces.push({ lv: m.level, type: 'scatter', mode: 'markers+text', name: bos.label, x: [m.break.time], y: [m.break.price],
+      marker: { color: bos.color, symbol: bos.symbol, size: 10, line: { width: 1, color: css('--panel') } },
+      text: [`${bos.label} ${m.back} back`], textposition: bullish ? 'top center' : 'bottom center', textfont: { size: 11, color: css('--muted') }, hovertemplate: hover });
+  }
+}
+
+// A Swing against the leg of the level above, which the structure leaves out (see OverlappingSwings): drawn as a Swing,
+// with a dashed or dotted border, when its layer is on. Narrow ones run from one leg of the level above into the next; general ones
+// lie inside the one leg as well.
+function drawOverlapSwings(ex, traces, swingBox) {
+  if (!swingBox) return;
+  const layerOf = w => `Overlap${w.direction}${w.overlap === 'inside' ? 'Inside' : ''}`;
+  for (const level of [...selectedLevels(ex)].sort((a, b) => a - b)) {
+    for (const w of (ex.overlapSwingsByLevel?.[level] ?? []).filter(w => on(layerOf(w)) && wideEnough(ex, w.start.time, w.end.time))) {
+      ex.levelsDrawn?.add(level);
+      const name = `Overlapping ${w.direction === 'Up' ? 'Upswing' : 'Downswing'} (${w.overlap === 'inside' ? 'general' : 'narrow'})`;
+      const box = swingBox(w, false);
+      // As a Swing is drawn, its border the level's colour, dashed for a narrow one and dotted for a general one.
+      traces.push({ ...box, name, line: { ...box.line, dash: w.overlap === 'inside' ? 'dot' : 'dash' },
+        hovertemplate: `${name} · level ${w.level}<br>${fmtTime(w.start.time)} → BoS ${fmtTime(w.end.time)}<br>${w.direction === 'Up' ? 'high' : 'low'} ${fmtPrice(w.start.price)} · ` +
+          `${w.direction === 'Up' ? 'low' : 'high'} ${fmtPrice(w.extreme.price)} at ${fmtTime(w.extreme.time)} · BoS ${fmtPrice(w.breakOfStructure.price)}<extra></extra>` });
+    }
   }
 }
 
@@ -1570,9 +1644,11 @@ function olderStructure(ex, t, window) {
   };
   return has.older = { keptFrom,
     pivots: byLevel(r.pivots, v => v.pivot, p => p.index < keptFrom),
-    swings: byLevel(r.swings, v => v, w => w.end.time < kept),
+    swings: byLevel(splitSwings(r).plain, v => v, w => w.end.time < kept),
+    overlapSwings: byLevel(splitSwings(r).overlap, v => v, w => w.end.time < kept),
     points: byLevel(r.points, v => v, p => p.time < kept),
-    marketStructureBreaks: byLevel(r.marketStructureBreaks, v => v.break, m => m.break.time < kept),
+    marketStructureBreaks: byLevel(splitBreaks(r).plain, v => v.break, m => m.break.time < kept),
+    deepBreaks: byLevel(splitBreaks(r).deep, v => v.break, m => m.break.time < kept),
     trends: byLevel(r.trends, v => v, tr => tr.end != null && tr.end.time < kept),
     retracements: byLevel(r.retracements, v => v, v => (v.steps[v.steps.length - 1]?.point ?? v.to).time < kept),
     ranges: byLevel(r.ranges, v => v, g => g.end != null && g.end.time < kept),
@@ -1640,9 +1716,11 @@ function liveView(ex, t) {
     prices,
     sawtooth,
     // A Swing comes at its BoS; one of a coarser level than the section's own, which holds it, as soon as it has begun.
-    swingsByLevel: byLevel(r.swings, v => v).map((list, level) => reached(list, w => (level < revealLevel() ? w.start : w.breakOfStructure ?? w.end ?? w.start).time).sort((a, b) => a.start.time.localeCompare(b.start.time))),
+    overlapSwingsByLevel: byLevel(splitSwings(r).overlap, v => v).map(list => reached(list, w => w.breakOfStructure.time)),
+    swingsByLevel: byLevel(splitSwings(r).plain, v => v).map((list, level) => reached(list, w => (level < revealLevel() ? w.start : w.breakOfStructure ?? w.end ?? w.start).time).sort((a, b) => a.start.time.localeCompare(b.start.time))),
     pointsByLevel: byLevel(r.points, v => v).map(list => reached(list, p => p.time).sort((a, b) => a.time.localeCompare(b.time))),
-    marketStructureBreaksByLevel: byLevel(r.marketStructureBreaks, v => v.break).map(list => reached(list, m => m.break.time)),
+    marketStructureBreaksByLevel: byLevel(splitBreaks(r).plain, v => v.break).map(list => reached(list, m => m.break.time)),
+    deepBreaksByLevel: byLevel(splitBreaks(r).deep, v => v.break).map(list => reached(list, m => m.break.time)),
     // A Trend grows as its Swings are reached: the count, Strength and arrow are of the Swings whose BoS the cursor has
     // passed, so it reads two, then three, and so on, rather than what it had by the analysis's cursor.
     trendsByLevel: byLevel(r.trends, v => v).map(list => reached(list, tr => tr.confirmed.time).map(open).map(tr => reveal ? trendSoFar(tr, time) : tr)),
@@ -1659,6 +1737,8 @@ function liveView(ex, t) {
     swingsByLevel: withOlder(older.swings, view.swingsByLevel, started).map(list => list.sort(byStart)),
     pointsByLevel: withOlder(older.points, view.pointsByLevel, p => `${p.kind}|${p.time}`).map(list => list.sort((a, b) => a.time.localeCompare(b.time))),
     marketStructureBreaksByLevel: withOlder(older.marketStructureBreaks, view.marketStructureBreaksByLevel, m => `${m.type}|${m.break.time}`),
+    deepBreaksByLevel: withOlder(older.deepBreaks ?? [], view.deepBreaksByLevel, m => `${m.type}|${m.break.time}|${m.back}`),
+    overlapSwingsByLevel: withOlder(older.overlapSwings ?? [], view.overlapSwingsByLevel, started),
     trendsByLevel: withOlder(older.trends, view.trendsByLevel, started),
     retracementsByLevel: withOlder(older.retracements, view.retracementsByLevel, v => `${v.direction}|${v.from.time}|${v.to.time}`),
     rangesByLevel: withOlder(older.ranges, view.rangesByLevel, g => `${g.swings ? 'swings|' : ''}${g.direction}|${g.identified.time}`),
@@ -1724,7 +1804,7 @@ function drawReplayExtras(ex, traces, level, asCloses) {
   {
     const grey = css('--close'), removed = e => e.ended === 'Removed' && e.until <= t, gone = e => e.value.level === level && removed(e);
     const when = e => fmtTime(full.prices.t[e.until]);
-    for (const e of on('ghostSwings') ? r.swings.filter(e => swingLevels(ex).includes(e.value.level) && removed(e)) : []) {
+    for (const e of on('ghostSwings') ? splitSwings(r).plain.filter(e => swingLevels(ex).includes(e.value.level) && removed(e)) : []) {
       const w = e.value;
       traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: 'Ghost swing', ...box(w.start.time, w.end.time, w.start.price, w.extreme.price),
         line: { color: grey, width: 1, dash: 'dot' }, fillcolor: withAlpha(grey, 0.08),
@@ -1738,7 +1818,7 @@ function drawReplayExtras(ex, traces, level, asCloses) {
     }
     // A market structure break that left one level is often found at the next: its ghost is then drawn larger, around the
     // one that is there now.
-    const msbs = on('ghostMsbs') ? r.marketStructureBreaks.filter(e => levels.includes(e.value.level) && removed(e)) : [];
+    const msbs = on('ghostMsbs') ? splitBreaks(r).plain.filter(e => levels.includes(e.value.level) && removed(e)) : [];
     const there = new Set(shownMarketStructureBreaks(ex).map(m => `${m.type}|${m.break.time}`));
     if (msbs.length) traces.push({ type: 'scatter', mode: 'markers', name: 'Ghost MSB', x: msbs.map(e => e.value.break.break.time), y: msbs.map(e => e.value.break.break.price),
       marker: { symbol: msbs.map(e => TERMS.get(e.value.break.type).symbol), size: msbs.map(e => there.has(`${e.value.break.type}|${e.value.break.break.time}`) ? 27 : 15),
@@ -1829,7 +1909,7 @@ function timelineEvents(ex, r, cacheId, level) {
     else if (before.label !== p.label) add({ at: e.from, ...tag(p.type), text: `${before.label} became ${p.label}: ${fmtPrice(p.price)}`, times: [before.time, p.time] }, e);
     else if (before.time !== p.time) add({ at: e.from, ...tag(p.type), text: `${p.label} moved to ${fmtPrice(p.price)}`, times: [before.time, p.time] }, e);
   }
-  for (const e of r.swings.filter(at(level)).filter(e => !e.continued)) {
+  for (const e of splitSwings(r).plain.filter(at(level)).filter(e => !e.continued)) {
     const w = e.value, type = w.direction === 'Up' ? 'BullishBreakOfStructure' : 'BearishBreakOfStructure';
     add({ at: e.from, ...tag(type), text: `${swingName(w.direction)} confirmed: close ${fmtPrice(w.breakOfStructure.price)} ${w.direction === 'Up' ? 'above the high' : 'below the low'} ${fmtPrice(w.start.price)}`,
       times: [w.start.time, w.breakOfStructure.time], swing: w }, e);
@@ -1840,7 +1920,7 @@ function timelineEvents(ex, r, cacheId, level) {
     const c = e.value;
     add({ at: e.until, label: '✕', color: css('--muted'), removal: true, text: `candidate ${swingName(c.direction)} from ${fmtPrice(c.start.price)} abandoned`, times: [c.start.time] });
   }
-  for (const e of r.marketStructureBreaks.filter(at(level)).filter(e => !e.continued)) {
+  for (const e of splitBreaks(r).plain.filter(at(level)).filter(e => !e.continued)) {
     const m = e.value.break, bullish = m.type === 'BullishMarketStructureBreak';
     add({ at: e.from, ...tag(m.type), text: `close ${fmtPrice(m.break.price)} ${bullish ? 'above the protective high' : 'below the protective low'} ${fmtPrice(m.reference.price)}`, times: [m.break.time] }, e);
   }
@@ -2423,6 +2503,8 @@ function clipToView(ex, el) {
     swingsByLevel: each(ex.swingsByLevel, s => overlaps(s.start.time, s.end.time)),
     pointsByLevel: each(ex.pointsByLevel, p => within(p.time)),
     marketStructureBreaksByLevel: each(ex.marketStructureBreaksByLevel, m => overlaps(m.reference.time, m.break.time)),
+    deepBreaksByLevel: each(ex.deepBreaksByLevel ?? [], m => overlaps(m.from.time, m.break.time)),
+    overlapSwingsByLevel: each(ex.overlapSwingsByLevel ?? [], s => overlaps(s.start.time, s.end.time)),
     trendsByLevel: each(ex.trendsByLevel, t => overlaps(t.start.time, t.end?.time ?? last)),
     retracementsByLevel: each(ex.retracementsByLevel, r => overlaps(r.from.time, r.steps[r.steps.length - 1]?.point.time ?? r.to.time)),
     rangesByLevel: each(ex.rangesByLevel, g => overlaps(g.identified.time, g.end?.time ?? last)),
@@ -2543,6 +2625,8 @@ function draw(el, ex, focus) {
   drawTrendArrows(ex, labels);
   drawTourLines(ex, labels);
   drawRanges(ex, traces, swingBox);
+  drawDeepBreaks(ex, traces, swingBox);
+  drawOverlapSwings(ex, traces, swingBox);
   drawSawtooth(ex, traces);
   drawStrategies(ex, traces);
 
@@ -2663,7 +2747,11 @@ function draw(el, ex, focus) {
   // A chart with a cursor short of its last candle, a tour's or a whole dataset's replay, fits the prices to the cursor
   // alone unless the candles after it are shown, and where its view has none of them, the candle at the cursor.
   const replayed = ex.tour || (ex.complete && ex.cursor < full.t.length - 1);
-  const view = { t: times, h: span(full.h), l: span(full.l), candle, all, widest: all ?? (ex.tour ? history : null), asCloses, candleMs, opensOn, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
+  // A tour's history ends at the last candle it shows, or the end of its view if that is further on: zoomed out further,
+  // the chart would be empty space.
+  const shownTo = replayed && !on('future') ? Math.max(Date.parse(full.t[ex.cursor]) + oneCandle, last + pad) : history?.[1];
+  const tourHistory = ex.tour && history ? [history[0], new Date(Math.min(Date.parse(history[1]), shownTo)).toISOString()] : null;
+  const view = { t: times, h: span(full.h), l: span(full.l), candle, all, widest: all ?? tourHistory, asCloses, candleMs, opensOn, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
     from: w?.from ?? 0, numbered: !!ex.tour, floor: ex.tour ? 0.01 : 0,
     until: replayed && !on('future') ? Date.parse(full.t[ex.cursor]) : undefined, now: replayed ? [full.l[ex.cursor], full.h[ex.cursor]] : null,
     pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46),
@@ -2802,7 +2890,9 @@ function roomForPins([low, high], pins, height) {
 
 function shownRanges(zoom, view) {
   const x = zoom?.x ?? view.x;
-  return { x, y: zoom?.y ?? fitPrices(view, x) ?? view.y, manual: zoom?.y != null };
+  // The least price range (view.floor) is for the view a chart opens on; zoomed in by hand, it fits the prices as the Chart's does.
+  const fit = zoom?.x && view.floor ? { ...view, floor: 0 } : view;
+  return { x, y: zoom?.y ?? fitPrices(fit, x) ?? view.y, manual: zoom?.y != null };
 }
 
 // How many candles across a chart of a whole dataset stops drawing them as candles: past this they are narrower than a
@@ -2875,12 +2965,13 @@ function plotPoint(el, e) {
 function wireZoom(el) {
   if (el.dataset.zoomWired) return;
   el.dataset.zoomWired = '1';
-  const id = el.dataset.id;
+  // The chart's id is read as each event comes: a tour keeps its chart as it cuts to another scene, which has another id.
   const iso = v => new Date(v).toISOString();
 
   // Plotly's own pans and zooms; the page's moves are already recorded.
   el.on('plotly_relayout', e => {
     if (movingViews) return;
+    const id = el.dataset.id;
     const pick = axis => e[`${axis}.range`] ?? (e[`${axis}.range[0]`] !== undefined ? [e[`${axis}.range[0]`], e[`${axis}.range[1]`]] : null);
     const x = pick('xaxis'), y = pick('yaxis');
     if (!x && !y) return;
@@ -2892,7 +2983,7 @@ function wireZoom(el) {
   el.on('plotly_doubleclick', () => moveView(el, null));
 
   el.addEventListener('wheel', e => {
-    const p = plotPoint(el, e), view = views.get(id);
+    const id = el.dataset.id, p = plotPoint(el, e), view = views.get(id);
     if (!p || !view || p.y < 0 || p.x < 0 || (p.x > p.w && !p.onPrices)) return;
     e.preventDefault();
     const zoom = { ...zooms.get(id) }, shown = shownRanges(zoom, view), lines = e.deltaMode === 1 ? 33 : 1;
@@ -2920,7 +3011,7 @@ function wireZoom(el) {
   // Dragging the price axis scales prices about the middle of the view, in place of Plotly's own axis drag.
   el.addEventListener('mousedown', e => {
     cross.hidden = true;
-    const view = views.get(id);
+    const id = el.dataset.id, view = views.get(id);
     if (e.button !== 0 || !view || !plotPoint(el, e)?.onPrices) return;
     e.preventDefault();
     e.stopPropagation();
@@ -2935,7 +3026,7 @@ function wireZoom(el) {
   }, true);
   el.addEventListener('dblclick', e => {
     if (!plotPoint(el, e)?.onPrices) return;
-    const { y, ...zoom } = zooms.get(id) ?? {};
+    const { y, ...zoom } = zooms.get(el.dataset.id) ?? {};
     moveView(el, zoom);
   });
 
@@ -2948,7 +3039,7 @@ function wireZoom(el) {
   const [v, h, timeLabel, priceLabel] = cross.children;
   let mouse = null;
   const aim = () => {
-    const p = mouse && plotPoint(el, mouse), view = views.get(id);
+    const p = mouse && plotPoint(el, mouse), view = views.get(el.dataset.id);
     el.style.cursor = p?.onPrices ? 'ns-resize' : '';
     cross.hidden = !p?.onPlot || !view;
     if (cross.hidden) return;
@@ -3949,7 +4040,8 @@ function sectionAfter(i, by) {
 
 function findExample(id) {
   return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id) ?? DATA.interims?.examples?.find(e => e.id === id)
-    ?? replayDatasets.find(e => e.id === id) ?? chartDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined);
+    ?? replayDatasets.find(e => e.id === id) ?? chartDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined)
+    ?? (game?.ex?.id === id ? game.ex : undefined);
 }
 
 // ---- Tour ------------------------------------------------------------------------------------------------------------
@@ -5309,7 +5401,7 @@ const TREND_COLUMNS = {
 // List button over the layers, then a layer. Each place is a row, listed as the Trends of Find similar are, with Show,
 // which takes the Chart to it with its layer and level on, and Analyse, which opens an analysis at it. A layer that draws
 // part of a thing lists the thing: a Range's bands list Ranges.
-const LISTED = ['SwingRange', 'Range', 'Uptrend', 'Downtrend', 'Upswing', 'Downswing', 'BullishBreakOfStructure', 'BearishBreakOfStructure', 'BullishMarketStructureBreak', 'BearishMarketStructureBreak'];
+const LISTED = ['DeepMsb', 'SwingRange', 'Range', 'Uptrend', 'Downtrend', 'Upswing', 'Downswing', 'BullishBreakOfStructure', 'BearishBreakOfStructure', 'BullishMarketStructureBreak', 'BearishMarketStructureBreak'];
 const LISTED_AS = { swingRangeWeak: 'SwingRange', rangeBands: 'Range', rangeZones: 'Range', bosLevelUp: 'BullishBreakOfStructure', bosLevelDown: 'BearishBreakOfStructure',
   msbLevelUp: 'BullishMarketStructureBreak', msbLevelDown: 'BearishMarketStructureBreak' };
 const OCCURRENCE_COLUMNS = {
@@ -5318,6 +5410,9 @@ const OCCURRENCE_COLUMNS = {
   low: { head: 'Low', num: true, cell: r => wholePrice(r.low), sort: r => r.low },
   high: { head: 'High', num: true, cell: r => wholePrice(r.high), sort: r => r.high },
   height: { head: 'Height', num: true, cell: r => `${r.height.toFixed(1)}%`, sort: r => r.height },
+  msb: { head: 'MSB', cell: r => r.direction === 'Up' ? 'Bullish' : 'Bearish', sort: r => r.direction },
+  back: { head: 'Swings back', num: true, cell: r => r.back, sort: r => r.back },
+  of: { head: 'Of', num: true, cell: r => r.of, sort: r => r.of },
   retracement: { head: 'Retracement', num: true, cell: r => `${r.retracement}%`, sort: r => r.retracement },
   swings: { head: 'Swings', num: true, cell: r => r.swings, sort: r => r.swings },
   weak: { head: 'Weak', num: true, cell: r => r.weak, sort: r => r.weak },
@@ -5325,7 +5420,8 @@ const OCCURRENCE_COLUMNS = {
   candles: { head: 'Candles', num: true, cell: r => r.candles.toLocaleString(), sort: r => r.candles },
   ends: { head: 'Ends', cell: r => r.end ? esc(fmtTime(r.end)) : 'not yet', sort: r => r.end },
 };
-const occurrenceColumns = kind => kind === 'SwingRange' ? ['begins', 'level', 'low', 'high', 'height', 'swings', 'weak', 'candles', 'ends']
+const occurrenceColumns = kind => kind === 'DeepMsb' ? ['begins', 'level', 'msb', 'back', 'of', 'low', 'high', 'height', 'candles', 'ends']
+  : kind === 'SwingRange' ? ['begins', 'level', 'low', 'high', 'height', 'swings', 'weak', 'candles', 'ends']
   : kind === 'Range' ? ['begins', 'level', 'low', 'high', 'height', 'retracement', 'candles', 'ends']
   : kind.endsWith('trend') ? ['begins', 'level', 'swings', 'strength', 'candles', 'ends']
   : kind.endsWith('MarketStructureBreak') ? ['begins', 'level'] : ['begins', 'level', 'candles', 'ends'];
@@ -5376,11 +5472,14 @@ function renderOccurrences(dialog) {
   const o = occurrences, levels = LEVEL_IDS.filter(on).map(id => Number(id.slice('level'.length)));
   // A Range by Swings is listed as its layer shows it: with Weak Swings in it on, only those with so many.
   const weak = o.kind === 'SwingRange' && on('swingRangeWeak') ? setting('swingRangeWeak') : 0;
-  const rows = o.rows.filter(r => (!o.only || levels.includes(r.level)) && (r.weak ?? 0) >= weak);
+  // An MSB further back is listed from as many Swings back as its layer shows.
+  const back = o.kind === 'DeepMsb' ? setting('DeepMsb') : 0;
+  const rows = o.rows.filter(r => (!o.only || levels.includes(r.level)) && (r.weak ?? 0) >= weak && (r.back ?? 0) >= back);
   o.found = sortTradeRows(rows, o.sort, OCCURRENCE_COLUMNS).slice(0, SIMILAR_SHOWN);
   const link = r => `./${analysisHash({ dataset: o.dataset, at: r.at, things: [r.thing], ...(o.kind === 'SwingRange' ? { rangeSwings: setting('SwingRange') } : {}), detail: detailOf('Analysis') })}`;
   const act = r => `<button type="button" data-occ-show="${o.found.indexOf(r)}" title="Take the Chart to it, with its layer and level on">Show</button>` +
-    `<a href="${esc(link(r))}" data-occ="analyse" title="An analysis of it, from where it begins to its end">Analyse</a>`;
+    // What has no analysis of its own has Show alone.
+    (!r.thing ? '' : `<a href="${esc(link(r))}" data-occ="analyse" title="An analysis of it, from where it begins to its end">Analyse</a>`);
   dialog.innerHTML = `<h4>List: ${esc(o.label)}</h4><p>Every one in the dataset, as known at its last candle${weak ? `, with ${weak} Weak Swings or more` : ''}. A heading orders the list by it.</p>
     <div class="sim-checks"><label><input type="checkbox" data-occ-levels ${o.only ? 'checked' : ''}>Only the levels shown (${levels.length ? levels.join(', ') : 'none'})</label></div>
     <div class="sim-count">${rows.length.toLocaleString()} found${rows.length > SIMILAR_SHOWN ? `: the first ${SIMILAR_SHOWN} as ordered are listed` : ''}.</div>
@@ -7854,17 +7953,24 @@ function analysedTrade(dataset) {
 
 function drawStrategies(ex, traces) {
   const dataset = (ex.hindsight ?? ex).dataset, p = ex.prices;
-  if (!dataset || !p?.t?.length) return;
+  if (!p?.t?.length) return;
   const first = minuteOf(p.t[0]), last = minuteOf(p.t[p.t.length - 1]), up = css('--up'), down = css('--down');
+  // A chart of a window of candles (windowFrom, the time the window begins) marks where it begins: the candles before are its run-up.
+  if (ex.windowFrom && minuteOf(ex.windowFrom) >= first && minuteOf(ex.windowFrom) <= last)
+    traces.push({ type: 'scatter', mode: 'lines', name: 'Window', hoverinfo: 'skip', x: [ex.windowFrom, ex.windowFrom], y: [Math.min(...p.l), Math.max(...p.h)], line: { color: css('--muted'), width: 1, dash: 'dot' } });
+  // A chart can carry strategy runs of its own (ex.runs: a name, colour, strategy and trades each), as the Game's does once
+  // a round is told, drawn as the strategies on the charts are.
+  if (!dataset && !ex.runs) return;
   // A trade the chart has not reached the exit of is open: its exits run a few candles past the last candle shown, so
   // where they are can be seen from the candle it is entered on.
   const whole = (ex.hindsight ?? ex).prices, ahead = whole.t[Math.min(whole.t.length - 1, (ex.cursor ?? whole.t.length - 1) + 3)];
   // The strategies on, and an analysis's own Trade on its "trade" layer: the one trade it tells of, with the run it began.
-  const drawn = STRATEGY_SECTION.layers.filter(l => on(l.id)).map(l => ({ name: l.label, colour: css(l.colour), strategy: l.chartStrategy.strategy }));
-  const analysed = analysedTrade(dataset);
+  const drawn = ex.runs ? ex.runs.map(r => ({ name: r.name, colour: r.colour, strategy: r.strategy, own: r }))
+    : STRATEGY_SECTION.layers.filter(l => on(l.id)).map(l => ({ name: l.label, colour: css(l.colour), strategy: l.chartStrategy.strategy }));
+  const analysed = ex.runs ? null : analysedTrade(dataset);
   if (analysed) drawn.push({ name: 'Trade', colour: css('--text'), strategy: analysed.strategy, at: minuteOf(analysed.trade.entryTime) });
-  for (const { name, colour, strategy, at } of drawn) {
-    const run = chartTrades(dataset, strategy);
+  for (const { name, colour, strategy, at, own } of drawn) {
+    const run = own ?? chartTrades(dataset, strategy);
     if (!run) continue;
     // A tour's scene starts its story at its first candle, so a trade entered before it is not shown.
     const shown = run.trades.filter(t => (!at || minuteOf(t.entryTime) === at) && minuteOf(t.entryTime) <= last && minuteOf(t.exitTime) >= first && (!ex.tour || minuteOf(t.entryTime) >= first))
@@ -7918,7 +8024,7 @@ function drawStrategies(ex, traces) {
         `<br>${fmtProfit(s.t.profit)} · ${fmtPercent(s.t.profitPercent)}<extra></extra>`) });
   }
   // Find similar's candles: rings around the candles of the dataset that are on the chart.
-  if (similarMarks?.dataset === dataset) {
+  if (dataset && similarMarks?.dataset === dataset) {
     const at = new Map(p.t.map((t, i) => [minuteOf(t), i])), marked = similarMarks.times.map(t => at.get(minuteOf(t))).filter(i => i != null);
     if (marked.length) traces.push({ type: 'scatter', mode: 'markers', name: 'Similar', x: marked.map(i => p.t[i]), y: marked.map(i => (p.h[i] + p.l[i]) / 2),
       marker: { symbol: 'circle-open', size: 24, color: css('--accent'), line: { width: 2.5, color: css('--accent') } },
@@ -8378,6 +8484,130 @@ function renderData() {
     fetchData(m, months(m).filter(x => x.year === Number(year) && x.month === Number(month)));
   }));
 }
+// ---- Game ------------------------------------------------------------------------------------------------------------
+// Which strategy would have made you the most money? A round is a window of a market's candles, a day or two of them, and
+// three strategies from strategies.json dealt at random: read the chart and the strategies, pick one, and the round shows
+// every trade each would have made on a stake a trade (POST api/game/round, see StrategyGame). No fees or slippage yet; a
+// trade still open at the window's end is refunded. The score is kept in the browser with the page's other settings.
+const GAME_LENGTHS = [{ label: '24 hours', candles: 24 }, { label: '48 hours', candles: 48 }], GAME_STAKE = 1000, GAME_LETTERS = ['A', 'B', 'C'];
+const GAME_COLOURS = ['--accent', '--lv5', '--lv3'];
+const fmtMoney = v => `${v < 0 ? '−' : v > 0 ? '+' : ''}$${Math.abs(Math.round(v)).toLocaleString()}`;
+let game = null;
+
+const gameScore = () => state.game ??= { candles: 48, rounds: 0, right: 0, money: 0, best: 0 };
+
+// The trades table's columns for a round: a refunded trade says so in place of its outcome, and each has its money.
+const GAME_COLUMNS = { ...TRADE_COLUMNS,
+  outcome: { head: 'Outcome', cell: r => r.trade.refunded ? `<span title="Still open at the window's end: refunded">Refunded</span>` : OUTCOMES[r.trade.outcome] ?? esc(r.trade.outcome),
+    sort: r => r.trade.refunded ? 'Refunded' : r.trade.outcome },
+  money: { head: 'Money', num: true, cls: r => tradeSign(r.trade.money), cell: r => fmtMoney(r.trade.money), sort: r => r.trade.money },
+};
+
+async function renderGamePage() {
+  const main = document.getElementById('main');
+  currentPage = 'Game';
+  const head = `<section class="term-head"><h2>Game</h2>
+    <p>Which strategy would have made you the most money? A round is a day or two of a market and three strategies. Read the chart and the strategies, pick one, then see every trade each would have made.</p>
+    <p class="remarks">Each trade stakes $${GAME_STAKE.toLocaleString()}, with no fees or slippage. Trades are entered only in the window, though a strategy reads the candles before it;
+    a trade still open at the window's end is refunded, so it makes nothing either way. The strategies are three of those in strategies.json, dealt at random, and the window is
+    one all three trade in where one can be found.</p></section>`;
+  if (!serverOn) {
+    main.innerHTML = head + `<div class="empty" data-server-check>Checking for the local server…</div>`;
+    return checkLocalServer();
+  }
+  if (!strategies) {
+    main.innerHTML = head + '<div class="empty">Loading strategies…</div>';
+    try { await loadStrategies(); } catch (e) { main.innerHTML = head + `<div class="empty">strategies.json could not be read: ${esc(e.message)}.</div>`; return; }
+  }
+  await loadDatasets();
+  if (currentPage !== 'Game') return;
+  game ??= { round: null, picked: null, dealing: false, error: null, dataset: datasetList[0]?.id, ex: null, before: 0 };
+  main.innerHTML = head + '<div class="game"></div>';
+  renderGame();
+  if (!game.round && !game.dealing) dealGameRound();
+}
+
+// Deals a round: three strategies of the book at random, without their costs, on a window the server picks.
+async function dealGameRound() {
+  const book = strategies.book.strategies.filter(s => s.entry && s.takeProfit && s.stopLoss);
+  if (book.length < 2) {
+    game.error = 'The game needs at least two strategies in strategies.json.';
+    return renderGame();
+  }
+  const deck = [...book];
+  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  const dealt = deck.slice(0, 3).map(s => ({ ...s, countFees: false, countSlippage: false }));
+  Object.assign(game, { dealing: true, error: null, round: null, picked: null, ex: null });
+  renderGame();
+  const result = await postToServer('api/game/round', { dataset: game.dataset, strategies: dealt, candles: gameScore().candles, stake: GAME_STAKE }, 'the game');
+  game.dealing = false;
+  if (result.error) game.error = result.error;
+  else {
+    game.round = result.round;
+    game.before = result.before;
+    game.ex = { id: 'Game/round', title: 'Round', level: 1, prices: result.prices, expected: [], annotations: [], windowFrom: result.round.from };
+  }
+  if (currentPage === 'Game') renderGame();
+}
+
+function renderGame() {
+  const box = document.querySelector('.game');
+  if (!box) return;
+  const score = gameScore(), r = game.round, data = r && datasetList?.find(d => d.id === r.dataset);
+  const stat = (label, value, cls = '') => `<div><span>${label}</span><b class="${cls}">${value}</b></div>`;
+  const best = r ? Math.max(...r.contenders.map(c => c.total)) : 0;
+  box.innerHTML = `<div class="strat-card">
+      <div class="strat-stats game-score">${stat('Rounds', score.rounds)}${stat('Picked the best', score.rounds ? `${score.right} of ${score.rounds}` : '–')}
+        ${stat('Your money', fmtMoney(score.money), tradeSign(score.money))}${stat('Best possible', fmtMoney(score.best), tradeSign(score.best))}</div>
+      <div class="strat-fields">
+        <label>Market<select data-game-dataset>${(datasetList ?? []).map(d => `<option value="${esc(d.id)}" ${d.id === game.dataset ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></label>
+        <label>Window<select data-game-candles>${GAME_LENGTHS.map(w => `<option value="${w.candles}" ${w.candles === score.candles ? 'selected' : ''}>${w.label}</option>`).join('')}</select></label>
+      </div>
+      <div class="strat-run">
+        <button type="button" data-game-new ${game.dealing ? 'disabled' : ''}>${game.dealing ? 'Dealing…' : r ? 'Next round' : 'Deal a round'}</button>
+        <span class="strat-note${game.error ? ' bad' : ''}">${esc(game.error ?? (r && game.picked == null ? 'Pick the strategy you think made the most.' : ''))}</span>
+      </div></div>
+    ${r ? `<article class="example game-chart" id="ex-${esc(game.ex.id)}">
+      <header><h3>${esc(data?.name ?? r.dataset)}</h3><span class="id">${esc(fmtTime(r.from))} to ${esc(fmtTime(r.to))} UTC · ${r.candles} candles from the dotted line; the ${game.before} before are the run-up</span></header>
+      ${chartRow(game.ex)}</article>
+    <div class="game-cards">${r.contenders.map((c, k) => gameCard(c, k, best)).join('')}</div>` : ''}`;
+  box.querySelector('[data-game-dataset]').addEventListener('change', e => { game.dataset = e.target.value; });
+  box.querySelector('[data-game-candles]').addEventListener('change', e => { gameScore().candles = Number(e.target.value); save(state); });
+  box.querySelector('[data-game-new]').addEventListener('click', dealGameRound);
+  box.querySelectorAll('[data-game-pick]').forEach(b => b.addEventListener('click', () => pickGame(Number(b.dataset.gamePick))));
+  if (r) drawAll(currentPage);
+}
+
+// A strategy's card: its letter, name and words, and Pick; once picked, what it made, trade by trade.
+function gameCard(c, k, best) {
+  const letter = GAME_LETTERS[k] ?? String(k + 1), s = c.strategy, picked = game.picked;
+  const head = `<h3><span class="game-swatch" style="background:${css(GAME_COLOURS[k % GAME_COLOURS.length])}"></span>${letter}. ${esc(s.name || s.id)}</h3>
+    <p class="remarks">${esc(strategySays(s))}</p>`;
+  if (picked == null) return `<div class="strat-card game-card">${head}<div class="strat-run"><button type="button" data-game-pick="${k}">Pick ${letter}</button></div></div>`;
+  const won = c.trades.filter(t => !t.refunded && t.money > 0).length, lost = c.trades.filter(t => !t.refunded && t.money < 0).length;
+  const rows = c.trades.map(t => ({ index: t.trade.entryIndex, time: t.trade.entryTime, trade: { ...t.trade, money: t.money, refunded: t.refunded } }));
+  const tags = `${k === picked ? '<span class="game-tag">Your pick</span>' : ''}${c.total === best ? '<span class="game-tag best">Made the most</span>' : ''}`;
+  return `<div class="strat-card game-card${k === picked ? ' picked' : ''}${c.total === best ? ' best' : ''}">${head}
+    <div class="game-total"><b class="${tradeSign(c.total)}">${fmtMoney(c.total)}</b>${tags}</div>
+    <p class="remarks">${c.trades.length} trade${c.trades.length === 1 ? '' : 's'}: ${won} won, ${lost} lost${c.refunded ? `, ${c.refunded} refunded` : ''}.</p>
+    ${c.trades.length ? tradeTable(rows, { columns: ['entry', 'exit', 'outcome', 'money'], defs: GAME_COLUMNS }) : ''}</div>`;
+}
+
+// The pick: the score counts the round, and the chart draws every strategy's trades.
+function pickGame(k) {
+  const r = game.round, score = gameScore(), totals = r.contenders.map(c => c.total), best = Math.max(...totals);
+  if (!r || game.picked != null) return;
+  game.picked = k;
+  score.rounds++;
+  if (totals[k] === best) score.right++;
+  score.money += totals[k];
+  score.best += best;
+  save(state);
+  game.ex.runs = r.contenders.map((c, i) => ({ name: `${GAME_LETTERS[i] ?? i + 1}. ${c.strategy.name || c.strategy.id}`, colour: css(GAME_COLOURS[i % GAME_COLOURS.length]),
+    strategy: c.strategy, trades: c.trades.map(t => t.trade) }));
+  renderGame();
+}
+
 function route() {
   document.body.classList.remove('analysing');
   document.body.classList.toggle('embed', embedMode);
@@ -8385,7 +8615,14 @@ function route() {
   pauseTour();
   // An analysis has an address of its own: #Analysis?explain=Swing&dataset=...
   const [first, asked] = location.hash.slice(1).split('?');
-  document.body.classList.toggle('strategizing', first === 'Strategies' || first === 'Explore' || first === 'Data');
+  document.body.classList.toggle('strategizing', first === 'Strategies' || first === 'Explore' || first === 'Game' || first === 'Data');
+  if (first === 'Game') {
+    ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
+    renderNav('Game');
+    renderGamePage();
+    window.scrollTo(0, 0);
+    return;
+  }
   if (first === 'Data') {
     ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
     renderNav('Data');

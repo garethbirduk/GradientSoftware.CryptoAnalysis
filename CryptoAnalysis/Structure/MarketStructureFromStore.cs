@@ -7,7 +7,7 @@ public static partial class MarketStructure
     /// gives it for them, looked up in the store and not worked out: what was known at each candle replayed is what the
     /// store has as known then. The ranges are those of the least retracement and band the store was read with.
     /// </summary>
-    public static ReplayTimeline Timeline(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int? keepFrom = null, int rangeSwings = 0)
+    public static ReplayTimeline Timeline(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int? keepFrom = null, int rangeSwings = 0, bool deepBreaks = false, bool overlaps = false)
     {
         var end = Math.Min(to ?? store.Candles, store.Candles);
         from = Math.Max(0, from);
@@ -27,7 +27,7 @@ public static partial class MarketStructure
             var kept = keepFrom is int k && k > 0 ? Math.Min(k, t) : 0;
             if (read == null || read.Kept != kept || store.PivotsChanged(t))
                 read = ReadPivots(store, t, kept, maxLevel);
-            snapshots[t - from] = Take(store, t, high, maxLevel, kept, read, t, 0, rangeSwings);
+            snapshots[t - from] = Take(store, t, high, maxLevel, kept, read, t, 0, rangeSwings, deepBreaks, overlaps);
         }
 
         return Track(snapshots, from);
@@ -40,7 +40,7 @@ public static partial class MarketStructure
     /// high or low it broke, a trend, a retracement, a run of candles, and a high or low both of whose legs are.
     /// With at, the stretch is as known at that candle and not the last, as an analysis seen from it has it.
     /// </summary>
-    public static ReplayTimeline Complete(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int narrowest = 0, int? at = null, int rangeSwings = 0)
+    public static ReplayTimeline Complete(StructureStore store, int maxLevel = 8, int from = 0, int? to = null, int narrowest = 0, int? at = null, int rangeSwings = 0, bool deepBreaks = false, bool overlaps = false)
     {
         var last = Math.Min(at ?? store.Candles - 1, store.Candles - 1);
         if (last < 0)
@@ -48,7 +48,7 @@ public static partial class MarketStructure
 
         var kept = Math.Clamp(from, 0, last);
         var read = ReadPivots(store, last, kept, maxLevel);
-        return Track([Take(store, last, HighOf(read, last), maxLevel, kept, read, Math.Clamp(to ?? last, kept, last), narrowest, rangeSwings)], last);
+        return Track([Take(store, last, HighOf(read, last), maxLevel, kept, read, Math.Clamp(to ?? last, kept, last), narrowest, rangeSwings, deepBreaks, overlaps)], last);
     }
 
     /// <summary>
@@ -204,7 +204,7 @@ public static partial class MarketStructure
     // Everything the replay tracks at a candle, as the store has it known then, leaving out what ended before the candle
     // kept from: what TakeSnapshot works out from the candles to there. With a candle before it to read up to, what
     // begins after that is left out too, and with a narrowest width, what is narrower (see Complete).
-    private static Snapshot Take(StructureStore store, int t, int high, int maxLevel, int kept, PivotsRead read, int upTo, int narrowest, int rangeSwings = 0)
+    private static Snapshot Take(StructureStore store, int t, int high, int maxLevel, int kept, PivotsRead read, int upTo, int narrowest, int rangeSwings = 0, bool deepBreaks = false, bool overlaps = false)
     {
         var prices = store.Prices;
         var keep = kept > 0 ? prices[kept].DateTime : DateTime.MinValue;
@@ -215,9 +215,11 @@ public static partial class MarketStructure
         var count = Math.Min(maxLevel, deepest) + 1;
         var pivots = new List<LevelPivot>();
         var points = new List<StructurePoint>();
+        var helds = new List<List<SawtoothPivot>>();
         for (var level = 0; level < count; level++)
         {
             var (held, furthest) = LevelOf(store, read, level, t, high);
+            helds.Add(held);
             var turns = held[^1].Kind == EnumPivotKind.Current ? held.Count - 1 : held.Count;
             // A line runs from the pivot before the stretch to the one after it.
             var first = keep == DateTime.MinValue ? 0 : Math.Max(0, held.FindLastIndex(turns - 1, turns, p => p.Time < keep));
@@ -256,12 +258,38 @@ public static partial class MarketStructure
 
         var top = Math.Min(maxLevel, deepest + 1);
         var swings = store.Swings(kept, upTo, t, top).Where(x => x.Break - x.Start >= narrowest).Select(x => Outline(store, x)).ToList();
+        // With those against the leg of the level above asked for, they are among them, marked (see OverlappingSwings).
+        if (overlaps)
+        {
+            for (var level = 1; level < helds.Count; level++)
+            {
+                swings.AddRange(OverlappingSwings.Of(helds[level], helds[level - 1], level, store.Price, t, kept, upTo).Where(x => x.Break - x.Start >= narrowest).Select(x =>
+                {
+                    var up = x.Direction == EnumSwingDirection.Up;
+                    var broke = Point(x.Break, up);
+                    return new SwingOutline(x.Level, x.Direction, Point(x.Start, up), broke, Point(x.Extreme, !up), broke) { Overlap = x.Across ? "across" : "inside" };
+                }));
+            }
+        }
+
         var candidates = store.Candidates(t, top).Where(x => x.Start <= upTo).Select(x =>
         {
             var up = x.Direction == EnumSwingDirection.Up;
             return new CandidateSwing(x.Level, x.Direction, Point(x.Start, up), Point(x.Extreme, !up));
         }).ToList();
         var breaks = store.Breaks(kept, upTo, t, top).Where(x => x.Break - x.Reference >= narrowest).Select(x => Outline(store, x)).ToList();
+        // With those that go further back than the last swing asked for, they are among them (see DeepBreaks).
+        if (deepBreaks)
+        {
+            breaks.AddRange(DeepBreaks.Over(store, kept, upTo, t).Where(x => x.Level <= top && x.Break - x.From >= narrowest).Select(x =>
+            {
+                var above = x.Type == EnumAnnotationType.BullishMarketStructureBreak;
+                return new LevelBreak(x.Level, new MarketStructureBreakOutline(x.Type, Point(x.Reference, above), Point(x.Break, above))
+                {
+                    Back = x.Back, Of = x.Of, From = Point(x.From, !above), Far = Point(x.Far, !above),
+                });
+            }));
+        }
         var trends = store.Trends(kept, upTo, t, top).Where(x => (x.End ?? t) - x.Start >= narrowest).Select(x => Outline(store, x)).ToList();
         var retracements = store.Retracements(kept, upTo, t, top).Where(x => x.Steps[^1].Candle - x.From >= narrowest).Select(x =>
         {

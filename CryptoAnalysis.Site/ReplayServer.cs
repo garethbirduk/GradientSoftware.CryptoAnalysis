@@ -92,7 +92,7 @@ public static class ReplayServer
         });
 
         var byId = datasets.ToDictionary(x => x.Id);
-        var batches = new ConcurrentDictionary<(string Dataset, int Anchor, int Start, (double Retracement, double Band) Settings, int RangeSwings), Lazy<string>>();
+        var batches = new ConcurrentDictionary<(string Dataset, int Anchor, int Start, (double Retracement, double Band) Settings, int RangeSwings, bool DeepBreaks, bool Overlaps), Lazy<string>>();
         // What is slow to work out is kept on disk too, beside the site, so it is there after a restart: the replay's batches,
         // and the datasets' structure.
         var kept = new StructureCache(Path.GetFullPath(Path.Combine(siteDir, "..", "cache")));
@@ -201,7 +201,7 @@ public static class ReplayServer
 
         // With an anchor, the replay is of the dataset from that candle on: from counts from it, and so does the batch. The
         // range settings (the least retracement and the band, as percentages) are the page's, so each pair has batches of its own.
-        app.MapGet("/api/replay", (string dataset, int from, int? anchor, double? retracement, double? band, int? rangeSwings) =>
+        app.MapGet("/api/replay", (string dataset, int from, int? anchor, double? retracement, double? band, int? rangeSwings, bool? deepBreaks, bool? overlaps) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
@@ -209,11 +209,11 @@ public static class ReplayServer
             var first = Math.Clamp(anchor ?? 0, 0, data.Prices.Count - 1);
             var start = Math.Clamp(from / BatchSize * BatchSize, 0, data.Prices.Count - first - 1);
             var settings = (Retracement: retracement ?? Ranges.DefaultMinRetracement, Band: band ?? Ranges.DefaultBand);
-            var json = batches.GetOrAdd((dataset, first, start, settings, Math.Clamp(rangeSwings ?? 0, 0, 99)), key => new Lazy<string>(() =>
-                kept.Text(BatchName(data, key.Anchor, key.Start, key.Settings, key.RangeSwings), () =>
+            var json = batches.GetOrAdd((dataset, first, start, settings, Math.Clamp(rangeSwings ?? 0, 0, 99), deepBreaks == true, overlaps == true), key => new Lazy<string>(() =>
+                kept.Text(BatchName(data, key.Anchor, key.Start, key.Settings, key.RangeSwings, key.DeepBreaks, key.Overlaps), () =>
                 {
                     var to = Math.Min(key.Start + BatchSize, data.Prices.Count - key.Anchor);
-                    return Batch(Structure(data, key.Anchor, key.Settings, to), key.Anchor, key.Start, to, key.RangeSwings);
+                    return Batch(Structure(data, key.Anchor, key.Settings, to), key.Anchor, key.Start, to, key.RangeSwings, key.DeepBreaks, key.Overlaps);
                 }))).Value;
             return Results.Text(json, "application/json");
         });
@@ -222,10 +222,10 @@ public static class ReplayServer
         // candles, and with narrowest, leaving out what is narrower than that many candles, as the page asks for the
         // stretch it draws and what can be seen at its zoom; looked up each time. With neither, everything in it, which is
         // kept as UTF-8, as a long dataset's comes to tens of megabytes.
-        var completes = new ConcurrentDictionary<(string Dataset, (double Retracement, double Band) Settings, int RangeSwings), Lazy<byte[]>>();
+        var completes = new ConcurrentDictionary<(string Dataset, (double Retracement, double Band) Settings, int RangeSwings, bool DeepBreaks, bool Overlaps), Lazy<byte[]>>();
         // With at, the stretch is as known at that candle, and with maxLevel only the levels to that one: what an analysis
         // seen from a candle shows of a thing that began long before it, which the replay's batches do not go back to.
-        app.MapGet("/api/complete", (string dataset, double? retracement, double? band, int? from, int? to, int? narrowest, int? at, int? maxLevel, int? rangeSwings) =>
+        app.MapGet("/api/complete", (string dataset, double? retracement, double? band, int? from, int? to, int? narrowest, int? at, int? maxLevel, int? rangeSwings, bool? deepBreaks, bool? overlaps) =>
         {
             if (!byId.TryGetValue(dataset, out var data))
                 return Results.NotFound();
@@ -236,11 +236,11 @@ public static class ReplayServer
                 var store = Structure(data, 0, settings);
                 var last = Math.Clamp(at ?? store.Candles - 1, 0, store.Candles - 1);
                 var (first, end) = (Math.Clamp(from ?? 0, 0, last), Math.Clamp(to ?? last, 0, last));
-                var timeline = MarketStructure.Complete(store, Math.Clamp(maxLevel ?? MaxLevel, 0, MaxLevel), first, end, Math.Max(0, narrowest ?? 0), last, Math.Clamp(rangeSwings ?? 0, 0, 99));
+                var timeline = MarketStructure.Complete(store, Math.Clamp(maxLevel ?? MaxLevel, 0, MaxLevel), first, end, Math.Max(0, narrowest ?? 0), last, Math.Clamp(rangeSwings ?? 0, 0, 99), deepBreaks == true, overlaps == true);
                 return Results.Bytes(JsonSerializer.SerializeToUtf8Bytes(new { Anchor = 0, From = last, To = last + 1, Stretch = new { From = first, To = end, Narrowest = Math.Max(0, narrowest ?? 0) }, Timeline = timeline }, Json), "application/json");
             }
 
-            var json = completes.GetOrAdd((dataset, settings, Math.Clamp(rangeSwings ?? 0, 0, 99)), key => new Lazy<byte[]>(() => Complete(Structure(data, 0, key.Settings), key.RangeSwings))).Value;
+            var json = completes.GetOrAdd((dataset, settings, Math.Clamp(rangeSwings ?? 0, 0, 99), deepBreaks == true, overlaps == true), key => new Lazy<byte[]>(() => Complete(Structure(data, 0, key.Settings), key.RangeSwings, key.DeepBreaks, key.Overlaps))).Value;
             return Results.Bytes(json, "application/json");
         });
 
@@ -624,6 +624,49 @@ public static class ReplayServer
             return Results.Text($"{{\"saved\":{JsonSerializer.Serialize($"{name}.json")},\"run\":{json}}}", "application/json");
         });
 
+        // A round of the game (see StrategyGame): { dataset, strategies, candles, stake, seed }, the strategies as the page
+        // has them from strategies.json, two or more. The round comes with the window's candles and some before it as the
+        // run-up, the entry conditions reading those. Nothing is saved. A strategy's signals are read once a dataset and kept.
+        var gameSignals = new ConcurrentDictionary<(string Dataset, string Strategy), List<(int Index, IReadOnlyList<int> Met)>>();
+        app.MapPost("/api/game/round", async (HttpRequest request) =>
+        {
+            JsonNode? body;
+            try
+            {
+                body = await JsonNode.ParseAsync(request.Body);
+            }
+            catch (JsonException e)
+            {
+                return Results.BadRequest($"The request is not a round: {e.Message}");
+            }
+
+            var dataset = body?["dataset"]?.GetValue<string>();
+            List<Strategy?>? strategies;
+            try
+            {
+                strategies = body?["strategies"]?.AsArray().Select(x => x.Deserialize<Strategy>(StrategyBook.JsonOptions)).ToList();
+            }
+            catch (Exception e) when (e is JsonException or InvalidOperationException)
+            {
+                return Results.BadRequest($"The strategies are not strategies: {e.Message}");
+            }
+
+            if (dataset == null || !byId.TryGetValue(dataset, out var data) || strategies is not { Count: >= 2 } || strategies.Any(x => x == null))
+                return Results.BadRequest("The request is { dataset, strategies, candles, stake }, with a dataset the server has and two or more strategies.");
+            var errors = strategies.SelectMany(s => s!.Validate()).ToList();
+            if (errors.Count > 0)
+                return Results.BadRequest(string.Join(" ", errors));
+            var candles = Math.Clamp(body?["candles"]?.GetValue<int>() ?? 48, 1, Math.Max(1, data.Prices.Count));
+            var stake = body?["stake"]?.GetValue<double>() ?? 1000;
+            var random = body?["seed"]?.GetValue<int>() is { } seed ? new Random(seed) : Random.Shared;
+            var round = StrategyGame.Round(data.Prices, data.Id, strategies!, candles, stake, random,
+                s => gameSignals.GetOrAdd((data.Id, JsonSerializer.Serialize(s, StrategyBook.JsonOptions)), _ => StrategyBacktest.Signals(data.Prices, s)));
+            var before = Math.Min(candles / 2, round.First);
+            var shown = data.Prices.Skip(round.First - before).Take(before + candles).ToList();
+            var prices = new { T = shown.Select(p => p.DateTime), O = shown.Select(p => p.Open), H = shown.Select(p => p.High), L = shown.Select(p => p.Low), C = shown.Select(p => p.Close) };
+            return Results.Text(JsonSerializer.Serialize(new { Round = round, Before = before, Prices = prices }, Json), "application/json");
+        });
+
         // Find similar on a trade: every candle of the dataset with what the strategy's entry looks for, found another way
         // than the backtest does (see StrategyBacktest.Occurrences), for the page to check the trades against.
         app.MapPost("/api/backtest/similar", async (HttpRequest request) =>
@@ -996,11 +1039,11 @@ public static class ReplayServer
     /// each (the levels and the window), and the fingerprint of every candle it was worked out from, the dataset's up to its
     /// last. A batch stays good as candles are added after it, and is not found again once a candle before it has changed.
     /// </summary>
-    public static string BatchName(Dataset data, int anchor, int start, (double Retracement, double Band) settings, int rangeSwings = 0)
+    public static string BatchName(Dataset data, int anchor, int start, (double Retracement, double Band) settings, int rangeSwings = 0, bool deepBreaks = false, bool overlaps = false)
     {
         var to = Math.Min(start + BatchSize, data.Prices.Count - anchor);
         var number = (double x) => x.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
-        return Path.Combine("replay", data.Id, $"a{anchor}-r{number(settings.Retracement)}-b{number(settings.Band)}-l{MaxLevel}-w{Window}{(rangeSwings > 0 ? $"-s{rangeSwings}" : "")}",
+        return Path.Combine("replay", data.Id, $"a{anchor}-r{number(settings.Retracement)}-b{number(settings.Band)}-l{MaxLevel}-w{Window}{(rangeSwings > 0 ? $"-s{rangeSwings}" : "")}{(deepBreaks ? "-d" : "")}{(overlaps ? "-o" : "")}",
             $"{start}-{to}-{PriceFingerprint.Of(data.Prices, anchor + to):x16}.json");
     }
 
@@ -1009,9 +1052,9 @@ public static class ReplayServer
     /// known to be carried over rather than new, looked up in the structure store of the series. The candles are counted
     /// from the anchor, which the store's are read from.
     /// </summary>
-    private static string Batch(StructureStore store, int anchor, int start, int to, int rangeSwings = 0)
+    private static string Batch(StructureStore store, int anchor, int start, int to, int rangeSwings = 0, bool deepBreaks = false, bool overlaps = false)
     {
-        var timeline = MarketStructure.Timeline(store, MaxLevel, from: Math.Max(0, start - 1), to: to, keepFrom: Math.Max(0, start - Window), rangeSwings: rangeSwings);
+        var timeline = MarketStructure.Timeline(store, MaxLevel, from: Math.Max(0, start - 1), to: to, keepFrom: Math.Max(0, start - Window), rangeSwings: rangeSwings, deepBreaks: deepBreaks, overlaps: overlaps);
         return JsonSerializer.Serialize(new { Anchor = anchor, From = start, To = to, Timeline = timeline }, Json);
     }
 
@@ -1019,10 +1062,10 @@ public static class ReplayServer
     /// The timeline of the last candle alone, keeping everything from the first: the structure of the whole dataset in
     /// hindsight, looked up in its structure store.
     /// </summary>
-    private static byte[] Complete(StructureStore store, int rangeSwings = 0)
+    private static byte[] Complete(StructureStore store, int rangeSwings = 0, bool deepBreaks = false, bool overlaps = false)
     {
         var last = store.Candles - 1;
-        var timeline = MarketStructure.Timeline(store, MaxLevel, from: last, to: last + 1, keepFrom: 0, rangeSwings: rangeSwings);
+        var timeline = MarketStructure.Timeline(store, MaxLevel, from: last, to: last + 1, keepFrom: 0, rangeSwings: rangeSwings, deepBreaks: deepBreaks, overlaps: overlaps);
         return JsonSerializer.SerializeToUtf8Bytes(new { Anchor = 0, From = last, To = last + 1, Timeline = timeline }, Json);
     }
 

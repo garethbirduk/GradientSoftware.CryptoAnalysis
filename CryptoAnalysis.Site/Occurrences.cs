@@ -13,7 +13,7 @@ public static class Occurrences
     /// </summary>
     public static readonly IReadOnlyList<string> Kinds =
     [
-        "SwingRange", "Range", "Uptrend", "Downtrend", "Upswing", "Downswing", "BullishBreakOfStructure", "BearishBreakOfStructure",
+        "DeepMsb", "SwingRange", "Range", "Uptrend", "Downtrend", "Upswing", "Downswing", "BullishBreakOfStructure", "BearishBreakOfStructure",
         "BullishMarketStructureBreak", "BearishMarketStructureBreak",
     ];
 
@@ -29,7 +29,7 @@ public static class Occurrences
         var prices = store.Prices;
         var last = store.Candles - 1;
         string Time(int candle) => prices[candle].DateTime.ToString("yyyy-MM-ddTHH:mm");
-        JsonObject Row(int level, EnumSwingDirection direction, int start, int? end, int at, string thing) => new()
+        JsonObject Row(int level, EnumSwingDirection direction, int start, int? end, int at, string? thing) => new()
         {
             ["index"] = start,
             ["start"] = Time(start),
@@ -46,6 +46,16 @@ public static class Occurrences
         var up = kind is "Uptrend" or "Upswing" or "BullishBreakOfStructure" or "BullishMarketStructureBreak" ? EnumSwingDirection.Up : EnumSwingDirection.Down;
         IEnumerable<JsonObject> rows = kind switch
         {
+            // A market structure break that goes further back than the last Swing: from where the earliest Swing it takes
+            // back starts to its close. It has no analysis of its own.
+            "DeepMsb" => DeepBreaks.Over(store, 0, last, last).Where(x => x.Level <= maxLevel).Select(x =>
+            {
+                var bullish = x.Type == EnumAnnotationType.BullishMarketStructureBreak;
+                var row = Row(x.Level, bullish ? EnumSwingDirection.Up : EnumSwingDirection.Down, x.From, x.Break, x.Break, null);
+                var (low, top) = bullish ? (prices[x.Far].Close, prices[x.Reference].Close) : (prices[x.Reference].Close, prices[x.Far].Close);
+                (row["low"], row["high"], row["height"], row["back"], row["of"]) = (low, top, 100 * (top - low) / low, x.Back, x.Of);
+                return row;
+            }),
             "SwingRange" => SwingRanges.Over(store, rangeSwings, 0, last, last).Where(x => x.Level <= maxLevel).Select(x =>
             {
                 var high = x.LegKind == EnumPivotKind.High;

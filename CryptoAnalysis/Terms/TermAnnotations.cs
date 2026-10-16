@@ -31,6 +31,13 @@ public sealed record SwingOutline(
     PricePoint? BreakOfStructure)
 {
     public bool Confirmed => BreakOfStructure != null;
+
+    /// <summary>
+    /// For a Swing against the leg of the level above (see <see cref="OverlappingSwings"/>), "across" when it runs from one
+    /// of that leg into the next, and "inside" when it lies in the one leg; null for every other Swing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Overlap { get; init; }
 }
 
 /// <summary>
@@ -203,7 +210,22 @@ public sealed record SwingNode(SwingOutline Swing, IReadOnlyList<SwingNode> Inte
 /// <summary>
 /// A market structure break and the level it broke: Reference is the protective high or low, Break the close beyond it.
 /// </summary>
-public sealed record MarketStructureBreakOutline(EnumAnnotationType Type, PricePoint Reference, PricePoint Break);
+public sealed record MarketStructureBreakOutline(EnumAnnotationType Type, PricePoint Reference, PricePoint Break)
+{
+    /// <summary>
+    /// How many of the last swings of the run it goes against have their turns closed beyond: 1 for the break of the last
+    /// swing's alone, and more for one that goes further back (see <see cref="DeepBreaks"/>), of the Of swings the run
+    /// has. One that goes further back also has where the earliest of those swings starts, From, and where the
+    /// counter-move began, Far.
+    /// </summary>
+    public int Back { get; init; } = 1;
+
+    public int Of { get; init; }
+
+    public PricePoint? From { get; init; }
+
+    public PricePoint? Far { get; init; }
+}
 
 /// <summary>
 /// Detects every structure term in a price series and flattens them into one time-ordered list.
