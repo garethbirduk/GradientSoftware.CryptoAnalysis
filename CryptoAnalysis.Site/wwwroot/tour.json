@@ -345,6 +345,50 @@
       ]
     },
     {
+      "chapter": "Overlapping Swings",
+      "layers": ["level1", "level2", "close", "sawtooth", "Upswing", "Downswing", "BearishBreakOfStructure"],
+      "rewind": { "to": 55, "speed": 100, "erase": true },
+      "until": 57,
+      "view": [47, 68],
+      "speed": 3,
+      "cues": [
+        { "texts": { "education": "Every Swing so far lies inside one leg of the Sawtooth one resolution lower, and runs the same way as that leg." } },
+        { "texts": { "education": "A 2nd order Upswing lies inside a 1st order Upleg, and a 2nd order Downswing inside a 1st order Downleg." } },
+        { "at": 57, "on": "close", "place": "above", "texts": { "education": "Swing High: 16736" }, "keep": "chapter", "hold": 3.5, "voice": false },
+        { "at": 57, "texts": { "education": "Here the price rises from the LL of Monday night to this Swing High, which we met in the Downswings chapter." } }
+      ]
+    },
+    {
+      "add": ["OverlapDownInside"],
+      "until": 60,
+      "cues": [
+        { "at": 56, "on": "close", "place": "below", "texts": { "education": "Swing Low: 16710" }, "keep": "chapter", "hold": 3.5, "voice": false },
+        { "at": 57, "texts": { "education": "Just before it is the Swing Low of the 2nd order Upswing that breaks structure at this high." } },
+        { "at": 60, "on": "close", "place": "below", "texts": { "education": "BoS" }, "keep": "chapter", "hold": 3.5, "voice": false },
+        { "at": 60, "texts": { "education": "Three hours later the price closes below that Swing Low. At the 2nd order that is the shape of a Downswing: a low, a Swing High, and a close below the low." } },
+        { "at": 60, "texts": { "education": "But the 1st order is still an Upleg here, so this is not an ordinary Downswing: it runs against the leg it lies in. We call it an Overlapping Downswing, and draw it with a dotted border." } }
+      ]
+    },
+    {
+      "add": ["OverlapDown"],
+      "until": 62,
+      "cues": [
+        { "at": 62, "on": "close", "place": "below", "texts": { "education": "1st order BoS" }, "hold": 3.5, "voice": false },
+        { "at": 62, "texts": { "education": "At 14:00 the 1st order Downswing is Confirmed, and its Swing High becomes a turning point of the 1st order Sawtooth: the Upleg ends there, and a Downleg begins." } },
+        { "at": 62, "texts": { "education": "The Overlapping Downswing now runs from the end of one 1st order leg into the next, so its border turns from dotted to dashed." } },
+        { "at": 62, "texts": { "education": "It begins at the last Swing Low before the turn, turns at the 1st order Swing High, and has its BoS at the first close below that Swing Low." } },
+        { "at": 62, "texts": { "education": "So there are two kinds. Dotted: inside one leg of the level above, against its direction. Dashed: across a turning point of the level above." } },
+        { "at": 62, "texts": { "education": "Its BoS is also an MSB at the 2nd order, as the close is below the Swing Low of the Upswing before it. The two are separate readings of the same close." } }
+      ]
+    },
+    {
+      "add": ["OverlapUp", "OverlapUpInside"],
+      "cues": [
+        { "texts": { "education": "The same holds the other way: an Overlapping Upswing runs from a 1st order Downleg into the next Upleg." } },
+        { "texts": { "education": "For now, Overlapping Swings are drawn on the chart only. The Trends and the rest of this tour count the other Swings alone." } }
+      ]
+    },
+    {
       "chapter": "Candles",
       "layers": ["level1", "close"],
       "rewind": { "to": 50, "speed": 100, "erase": true },
@@ -642,6 +686,80 @@
         { "texts": { "education": "Later in this data, with a year and a half behind it, one 1st order Downswing lasts two months." } },
         { "texts": { "education": "Swings within Swings over a couple of hours are hard to act on. A Swing that plays out over weeks is not." } },
         { "texts": { "education": "Which order to work at, and from how much history, is a choice. Choices are strategy, which comes later." } }
+      ]
+    },
+    {
+      "chapter": "MSBs further back",
+      "scene": { "dataset": "btc-coinbase-1h", "time": "2017-12-17T11:00" },
+      "layers": ["level5", "close", "Downswing", "BearishBreakOfStructure", "LowerHigh"],
+      "from": 6300,
+      "until": 6354,
+      "view": [6270, 6490],
+      "speed": 10,
+      "cues": [
+        { "texts": { "education": "This chapter leaves 2023 for September 2018, with the Sawtooth starting at the all-time high of December 2017." } },
+        { "texts": { "education": "At the 5th order the price falls in Downswings, one after another: eleven of them, down to the 9th." } },
+        { "at": 6305, "on": "close", "place": "above", "texts": { "education": "Swing High: 6512" }, "keep": "chapter", "hold": 3.5, "voice": false },
+        { "at": 6337, "on": "close", "place": "above", "texts": { "education": "Swing High: 6456" }, "keep": "chapter", "hold": 3.5, "voice": false },
+        { "at": 6353, "on": "close", "place": "above", "texts": { "education": "Swing High: 6200" }, "keep": "chapter", "hold": 3.5, "voice": false },
+        { "at": 6354, "on": "close", "place": "below", "texts": { "education": "LL: 6165" }, "keep": "chapter", "hold": 3.5, "voice": false },
+        { "at": 6354, "texts": { "education": "Each Downswing leaves its Swing High behind. While the price closes below them, the fall is intact." } }
+      ]
+    },
+    {
+      "add": ["BullishMarketStructureBreak", "msbLevelUp"],
+      "until": 6361,
+      "cues": [
+        { "at": 6361, "on": "close", "place": "above", "texts": { "education": "MSB" }, "hold": 3.5, "voice": false },
+        { "at": 6361, "texts": { "education": "On the 9th the price closes above the Swing High of the last Downswing: an MSB, as before." } }
+      ]
+    },
+    {
+      "cues": [
+        { "at": 6353, "on": "close", "place": "left", "texts": { "education": "1" }, "hold": 2, "voice": false },
+        { "texts": { "education": "Count the Swing Highs back from the LL. 1 is the Swing High of the last Downswing, the one that MSB closed above." } },
+        { "at": 6337, "on": "close", "place": "below", "texts": { "education": "2" }, "hold": 2, "voice": false },
+        { "texts": { "education": "2 is the Swing High of the Downswing before that one." } }
+      ]
+    },
+    {
+      "add": ["DeepMsb"],
+      "until": 6459,
+      "speed": 20,
+      "cues": [
+        { "texts": { "education": "The rise goes on." } },
+        { "at": 6353, "on": "close", "place": "left", "texts": { "education": "1" }, "to": { "at": 6459, "on": 6200 }, "keep": "chapter", "hold": 1, "voice": false },
+        { "at": 6337, "on": "close", "place": "below", "texts": { "education": "2" }, "to": { "at": 6459, "on": 6456.13 }, "keep": "chapter", "hold": 1, "voice": false },
+        { "at": 6459, "on": "close", "place": "above", "texts": { "education": "2 back" }, "keep": "chapter", "hold": 3.5, "voice": false },
+        { "at": 6459, "texts": { "education": "On the 13th the close is above both: above 1, and above 2 as well." } },
+        { "at": 6459, "define": "MsbBack.what", "direction": "Down" },
+        { "at": 6459, "texts": { "education": "This one has taken back the last two of the eleven Downswings: it is 2 back." } }
+      ]
+    },
+    {
+      "view": [6266, 6362],
+      "cues": [
+        { "texts": { "education": "Go on counting back, past 2." } },
+        { "at": 6305, "on": "close", "place": "right", "texts": { "education": "3" }, "hold": 2, "voice": false },
+        { "texts": { "education": "3 is higher than 1 and 2." } },
+        { "at": 6288, "on": "close", "place": "below", "texts": { "education": "4" }, "keep": "chapter", "hold": 1, "voice": false },
+        { "at": 6284, "on": "close", "place": "above", "texts": { "education": "5" }, "keep": "chapter", "hold": 1, "voice": false },
+        { "at": 6282, "on": "close", "place": "left", "texts": { "education": "6" }, "keep": "chapter", "hold": 1, "voice": false },
+        { "texts": { "education": "4, 5 and 6 are all lower than 3." } },
+        { "at": 6276, "on": "close", "place": "above", "texts": { "education": "7" }, "keep": "chapter", "hold": 2, "voice": false },
+        { "texts": { "education": "7 is higher than all of them." } }
+      ]
+    },
+    {
+      "until": 6474,
+      "view": [6270, 6490],
+      "cues": [
+        { "at": 6305, "on": "close", "place": "right", "texts": { "education": "3" }, "to": { "at": 6474, "on": 6512.73 }, "keep": "chapter", "hold": 1, "voice": false },
+        { "at": 6474, "on": "close", "place": "above", "texts": { "education": "6 back" }, "hold": 3.5, "voice": false },
+        { "at": 6474, "texts": { "education": "On the 14th the close is above 3. Since 4, 5 and 6 are lower than 3, it is above them too, so this one close takes back six Downswings at once: 6 back." } },
+        { "at": 6474, "define": "MsbBack.count", "direction": "Down" },
+        { "at": 6474, "texts": { "education": "7 is higher still, and is not reached here, so the count stops at six of the eleven." } },
+        { "at": 6474, "texts": { "education": "Counted this way, an MSB says how much of a fall has been taken back, in Swings rather than in price. The same holds for a rise, with closes below the Swing Lows of its Upswings." } }
       ]
     },
     {

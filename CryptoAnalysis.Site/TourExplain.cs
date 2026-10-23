@@ -5,26 +5,29 @@ namespace Gradient.CryptoAnalysis.Site;
 
 /// <summary>
 /// What an explanation is told with: the page's settings that decide which things are worth telling of. GreenRuns and
-/// RedRuns are how many candles of a colour in a row make Successive Candles, as the page's Candles layers have it.
+/// RedRuns are how many candles of a colour in a row make Successive Candles, as the page's Candles layers have it, and
+/// RangeSwings how many Swings one order finer find a Range by Swings, as its layer has it.
 /// </summary>
-public sealed record ExplainOptions(int GreenRuns = 5, int RedRuns = 5)
+public sealed record ExplainOptions(int GreenRuns = 5, int RedRuns = 5, int RangeSwings = SwingRanges.DefaultSwings)
 {
     public static readonly ExplainOptions Default = new();
 
     /// <summary>
-    /// The options a tour.json section gives: "runs" as one number for both colours, or { "green", "red" }.
+    /// The options a tour.json section gives: "runs" as one number for both colours, or { "green", "red" }, with
+    /// "rangeSwings" when that is not the usual count.
     /// </summary>
     public static ExplainOptions From(JsonNode? node)
     {
         return node switch
         {
             JsonValue value when value.TryGetValue<int>(out var both) => new ExplainOptions(both, both),
-            JsonObject each => new ExplainOptions(each["green"]?.GetValue<int>() ?? Default.GreenRuns, each["red"]?.GetValue<int>() ?? Default.RedRuns),
+            JsonObject each => new ExplainOptions(each["green"]?.GetValue<int>() ?? Default.GreenRuns, each["red"]?.GetValue<int>() ?? Default.RedRuns, each["rangeSwings"]?.GetValue<int>() ?? Default.RangeSwings),
             _ => Default,
         };
     }
 
-    public JsonNode ToJson() => GreenRuns == RedRuns ? JsonValue.Create(GreenRuns) : new JsonObject { ["green"] = GreenRuns, ["red"] = RedRuns };
+    public JsonNode ToJson() => RangeSwings != Default.RangeSwings ? new JsonObject { ["green"] = GreenRuns, ["red"] = RedRuns, ["rangeSwings"] = RangeSwings }
+        : GreenRuns == RedRuns ? JsonValue.Create(GreenRuns) : new JsonObject { ["green"] = GreenRuns, ["red"] = RedRuns };
 }
 
 /// <summary>
@@ -40,7 +43,7 @@ public static partial class Explain
     /// <summary>
     /// The things a section can explain.
     /// </summary>
-    public static readonly IReadOnlyList<string> Terms = ["Candle", "SuccessiveCandles", "Point", "Swing", "Trend", "Trade"];
+    public static readonly IReadOnlyList<string> Terms = ["Candle", "SuccessiveCandles", "Point", "Swing", "Trend", "SwingRange", "Trade"];
 
     /// <summary>
     /// A thing at a candle that can be explained: its kind (one of <see cref="Terms"/>), the sawtooth level it is at when
@@ -87,6 +90,7 @@ public static partial class Explain
         "Point" => PointBlocks.Select(x => x.Name).ToList(),
         "Swing" => SwingBlocks.Select(x => x.Name).ToList(),
         "Trend" => TrendBlocks.Select(x => x.Name).ToList(),
+        "SwingRange" => SwingRangeBlocks.Select(x => x.Name).ToList(),
         "Trade" => TradeBlocks.Select(x => x.Name).ToList(),
         _ => [],
     };
@@ -340,7 +344,7 @@ public static partial class Explain
             return null;
         var when = prices[index].DateTime;
         var one = things.Count == 1 ? things[0] : null;
-        var what = one == null ? "Analysis" : $"{(one.Level is int l ? $"{Order(l)} " : "")}{one.Kind}";
+        var what = one == null ? "Analysis" : $"{(one.Level is int l ? $"{Order(l)} " : "")}{(one.Kind == "SwingRange" ? "Range by Swings" : one.Kind)}";
         var title = $"{what} at {when:HH:mm} on {when.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)}";
         var tour = TourOf(title, dataset, prices[0].DateTime, [Math.Max(0, index - CandlesBefore), index + CandlesAfter], ["level1", "candles"], sections.ToArray());
         if (inPlace)
@@ -386,6 +390,8 @@ public static partial class Explain
                     return null;
                 return new JsonObject { ["chapter"] = $"{Order(level)} {point.Point.Label}", ["explain"] = thing.Kind, ["at"] = index, ["level"] = level, ["from"] = Math.Max(0, point.PreviousAt - 1), ["known"] = cursor, ["layers"] = Layers($"level{level}", "close", "sawtooth"), ["speed"] = 8.0 };
             }
+            case "SwingRange":
+                return SwingRangeChapter(prices, index, level, cursor, inPlace, options, out keeps);
             default:
                 return SwingOrTrend(thing.Kind, prices, known, index, level, cursor, inPlace, out keeps, out then);
         }
@@ -566,6 +572,8 @@ public static partial class Explain
                 return Trade(prices, at, reached, strategy, blocks, out problem);
             case "Swing":
                 return Swing(prices, at, level, reached, out problem, until, known, blocks);
+            case "SwingRange":
+                return SwingRange(prices, at, level, reached, out problem, until, known, blocks, options.RangeSwings);
             default:
                 return Trend(prices, at, level, reached, out problem, until, known, blocks);
         }

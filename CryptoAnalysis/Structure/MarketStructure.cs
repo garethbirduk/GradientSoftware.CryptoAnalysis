@@ -172,7 +172,7 @@ public static partial class MarketStructure
         {
             var s = snapshots[t - from];
             // A candidate is confirmed when a swing with its start appears at any level: the break may also promote it.
-            var confirmed = s.Swings.Select(x => (object)(x.Direction, x.Start.Time)).ToHashSet();
+            var confirmed = s.Swings.Where(x => x.Overlap == null).Select(x => (object)(x.Direction, x.Start.Time)).ToHashSet();
             pivots.Step(t, s.Pivots);
             points.Step(t, s.Points);
             runs.Step(t, s.Runs);

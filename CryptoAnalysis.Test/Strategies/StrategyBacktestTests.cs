@@ -518,8 +518,8 @@ public class StrategyBacktestTests
         Assert.AreEqual((StrategyEntry.Trend, EnumSwingDirection.Up, 2, 3, 48), (s.Entry.Type, s.Entry.Direction, s.Entry.Level, s.Entry.Swings, s.Entry.Within));
         Assert.AreEqual(0, s.Validate().Count);
         s.Entry.Swings = 1;
-        s.After[0].Level = 9;
-        CollectionAssert.AreEqual(new[] { "Step 1: Level must be from 1 to 4.", "Entry: Swings must be at least 2: a Trend is two or more Swings in a row." }, s.Validate());
+        s.After[0].Level = Gradient.CryptoAnalysis.Research.KnownStructure.Levels + 1;
+        CollectionAssert.AreEqual(new[] { $"Step 1: Level must be from 1 to {Gradient.CryptoAnalysis.Research.KnownStructure.Levels}.","Entry: Swings must be at least 2: a Trend is two or more Swings in a row." }, s.Validate());
     }
 
     [TestMethod]

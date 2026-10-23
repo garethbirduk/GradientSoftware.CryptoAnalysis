@@ -31,6 +31,13 @@ public sealed record SwingOutline(
     PricePoint? BreakOfStructure)
 {
     public bool Confirmed => BreakOfStructure != null;
+
+    /// <summary>
+    /// For a Swing against the leg of the level above (see <see cref="OverlappingSwings"/>), "across" when it runs from one
+    /// of that leg into the next, and "inside" when it lies in the one leg; null for every other Swing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Overlap { get; init; }
 }
 
 /// <summary>
@@ -140,6 +147,37 @@ public sealed record RangeOutline(
     double Band,
     PricePoint? End)
 {
+    /// <summary>
+    /// For a range found by swings (see <see cref="SwingRanges"/>), which has no retracement or band: how many swings one
+    /// level finer are confirmed inside it, and how many of those are weak. Both 0 for a range found by its retracement.
+    /// Its From is then the end of the leg it came from, and Low and High are the leg's two ends.
+    /// </summary>
+    public int Swings { get; init; }
+
+    public int Weak { get; init; }
+
+    /// <summary>
+    /// For a range found by swings, the swings counted: those one level finer confirmed inside its leg, in the order they
+    /// broke structure.
+    /// </summary>
+    public IReadOnlyList<SwingOutline> Inner { get; init; } = [];
+
+    /// <summary>
+    /// Compares the ranges by value, the swings inside included, so a replay can tell when one has changed.
+    /// </summary>
+    public bool Equals(RangeOutline? other)
+    {
+        return other is not null && Level == other.Level && Direction == other.Direction && From == other.From && Low == other.Low && High == other.High
+            && Identified == other.Identified && Retracement == other.Retracement && Band == other.Band && End == other.End && Swings == other.Swings
+            && Weak == other.Weak && Inner.SequenceEqual(other.Inner);
+    }
+
+    /// <inheritdoc/>
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Level, Direction, Low, High, Identified, End, Swings, Inner.Count);
+    }
+
     public double Height => High.Price - Low.Price;
 
     public double BandLow => Low.Price - Height * Band / 100;
@@ -172,7 +210,22 @@ public sealed record SwingNode(SwingOutline Swing, IReadOnlyList<SwingNode> Inte
 /// <summary>
 /// A market structure break and the level it broke: Reference is the protective high or low, Break the close beyond it.
 /// </summary>
-public sealed record MarketStructureBreakOutline(EnumAnnotationType Type, PricePoint Reference, PricePoint Break);
+public sealed record MarketStructureBreakOutline(EnumAnnotationType Type, PricePoint Reference, PricePoint Break)
+{
+    /// <summary>
+    /// How many of the last swings of the run it goes against have their turns closed beyond: 1 for the break of the last
+    /// swing's alone, and more for one that goes further back (see <see cref="DeepBreaks"/>), of the Of swings the run
+    /// has. One that goes further back also has where the earliest of those swings starts, From, and where the
+    /// counter-move began, Far.
+    /// </summary>
+    public int Back { get; init; } = 1;
+
+    public int Of { get; init; }
+
+    public PricePoint? From { get; init; }
+
+    public PricePoint? Far { get; init; }
+}
 
 /// <summary>
 /// Detects every structure term in a price series and flattens them into one time-ordered list.

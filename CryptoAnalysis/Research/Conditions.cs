@@ -8,11 +8,16 @@ public sealed record Condition(string Id, string Name, string Group, Func<IReadO
 
 /// <summary>
 /// The conditions the explorer has. Each looks only backwards: a run of candles, a close beyond the candles before it, a
-/// close against their average, a candle's size against theirs, the day of the week, and market structure as a chart of the
-/// last candles would show it (see KnownStructure).
+/// close against their average, a candle's size against theirs, the day of the week, and market structure as known at the
+/// candle (see KnownStructure).
 /// </summary>
 public static class ExploreConditions
 {
+    /// <summary>
+    /// The levels the market structure conditions are listed for: the levels the pages draw.
+    /// </summary>
+    public const int StructureLevels = 8;
+
     public static readonly IReadOnlyList<Condition> All =
     [
         .. new[] { 2, 3, 4, 5, 6 }.Select(n => new Condition($"green-{n}", $"{n} green candles in a row", "Candle runs", p => Run(p, green: true, n))),
@@ -26,7 +31,7 @@ public static class ExploreConditions
         new("big-24", "A candle over twice the average size of the last 24", "Candle size", p => Size(p, 24, larger: true)),
         new("small-24", "A candle under half the average size of the last 24", "Candle size", p => Size(p, 24, larger: false)),
         new("weekend", "A candle at the weekend (UTC)", "Time", p => p.Select(x => x.DateTime.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday).ToArray()),
-        .. Enumerable.Range(1, KnownStructure.Levels).SelectMany(level => new (string Id, string Name, KnownStructure.EnumFlag Flag)[]
+        .. Enumerable.Range(1, StructureLevels).SelectMany(level => new (string Id, string Name, KnownStructure.EnumFlag Flag)[]
         {
             ("bos-up", "an Upswing Confirmed (Break of Structure)", KnownStructure.EnumFlag.BreakUp),
             ("bos-down", "a Downswing Confirmed (Break of Structure)", KnownStructure.EnumFlag.BreakDown),
@@ -34,7 +39,7 @@ public static class ExploreConditions
             ("msb-bearish", "a Bearish Market Structure Break", KnownStructure.EnumFlag.BearishMarketStructureBreak),
             ("uptrend", "in an Uptrend", KnownStructure.EnumFlag.Uptrend),
             ("downtrend", "in a Downtrend", KnownStructure.EnumFlag.Downtrend),
-        }.Select(x => new Condition($"l{level}-{x.Id}", $"Level {level}: {x.Name}", $"Structure, last {KnownStructure.Window} candles",
+        }.Select(x => new Condition($"l{level}-{x.Id}", $"Level {level}: {x.Name}", "Structure, as known at the candle",
             p => KnownStructure.Met(p, level, x.Flag)))),
     ];
 

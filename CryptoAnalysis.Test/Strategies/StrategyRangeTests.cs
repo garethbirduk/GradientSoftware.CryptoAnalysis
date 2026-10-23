@@ -161,6 +161,78 @@ public class StrategyRangeTests
     }
 
     [TestMethod]
+    public void Run_RangeOfAnyLevel_IsMetByTheRangeWhateverItsLevel()
+    {
+        var prices = Training();
+        var any = Zone(killed: false, level: StrategyEntry.AnyLevel);
+
+        CollectionAssert.AreEqual(new[] { 69, 71, 93 }, StrategyBacktest.Run(prices, RangeTrade(any)).Trades.Select(x => x.EntryIndex).ToArray());
+    }
+
+    [TestMethod]
+    public void Run_RangeOfASize_LeavesOutARangeTooSmallTooTallOrTooNew()
+    {
+        // The training's Range is 3,833 high from a low of 55,927, 6.8%, and was identified at #68.
+        var prices = Training();
+        int[] Entries(Action<StrategyEntry> size)
+        {
+            var zone = Zone(killed: false, level: StrategyEntry.AnyLevel);
+            size(zone);
+            return StrategyBacktest.Run(prices, RangeTrade(zone)).Trades.Select(x => x.EntryIndex).ToArray();
+        }
+
+        CollectionAssert.AreEqual(new[] { 69, 71, 93 }, Entries(x => (x.MinHeight, x.MaxHeight) = (6, 7)));
+        CollectionAssert.AreEqual(Array.Empty<int>(), Entries(x => x.MinHeight = 7));
+        CollectionAssert.AreEqual(Array.Empty<int>(), Entries(x => x.MaxHeight = 6));
+        CollectionAssert.AreEqual(new[] { 71, 93 }, Entries(x => x.MinCandles = 3), "Held three candles at #71, one at #69.");
+    }
+
+    [TestMethod]
+    public void Signals_AStepFinerThanTheRange_IsReadAtTheRangesLevelAndThoseAfterIt()
+    {
+        var prices = Btc.From2023().Take(6000).ToList();
+        var strategy = RangeTrade(Green(1), Zone(level: StrategyEntry.AnyLevel), new StrategyEntry { Type = StrategyEntry.BreakOfStructure, Direction = EnumSwingDirection.Up, Finer = 1 });
+        strategy.OnePositionAtATime = false;
+        Assert.AreEqual(0, strategy.Validate().Count, string.Join(" ", strategy.Validate()));
+
+        var signals = StrategyBacktest.Signals(prices, strategy);
+
+        Assert.IsTrue(signals.Count > 5, $"{signals.Count} signals");
+        var levels = new HashSet<int>();
+        foreach (var (index, met) in signals)
+        {
+            // The chain's Range, held at the candle of its first step, and the break one level after it at the second's.
+            var range = StrategyBacktest.RangeOf(prices, strategy, index, met)!;
+            var read = StrategyBacktest.StepAt(prices, strategy.Steps, 1, met[1], range)!;
+            Assert.IsTrue(read.Finer == null && read.Level > 1 && Math.Abs(read.Level - (range.Level + 1)) <= 2, $"#{index}: level {read.Level} for a Range at {range.Level}");
+            Assert.IsNotNull(StrategyBacktest.Found(prices, met[1], read), $"#{index}: a Bullish BoS at level {read.Level} at #{met[1]}");
+            levels.Add(range.Level);
+        }
+
+        Assert.IsTrue(levels.Count > 1, "Ranges of more than one level are traded.");
+        CollectionAssert.AreEqual(signals.Select(x => x.Index).ToList(), StrategyBacktest.Occurrences(prices, strategy));
+    }
+
+    [TestMethod]
+    public void Validate_SaysWhereAStepCannotBeFinerThanARange()
+    {
+        var finer = new StrategyEntry { Type = StrategyEntry.Trend, Finer = 1, Level = 0 };
+        var strategy = RangeTrade(Green(2), finer);
+        CollectionAssert.AreEqual(new[] { "Step 1: a step read finer than a Range needs a Range step before it.", "A target on a Range's lines needs a Range step in the entry condition." }, strategy.Validate());
+
+        strategy = RangeTrade(Green(2), Zone(level: StrategyEntry.AnyLevel), finer);
+        Assert.AreEqual(0, strategy.Validate().Count, string.Join(" ", strategy.Validate()));
+
+        strategy.After[0].Kill = [new StrategyEntry { Type = StrategyEntry.Trend, Finer = 1 }];
+        strategy.After[1] = new StrategyEntry { Type = StrategyEntry.Trend, Level = 0 };
+        CollectionAssert.AreEqual(new[]
+        {
+            "Step 1: Kill 1: Only a market structure step of the chain can be read finer than a Range.",
+            $"Step 2: Level must be from 1 to {Gradient.CryptoAnalysis.Research.KnownStructure.Levels}.",
+        }, strategy.Validate());
+    }
+
+    [TestMethod]
     public void Validate_SaysWhereAKillOrARangesLineCannotBe()
     {
         var strategy = RangeTrade(Green(2), Zone());

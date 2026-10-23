@@ -104,6 +104,12 @@ public sealed class Strategy
         errors.AddRange(Entry.Validate().Select(x => $"Entry: {x}"));
         if (Steps[0].Within != null)
             errors.Add($"{(After.Count > 0 ? "Step 1" : "Entry")}: Within needs a step before it.");
+        for (var k = 0; k < Steps.Count; k++)
+        {
+            if (Steps[k].Finer != null && !Steps.Take(k).Any(x => x.IsRange))
+                errors.Add($"{(k < After.Count ? $"Step {k + 1}" : "Entry")}: a step read finer than a Range needs a Range step before it.");
+        }
+
         if (Entry.Kill is { Count: > 0 })
             errors.Add("Entry: a kill ends the wait that follows a step, and nothing is waited for after the entry.");
         errors.AddRange(TakeProfit.Validate().Select(x => $"Take Profit: {x}"));
@@ -133,7 +139,7 @@ public enum EnumSwingStrength
 /// <summary>
 /// A step of an entry condition: what is met at the close of a candle. SuccessiveCandles is met at the close of the candle
 /// that makes a run of Length candles of one colour, once a run, so a longer run does not meet it again.
-/// The others are market structure at a sawtooth Level, read as a chart of the last candles to that one shows it (see
+/// The others are market structure at a sawtooth Level, as known at that candle of all the candles to it (see
 /// <see cref="KnownStructure"/>), in a Direction: up for bullish, an Upswing or an Uptrend. BreakOfStructure and
 /// MarketStructureBreak are met at the close that breaks. Swing is met at the break of structure that Confirms a Swing, of
 /// the Strength asked for. Trend is met at the break of structure that makes Swings Swings in a row, once a run, so two is
@@ -145,6 +151,9 @@ public enum EnumSwingStrength
 /// RangeSweep is met at the close of a candle that sweeps such a Range: on the BuyLow side its wick goes below the Range's
 /// low and it closes at or above it, back inside the box; on the SellHigh side its wick goes above the high and it closes at
 /// or below it. It holds the Range as a RangeZone does, with Depth the depth of the zones its exits can be set on.
+/// A Range step at level 0 is met by a Range of any level, the tallest of those it could be, and can ask for a Range of a
+/// size: its height as a percentage of its low, and how many candles it has held. A market structure step after it can
+/// then name its level by that Range, so many levels Finer than it, in place of a Level of its own.
 /// A step can have kills: conditions of these same types that, met at a close after the step is met and before the trade is
 /// entered, end the wait, so the chain starts again. RangeEnd is a kill alone, and of a Range step: the close beyond a
 /// band of the Range that step holds.
@@ -194,6 +203,46 @@ public sealed class StrategyEntry
     public double Band { get; set; } = Ranges.DefaultBand;
 
     /// <summary>
+    /// For a market structure step that follows a Range step: how many levels finer than the Range the chain holds the
+    /// step is read at, 0 for the Range's own level and 1 for the one after it. Its Level is then not used. Not set, the
+    /// step is read at its Level.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Finer { get; set; }
+
+    /// <summary>
+    /// For a Range step: the least and the most the Range's height can be, as a percentage of its low; no limit when not
+    /// set.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? MinHeight { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? MaxHeight { get; set; }
+
+    /// <summary>
+    /// For a Range step: the fewest candles the Range must have held, from the one that identified it to the one that
+    /// meets the step; no limit when not set.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MinCandles { get; set; }
+
+    /// <summary>
+    /// The level a Range step has when it is met by a Range of any level.
+    /// </summary>
+    public const int AnyLevel = 0;
+
+    /// <summary>
+    /// The step read at a level of its own: as it is, but for its Level, with no Finer.
+    /// </summary>
+    public StrategyEntry AtLevel(int level)
+    {
+        var step = (StrategyEntry)MemberwiseClone();
+        (step.Level, step.Finer) = (level, null);
+        return step;
+    }
+
+    /// <summary>
     /// The conditions that end the wait this step begins; none when not set.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -213,7 +262,7 @@ public sealed class StrategyEntry
     public bool IsRange => Type is RangeZone or RangeSweep;
 
     /// <summary>
-    /// Whether the step is read from a chart of the last candles to its candle, so its Level is that chart's.
+    /// Whether the step is read from the market structure known at its candle, so it has a Level.
     /// </summary>
     [JsonIgnore]
     public bool ReadsChart => IsStructure || IsRange;
@@ -243,8 +292,18 @@ public sealed class StrategyEntry
         var errors = new List<string>();
         if (Type == SuccessiveCandles && Length < 1)
             errors.Add("Length must be at least 1.");
-        if (ReadsChart && Level is < 1 or > KnownStructure.Levels)
+        if (IsStructure && Finer == null && Level is < 1 or > KnownStructure.Levels)
             errors.Add($"Level must be from 1 to {KnownStructure.Levels}.");
+        if (IsRange && Level is < AnyLevel or > KnownStructure.Levels)
+            errors.Add($"Level must be from 1 to {KnownStructure.Levels}, or {AnyLevel} for a Range of any level.");
+        if (Finer != null && (!IsStructure || kill))
+            errors.Add("Only a market structure step of the chain can be read finer than a Range.");
+        else if (Finer is < 0 or > KnownStructure.Levels)
+            errors.Add($"Finer must be from 0 to {KnownStructure.Levels}.");
+        if (IsRange && (MinHeight < 0 || MaxHeight <= (MinHeight ?? 0)))
+            errors.Add("A Range's least height cannot be less than 0, and its most must be more than its least.");
+        if (IsRange && MinCandles < 0)
+            errors.Add("The candles a Range has held cannot be fewer than 0.");
         if (Type == Trend && Swings < 2)
             errors.Add("Swings must be at least 2: a Trend is two or more Swings in a row.");
         if (IsRange && Depth is <= 0 or > 50)
@@ -396,7 +455,7 @@ public sealed class StrategyTarget
 /// <summary>
 /// The Range an entry condition holds once a RangeZone step is met, as the lines a strategy trades it by: its Low and
 /// High, its bands, a close beyond which ends it, and the edges of its zones, the top of the buy-low zone and the bottom
-/// of the sell-high zone. Level is the chart's it was read at, From the candle its Retracement is measured from,
+/// of the sell-high zone. Level is the one it lay at when the step was met, From the candle its Retracement is measured from,
 /// Identified the candle whose close identified it, and Met the candle that met the step.
 /// </summary>
 public sealed record HeldRange(int Level, EnumSwingDirection Direction, double Low, double High, double BandLow, double BandHigh,

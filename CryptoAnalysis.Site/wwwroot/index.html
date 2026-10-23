@@ -55,7 +55,8 @@
     border-radius: 5px; padding: 3px 6px; }
   .replay-big .chart { height: 600px; }
   .topnav .foot { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
-  .layout { display: grid; grid-template-columns: 72px 230px 1fr; min-height: calc(100vh - var(--nav-h, 50px)); }
+  /* The levels column and the layers column are as wide wherever the layout sets its columns, with the side panel or not. */
+  .layout { --levels-w: 104px; --layers-w: 230px; display: grid; grid-template-columns: var(--levels-w) var(--layers-w) 1fr; min-height: calc(100vh - var(--nav-h, 50px)); }
   aside { border-right: 1px solid var(--border); padding: 14px 12px 24px; position: sticky; top: var(--nav-h, 50px);
     height: calc(100vh - var(--nav-h, 50px)); overflow-y: auto; }
   #levels { padding: 14px 6px 24px; }
@@ -92,6 +93,18 @@
   .layerbar .all-none button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .layerbar .items { display: flex; flex-direction: column; align-items: stretch; }
   .layerbar .items.levels { gap: 2px; }
+  /* A slider runs down either side of the level buttons, a level to each: every level up to it, and the one alone. */
+  .level-pick { display: flex; align-items: stretch; gap: 2px; }
+  .level-list { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+  .level-slide { flex: none; width: 14px; margin: 0; writing-mode: vertical-lr; cursor: pointer; appearance: none; -webkit-appearance: none; background: none; }
+  .level-slide::-webkit-slider-runnable-track { block-size: 4px; border-radius: 2px; background: var(--border); }
+  .level-slide::-moz-range-track { block-size: 4px; border-radius: 2px; background: var(--border); }
+  /* Its circle is filled while the levels on are the ones it set, and clear once the other slider or a button has changed them. */
+  .level-slide::-webkit-slider-thumb { -webkit-appearance: none; box-sizing: border-box; width: 12px; height: 12px; margin-block-start: -4px; border: 2px solid var(--accent); border-radius: 50%; background: var(--panel); }
+  .level-slide::-moz-range-thumb { box-sizing: border-box; width: 12px; height: 12px; border: 2px solid var(--accent); border-radius: 50%; background: var(--panel); }
+  .level-slide.in-use::-webkit-slider-thumb { background: var(--accent); }
+  .level-slide.in-use::-moz-range-thumb { background: var(--accent); }
+  .level-slide:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .levelbar .lead { flex-direction: column; align-items: flex-start; gap: 0; }
   .levelbar .lead .state { margin-left: 0; }
   .layerbar .item { display: flex; align-items: center; }
@@ -164,8 +177,8 @@
   .replay-controls .keys { color: var(--muted); font-size: 11px; white-space: nowrap; }
   /* Beside the chart: the event log, and the contents of a tour or an analysis, as tabs (see updateSide). */
   #side { display: none; flex-direction: column; border-right: 0; border-left: 1px solid var(--border); padding: 0; font-size: 13px; }
-  body.side-open .layout { grid-template-columns: 72px 230px minmax(0, 1fr) 340px; }
-  body.side-open.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr) 400px; }
+  body.side-open .layout { grid-template-columns: var(--levels-w) var(--layers-w) minmax(0, 1fr) 340px; }
+  body.side-open.editing .layout { grid-template-columns: var(--levels-w) var(--layers-w) minmax(0, 1fr) 400px; }
   body.side-open #side { display: flex; }
   .side-tabs { display: flex; gap: 2px; padding: 6px 10px 0; border-bottom: 1px solid var(--border); flex: none; }
   .side-tabs button { font: inherit; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em;
@@ -192,7 +205,7 @@
   .eventlog .empty-log { color: var(--muted); padding: 10px; cursor: default; display: block; }
   body.replaying .example.replay-active { box-shadow: 0 0 0 2px var(--accent); }
   body.replaying .example .chart { cursor: pointer; }
-  @media (max-width: 1100px) { body.side-open .layout, body.side-open.editing .layout { grid-template-columns: 72px 230px minmax(0, 1fr); }
+  @media (max-width: 1100px) { body.side-open .layout, body.side-open.editing .layout { grid-template-columns: var(--levels-w) var(--layers-w) minmax(0, 1fr); }
     body.side-open #side { grid-column: 3; position: static; height: 70vh; border-left: 0; border-top: 1px solid var(--border); } }
   .empty { margin-top: 24px; padding: 20px; border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); }
   body.touring .replay-controls, body.analysing .replay-controls { display: none; }
@@ -220,6 +233,9 @@
   .tour-controls .pace input { width: 70px; accent-color: var(--accent); }
   .tour-controls .pace span { min-width: 3.6em; color: var(--text); }
   .tour-controls button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+  /* Voice while it waits for a clip: it pulses until the clip is read. */
+  .tour-controls button.buffering { animation: voice-buffering 1s ease-in-out infinite; }
+  @keyframes voice-buffering { 50% { opacity: .45; } }
   .tour-controls .edit { margin-left: auto; }
   .tour-warning { color: var(--warn); font-size: 13px; }
   .player { margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
@@ -235,22 +251,22 @@
   /* Explain, pressed while any explanation is on, in the explanations' purple. */
   #tour-editor button[data-ed="explain"] { color: #8b5cf6; border-color: #8b5cf6; }
   #tour-editor button[data-ed="explain"][aria-pressed="true"] { background: #8b5cf6; color: #fff; }
-  :is(#similar, #similar-trades) { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
-  :is(#similar, #similar-trades)::backdrop { background: rgba(0, 0, 0, .35); }
-  :is(#similar, #similar-trades) h4 { margin: 0 0 4px; font-size: 15px; }
-  :is(#similar, #similar-trades) p { margin: 0 0 10px; color: var(--muted); }
-  :is(#similar, #similar-trades) .sim-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 12px; }
-  :is(#similar, #similar-trades) .sim-checks label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-  :is(#similar, #similar-trades) .sim-foot { display: flex; align-items: center; gap: 8px; }
-  :is(#similar, #similar-trades) button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
-  :is(#similar, #similar-trades) button:hover { background: var(--chip); }
-  :is(#similar, #similar-trades) button.go { background: var(--accent); border-color: var(--accent); color: #fff; }
-  :is(#similar, #similar-trades) .sim-count { margin: 12px 0 6px; color: var(--muted); }
-  :is(#similar, #similar-trades) ol { margin: 0; padding: 0; list-style: none; max-height: 44vh; overflow-y: auto; border-top: 1px solid var(--border); }
-  :is(#similar, #similar-trades) li a { display: grid; grid-template-columns: 5.5em 10.5em 1fr; gap: 10px; padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--text); text-decoration: none; font-variant-numeric: tabular-nums; }
-  :is(#similar, #similar-trades) li a[href]:hover { background: var(--chip); }
-  :is(#similar, #similar-trades) li a:not([href]) { color: var(--muted); }
-  :is(#similar, #similar-trades) li.current a { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
+  :is(#similar, #similar-trades, #occurrences) { width: min(620px, calc(100vw - 32px)); max-height: 80vh; padding: 16px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 13px; }
+  :is(#similar, #similar-trades, #occurrences)::backdrop { background: rgba(0, 0, 0, .35); }
+  :is(#similar, #similar-trades, #occurrences) h4 { margin: 0 0 4px; font-size: 15px; }
+  :is(#similar, #similar-trades, #occurrences) p { margin: 0 0 10px; color: var(--muted); }
+  :is(#similar, #similar-trades, #occurrences) .sim-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 12px; }
+  :is(#similar, #similar-trades, #occurrences) .sim-checks label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  :is(#similar, #similar-trades, #occurrences) .sim-foot { display: flex; align-items: center; gap: 8px; }
+  :is(#similar, #similar-trades, #occurrences) button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+  :is(#similar, #similar-trades, #occurrences) button:hover { background: var(--chip); }
+  :is(#similar, #similar-trades, #occurrences) button.go { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :is(#similar, #similar-trades, #occurrences) .sim-count { margin: 12px 0 6px; color: var(--muted); }
+  :is(#similar, #similar-trades, #occurrences) ol { margin: 0; padding: 0; list-style: none; max-height: 44vh; overflow-y: auto; border-top: 1px solid var(--border); }
+  :is(#similar, #similar-trades, #occurrences) li a { display: grid; grid-template-columns: 5.5em 10.5em 1fr; gap: 10px; padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--text); text-decoration: none; font-variant-numeric: tabular-nums; }
+  :is(#similar, #similar-trades, #occurrences) li a[href]:hover { background: var(--chip); }
+  :is(#similar, #similar-trades, #occurrences) li a:not([href]) { color: var(--muted); }
+  :is(#similar, #similar-trades, #occurrences) li.current a { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
   .tour-errors ul { margin: 6px 0 0; padding-left: 20px; }
   body.picking .chart .nsewdrag { cursor: cell !important; }
   body.video .topnav, body.video aside, body.video #replaybar, body.video .term-head, body.video .tour-controls,
@@ -496,8 +512,8 @@
   .strat-trades tr.bad td { color: var(--bad); }
   .strat-trades td.act { white-space: nowrap; text-align: right; }
   .strat-trades tr.out td:not(.inc) { opacity: .4; }
-  .strat-trades th button.sort, #similar-trades .strat-trades th button.sort { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
-  .strat-trades th button.sort:hover, #similar-trades .strat-trades th button.sort:hover { color: var(--accent); background: none; }
+  .strat-trades th button.sort, :is(#similar, #similar-trades, #occurrences) .strat-trades th button.sort { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+  .strat-trades th button.sort:hover, :is(#similar, #similar-trades, #occurrences) .strat-trades th button.sort:hover { color: var(--accent); background: none; }
   .strat-trades th[aria-sort] button.sort { color: var(--accent); }
   .strat-trades .inc { width: 1.5em; padding-right: 6px; }
   .strat-trades button.inc { padding: 0; border: 0; background: none; color: var(--accent); font-size: 15px; line-height: 1; cursor: pointer; }
@@ -550,8 +566,29 @@
   .strat-trades td.act button { font: inherit; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; margin-left: 4px; cursor: pointer; }
   .strat-trades td.act button:hover { background: var(--chip); }
   #similar-trades { width: min(900px, calc(100vw - 32px)); }
-  #similar-trades .strat-trades { max-height: 50vh; }
+  :is(#similar, #similar-trades, #occurrences) .strat-trades { max-height: 50vh; }
+  #similar { width: min(760px, calc(100vw - 32px)); }
+  #occurrences { width: min(980px, calc(100vw - 32px)); }
+  :is(#similar, #occurrences) .strat-trades td.act { color: var(--muted); white-space: nowrap; }
+  :is(#similar, #occurrences) .strat-trades td.act a { padding: 2px 10px; border: 1px solid var(--accent); border-radius: 5px; color: var(--accent); font-weight: 600; text-decoration: none; }
+  :is(#similar, #occurrences) .strat-trades td.act a:hover { background: var(--chip); }
+  #occurrences .strat-trades td.act button { padding: 2px 10px; margin-right: 6px; }
+  /* The List button: on, the next layer clicked is listed and not turned on or off. */
+  .layerbar .all-none button[data-list][aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .layout.listing .layer[data-layer] { cursor: help; }
   .won { color: var(--up); } .lost { color: var(--down); }
+.game-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 14px; align-items: start; }
+.game-card h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.game-card > .remarks { color: var(--muted); font-size: 13px; margin: 6px 0 10px; }
+.game-card.picked { border-color: var(--accent); }
+.game-card.best { box-shadow: inset 0 0 0 1px var(--up); }
+.game-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.game-total { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.game-total b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.game-tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
+.game-tag.best { color: var(--up); border-color: var(--up); }
+.game-chart .chart { height: 420px; }
+.game-card .strat-trades { max-height: 280px; overflow: auto; }
   @media (max-width: 760px) { .strat { grid-template-columns: 1fr; } }
   /* Strategies on charts: the section's add form, each strategy's remove button, and Find similar. */
   .layerbar .strat-remove { flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); font-size: 11px; cursor: pointer; }
@@ -601,8 +638,7 @@ const TERMS = new Map(DATA.terms.map(t => [t.type, t]));
 const ARROW = { Up: '↑', Down: '↓' };
 const STORE_KEY = 'terms-site:v8';
 const LEVELS = 9;
-const SWINGS = { Up: { name: 'Upswings', layer: 'Upswing', color: '--upswing' }, Down: { name: 'Downswings', layer: 'Downswing', color: '--downswing' } };
-const SWING_DIRECTION = { Upswing: 'Up', Downswing: 'Down' };
+const SWINGS = { Up: { name: 'Upswings', layer: 'Upswing', color: '--upswing' }, Down: { name: 'Downswings', layer: 'Downswing', color: '--downswing' } };const SWING_DIRECTION = { Upswing: 'Up', Downswing: 'Down' };
 const TREND_DIRECTION = { Uptrend: 'Up', Downtrend: 'Down' };
 const STRUCTURE_PAGES = ['Sawtooth', 'InterimSwings', 'Replay', 'Analysis', 'Tour'];
 
@@ -619,13 +655,22 @@ const SECTIONS = [
   { name: 'Candles', layers: [{ id: 'SuccessiveGreenCandles', label: 'Green runs' }, { id: 'SuccessiveRedCandles', label: 'Red runs' }] },
   { name: 'Sawtooth', layers: [{ id: 'sawtooth', label: 'Sawtooth' }] },
   { name: 'Points', layers: ['HigherHigh', 'LowerHigh', 'LowerLow', 'HigherLow'].map(id => ({ id })) },
-  { name: 'Upswings', layers: [{ id: 'Upswing', label: 'Upswing' }, { id: 'BullishBreakOfStructure' }, { id: 'bosLevelUp', label: 'BoS level', term: 'BullishBreakOfStructure' }] },
-  { name: 'Downswings', layers: [{ id: 'Downswing', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' }] },
+  // Overlapping: a Swing against the leg of the level above (see drawOverlapSwings). Narrow, those that run from one of
+  // its legs into the next; general, those inside one leg too.
+  { name: 'Upswings', layers: [{ id: 'Upswing', label: 'Upswing' }, { id: 'BullishBreakOfStructure' }, { id: 'bosLevelUp', label: 'BoS level', term: 'BullishBreakOfStructure' },
+    { id: 'OverlapUp', label: 'Overlapping Upswing (narrow)' }, { id: 'OverlapUpInside', label: 'Overlapping Upswing (general)' }] },
+  { name: 'Downswings', layers: [{ id: 'Downswing', label: 'Downswing' }, { id: 'BearishBreakOfStructure' }, { id: 'bosLevelDown', label: 'BoS level', term: 'BearishBreakOfStructure' },
+    { id: 'OverlapDown', label: 'Overlapping Downswing (narrow)' }, { id: 'OverlapDownInside', label: 'Overlapping Downswing (general)' }] },
   { name: 'Trends', layers: [{ id: 'Uptrend', label: 'Uptrend' }, { id: 'Downtrend', label: 'Downtrend' }, { id: 'trendArrows', label: 'Trend arrows' }] },
   { name: 'Indicators', layers: [{ id: 'BullishMarketStructureBreak' }, { id: 'msbLevelUp', label: 'MSB↑ level', term: 'BullishMarketStructureBreak' },
     { id: 'BearishMarketStructureBreak' }, { id: 'msbLevelDown', label: 'MSB↓ level', term: 'BearishMarketStructureBreak' },
     { id: 'Retracement', label: 'Retracement' }, { id: 'Range', label: 'Range' }, { id: 'rangeBands', label: 'Range bands', term: 'Range' },
-    { id: 'rangeZones', label: 'Range zones', term: 'Range' }] },
+    { id: 'rangeZones', label: 'Range zones', term: 'Range' },
+    // A Range found by Swings: the price inside the last leg of an order while the order after it Confirms a count of
+    // Swings. With the second on, only those with so many Weak Swings among them.
+    { id: 'SwingRange', label: 'Range by Swings', term: 'Range' }, { id: 'swingRangeWeak', label: 'Weak Swings in it', term: 'Range' },
+    // An MSB that closes beyond the turn of a Swing before the last: its box, from so many Swings back.
+    { id: 'DeepMsb', label: 'MSB further back', term: 'BullishMarketStructureBreak' }] },
 ].map(s => ({ ...s, layers: s.layers.map(l => ({ ...l, label: l.label ?? TERMS.get(l.id)?.label ?? l.id })) }));
 // The strategies added to the charts (see Strategies on charts), a layer each, filled in once the page's settings are read.
 const STRATEGY_SECTION = { name: 'Strategies', strategies: true, layers: [] };
@@ -639,7 +684,12 @@ const SETTINGS = {
   Retracement: { key: 'retracement', min: 1, max: 99, fallback: 75, title: 'Least retracement to mark, as a percentage of the move it comes back along', unit: '%', remote: true },
   Range: { key: 'band', min: 0, max: 99, fallback: 20, title: 'Band either side of a range, as a percentage of its height: a close beyond it ends the range', unit: '%', remote: true },
   rangeZones: { key: 'zone', min: 1, max: 49, fallback: 25, title: 'Depth of the buy-low and sell-high zones from the range\'s edges, as a percentage of its height; each zone reaches out to the band', unit: '%' },
+  SwingRange: { key: 'rangeSwings', min: 1, max: 99, fallback: 4, title: 'How many Swings one order finer must be Confirmed inside a leg, with the price between its two ends, for a Range to be found there', unit: '', remote: true },
+  swingRangeWeak: { key: 'rangeWeak', min: 1, max: 99, fallback: 2, title: 'With this on, a Range by Swings is shown only once this many of the Swings inside it are Weak', unit: '' },
 };
+SETTINGS.DeepMsb = { key: 'msbBack', min: 2, max: 64, fallback: 2, title: 'The fewest Swings back an MSB must reach to be shown: 2 is the turn of the Swing before the last', unit: '' };
+// The colour of a Range found by Swings, apart from the Range found by its Retracement.
+const SWING_RANGE_COLOR = '#0e7490';
 const LAYERS = SECTIONS.flatMap(s => s.layers);
 const LEVEL_IDS = LAYERS.filter(l => l.level !== undefined).map(l => l.id);
 const POINT_LAYERS = ['HigherHigh', 'HigherLow', 'LowerHigh', 'LowerLow'];
@@ -725,7 +775,7 @@ function renderNav(active) {
   const nav = document.getElementById('nav');
   // The term pages and their examples are no longer in the bar; their addresses still open them.
   nav.innerHTML = `<h1>Market structure</h1>
-    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}${link('Explore')}${link('Data')}
+    ${link('Chart')}${link('Replay')}${link('Analysis')}${link('Tour')}${link('Strategies')}${link('Explore')}${link('Game')}${link('Data')}
     <span class="foot">Built ${esc(fmtTime(DATA.generated || ''))} UTC</span>`;
   document.documentElement.style.setProperty('--nav-h', `${nav.offsetHeight}px`);
 }
@@ -794,6 +844,13 @@ function swatch(layer) {
   if (layer.id.startsWith('msbLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="1.5 2.5"/>`);
   if (layer.id === 'rangeBands') return svg(`<line x1="1" y1="3" x2="21" y2="3" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/><line x1="1" y1="11" x2="21" y2="11" stroke="${TERMS.get('Range')?.color}" stroke-width="1.5" stroke-dasharray="4 3"/>`);
   if (layer.id === 'rangeZones') return svg(`<rect x="1" y="1" width="20" height="5" fill="${withAlpha(css('--down'), 0.25)}"/><rect x="1" y="8" width="20" height="5" fill="${withAlpha(css('--up'), 0.25)}"/><line x1="1" y1="6" x2="21" y2="6" stroke="${TERMS.get('Range')?.color}" stroke-width="1" stroke-dasharray="3 2"/><line x1="1" y1="8" x2="21" y2="8" stroke="${TERMS.get('Range')?.color}" stroke-width="1" stroke-dasharray="3 2"/>`);
+  if (layer.id === 'SwingRange') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(SWING_RANGE_COLOR, 0.12)}" stroke="${SWING_RANGE_COLOR}" stroke-width="1.5"/>`);
+  if (layer.id.startsWith('Overlap')) {
+    const color = css(layer.id.startsWith('OverlapUp') ? '--upswing' : '--downswing');
+    return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(color, 0.18)}" stroke="${color}" stroke-width="1.5" stroke-dasharray="${layer.id.endsWith('Inside') ? '1.5 2' : '5 2'}"/>`);
+  }
+  if (layer.id === 'DeepMsb') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(css('--upswing'), 0.15)}" stroke="${css('--upswing')}" stroke-width="1.5" stroke-dasharray="5 2"/>`);
+  if (layer.id === 'swingRangeWeak') return svg(`<rect x="2" y="2" width="18" height="10" fill="none" stroke="${SWING_RANGE_COLOR}" stroke-width="1.5"/><path d="M5 9 L9 5 L13 9 L17 5" fill="none" stroke="${SWING_RANGE_COLOR}" stroke-width="1.3"/>`);
   if (layer.id === 'ghostRanges') return svg(`<rect x="2" y="2" width="18" height="10" fill="${withAlpha(css('--close'), 0.1)}" stroke="${css('--close')}" stroke-dasharray="1.5 2"/>`);
   if (layer.id.startsWith('bosLevel')) return svg(`<line x1="1" y1="7" x2="21" y2="7" stroke="${TERMS.get(layer.term)?.color}" stroke-width="2" stroke-dasharray="4 3"/>`);
   const term = TERMS.get(layer.term ?? layer.id);
@@ -803,7 +860,13 @@ function swatch(layer) {
 const setting = id => state.runMin?.[SETTINGS[id].key] ?? SETTINGS[id].fallback;
 const runMin = setting;
 // The range settings the local server is asked for, as part of every replay request.
-const rangeQuery = () => `&retracement=${setting('Retracement')}&band=${setting('Range')}`;
+const rangeQuery = () => `&retracement=${setting('Retracement')}&band=${setting('Range')}&rangeSwings=${setting('SwingRange')}&deepBreaks=true&overlaps=true`;
+// A timeline's market structure breaks apart: those of the last Swing's turn, as every part of the page knows them, and
+// those that go further back (see drawDeepBreaks), which have a layer of their own.
+const splitBreaks = r => r.splitBreaks ??= { plain: (r.marketStructureBreaks ?? []).filter(e => !(e.value.break.back > 1)), deep: (r.marketStructureBreaks ?? []).filter(e => e.value.break.back > 1) };
+// A timeline's Swings apart in the same way: those every part of the page knows, and those against the leg of the level
+// above (see drawOverlapSwings), which have layers of their own and count for nothing else.
+const splitSwings = r => r.splitSwings ??= { plain: (r.swings ?? []).filter(e => !e.value.overlap), overlap: (r.swings ?? []).filter(e => e.value.overlap) };
 
 // One section of the layer bar. Its heading turns the whole section on, or off when it is all on already; the arrow
 // beside it folds the section away, leaving the heading and its count. Folded sections are remembered across pages.
@@ -815,7 +878,11 @@ function layerSection(s, i, foldable = true) {
     : '';
   const button = l => `<button class="layer" data-layer="${l.id}" aria-pressed="${on(l.id)}" title="${esc(TERMS.get(l.term ?? l.id)?.name ?? l.label)}">${swatch(l)}<span class="name">${esc(l.label)}</span></button>`;
   const items = s => s.levels
-    ? `<div class="items levels"><button class="layer text" data-levels="none">None</button>${s.layers.map(button).join('')}<button class="layer text" data-levels="all">All</button></div>`
+    ? `<div class="items levels"><button class="layer text" data-levels="none">None</button>
+        <div class="level-pick"><input type="range" class="level-slide" min="0" max="${s.layers.length - 1}" step="1" data-level-slide="upTo" title="Slide to a level to show every level up to it; the buttons still turn levels on and off" aria-label="Show every level up to one">
+          <div class="level-list">${s.layers.map(button).join('')}</div>
+          <input type="range" class="level-slide" min="0" max="${s.layers.length - 1}" step="1" data-level-slide="alone" title="Slide to a level to show it alone; the buttons still turn levels on and off" aria-label="Show one level alone"></div>
+        <button class="layer text" data-levels="all">All</button></div>`
     : s.strategies ? `<div class="items">${s.layers.map(l => `<div class="item">${button(l)}<button type="button" class="strat-remove" data-strategy-remove="${esc(l.chartStrategy.id)}" title="Take ${esc(l.label)} off the charts" aria-label="Take ${esc(l.label)} off the charts">✕</button></div>`).join('')}${strategyLayerExtras()}</div>`
     : `<div class="items">${s.layers.map(l => `<div class="item">${button(l)}${runInput(l)}</div>`).join('')}</div>`;
   const lead = `<button type="button" class="lead" data-section="${i}" title="Show all or none of ${esc(s.name.toLowerCase())}">${esc(s.name)}<span class="state"></span></button>`;
@@ -829,7 +896,8 @@ function layerSection(s, i, foldable = true) {
 function layerBar() {
   return `<div class="layerbar" role="toolbar" aria-orientation="vertical" aria-label="Chart layers">
     <div class="all-none"><button type="button" data-all="all" title="Show every chart layer (the replay settings, the levels and the price stay as they are)">All</button>
-      <button type="button" data-all="none" title="Hide every chart layer (the replay settings, the levels and the price stay as they are)">None</button></div>
+      <button type="button" data-all="none" title="Hide every chart layer (the replay settings, the levels and the price stay as they are)">None</button>
+      <button type="button" data-list aria-pressed="false" title="List where something occurs: click List, then a layer, for every place it is found in the dataset, each with a button to show it on the chart and one to analyse it">List</button></div>
     ${SECTIONS.map((s, i) => s.levels || (currentPage === 'Chart' && (s.name === 'Replay' || s.name === 'Ghosts')) ? '' : layerSection(s, i)).join('')}</div>`;
 }
 
@@ -863,6 +931,35 @@ function renderLayers() {
 function syncLayerButtons(root = document.querySelector('.layout')) {
   root.querySelectorAll('.layer[data-layer]').forEach(b => b.setAttribute('aria-pressed', on(b.dataset.layer)));
   updateSectionStates(root);
+  syncLevelSlide(root);
+}
+
+// The levels' sliders: the one on the right stands at the level that is on alone, the one on the left at the last of the
+// levels on when they are every level up to it. Otherwise each stays where it was, its circle clear.
+// On the Analysis page the levels on are those of what the analysis tells of, so a level with nothing at the candle is
+// never on: there the slider last moved (analysisSlide) is in use for as long as every level on is one it set.
+let analysisSlide = null, levelSlideTimer = 0;
+const LEVEL_SLIDE_WAIT = 700;
+function syncLevelSlide(root) {
+  const shown = LEVEL_IDS.filter(on), last = LEVEL_IDS.indexOf(shown[shown.length - 1]);
+  const alone = root.querySelector('[data-level-slide="alone"]'), upTo = root.querySelector('[data-level-slide="upTo"]');
+  if (currentPage === 'Analysis' && analysisSlide) {
+    const { name, at } = analysisSlide, set = name === 'upTo' ? LEVEL_IDS.slice(0, at + 1) : [LEVEL_IDS[at]];
+    if (shown.every(id => set.includes(id))) {
+      const used = name === 'upTo' ? upTo : alone, other = name === 'upTo' ? alone : upTo;
+      if (used) used.value = at;
+      used?.classList.add('in-use');
+      other?.classList.remove('in-use');
+      return;
+    }
+    analysisSlide = null;
+  }
+  const one = shown.length === 1, run = shown.length > 0 && shown.length === last + 1;
+  if (alone && one) alone.value = last;
+  if (upTo && run) upTo.value = last;
+  // A slider is in use while the levels on are those it set.
+  alone?.classList.toggle('in-use', one);
+  upTo?.classList.toggle('in-use', run);
 }
 
 // The price is always drawn, as candles, closes or both: turning the last of them off turns the other on.
@@ -880,8 +977,37 @@ function wireLayerBar(root) {
     drawAll(currentPage);
   };
   updateSectionStates(root);
+  syncLevelSlide(root);
+  // Sliding to a level turns it on and every other level off, or on the left slider every level up to it on and the
+  // rest off; a click on a slider where it stands does the same.
+  root.querySelectorAll('[data-level-slide]').forEach(slide => {
+    const pick = () => {
+      const at = Number(slide.value), levels = slide.dataset.levelSlide === 'upTo' ? LEVEL_IDS.slice(0, at + 1) : [LEVEL_IDS[at]];
+      // An analysis can tell of an order finer than the levels here go to: a slider leaves that out too.
+      if (currentPage === 'Analysis') analysisSlide = { name: slide.dataset.levelSlide, at };
+      sync([...layersOf(currentPage).filter(x => currentPage === 'Analysis' ? !/^level\d+$/.test(x) : !LEVEL_IDS.includes(x)), ...levels]);
+    };
+    // On the Analysis page the levels on are the orders the analysis tells of, and it is written again when they change
+    // (see analysisLevelsChanged), so there a slider acts once it has been still a moment, not at every level it passes.
+    const move = () => {
+      clearTimeout(levelSlideTimer);
+      if (currentPage === 'Analysis') levelSlideTimer = setTimeout(pick, LEVEL_SLIDE_WAIT); else pick();
+    };
+    for (const name of ['input', 'change', 'click']) slide.addEventListener(name, move);
+  });
+  // With List on, the next layer clicked is listed (see openOccurrences) and stays as it was.
+  const listing = value => {
+    root.classList.toggle('listing', value);
+    root.querySelectorAll('[data-list]').forEach(b => b.setAttribute('aria-pressed', value));
+  };
+  root.querySelectorAll('[data-list]').forEach(b => b.addEventListener('click', () => listing(!root.classList.contains('listing'))));
   root.querySelectorAll('.layer[data-layer]').forEach(b => b.addEventListener('click', () => {
+    if (root.classList.contains('listing')) {
+      listing(false);
+      return openOccurrences(b.dataset.layer);
+    }
     const id = b.dataset.layer, layers = layersOf(currentPage);
+    if (LEVEL_IDS.includes(id)) analysisSlide = null;
     sync(on(id) ? layers.filter(x => x !== id) : [...layers, id]);
   }));
   root.querySelectorAll('.lead[data-section]').forEach(lead => lead.addEventListener('click', () => {
@@ -895,6 +1021,7 @@ function wireLayerBar(root) {
     sync(b.dataset.all === 'all' ? [...stay, ...LAYERS.map(l => l.id).filter(x => !kept.includes(x))] : stay);
   }));
   root.querySelectorAll('.layer[data-levels]').forEach(b => b.addEventListener('click', () => {
+    analysisSlide = null;
     sync([...layersOf(currentPage).filter(x => !LEVEL_IDS.includes(x)), ...(b.dataset.levels === 'all' ? LEVEL_IDS : [])]);
   }));
   root.querySelectorAll('[data-fold]').forEach(b => b.addEventListener('click', () => {
@@ -1052,9 +1179,22 @@ function shownRetracements(ex) {
     .map(r => ({ ...r, level, reached: r.steps.find(s => s.percent >= min) })).filter(r => r.reached));
 }
 
+// The Ranges found by their Retracement; those found by Swings, which have a count of Swings, are shown by a layer of
+// their own (see shownSwingRanges).
 function shownRangeBoxes(ex) {
-  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.rangesByLevel?.[level] ?? []).map(g => ({ ...g, level })));
+  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.rangesByLevel?.[level] ?? []).filter(g => !g.swings).map(g => ({ ...g, level })));
 }
+
+// The Ranges found by Swings at the levels selected: with Weak Swings in it on, only those with so many Weak Swings.
+function shownSwingRanges(ex) {
+  const weak = on('swingRangeWeak') ? setting('swingRangeWeak') : 0;
+  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.rangesByLevel?.[level] ?? []).filter(g => g.swings && g.weak >= weak).map(g => ({ ...g, level })));
+}
+
+const swingRangeHover = g => `Range by Swings · level ${g.level}<br>${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}: the two ends of the leg` +
+  `<br>identified ${fmtTime(g.identified.time)}` +
+  `<br>${g.swings} ${g.direction === 'Up' ? 'Downswings' : 'Upswings'} one order finer inside it, ${g.weak} Weak` +
+  `<br>${g.end ? `ended ${fmtTime(g.end.time)}, close ${fmtPrice(g.end.price)} ${g.endedAbove ? 'above its high' : 'below its low'}` : 'holds'}`;
 
 const rangeOrigin = g => g.direction === 'Down' ? 'a downtrend' : 'an uptrend';
 const rangeHover = g => `Range · level ${g.level} · out of ${rangeOrigin(g)}<br>${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}` +
@@ -1066,22 +1206,75 @@ const rangeHover = g => `Range · level ${g.level} · out of ${rangeOrigin(g)}<b
 // between its low and high, with its bands as dashed lines beyond. The zones are the training's discount and premium:
 // the buy-low zone from the lower band up to the zone setting above the low, the sell-high zone from as far below the
 // high up to the upper band.
-function drawRanges(ex, traces) {
-  if (!on('Range') && !on('rangeBands') && !on('rangeZones')) return;
+function drawRanges(ex, traces, swingBox) {
   const last = ex.prices.t[ex.prices.t.length - 1];
+  // A Range found by Swings is its box alone: it has no band, and ends at a close beyond the box. The Swings one order
+  // finer that it was found by are drawn with it, those inside its leg and no others, whether or not their level is on.
+  for (const g of on('SwingRange') ? shownSwingRanges(ex) : []) {
+    ex.levelsDrawn?.add(g.level);
+    drawRange(traces, g, g.end?.time ?? last, { box: true, bands: false, zones: null, hover: swingRangeHover(g), color: SWING_RANGE_COLOR, name: 'Range by Swings' });
+    for (const w of swingBox ? g.inner ?? [] : []) traces.push({ ...swingBox(w, false), lv: g.level });
+  }
+  if (!on('Range') && !on('rangeBands') && !on('rangeZones')) return;
   for (const g of shownRangeBoxes(ex)) {
     ex.levelsDrawn?.add(g.level);
     drawRange(traces, g, g.end?.time ?? last, { box: on('Range'), bands: on('rangeBands') || on('rangeZones'), zones: on('rangeZones') ? setting('rangeZones') : null });
   }
 }
 
+// A market structure break that goes further back than the last Swing: the counter-move after a run of Swings has closed
+// beyond the turns of the last so many of them. Shown from as many Swings back as the layer's number.
+const DEEP_BREAK_COLOR = '#ca8a04';
+function shownDeepBreaks(ex) {
+  const least = setting('DeepMsb');
+  return [...selectedLevels(ex)].sort((a, b) => a - b).flatMap(level => (ex.deepBreaksByLevel?.[level] ?? []).filter(m => m.back >= least).map(m => ({ ...m, level })));
+}
+
+const deepBreakSays = m => `${m.type === 'BullishMarketStructureBreak' ? 'Bullish' : 'Bearish'} MSB, ${m.back} of ${m.of} ${m.type === 'BullishMarketStructureBreak' ? 'Downswings' : 'Upswings'} back`;
+
+// It is drawn as the Swing it has the shape of: from the turn it closed beyond, to where the counter-move began, to the
+// close, which is where a Swing that began at that turn would have its BoS. An Upswing for a Bullish one.
+function drawDeepBreaks(ex, traces, swingBox) {
+  if (!on('DeepMsb') || !swingBox) return;
+  for (const m of shownDeepBreaks(ex)) {
+    ex.levelsDrawn?.add(m.level);
+    const bullish = m.type === 'BullishMarketStructureBreak', bos = TERMS.get(bullish ? 'BullishBreakOfStructure' : 'BearishBreakOfStructure');
+    const hover = `${deepBreakSays(m)} · level ${m.level}<br>close ${fmtPrice(m.break.price)} at ${fmtTime(m.break.time)}, ${bullish ? 'above' : 'below'} the turn of ${fmtPrice(m.reference.price)} at ${fmtTime(m.reference.time)}` +
+      `<br>the counter-move began at ${fmtPrice(m.far.price)}, ${fmtTime(m.far.time)}<br>the earliest Swing taken back starts ${fmtTime(m.from.time)}<extra></extra>`;
+    traces.push({ ...swingBox({ level: m.level, direction: bullish ? 'Up' : 'Down', start: m.reference, end: m.break, extreme: m.far }, false), name: 'MSB further back', hovertemplate: hover });
+    if (bos) traces.push({ lv: m.level, type: 'scatter', mode: 'markers+text', name: bos.label, x: [m.break.time], y: [m.break.price],
+      marker: { color: bos.color, symbol: bos.symbol, size: 10, line: { width: 1, color: css('--panel') } },
+      text: [`${bos.label} ${m.back} back`], textposition: bullish ? 'top center' : 'bottom center', textfont: { size: 11, color: css('--muted') }, hovertemplate: hover });
+  }
+}
+
+// A Swing against the leg of the level above, which the structure leaves out (see OverlappingSwings): drawn as a Swing,
+// with a dashed or dotted border, when its layer is on. Narrow ones run from one leg of the level above into the next; general ones
+// lie inside the one leg as well.
+function drawOverlapSwings(ex, traces, swingBox) {
+  if (!swingBox) return;
+  const layerOf = w => `Overlap${w.direction}${w.overlap === 'inside' ? 'Inside' : ''}`;
+  for (const level of [...selectedLevels(ex)].sort((a, b) => a - b)) {
+    for (const w of (ex.overlapSwingsByLevel?.[level] ?? []).filter(w => on(layerOf(w)) && wideEnough(ex, w.start.time, w.end.time))) {
+      ex.levelsDrawn?.add(level);
+      const name = `Overlapping ${w.direction === 'Up' ? 'Upswing' : 'Downswing'} (${w.overlap === 'inside' ? 'general' : 'narrow'})`;
+      const box = swingBox(w, false);
+      // As a Swing is drawn, its border the level's colour, dashed for a narrow one and dotted for a general one.
+      traces.push({ ...box, name, line: { ...box.line, dash: w.overlap === 'inside' ? 'dot' : 'dash' },
+        hovertemplate: `${name} · level ${w.level}<br>${fmtTime(w.start.time)} → BoS ${fmtTime(w.end.time)}<br>${w.direction === 'Up' ? 'high' : 'low'} ${fmtPrice(w.start.price)} · ` +
+          `${w.direction === 'Up' ? 'low' : 'high'} ${fmtPrice(w.extreme.price)} at ${fmtTime(w.extreme.time)} · BoS ${fmtPrice(w.breakOfStructure.price)}<extra></extra>` });
+    }
+  }
+}
+
 // One Range's box, zones and bands, from the candle that identified it until a time: the parts asked for, the zones as
 // deep as given, as a percentage of the Range's height. The Ranges of a chart and the Range a trade's entry condition
 // held (see drawStrategies) are drawn by it alike.
-function drawRange(into, g, until, { box: boxed, bands, zones, hover = rangeHover(g) }) {
+function drawRange(into, g, until, { box: boxed, bands, zones, hover, color, name }) {
+  hover ??= rangeHover(g);
   // Each of its traces says the Range's sawtooth level (see Level in focus).
   const traces = { push: t => into.push({ lv: g.level, ...t }) };
-  const term = TERMS.get('Range'), height = g.high.price - g.low.price;
+  const term = { ...TERMS.get('Range'), ...(color ? { color } : {}), ...(name ? { name } : {}) }, height = g.high.price - g.low.price;
   const box = (a, b) => ({ x: [g.identified.time, until, until, g.identified.time, g.identified.time], y: [a, a, b, b, a] });
   if (zones != null) {
     const depth = Math.round(zones * 100) / 100, buyTop = g.low.price + height * zones / 100, sellBottom = g.high.price - height * zones / 100;
@@ -1276,9 +1469,10 @@ let player = null;
 
 // ---- Local server --------------------------------------------------------------------------------------------------
 // Served by build-site.ps1 -Serve, the page can also replay datasets too long to build into it. The server returns the same
-// timeline shape in batches of candles; the page caches them, fetches ahead while playing, and shows a moving window.
-const REMOTE_BATCH = 50, REMOTE_FUTURE = 48, REMOTE_AHEAD = 25;
-// How much history a long replay shows before the cursor; the server keeps up to a month (744 candles) per batch.
+// timeline shape in batches of candles; the page caches them and fetches ahead while playing. A batch goes back a month
+// (REMOTE_KEPT candles) before its first candle: what ended before that it leaves out (see olderStructure).
+const REMOTE_BATCH = 50, REMOTE_FUTURE = 48, REMOTE_AHEAD = 25, REMOTE_KEPT = 744;
+// How much history a long replay opens on before the cursor, until its view is taken elsewhere.
 const REPLAY_WINDOWS = [{ label: '1 day', candles: 24 }, { label: '1 week', candles: 168 }, { label: '2 weeks', candles: 336 }, { label: '1 month', candles: 720 }];
 const replayWindow = () => REPLAY_WINDOWS.find(w => w.candles === state.replayWindow)?.candles ?? 336;
 let serverOn = false;
@@ -1361,9 +1555,9 @@ function trendSoFar(tr, time) {
 // While a tour that has a known candle plays, as an analysis does, the structure is the one its texts are written from (as
 // known there), drawn a part at a time: each part once the cursor has reached its candle, so the sawtooth, points and Swings
 // come as the run goes.
-// A section that tells of a strategy's market structure steps shows the structure each was read from: that of a chart of
-// the last candles to the candle that met it (the section's "structure", a { from, at } for each such step), not of the
-// chart from its own first candle. The step the cursor has yet to reach is the one shown; null past the last, or when the
+// A section that tells of a strategy's market structure steps shows the structure each was read from: that known at the
+// candle that met it (the section's "structure", a { from, at } for each such step, from being the first candle its chart
+// has, 0 for the example's own). The step the cursor has yet to reach is the one shown; null past the last, or when the
 // section has none.
 function structureWindow(ex, t) {
   if (!ex.tour || tour?.ex !== ex) return null;
@@ -1391,12 +1585,15 @@ function knownStretch(ex) {
   if (tour?.ex !== ex || tour.page !== 'Analysis' || tour.known == null || !isRemote(ex)) return null;
   const s = tourSection(), level = revealLevel();
   if (!s || !Number.isFinite(level) || s.structure) return null;
-  const from = Math.max(0, Math.floor((Math.min(s.from, s.view[0]) - 48) / 500) * 500), key = `${from}|${level}${rangeQuery()}`;
+  const from = Math.max(0, Math.floor((Math.min(s.from, s.view[0]) - 48) / 500) * 500);
+  // Only the candles the chapter runs through are asked for: seen from long after, as a Trend found among the dataset's
+  // is from its last candle, the candles between are years of structure the chapter never draws.
+  const to = Math.min(tour.known, Math.ceil((Math.max(s.until ?? s.from, s.view[1]) + 48) / 500) * 500), key = `${from}|${to}|${level}${rangeQuery()}`;
   const kept = tour.stretches ??= new Map();
   if (!kept.has(key)) {
     const mine = tour;
     kept.set(key, null);
-    fetch(`api/complete?dataset=${encodeURIComponent(ex.dataset)}&from=${from}&to=${mine.known}&at=${mine.known}&maxLevel=${level}&narrowest=0${rangeQuery()}`)
+    fetch(`api/complete?dataset=${encodeURIComponent(ex.dataset)}&from=${from}&to=${to}&at=${mine.known}&maxLevel=${level}&narrowest=0${rangeQuery()}`)
       .then(r => r.ok ? r.json() : Promise.reject(new Error(r.statusText))).then(batch => {
         // A server from before stretches as known at a candle gives the whole dataset's in hindsight: not this one's.
         if (batch.from !== mine.known) return;
@@ -1409,25 +1606,90 @@ function knownStretch(ex) {
   return kept.get(key);
 }
 
+// What a whole dataset's replay draws of what ended before the candles its batch goes back to, when its view reaches
+// there: the stretch in view as known at the cursor (api/complete), each kind by level as liveView shapes them, with what
+// is too narrow to see at the view's zoom left out as on the Chart. The batch has everything that ended later, exactly
+// as known at each candle; this is fetched again when the cursor reaches another batch or the view goes beyond it, so
+// until it comes it can be as known up to two batches away. Null when the view needs none of it or it has not come.
+const STRETCH_KEEPS = 2 * REMOTE_BATCH;
+function olderStructure(ex, t, window) {
+  const batch = loadedBatch(ex, t);
+  if (!batch || ex.noStretch) return null;
+  const keptFrom = Math.max(0, batch.from - REMOTE_KEPT), query = rangeQuery();
+  const el = [...document.querySelectorAll('.chart')].find(e => e.dataset.id === ex.id);
+  const need = drawnStretch({ ...ex, window }, el), candle = ex.prices.t.length > 1 ? Date.parse(ex.prices.t[1]) - Date.parse(ex.prices.t[0]) : 3600000;
+  if (need.from >= keptFrom) return null;
+  const narrowest = Math.floor((need.x1 - need.x0) / need.across * NARROWEST_DRAWN / candle), upTo = Math.min(keptFrom, need.to);
+  const has = ex.stretch, covers = has && has.query === query && has.from <= need.from && has.to >= upTo && has.narrowest <= narrowest;
+  if (!ex.stretching && !(covers && batchStart(has.at) === batch.from)) {
+    const beside = Math.ceil((need.to - need.from) * FETCHED_BESIDE);
+    const asked = ex.stretching = { query, at: t, from: Math.max(0, need.from - beside), to: Math.min(t, keptFrom + STRETCH_KEEPS, need.to + beside), narrowest: Math.floor(narrowest / FETCHED_NARROWER) };
+    fetch(`api/complete?dataset=${encodeURIComponent(ex.dataset)}&from=${asked.from}&to=${asked.to}&at=${asked.at}&narrowest=${asked.narrowest}${query}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(r.statusText))).then(reply => {
+        if (ex.stretching !== asked) return;
+        ex.stretching = null;
+        // A server from before stretches as known at a candle gives the dataset's in hindsight: not asked for again.
+        if (reply.from !== asked.at) { ex.noStretch = true; return; }
+        ex.stretch = { ...asked, timeline: reply.timeline };
+        if (currentPage === 'Replay') redrawExample(ex);
+      }).catch(() => { if (ex.stretching === asked) ex.stretching = null; });
+  }
+  if (!covers || Math.abs(has.at - t) > STRETCH_KEEPS) return null;
+  if (has.older?.keptFrom === keptFrom) return has.older;
+  const r = has.timeline, holds = holdsAt(has.at), kept = ex.prices.t[keptFrom];
+  const byLevel = (entries, value, ended) => {
+    const out = [];
+    for (const e of entries ?? []) if (holds(e) && ended(value(e.value))) (out[e.value.level] ??= []).push(value(e.value));
+    return out;
+  };
+  return has.older = { keptFrom,
+    pivots: byLevel(r.pivots, v => v.pivot, p => p.index < keptFrom),
+    swings: byLevel(splitSwings(r).plain, v => v, w => w.end.time < kept),
+    overlapSwings: byLevel(splitSwings(r).overlap, v => v, w => w.end.time < kept),
+    points: byLevel(r.points, v => v, p => p.time < kept),
+    marketStructureBreaks: byLevel(splitBreaks(r).plain, v => v.break, m => m.break.time < kept),
+    deepBreaks: byLevel(splitBreaks(r).deep, v => v.break, m => m.break.time < kept),
+    trends: byLevel(r.trends, v => v, tr => tr.end != null && tr.end.time < kept),
+    retracements: byLevel(r.retracements, v => v, v => (v.steps[v.steps.length - 1]?.point ?? v.to).time < kept),
+    ranges: byLevel(r.ranges, v => v, g => g.end != null && g.end.time < kept),
+    candleRuns: r.candleRuns.filter(holds).map(e => e.value).filter(run => run.end.time < kept) };
+}
+
+// Each level's list with the older ones of its kind before it, one the list already has left out.
+function withOlder(older, lists, key) {
+  if (!older) return lists;
+  const out = [];
+  for (let level = 0; level < Math.max(older.length, lists.length); level++) {
+    if (!older[level] && !lists[level]) continue;
+    const mine = lists[level] ?? [], has = new Set(mine.map(key));
+    out[level] = [...(older[level] ?? []).filter(v => !has.has(key(v))), ...mine];
+  }
+  return out;
+}
+
 function liveView(ex, t) {
   // A structure step's chart counts its candles from where it begins: shift on from the example's own.
-  const win = structureWindow(ex, t), src = win ? windowExample(ex, win.from) : ex, shift = win?.from ?? 0;
+  const win = structureWindow(ex, t), src = win?.from ? windowExample(ex, win.from) : ex, shift = win?.from ?? 0;
+  // A whole dataset replayed, as the Replay page does: its chart is drawn as the Chart's is, around its view wherever
+  // that is taken (see clipToView), with every candle to the cursor.
+  const whole = !ex.tour && isRemote(ex);
   const told = win ? win.at : tour?.ex === ex && tour.known != null && t <= tour.known && timelineAt(ex, tour.known) ? tour.known : null;
   // A thing an analysis tells of can have begun long before the candles a replay's batch goes back to: its stretch is
   // then asked for as known at the analysis's cursor (see knownStretch), the batch's drawn until it has come.
   const reveal = told != null, r = (!win && reveal ? knownStretch(ex) : null) ?? timelineAt(src, (told ?? t) - shift), holds = holdsAt((told ?? t) - shift), time = ex.prices.t[t];
-  // A long replay shows a moving window: recent candles up to the cursor, and a little of what is to come.
+  // A long replay opens on the recent candles up to the cursor, and a little of what is to come.
   const window = ex.tour ? tourWindow(ex, t)
     : isRemote(ex) ? { from: Math.max(0, t - replayWindow()), to: Math.min(ex.prices.t.length - 1, t + REMOTE_FUTURE) } : null;
-  // A tour's chart has every candle of its scene before the cursor, to pan to, as only what is in view is painted.
-  const cut = a => a.slice(ex.tour ? 0 : window?.from ?? 0, t + 1);
+  // A chart has every candle before the cursor, to pan to, as only what is in view is painted.
+  const cut = a => a.slice(0, t + 1);
   const prices = { t: cut(ex.prices.t), o: cut(ex.prices.o), h: cut(ex.prices.h), l: cut(ex.prices.l), c: cut(ex.prices.c) };
   // With every candle there, their times are read once for the dataset and not at every draw (see timesOf).
   if (ex.tour) prices.ms =timesOf(ex).subarray(0, t + 1);
+  const complete = ex.complete || whole;
   if (!r) {
     if (win) fetchBatch(src, win.at - shift).then(batch => batch && redrawExample(ex));
     else prefetch(ex, t);
-    return { ...ex, hindsight: ex, cursor: t, window, loading: true, timeline: null, prices, sawtooth: [], swingsByLevel: [], pointsByLevel: [],
+    return { ...ex, complete, hindsight: ex, cursor: t, window, loading: true, timeline: null, prices, sawtooth: [], swingsByLevel: [], pointsByLevel: [],
       marketStructureBreaksByLevel: [], trendsByLevel: [], candidatesByLevel: [], retracementsByLevel: [], rangesByLevel: [], candleRuns: [], liveByLevel: null };
   }
   const byLevel = (entries, value) => {
@@ -1437,23 +1699,28 @@ function liveView(ex, t) {
   };
   const reached = (list, when) => reveal ? list.filter(v => when(v) <= time) : list;
   const open = v => reveal && v.end && v.end.time > time ? { ...v, end: null } : v;
-  const sawtooth = byLevel(r.pivots, v => v.pivot).map(pivots => {
+  const older = whole ? olderStructure(ex, t, window) : null;
+  const sawtooth = byLevel(r.pivots, v => v.pivot).map((pivots, level) => {
     if (reveal) pivots = pivots.filter(p => p.index + shift <= t);
     if (!pivots.length) return [];
     pivots.sort((a, b) => a.index - b.index);
+    // A level's line runs on back through its older highs and lows.
+    if (older?.pivots[level]) pivots = [...older.pivots[level].filter(p => p.index < pivots[0].index).sort((a, b) => a.index - b.index), ...pivots];
     const out = pivots.map(p => ({ kind: p.kind, time: p.time, price: p.price, confirmedTime: p.confirmedIndex != null ? ex.prices.t[p.confirmedIndex + shift] : null }));
     // The timeline leaves out the current price: it is this candle's close, unless the level already ends here.
     if (pivots[pivots.length - 1].index + shift < t) out.push({ kind: 'Current', time, price: ex.prices.c[t], confirmedTime: null });
     return out;
   });
-  return {
-    ...ex, hindsight: ex, cursor: t, window, timeline: reveal ? timelineAt(ex, t) ?? r : r,
+  const view = {
+    ...ex, complete, hindsight: ex, cursor: t, window, timeline: reveal ? timelineAt(ex, t) ?? r : r,
     prices,
     sawtooth,
     // A Swing comes at its BoS; one of a coarser level than the section's own, which holds it, as soon as it has begun.
-    swingsByLevel: byLevel(r.swings, v => v).map((list, level) => reached(list, w => (level < revealLevel() ? w.start : w.breakOfStructure ?? w.end ?? w.start).time).sort((a, b) => a.start.time.localeCompare(b.start.time))),
+    overlapSwingsByLevel: byLevel(splitSwings(r).overlap, v => v).map(list => reached(list, w => w.breakOfStructure.time)),
+    swingsByLevel: byLevel(splitSwings(r).plain, v => v).map((list, level) => reached(list, w => (level < revealLevel() ? w.start : w.breakOfStructure ?? w.end ?? w.start).time).sort((a, b) => a.start.time.localeCompare(b.start.time))),
     pointsByLevel: byLevel(r.points, v => v).map(list => reached(list, p => p.time).sort((a, b) => a.time.localeCompare(b.time))),
-    marketStructureBreaksByLevel: byLevel(r.marketStructureBreaks, v => v.break).map(list => reached(list, m => m.break.time)),
+    marketStructureBreaksByLevel: byLevel(splitBreaks(r).plain, v => v.break).map(list => reached(list, m => m.break.time)),
+    deepBreaksByLevel: byLevel(splitBreaks(r).deep, v => v.break).map(list => reached(list, m => m.break.time)),
     // A Trend grows as its Swings are reached: the count, Strength and arrow are of the Swings whose BoS the cursor has
     // passed, so it reads two, then three, and so on, rather than what it had by the analysis's cursor.
     trendsByLevel: byLevel(r.trends, v => v).map(list => reached(list, tr => tr.confirmed.time).map(open).map(tr => reveal ? trendSoFar(tr, time) : tr)),
@@ -1464,10 +1731,22 @@ function liveView(ex, t) {
     candleRuns: reached(r.candleRuns.filter(holds).map(e => e.value), run => run.end.time),
     liveByLevel: ex.liveByLevel?.map(events => events.filter(e => e.time <= time)),
   };
+  if (!older) return view;
+  const byStart = (a, b) => a.start.time.localeCompare(b.start.time), started = v => `${v.direction}|${v.start.time}`;
+  return { ...view,
+    swingsByLevel: withOlder(older.swings, view.swingsByLevel, started).map(list => list.sort(byStart)),
+    pointsByLevel: withOlder(older.points, view.pointsByLevel, p => `${p.kind}|${p.time}`).map(list => list.sort((a, b) => a.time.localeCompare(b.time))),
+    marketStructureBreaksByLevel: withOlder(older.marketStructureBreaks, view.marketStructureBreaksByLevel, m => `${m.type}|${m.break.time}`),
+    deepBreaksByLevel: withOlder(older.deepBreaks ?? [], view.deepBreaksByLevel, m => `${m.type}|${m.break.time}|${m.back}`),
+    overlapSwingsByLevel: withOlder(older.overlapSwings ?? [], view.overlapSwingsByLevel, started),
+    trendsByLevel: withOlder(older.trends, view.trendsByLevel, started),
+    retracementsByLevel: withOlder(older.retracements, view.retracementsByLevel, v => `${v.direction}|${v.from.time}|${v.to.time}`),
+    rangesByLevel: withOlder(older.ranges, view.rangesByLevel, g => `${g.swings ? 'swings|' : ''}${g.direction}|${g.identified.time}`),
+    candleRuns: withOlder([older.candleRuns], [view.candleRuns], run => `${run.green}|${run.start.time}`)[0] };
 }
 
 // Candidates, ghosts, future candles, unbroken protective levels, the cursor line and the selected log entry.
-function drawReplayExtras(ex, traces, level) {
+function drawReplayExtras(ex, traces, level, asCloses) {
   const t = ex.cursor, full = ex.hindsight, r = ex.timeline, now = full.prices.t[t];
   // The cursor is a faint dotted line, so the wick of the candle it stands on shows through it.
   const shapes = [{ type: 'line', xref: 'x', yref: 'paper', x0: now, x1: now, y0: 0, y1: 1, layer: 'below',
@@ -1475,8 +1754,11 @@ function drawReplayExtras(ex, traces, level) {
   const box = (start, end, a, b) => ({ x: [start, end, end, start, start], y: [a, a, b, b, a] });
 
   if (on('future') && t + 1 < full.prices.t.length) {
-    const rest = a => a.slice(t + 1, ex.window && !ex.tour ? ex.window.to + 1 : undefined), grey = css('--close');
-    traces.push({ type: 'candlestick', name: 'Future', x: rest(full.prices.t), ...(ex.tour ? { xms: timesOf(full).subarray(t + 1) } : {}), open: rest(full.prices.o), high: rest(full.prices.h), low: rest(full.prices.l), close: rest(full.prices.c),
+    // Every candle after the cursor; on a chart drawn around its view (see clipToView), those of what is drawn, as the
+    // line of their closes where the chart's own candles are.
+    const rest = a => ex.drawn ? a.slice(Math.max(t + 1, ex.drawn.from), ex.drawn.to + 1) : a.slice(t + 1), grey = css('--close');
+    if (asCloses) traces.push({ type: 'scatter', mode: 'lines', name: 'Future', x: rest(full.prices.t), y: rest(full.prices.c), opacity: 0.5, line: { color: grey, width: 1.2 }, hoverinfo: 'skip' });
+    else traces.push({ type: 'candlestick', name: 'Future', x: rest(full.prices.t), ...(ex.tour ? { xms: timesOf(full).subarray(t + 1) } : {}), open: rest(full.prices.o), high: rest(full.prices.h), low: rest(full.prices.l), close: rest(full.prices.c),
       opacity: 0.3, increasing: { line: { color: grey, width: 1 }, fillcolor: withAlpha(grey, 0.3) }, decreasing: { line: { color: grey, width: 1 }, fillcolor: withAlpha(grey, 0.6) }, hoverinfo: 'skip' });
   }
   if (!r) return shapes;
@@ -1496,7 +1778,7 @@ function drawReplayExtras(ex, traces, level) {
   // Protective levels that have not broken yet run on to the cursor, at every level selected.
   // A whole dataset's chart has only the Swings and breaks of the stretch it draws, and of those only what is wide enough
   // to see, so the last Swing it has may not be the level's last, nor its break among the breaks it has. There a level
-  // is drawn only when the stretch reaches the last candle, and no close since has gone beyond it.
+  // is drawn only when the stretch reaches the cursor, the last candle on the Chart, and no close since has gone beyond it.
   const levels = selectedLevels(ex), partial = !!ex.drawn, closes = full.prices.c;
   const brokenSince = (time, price, dir) => {
     let lo = 0, hi = full.prices.t.length;
@@ -1505,7 +1787,7 @@ function drawReplayExtras(ex, traces, level) {
     return false;
   };
   for (const [layer, dir, type] of [['msbLevelDown', 'Up', 'BearishMarketStructureBreak'], ['msbLevelUp', 'Down', 'BullishMarketStructureBreak']]) {
-    if (!on(layer) || (partial && ex.drawn.to < full.prices.t.length - 1)) continue;
+    if (!on(layer) || (partial && ex.drawn.to < t)) continue;
     for (const l of levels) {
       const latest = (ex.swingsByLevel?.[l] ?? []).filter(w => w.direction === dir)
         .sort((a, b) => a.breakOfStructure.time.localeCompare(b.breakOfStructure.time)).pop();
@@ -1522,7 +1804,7 @@ function drawReplayExtras(ex, traces, level) {
   {
     const grey = css('--close'), removed = e => e.ended === 'Removed' && e.until <= t, gone = e => e.value.level === level && removed(e);
     const when = e => fmtTime(full.prices.t[e.until]);
-    for (const e of on('ghostSwings') ? r.swings.filter(e => swingLevels(ex).includes(e.value.level) && removed(e)) : []) {
+    for (const e of on('ghostSwings') ? splitSwings(r).plain.filter(e => swingLevels(ex).includes(e.value.level) && removed(e)) : []) {
       const w = e.value;
       traces.push({ type: 'scatter', mode: 'lines', fill: 'toself', hoveron: 'fills+points', name: 'Ghost swing', ...box(w.start.time, w.end.time, w.start.price, w.extreme.price),
         line: { color: grey, width: 1, dash: 'dot' }, fillcolor: withAlpha(grey, 0.08),
@@ -1536,7 +1818,7 @@ function drawReplayExtras(ex, traces, level) {
     }
     // A market structure break that left one level is often found at the next: its ghost is then drawn larger, around the
     // one that is there now.
-    const msbs = on('ghostMsbs') ? r.marketStructureBreaks.filter(e => levels.includes(e.value.level) && removed(e)) : [];
+    const msbs = on('ghostMsbs') ? splitBreaks(r).plain.filter(e => levels.includes(e.value.level) && removed(e)) : [];
     const there = new Set(shownMarketStructureBreaks(ex).map(m => `${m.type}|${m.break.time}`));
     if (msbs.length) traces.push({ type: 'scatter', mode: 'markers', name: 'Ghost MSB', x: msbs.map(e => e.value.break.break.time), y: msbs.map(e => e.value.break.break.price),
       marker: { symbol: msbs.map(e => TERMS.get(e.value.break.type).symbol), size: msbs.map(e => there.has(`${e.value.break.type}|${e.value.break.break.time}`) ? 27 : 15),
@@ -1627,7 +1909,7 @@ function timelineEvents(ex, r, cacheId, level) {
     else if (before.label !== p.label) add({ at: e.from, ...tag(p.type), text: `${before.label} became ${p.label}: ${fmtPrice(p.price)}`, times: [before.time, p.time] }, e);
     else if (before.time !== p.time) add({ at: e.from, ...tag(p.type), text: `${p.label} moved to ${fmtPrice(p.price)}`, times: [before.time, p.time] }, e);
   }
-  for (const e of r.swings.filter(at(level)).filter(e => !e.continued)) {
+  for (const e of splitSwings(r).plain.filter(at(level)).filter(e => !e.continued)) {
     const w = e.value, type = w.direction === 'Up' ? 'BullishBreakOfStructure' : 'BearishBreakOfStructure';
     add({ at: e.from, ...tag(type), text: `${swingName(w.direction)} confirmed: close ${fmtPrice(w.breakOfStructure.price)} ${w.direction === 'Up' ? 'above the high' : 'below the low'} ${fmtPrice(w.start.price)}`,
       times: [w.start.time, w.breakOfStructure.time], swing: w }, e);
@@ -1638,7 +1920,7 @@ function timelineEvents(ex, r, cacheId, level) {
     const c = e.value;
     add({ at: e.until, label: '✕', color: css('--muted'), removal: true, text: `candidate ${swingName(c.direction)} from ${fmtPrice(c.start.price)} abandoned`, times: [c.start.time] });
   }
-  for (const e of r.marketStructureBreaks.filter(at(level)).filter(e => !e.continued)) {
+  for (const e of splitBreaks(r).plain.filter(at(level)).filter(e => !e.continued)) {
     const m = e.value.break, bullish = m.type === 'BullishMarketStructureBreak';
     add({ at: e.from, ...tag(m.type), text: `close ${fmtPrice(m.break.price)} ${bullish ? 'above the protective high' : 'below the protective low'} ${fmtPrice(m.reference.price)}`, times: [m.break.time] }, e);
   }
@@ -1661,6 +1943,13 @@ function timelineEvents(ex, r, cacheId, level) {
   }
   for (const e of (r.ranges ?? []).filter(at(level))) {
     const g = e.value;
+    // A Range found by Swings says so, and only while its layer is on.
+    if (g.swings) {
+      if (!on('SwingRange')) continue;
+      if (!e.continued) add({ at: e.from, ...tag('Range'), text: `range by Swings: ${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}, the leg's two ends, with ${g.swings} Swings one order finer inside it`, times: [g.identified.time] }, e);
+      else if (g.end && g.end.time === T(e.from)) add({ at: e.from, ...tag('Range'), text: `range by Swings ended: close ${fmtPrice(g.end.price)} ${g.endedAbove ? 'above its high' : 'below its low'}`, times: [g.identified.time, g.end.time] }, e);
+      continue;
+    }
     if (!e.continued) add({ at: e.from, ...tag('Range'), text: `range out of ${rangeOrigin(g)}: ${fmtPrice(g.low.price)} to ${fmtPrice(g.high.price)}, after a ${g.retracement}% retracement broke structure`, times: [g.identified.time] }, e);
     else if (g.end && g.end.time === T(e.from)) add({ at: e.from, ...tag('Range'), text: `range ended: close ${fmtPrice(g.end.price)} ${g.endedAbove ? 'above' : 'below'} the band`, times: [g.identified.time, g.end.time] }, e);
   }
@@ -1717,6 +2006,16 @@ function moveTo(ex, index) {
   redrawExample(ex);
 }
 
+// Replay from here, on a candle's card: the cursor goes to the candle and the chart stays where it is, so the candles
+// after it are cleared from under the view and the steps from there fill it again. A chart still on the view it opened
+// with, which follows the cursor, is held to what it shows now.
+function replayFrom(ex, index) {
+  stopPlaying();
+  const el = document.querySelector(`.chart[data-id="${CSS.escape(ex.id)}"]`);
+  if (!zooms.get(ex.id)?.x && el?._fullLayout) zooms.set(ex.id, { ...zooms.get(ex.id), x: el._fullLayout.xaxis.range.map(v => new Date(axisTime(v)).toISOString()) });
+  moveTo(ex, index);
+}
+
 // Finds the next (or previous) event in a long replay, loading batches until one turns up.
 async function seekEvent(ex, from, forward) {
   for (let start = batchStart(from), tries = 0; start >= 0 && start < ex.prices.t.length && tries < 20; start += forward ? REMOTE_BATCH : -REMOTE_BATCH, tries++) {
@@ -1770,7 +2069,11 @@ function go(action) {
 
 function play(ex) {
   stopPlaying();
-  if (cursorOf(ex) >= ex.prices.t.length - 1) moveTo(ex, 0);
+  // A snippet at its end plays again from its start; a whole dataset, which opens at its last candle, has no more to play.
+  if (cursorOf(ex) >= ex.prices.t.length - 1) {
+    if (isRemote(ex)) return;
+    moveTo(ex, 0);
+  }
   player = { id: ex.id, timer: setInterval(() => {
     const i = cursorOf(ex);
     if (i >= ex.prices.t.length - 1) return stopPlaying();
@@ -2200,6 +2503,8 @@ function clipToView(ex, el) {
     swingsByLevel: each(ex.swingsByLevel, s => overlaps(s.start.time, s.end.time)),
     pointsByLevel: each(ex.pointsByLevel, p => within(p.time)),
     marketStructureBreaksByLevel: each(ex.marketStructureBreaksByLevel, m => overlaps(m.reference.time, m.break.time)),
+    deepBreaksByLevel: each(ex.deepBreaksByLevel ?? [], m => overlaps(m.from.time, m.break.time)),
+    overlapSwingsByLevel: each(ex.overlapSwingsByLevel ?? [], s => overlaps(s.start.time, s.end.time)),
     trendsByLevel: each(ex.trendsByLevel, t => overlaps(t.start.time, t.end?.time ?? last)),
     retracementsByLevel: each(ex.retracementsByLevel, r => overlaps(r.from.time, r.steps[r.steps.length - 1]?.point.time ?? r.to.time)),
     rangesByLevel: each(ex.rangesByLevel, g => overlaps(g.identified.time, g.end?.time ?? last)),
@@ -2319,7 +2624,9 @@ function draw(el, ex, focus) {
   drawCandleRuns(ex, labels, traces);
   drawTrendArrows(ex, labels);
   drawTourLines(ex, labels);
-  drawRanges(ex, traces);
+  drawRanges(ex, traces, swingBox);
+  drawDeepBreaks(ex, traces, swingBox);
+  drawOverlapSwings(ex, traces, swingBox);
   drawSawtooth(ex, traces);
   drawStrategies(ex, traces);
 
@@ -2420,7 +2727,7 @@ function draw(el, ex, focus) {
 
   const shapes = highlight(ex, traces, labels);
   drawTrendStrips(ex, traces);
-  if (ex.hindsight) shapes.push(...drawReplayExtras(ex, traces, level));
+  if (ex.hindsight) shapes.push(...drawReplayExtras(ex, traces, level, asCloses));
   for (const pin of ex.pins ?? []) labels.push(pinLabel(pin));
 
   // A fixed default view of the whole snippet, so toggling layers never rescales; a zoom or pan is kept across redraws.
@@ -2437,9 +2744,16 @@ function draw(el, ex, focus) {
   const history = full.t.length > 1 ? [new Date(Date.parse(full.t[0]) - oneCandle).toISOString(), new Date(Date.parse(full.t[full.t.length - 1]) + oneCandle).toISOString()] : null;
   const all = ex.complete ? history : null;
   // A tour's or an analysis's chart has every candle of its scene, and can be zoomed out to all of them too.
-  const view = { t: times, h: span(full.h), l: span(full.l), candle, all, widest: all ?? (ex.tour ? history : null), asCloses, candleMs, opensOn, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
+  // A chart with a cursor short of its last candle, a tour's or a whole dataset's replay, fits the prices to the cursor
+  // alone unless the candles after it are shown, and where its view has none of them, the candle at the cursor.
+  const replayed = ex.tour || (ex.complete && ex.cursor < full.t.length - 1);
+  // A tour's history ends at the last candle it shows, or the end of its view if that is further on: zoomed out further,
+  // the chart would be empty space.
+  const shownTo = replayed && !on('future') ? Math.max(Date.parse(full.t[ex.cursor]) + oneCandle, last + pad) : history?.[1];
+  const tourHistory = ex.tour && history ? [history[0], new Date(Math.min(Date.parse(history[1]), shownTo)).toISOString()] : null;
+  const view = { t: times, h: span(full.h), l: span(full.l), candle, all, widest: all ?? tourHistory, asCloses, candleMs, opensOn, x: [new Date(first - pad).toISOString(), new Date(last + pad).toISOString()],
     from: w?.from ?? 0, numbered: !!ex.tour, floor: ex.tour ? 0.01 : 0,
-    until: ex.tour && !on('future') ? Date.parse(full.t[ex.cursor]) : undefined, now: ex.tour ? [full.l[ex.cursor], full.h[ex.cursor]] : null,
+    until: replayed && !on('future') ? Date.parse(full.t[ex.cursor]) : undefined, now: replayed ? [full.l[ex.cursor], full.h[ex.cursor]] : null,
     pins: (ex.pinRoom ?? []).map(pinRoom), height: el._fullLayout?._size?.h ?? Math.max(100, el.clientHeight - 46),
     // The times of what is drawn, when that is not the whole dataset, and whether it reaches the dataset's first and last candle.
     drawn: ex.drawn ? { from: Date.parse(full.t[ex.drawn.from]), to: Date.parse(full.t[ex.drawn.to]), first: ex.drawn.from === 0, last: ex.drawn.to === full.t.length - 1, span: ex.drawn.span } : null };
@@ -2449,7 +2763,7 @@ function draw(el, ex, focus) {
   // They are the candles it draws, wherever its view has been taken, not those it opens on alone: a view panned away
   // from those would have no prices to fit, and be taken for one left without candles (see zoomedRanges).
   const drawn = a => ex.drawn ? a.slice(ex.drawn.from, ex.drawn.to + 1) : span(a);
-  view.series = ex.complete ? [{ x: drawn(full.t).map(Date.parse), low: drawn(full.l), high: drawn(full.h) }] : seriesOf(traces, shapes);
+  view.series = ex.complete ? [{ x: ex.drawn ? timesOf(ex.hindsight ?? ex).subarray(ex.drawn.from, ex.drawn.to + 1) : drawn(full.t).map(Date.parse), low: drawn(full.l), high: drawn(full.h) }] : seriesOf(traces, shapes);
   view.y = fitPrices(view, view.x);
   views.set(ex.id, view);
   const { x: xRange, y: yRange, manual } = shownRanges(zoomedRanges(ex, view), view);
@@ -2576,7 +2890,9 @@ function roomForPins([low, high], pins, height) {
 
 function shownRanges(zoom, view) {
   const x = zoom?.x ?? view.x;
-  return { x, y: zoom?.y ?? fitPrices(view, x) ?? view.y, manual: zoom?.y != null };
+  // The least price range (view.floor) is for the view a chart opens on; zoomed in by hand, it fits the prices as the Chart's does.
+  const fit = zoom?.x && view.floor ? { ...view, floor: 0 } : view;
+  return { x, y: zoom?.y ?? fitPrices(fit, x) ?? view.y, manual: zoom?.y != null };
 }
 
 // How many candles across a chart of a whole dataset stops drawing them as candles: past this they are narrower than a
@@ -2649,12 +2965,13 @@ function plotPoint(el, e) {
 function wireZoom(el) {
   if (el.dataset.zoomWired) return;
   el.dataset.zoomWired = '1';
-  const id = el.dataset.id;
+  // The chart's id is read as each event comes: a tour keeps its chart as it cuts to another scene, which has another id.
   const iso = v => new Date(v).toISOString();
 
   // Plotly's own pans and zooms; the page's moves are already recorded.
   el.on('plotly_relayout', e => {
     if (movingViews) return;
+    const id = el.dataset.id;
     const pick = axis => e[`${axis}.range`] ?? (e[`${axis}.range[0]`] !== undefined ? [e[`${axis}.range[0]`], e[`${axis}.range[1]`]] : null);
     const x = pick('xaxis'), y = pick('yaxis');
     if (!x && !y) return;
@@ -2666,7 +2983,7 @@ function wireZoom(el) {
   el.on('plotly_doubleclick', () => moveView(el, null));
 
   el.addEventListener('wheel', e => {
-    const p = plotPoint(el, e), view = views.get(id);
+    const id = el.dataset.id, p = plotPoint(el, e), view = views.get(id);
     if (!p || !view || p.y < 0 || p.x < 0 || (p.x > p.w && !p.onPrices)) return;
     e.preventDefault();
     const zoom = { ...zooms.get(id) }, shown = shownRanges(zoom, view), lines = e.deltaMode === 1 ? 33 : 1;
@@ -2694,7 +3011,7 @@ function wireZoom(el) {
   // Dragging the price axis scales prices about the middle of the view, in place of Plotly's own axis drag.
   el.addEventListener('mousedown', e => {
     cross.hidden = true;
-    const view = views.get(id);
+    const id = el.dataset.id, view = views.get(id);
     if (e.button !== 0 || !view || !plotPoint(el, e)?.onPrices) return;
     e.preventDefault();
     e.stopPropagation();
@@ -2709,7 +3026,7 @@ function wireZoom(el) {
   }, true);
   el.addEventListener('dblclick', e => {
     if (!plotPoint(el, e)?.onPrices) return;
-    const { y, ...zoom } = zooms.get(id) ?? {};
+    const { y, ...zoom } = zooms.get(el.dataset.id) ?? {};
     moveView(el, zoom);
   });
 
@@ -2722,7 +3039,7 @@ function wireZoom(el) {
   const [v, h, timeLabel, priceLabel] = cross.children;
   let mouse = null;
   const aim = () => {
-    const p = mouse && plotPoint(el, mouse), view = views.get(id);
+    const p = mouse && plotPoint(el, mouse), view = views.get(el.dataset.id);
     el.style.cursor = p?.onPrices ? 'ns-resize' : '';
     cross.hidden = !p?.onPlot || !view;
     if (cross.hidden) return;
@@ -2791,7 +3108,8 @@ async function loadDataset(info) {
   const prices = await fetch(`api/prices?dataset=${encodeURIComponent(info.id)}`).then(r => r.json());
   const ex = { id: `Replay/${info.id}`, dataset: info.id, title: info.name, level: 1, prices, expected: [], annotations: [] };
   replayDatasets.push(ex);
-  cursors.set(ex.id, 0);
+  // It opens with every candle there, the cursor at the last, until a candle is picked to replay from.
+  cursors.set(ex.id, prices.t.length - 1);
   return ex;
 }
 
@@ -2818,8 +3136,9 @@ async function renderReplayPage() {
   const head = `<section class="term-head"><h2>Replay</h2>
     <p>Step through a whole dataset as it was known at each candle. The sawtooth, points, swings, breaks and trends come only from
     the prices up to the cursor, with the levels anchored at the dataset's first candle.</p>
-    <p class="remarks">The local server works it out ${REMOTE_BATCH} candles at a time and fetches ahead while you play. The chart
-    follows the cursor, showing the chosen window of history before it. Click a candle for its prices and Analyse, which explains it as the tour would, here on the chart.</p></section>`;
+    <p class="remarks">The chart opens with every candle of the dataset, as the Chart does: drag and zoom to anywhere in it. Click a candle
+    and choose Replay from here, and the candles after it are cleared, unless Future candles is on; then step on or back with the controls below.
+    The card also has the candle's prices and Analyse, which explains it as the tour would.</p></section>`;
   const show = body => { main.innerHTML = head + body; renderLayers(); wireReplayExamples(main); drawAll(currentPage); };
 
   if (!serverOn) {
@@ -2951,7 +3270,7 @@ async function renderChartPage() {
 const BASIC_KINDS = new Set(['Candle', 'SuccessiveCandles', 'Point']);
 const isBasic = id => BASIC_KINDS.has(String(id ?? '').split(':')[0]);
 const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ? on('SuccessiveGreenCandles') || on('SuccessiveRedCandles')
-  : on(`level${t.level}`) && (t.kind === 'Point' ? POINT_LAYERS.some(on) : t.kind === 'Swing' ? on('Upswing') || on('Downswing') : on('Uptrend') || on('Downtrend')));
+  : on(`level${t.level}`) && (t.kind === 'Point' ? POINT_LAYERS.some(on) : t.kind === 'Swing' ? on('Upswing') || on('Downswing') : t.kind === 'SwingRange' ? on('SwingRange') : on('Uptrend') || on('Downtrend')));
 {
   let down = null, asked = 0;
   const card = document.createElement('div');
@@ -2970,13 +3289,18 @@ const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ?
     // A click on something of a sawtooth level puts the level in focus and opens no card (see Level in focus).
     if (focusClick(chart, e)) return close();
     const ex = findExample(chart.dataset.id), i = ex && candleAt(chart, e), p = ex && (ex.hindsight ?? ex).prices;
-    if (i == null || !p?.t[i] || i > cursorOf(ex)) return close();
+    if (i == null || !p?.t[i]) return close();
+    // A candle after the cursor is there to click only with the future candles shown, and only to replay from.
+    const ahead = i > cursorOf(ex);
+    if (ahead && !(currentPage === 'Replay' && on('future'))) return close();
+    const replayButton = currentPage === 'Replay' && i !== cursorOf(ex)
+      ? `<button type="button" data-replay-from="${i}" title="Moves the replay to this candle: the chart stays where it is, as known at this candle, with the candles after it cleared unless Future candles is on">Replay from here</button>` : '';
     const time = p.t[i], up = p.c[i] > p.o[i], colour = p.c[i] === p.o[i] ? 'no body' : up ? 'green' : 'red';
     const money = v => Math.floor(v).toLocaleString('en-US');
     // A trade of a strategy on the chart that this candle is part of has Analyse trade and Find similar, and Analyse tells
     // of it too.
     // A replay only has the trades entered by its cursor.
-    card.trades = tradesAround(ex.dataset, i).filter(x => x.trade.entryIndex <= cursorOf(ex));
+    card.trades = ahead ? [] : tradesAround(ex.dataset, i).filter(x => x.trade.entryIndex <= cursorOf(ex));
     // On the Replay page the candle is seen from the cursor. The Chart has no cursor: a trade is seen from where it ends, so
     // its analysis replays it to its outcome; another candle from CHART_SEEN candles on, so what is there can be told to its
     // end. Either is soon enough after the candle for the replay batches to hold it.
@@ -2992,8 +3316,8 @@ const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ?
         ? `${trade.direction === 'Short' ? 'sells' : 'buys'} at the close` : trade.entryIndex > i ? `enters at ${esc(fmtTime(trade.entryTime).slice(11))}` : `entered at ${esc(fmtTime(trade.entryTime))}`}</span>
         <button type="button" data-trade-analyse="${n}" title="An analysis of this trade, a chapter each for its entry, its exits and its outcome, read aloud">Analyse trade</button>
         <button type="button" data-trade-similar="${n}" title="Every candle with what this strategy's entry looks for, found from the candle runs, against the strategy's trades">Find similar</button></div>`).join('')}
-      <div class="analyse"><button type="button" data-analyse-go disabled title="A chapter for each thing the chart shows at this candle; the others can be added on the Analysis page">Analyse</button></div>
-      <span class="hint" data-things>Reading what is at this candle…</span>`;
+      <div class="analyse">${ahead ? '' : '<button type="button" data-analyse-go disabled title="A chapter for each thing the chart shows at this candle; the others can be added on the Analysis page">Analyse</button>'}${replayButton}</div>
+      ${ahead ? '' : '<span class="hint" data-things>Reading what is at this candle…</span>'}`;
     stopPlaying();
     card.hidden = false;
     const place = () => {
@@ -3003,6 +3327,7 @@ const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ?
     };
     place();
     const mine = ++asked;
+    if (ahead) return;
     const list = await fetch(`api/explain/at?${new URLSearchParams({ ...base, greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') })}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null).catch(() => null);
     if (mine !== asked || card.hidden) return;
@@ -3034,6 +3359,11 @@ const thingShown = t => t.kind === 'Candle' || (t.kind === 'SuccessiveCandles' ?
       const { layer, trade } = card.trades[Number(similar.dataset.tradeSimilar)];
       close();
       return openTradeSimilar(layer, trade, card.ex);
+    }
+    const from = e.target.closest('[data-replay-from]');
+    if (from) {
+      close();
+      return replayFrom(card.ex, Number(from.dataset.replayFrom));
     }
     const b = e.target.closest('[data-analyse-go]');
     if (!b || b.disabled) return;
@@ -3148,7 +3478,8 @@ let wantedAnalysis = null;
 // The order things are told in, as the server tells them: the candle, its run, then each order's from the finest.
 const thingRank = id => { const [kind, level] = String(id).split(':'); return [{ Trade: -1, Candle: 0, SuccessiveCandles: 1 }[kind] ?? 2, -(Number(level) || 0), ['Point', 'Swing', 'Trend'].indexOf(kind)]; };
 const byThing = (a, b) => { const x = thingRank(a), y = thingRank(b); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; };
-const runsOf = p => p.greenRuns != null ? { greenRuns: p.greenRuns, redRuns: p.redRuns } : {};
+// The count of Swings a Range by Swings is found by is carried with them, when the analysis is of one.
+const runsOf = p => ({ ...(p.greenRuns != null ? { greenRuns: p.greenRuns, redRuns: p.redRuns } : {}), ...(p.rangeSwings != null ? { rangeSwings: p.rangeSwings } : {}) });
 // What defines an analysis's content: the address without the detail, which only says which of its chapters are on.
 // A Trade is a strategy's: the address carries the strategy, as strategies.json has it.
 const strategyOf = p => p.strategy ? { strategy: p.strategy } : {};
@@ -3169,7 +3500,8 @@ async function renderAnalysisPage(query) {
     ?? (explain ? [explain === 'Candle' ? 'Candle' : `${explain}:${Number(query.get('level')) || 1}`] : null);
   if (things?.length && query.get('dataset') && query.get('at')) {
     const detail = DETAILS.includes(query.get('detail')) ? query.get('detail') : detailOf('Analysis');
-    const runs = Number(query.get('greenRuns')) > 0 ? { greenRuns: Number(query.get('greenRuns')), redRuns: Number(query.get('redRuns')) || Number(query.get('greenRuns')) } : {};
+    const runs = { ...(Number(query.get('greenRuns')) > 0 ? { greenRuns: Number(query.get('greenRuns')), redRuns: Number(query.get('redRuns')) || Number(query.get('greenRuns')) } : {}),
+      ...(Number(query.get('rangeSwings')) > 0 ? { rangeSwings: Number(query.get('rangeSwings')) } : {}) };
     const asked = { dataset: query.get('dataset'), at: query.get('at'), ...(query.get('seen') ? { seen: query.get('seen') } : {}), things, ...runs, ...(query.get('strategy') ? { strategy: query.get('strategy') } : {}), detail };
     if (!wantedAnalysis || analysisHash(wantedAnalysis) !== analysisHash(asked)) wantedAnalysis = asked;
     if (`#Analysis?${query}` !== analysisHash(asked)) history.replaceState(null, '', analysisHash(asked));
@@ -3227,7 +3559,7 @@ async function renderAnalysisPage(query) {
 // scene on the dataset from its first candle, and the structure as known at the cursor it was seen from, fetched.
 async function loadAnalysis(params) {
   // How long a run must be to count: as the address says, else the page's Successive Candles settings.
-  const runs = params.greenRuns != null ? runsOf(params) : { greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles') };
+  const runs = { greenRuns: runMin('SuccessiveGreenCandles'), redRuns: runMin('SuccessiveRedCandles'), ...runsOf(params) };
   const where = { dataset: params.dataset, at: params.at, ...(params.seen ? { seen: params.seen } : {}) };
   const found = await fetch(`api/explain/at?${new URLSearchParams({ ...where, ...runs })}`, { cache: 'no-store' }).then(x => x.ok ? x.json() : null).catch(() => null);
   // A strategy's trade is not one of the things the chart has at the candle, so its chapters are listed with them here.
@@ -3274,8 +3606,11 @@ async function loadAnalysis(params) {
   // them: unless one was ticked before the analysis was written again, or they are all there is to tell of.
   const basic = loaded.chapters.flatMap((c, i) => isBasic(loaded.sections[c.section].thing) ? [i] : []);
   const kept = new Set(params.basicOn ?? []);
-  if (loaded.chapters.some((c, i) => !basic.includes(i) && !loaded.chaptersOff.has(i)))
+  // Written again, as when its levels change, it has the ones that were ticked and no others, whatever else it tells of.
+  if (params.basicOn || loaded.chapters.some((c, i) => !basic.includes(i) && !loaded.chaptersOff.has(i)))
     basic.filter(i => !kept.has(loaded.sections[loaded.chapters[i].section].thing)).forEach(i => loaded.chaptersOff.add(i));
+  // The orders its contents list: those the Levels had on when it was written again, else those of its chapters that are on.
+  loaded.levelsShown = new Set(params.levelsShown ?? loaded.chapters.flatMap((c, i) => loaded.chaptersOff.has(i) ? [] : [thingLevel(loaded.sections[c.section].thing)]).filter(Boolean));
   if (!loaded.sections.some(s => s.cues.some(c => !c.skipped))) throw new Error(loaded.errors[0] ?? 'the server wrote no texts for it');
   if (Number.isInteger(writtenDef.known)) { loaded.known = writtenDef.known; await fetchBatch(loaded.ex, loaded.known); }
   return loaded;
@@ -3345,12 +3680,13 @@ function addThing(id) {
 }
 
 // Things at the candle the analysis does not tell of yet: it is written again with them, and opens at the chapter of the
-// thing given, or the one on show.
-function addThings(ids, jump = tourSection()?.thing) {
-  if (tour?.page !== 'Analysis' || !ids.length) return;
+// thing given, or the one on show. With without, the things it tells of that are to go are left out of it as well.
+function addThings(ids, jump = tourSection()?.thing, without = () => false) {
+  if (tour?.page !== 'Analysis' || (!ids.length && !tour.params.things.some(without))) return;
+  const kept = thingsOn().filter(id => !without(id));
   // The basic building blocks keep their chapters, each off or on as it was.
-  wantedAnalysis = { ...tour.params, things: [...new Set([...thingsOn(), ...tour.params.things.filter(isBasic), ...ids])],
-    detail: explainsOn() ? 'education' : 'summary', jump, basicOn: [...thingsOn(), ...ids].filter(isBasic), changes: analysisDirty() ? analysisChanges() : undefined };
+  wantedAnalysis = { ...tour.params, things: [...new Set([...kept, ...tour.params.things.filter(id => isBasic(id) && !without(id)), ...ids])],
+    detail: explainsOn() ? 'education' : 'summary', jump: jump && without(jump) ? undefined : jump, levelsShown: [...tour.levelsShown], basicOn: [...kept, ...ids].filter(isBasic), changes: analysisDirty() ? analysisChanges() : undefined };
   history.replaceState(null, '', analysisHash(wantedAnalysis));
   renderAnalysisPage();
 }
@@ -3371,13 +3707,16 @@ function sectionLayers(s) {
 
 // On the Analysis page the Levels buttons say which orders the analysis tells of. A level turned on brings the chapters of
 // what is at the candle at that order: those it has, turned on again, and those it has not, written in, with their
-// explanations when Explain is on. A level turned off turns its chapters off, where they stay to be turned on again.
+// explanations when Explain is on. A level turned off takes its things out of the analysis, so it tells of the orders
+// that are on and no others; they are still in the Contents, to add again.
 function analysisLevelsChanged(before, after) {
   if (tour?.page !== 'Analysis') return;
   const levels = list => new Set(list.filter(id => /^level\d+$/.test(id)).map(id => Number(id.slice(5))));
   const was = levels(before), now = levels(after);
   const added = [...now].filter(l => !was.has(l)), removed = [...was].filter(l => !now.has(l));
   if (!added.length && !removed.length) return;
+  // The orders the contents list: those the Levels now have on, whether or not anything is at them.
+  tour.levelsShown = now;
   const explaining = explainsOn();
   tour.chapters.forEach((c, i) => {
     const s = tour.sections[c.section], level = thingLevel(s.thing);
@@ -3385,7 +3724,8 @@ function analysisLevelsChanged(before, after) {
     else if (added.includes(level) && (!s.explains || (explaining && !s.repeat))) tour.chaptersOff.delete(i);
   });
   const missing = (tour.list ?? []).filter(t => added.includes(t.level) && !tour.sections.some(s => s.thing === t.id)).map(t => t.id);
-  if (missing.length) return addThings(missing);
+  const gone = id => removed.includes(thingLevel(id));
+  if (missing.length || tour.params.things.some(gone)) return addThings(missing, tourSection()?.thing, gone);
   chaptersChanged();
 }
 
@@ -3502,13 +3842,35 @@ async function fillLearnLinks() {
   box.innerHTML = links.length ? `Learn more in the tour about ${links.length > 1 ? `${links.slice(0, -1).join(', ')} and ${links.at(-1)}` : links[0]}.` : '';
 }
 
+// The things at the candle at orders the Levels have off, as one row at the end of the contents: how many, which orders
+// they are at when pointed at, and a click turns on every level up to the finest anything is at, as the left slider does.
+function othersRow(hidden) {
+  const orders = [...new Set(hidden.map(t => t.level))].sort((a, b) => a - b).map(orderOf), finest = Math.max(...tour.list.map(t => t.level ?? 0));
+  const said = orders.length > 1 ? `${orders.slice(0, -1).join(', ')} and ${orders.at(-1)}` : orders[0];
+  return `<button type="button" class="ct-add" data-levels-up-to="${finest}" title="At the ${said}: turn on every level up to ${finest}, as the left slider does, to list them all">+ ${hidden.length} other${hidden.length === 1 ? '' : 's'}</button>`;
+}
+
+// Turns on every level up to one on the Analysis page, as its left slider does; an order finer than the levels go to,
+// which the slider cannot reach, with them.
+function analysisLevelsUpTo(level) {
+  if (tour?.page !== 'Analysis' || currentPage !== 'Analysis') return;
+  analysisSlide = { name: 'upTo', at: Math.min(level, LEVEL_IDS.length - 1) };
+  const levels = Array.from({ length: level + 1 }, (_, l) => `level${l}`);
+  setLayers(keepPrice([...new Set([...layersOf(currentPage).filter(x => !/^level\d+$/.test(x)), ...levels])], layersOf(currentPage)));
+  syncLayerButtons();
+  drawAll(currentPage);
+}
+
 function renderAnalysisContents() {
   const box = document.getElementById('tour-editor');
   if (!tour || tour.page !== 'Analysis' || currentPage !== 'Analysis') { box.innerHTML = ''; return; }
   const scrolled = box.querySelector('.ed-body')?.scrollTop ?? 0;
   // The things at the candle, grouped: the candle and its run, then each order from the finest.
-  const groups = [];
+  // Only the orders the Levels have on are listed (see levelsShown); the things at the others are counted at the end,
+  // with a button that turns on every level up to the finest there is anything at, to list them all.
+  const groups = [], hidden = (tour.list ?? []).filter(t => t.level && !tour.levelsShown.has(t.level));
   for (const t of tour.list ?? []) {
+    if (hidden.includes(t)) continue;
     const name = t.kind === 'Trade' ? 'The trade' : t.level ? orderOf(t.level) : 'The candle';
     if (groups.at(-1)?.name !== name) groups.push({ name, things: [] });
     groups.at(-1).things.push(t);
@@ -3538,6 +3900,7 @@ function renderAnalysisContents() {
       <div class="ct-learn" data-learn-links></div>
       ${tour.missing.length ? `<div class="ct-warn">Not at this candle as the chart had it: ${esc(tour.missing.join(', '))}</div>` : ''}
       ${groups.map(group).join('')}
+      ${hidden.length ? othersRow(hidden) : ''}
     </div>`;
   box.querySelector('.ed-body').scrollTop = scrolled;
   syncContents();
@@ -3677,7 +4040,8 @@ function sectionAfter(i, by) {
 
 function findExample(id) {
   return DATA.examples.find(e => e.id === id) ?? DATA.structure?.examples?.find(e => e.id === id) ?? DATA.interims?.examples?.find(e => e.id === id)
-    ?? replayDatasets.find(e => e.id === id) ?? chartDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined);
+    ?? replayDatasets.find(e => e.id === id) ?? chartDatasets.find(e => e.id === id) ?? tour?.scenes?.find(sc => sc.ex?.id === id)?.ex ?? (tour?.ex.id === id ? tour.ex : undefined)
+    ?? (game?.ex?.id === id ? game.ex : undefined);
 }
 
 // ---- Tour ------------------------------------------------------------------------------------------------------------
@@ -3714,9 +4078,9 @@ const TOUR_TICK = 40;
 // The Speed slider's paces: how fast the voice reads (its clips are played that much faster or slower, at the same pitch),
 // how fast a text is read without the voice (against about 240 words a minute), how fast the candles run against the
 // section's speed, and the seconds a text stays after it has been read.
-const TOUR_PACES = [{ name: 'Slowest', voice: 0.8, reading: 0.6, candles: 0.35, gap: 0.8 }, { name: 'Slower', voice: 0.9, reading: 0.8, candles: 0.6, gap: 0.4 },
-  { name: 'Normal', voice: 1, reading: 1, candles: 1, gap: 0.15 }, { name: 'Faster', voice: 1.1, reading: 1.3, candles: 1.6, gap: 0.05 },
-  { name: 'Fastest', voice: 1.2, reading: 1.7, candles: 2.6, gap: 0 }];
+const TOUR_PACES = [{ name: 'Slowest', voice: 0.7, reading: 0.45, candles: 0.2, gap: 1.2 }, { name: 'Slower', voice: 0.8, reading: 0.6, candles: 0.35, gap: 0.8 },
+  { name: 'Normal', voice: 1, reading: 1, candles: 1, gap: 0.15 }, { name: 'Faster', voice: 1.2, reading: 1.7, candles: 2.6, gap: 0 },
+  { name: 'Fastest', voice: 1.4, reading: 2.3, candles: 4.2, gap: 0 }];
 const NORMAL_PACE = TOUR_PACES.find(p => p.name === 'Normal');
 // The player on the page shown, and each page's own, kept while another page is shown.
 let tour = null, tourLoading = null;
@@ -4237,10 +4601,11 @@ function speak(cue) {
 }
 
 function readAloud(cue) {
-  const clip = tour.audio[textKey(cue.text)], turn = tour.voice.now = { timer: null };
+  const clip = tour.audio[textKey(cue.text)], turn = tour.voice.now = { timer: null, loadingSince: null };
   const done = () => {
     if (tour.voice.now !== turn) return;
     tour.voice.now = null;
+    showVoiceBuffering();
     if (tour.voice.waiting.length) readAloud(tour.voice.waiting.shift());
   };
   // Its time on show, at the slider's pace, starts as its reading does.
@@ -4252,6 +4617,9 @@ function readAloud(cue) {
   }
   tour.player = new Audio(`tour-audio/${clip.file}`);
   tour.player.playbackRate = tourPace().voice;
+  // Until the clip's sound begins it is loading, which the Voice button shows when it takes long enough to notice.
+  turn.loadingSince = performance.now();
+  tour.player.addEventListener('playing', () => { turn.loadingSince = null; showVoiceBuffering(); });
   tour.player.addEventListener('ended', done);
   tour.player.addEventListener('error', done);
   tour.player.play().catch(e => {
@@ -4270,6 +4638,22 @@ for (const name of ['pointerdown', 'keydown']) window.addEventListener(name, () 
   if (tour?.active && tour.timer && voiced(tour.active) && !tour.voice.now) readAloud(tour.active);
   updateTourPanel();
 }, true);
+
+// Whether the voice is on and playing but has no sound to give yet: the text due has no clip, which the server is still
+// reading, and the analysis waits for it (see tourTick); or its clip has been loading for longer than a moment.
+const VOICE_LOADS_FOR = 300;
+function voiceBuffering() {
+  if (!tour?.timer || !voiceOn() || voiceBlocked) return false;
+  const since = tour.voice.now?.loadingSince, unread = tour.unread && tour.unread === tour.active && !tour.audio[textKey(tour.unread.text)];
+  return (since != null && performance.now() - since > VOICE_LOADS_FOR) || unread || awaitsClip();
+}
+
+// Shows on the Voice button whether it is buffering, at every beat of a playing tour and whenever a clip starts or ends.
+function showVoiceBuffering() {
+  const voice = document.querySelector('[data-tour-go="voice"]');
+  if (!voice || !tour) return;
+  if (voice.classList.contains('buffering') !== voiceBuffering()) updateTourPanel();
+}
 
 function hush() {
   tour.player?.pause();
@@ -4480,7 +4864,10 @@ function updateTourPanel() {
   if (go('tradeSimilar')) go('tradeSimilar').hidden = !(tour.page === 'Analysis' && tour.params?.strategy);
   const voice = go('voice'), clips = Object.keys(tour.audio ?? {}).length;
   voice.setAttribute('aria-pressed', voiceOn());
-  voice.textContent = voiceBlocked && voiceOn() ? 'Voice: click anywhere to hear it' : 'Voice';
+  const buffering = voiceBuffering();
+  voice.classList.toggle('buffering', buffering);
+  voice.setAttribute('aria-busy', buffering);
+  voice.textContent = voiceBlocked && voiceOn() ? 'Voice: click anywhere to hear it' : buffering ? 'Voice: buffering…' : 'Voice';
   if (!clips) voice.title ='No clips yet: the local server reads the texts aloud when Voice is on';
   const pace = TOUR_PACES.indexOf(tourPace());
   part('pace').value = pace;
@@ -4503,6 +4890,7 @@ function tourTick() {
   // The slider and the caption move on while a text is read, as well as while the candles run.
   showScrub();
   showCaption();
+  showVoiceBuffering();
   const s = tourSection(), ex = tour.ex, now = performance.now(), t = cursorOf(ex);
   // A section that shows a page reads on once the page is where the tour is.
   if (tourPage.pending) return;
@@ -4942,6 +5330,11 @@ async function openSimilar() {
     dialog.addEventListener('click', e => {
       if (e.target === dialog || e.target.closest('[data-sim="close"]')) dialog.close();
       else if (e.target.closest('[data-sim="search"]')) searchSimilar(dialog);
+      const order = e.target.closest('[data-sort]');
+      if (order) {
+        similar.sort = nextTradeSort(similar.sort, order.dataset.sort);
+        return searchSimilar(dialog);
+      }
       // On the Replay page a Trend found is explained there, in place; on the Tour page its link opens a tour of its own.
       const found = e.target.closest('a[data-sim-at]');
       if (found && currentPage === 'Analysis' && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) {
@@ -4980,16 +5373,130 @@ function searchSimilar(dialog) {
   const s = similar.shown, keys = [...dialog.querySelectorAll('[data-sim-check]')].filter(c => c.checked).map(c => c.dataset.simCheck);
   const same = t => t.level === s.level && t.start === s.start && t.direction === s.direction;
   const found = similar.trends.filter(t => keys.every(k => t[k] === s[k]));
+  // Each Trend opens as an analysis of itself: the one its last BoS is in, seen from the dataset's last candle, as the
+  // list has it, which runs from where it begins to its own end. The address has no cursor, which is that.
   const link = t => `./${analysisHash({ dataset: similar.params.dataset, at: t.at, things: [`Trend:${t.level}`], detail: detailOf('Analysis') })}`;
-  // A Trend the chart had otherwise at the time has no tour to open, as a tour shows the chart as it was.
-  const row = t => `<li${same(t) ? ' class="current"' : ''}><${t.tour ? `a href="${esc(link(t))}" data-sim-at="${esc(t.at)}" data-sim-level="${t.level}"` :'a title="The chart had this otherwise at the time, so there is no tour of it"'}${same(t) ? ' aria-current="true"' : ''}><span>#${t.index}</span><span>${esc(fmtTime(t.start))}</span>
-    <span>${esc(`${orderOf(t.level)} ${trendName(t)} · ${swingsOf(t)} · ${t.strength}%${same(t) ? ' · this one' : ''}${t.tour ? '' : ' · no tour'}`)}</span></a></li>`;
+  const act = t => t.current ? 'this one' : `<a href="${esc(link(t))}" data-sim-at="${esc(t.at)}" data-sim-level="${t.level}" title="An analysis of this Trend, from where it begins to its end">Analyse</a>`;
   // The tour shows its Trend as the chart had it where the tour ends; the list has the Trends as the whole dataset does.
   const whole = similar.trends.find(same), differs = whole && (whole.swings !== s.swings || whole.strength !== s.strength);
   const note = !whole ? ' This one is not among them: with the candles since, it is a Ghost.' : differs ? ` With the candles since, this one is ${swingsOf(whole)} at ${whole.strength}%.` : '';
-  dialog.querySelector('[data-sim="results"]').innerHTML = `<div class="sim-count">${found.length} Trend${found.length === 1 ? '' : 's'} in the dataset as a whole, by the candle they begin at${found.length > SIMILAR_SHOWN ? `: the first ${SIMILAR_SHOWN} are listed` : ''}.${esc(note)}</div>
-    <ol>${found.slice(0, SIMILAR_SHOWN).map(row).join('')}</ol>`;
-  dialog.querySelector('li.current')?.scrollIntoView({ block: 'nearest' });
+  const rows = sortTradeRows(found.map(t => ({ ...t, current: same(t) })), similar.sort, TREND_COLUMNS);
+  dialog.querySelector('[data-sim="results"]').innerHTML = `<div class="sim-count">${found.length} Trend${found.length === 1 ? '' : 's'} in the dataset as a whole${found.length > SIMILAR_SHOWN ? `: the first ${SIMILAR_SHOWN} are listed` : ''}.${esc(note)}</div>
+    ${tradeTable(rows.slice(0, SIMILAR_SHOWN), { columns: Object.keys(TREND_COLUMNS), defs: TREND_COLUMNS, sort: similar.sort, act })}`;
+  dialog.querySelector('tr.current')?.scrollIntoView({ block: 'nearest' });
+}
+
+// The columns of the Trends found, listed as trades are (see tradeTable).
+const TREND_COLUMNS = {
+  begins: { head: 'Begins', cell: t => esc(fmtTime(t.start)), sort: t => t.index },
+  level: { head: 'Level', cell: t => orderOf(t.level), sort: t => t.level },
+  trend: { head: 'Trend', cell: t => trendName(t), sort: t => t.direction },
+  swings: { head: 'Swings', num: true, cell: t => t.swings, sort: t => t.swings },
+  strength: { head: 'Strength', num: true, cell: t => `${t.strength}%`, sort: t => t.strength },
+  ends: { head: 'Ends', cell: t => t.end ? esc(fmtTime(t.end)) : 'still runs', sort: t => t.end },
+};
+
+// ---- List -------------------------------------------------------------------------------------------------------------
+// Where a kind of thing the chart shows occurs in the whole dataset, as known at its last candle (api/occurrences): the
+// List button over the layers, then a layer. Each place is a row, listed as the Trends of Find similar are, with Show,
+// which takes the Chart to it with its layer and level on, and Analyse, which opens an analysis at it. A layer that draws
+// part of a thing lists the thing: a Range's bands list Ranges.
+const LISTED = ['DeepMsb', 'SwingRange', 'Range', 'Uptrend', 'Downtrend', 'Upswing', 'Downswing', 'BullishBreakOfStructure', 'BearishBreakOfStructure', 'BullishMarketStructureBreak', 'BearishMarketStructureBreak'];
+const LISTED_AS = { swingRangeWeak: 'SwingRange', rangeBands: 'Range', rangeZones: 'Range', bosLevelUp: 'BullishBreakOfStructure', bosLevelDown: 'BearishBreakOfStructure',
+  msbLevelUp: 'BullishMarketStructureBreak', msbLevelDown: 'BearishMarketStructureBreak' };
+const OCCURRENCE_COLUMNS = {
+  begins: { head: 'Begins', cell: r => esc(fmtTime(r.start)), sort: r => r.index },
+  level: { head: 'Level', cell: r => orderOf(r.level), sort: r => r.level },
+  low: { head: 'Low', num: true, cell: r => wholePrice(r.low), sort: r => r.low },
+  high: { head: 'High', num: true, cell: r => wholePrice(r.high), sort: r => r.high },
+  height: { head: 'Height', num: true, cell: r => `${r.height.toFixed(1)}%`, sort: r => r.height },
+  msb: { head: 'MSB', cell: r => r.direction === 'Up' ? 'Bullish' : 'Bearish', sort: r => r.direction },
+  back: { head: 'Swings back', num: true, cell: r => r.back, sort: r => r.back },
+  of: { head: 'Of', num: true, cell: r => r.of, sort: r => r.of },
+  retracement: { head: 'Retracement', num: true, cell: r => `${r.retracement}%`, sort: r => r.retracement },
+  swings: { head: 'Swings', num: true, cell: r => r.swings, sort: r => r.swings },
+  weak: { head: 'Weak', num: true, cell: r => r.weak, sort: r => r.weak },
+  strength: { head: 'Strength', num: true, cell: r => `${r.strength}%`, sort: r => r.strength },
+  candles: { head: 'Candles', num: true, cell: r => r.candles.toLocaleString(), sort: r => r.candles },
+  ends: { head: 'Ends', cell: r => r.end ? esc(fmtTime(r.end)) : 'not yet', sort: r => r.end },
+};
+const occurrenceColumns = kind => kind === 'DeepMsb' ? ['begins', 'level', 'msb', 'back', 'of', 'low', 'high', 'height', 'candles', 'ends']
+  : kind === 'SwingRange' ? ['begins', 'level', 'low', 'high', 'height', 'swings', 'weak', 'candles', 'ends']
+  : kind === 'Range' ? ['begins', 'level', 'low', 'high', 'height', 'retracement', 'candles', 'ends']
+  : kind.endsWith('trend') ? ['begins', 'level', 'swings', 'strength', 'candles', 'ends']
+  : kind.endsWith('MarketStructureBreak') ? ['begins', 'level'] : ['begins', 'level', 'candles', 'ends'];
+let occurrences = null;
+
+async function openOccurrences(layerId) {
+  let dialog = document.getElementById('occurrences');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'occurrences';
+    dialog.setAttribute('aria-label', 'Where it occurs');
+    document.body.append(dialog);
+    dialog.addEventListener('click', e => {
+      if (e.target === dialog || e.target.closest('[data-occ="close"]') || e.target.closest('a[data-occ="analyse"]')) return dialog.close();
+      const order = e.target.closest('[data-sort]'), shown = e.target.closest('[data-occ-show]');
+      if (order) {
+        occurrences.sort = nextTradeSort(occurrences.sort, order.dataset.sort);
+        renderOccurrences(dialog);
+      } else if (shown) {
+        dialog.close();
+        showOccurrence(occurrences.found[Number(shown.dataset.occShow)]);
+      }
+    });
+    dialog.addEventListener('change', e => {
+      if (!e.target.matches('[data-occ-levels]')) return;
+      occurrences.only = e.target.checked;
+      renderOccurrences(dialog);
+    });
+  }
+  const kind = LISTED.includes(layerId) ? layerId : LISTED_AS[layerId], label = LAYERS.find(l => l.id === (kind ?? layerId))?.label ?? layerId;
+  const chart = document.querySelector('#main .chart'), dataset = chart && findExample(chart.dataset.id)?.dataset;
+  const say = text => { dialog.innerHTML = `<h4>List: ${esc(label)}</h4><p${text.warn ? ' class="warn"' : ''}>${esc(text.warn ?? text)}</p><div class="sim-foot"><button type="button" data-occ="close">Close</button></div>`; };
+  say('Reading the dataset…');
+  dialog.showModal();
+  if (!kind) return say(`There is no list of this layer yet. These can be listed: ${LISTED.map(id => LAYERS.find(l => l.id === id)?.label ?? id).join(', ')}.`);
+  if (!dataset || !serverOn) return say('A list is of a whole dataset: open the Chart or the Replay page, then List.');
+  try {
+    const r = await fetch(`api/occurrences?dataset=${encodeURIComponent(dataset)}&kind=${kind}${rangeQuery()}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status === 404 ? 'the local server is older than this page: restart ./build-site.ps1 -Serve' : await r.text() || `the server answered ${r.status}`);
+    occurrences = { ...await r.json(), label, dataset, sort: null, only: LEVEL_IDS.some(on) };
+  } catch (e) {
+    return say({ warn: e.message });
+  }
+  renderOccurrences(dialog);
+}
+
+function renderOccurrences(dialog) {
+  const o = occurrences, levels = LEVEL_IDS.filter(on).map(id => Number(id.slice('level'.length)));
+  // A Range by Swings is listed as its layer shows it: with Weak Swings in it on, only those with so many.
+  const weak = o.kind === 'SwingRange' && on('swingRangeWeak') ? setting('swingRangeWeak') : 0;
+  // An MSB further back is listed from as many Swings back as its layer shows.
+  const back = o.kind === 'DeepMsb' ? setting('DeepMsb') : 0;
+  const rows = o.rows.filter(r => (!o.only || levels.includes(r.level)) && (r.weak ?? 0) >= weak && (r.back ?? 0) >= back);
+  o.found = sortTradeRows(rows, o.sort, OCCURRENCE_COLUMNS).slice(0, SIMILAR_SHOWN);
+  const link = r => `./${analysisHash({ dataset: o.dataset, at: r.at, things: [r.thing], ...(o.kind === 'SwingRange' ? { rangeSwings: setting('SwingRange') } : {}), detail: detailOf('Analysis') })}`;
+  const act = r => `<button type="button" data-occ-show="${o.found.indexOf(r)}" title="Take the Chart to it, with its layer and level on">Show</button>` +
+    // What has no analysis of its own has Show alone.
+    (!r.thing ? '' : `<a href="${esc(link(r))}" data-occ="analyse" title="An analysis of it, from where it begins to its end">Analyse</a>`);
+  dialog.innerHTML = `<h4>List: ${esc(o.label)}</h4><p>Every one in the dataset, as known at its last candle${weak ? `, with ${weak} Weak Swings or more` : ''}. A heading orders the list by it.</p>
+    <div class="sim-checks"><label><input type="checkbox" data-occ-levels ${o.only ? 'checked' : ''}>Only the levels shown (${levels.length ? levels.join(', ') : 'none'})</label></div>
+    <div class="sim-count">${rows.length.toLocaleString()} found${rows.length > SIMILAR_SHOWN ? `: the first ${SIMILAR_SHOWN} as ordered are listed` : ''}.</div>
+    ${tradeTable(o.found, { columns: occurrenceColumns(o.kind), defs: OCCURRENCE_COLUMNS, sort: o.sort, act })}
+    <div class="sim-foot" style="margin-top: 10px"><button type="button" data-occ="close">Close</button></div>`;
+}
+
+// Takes the Chart to an occurrence: its dataset, with the layer listed and its level on, and the view from a little
+// before it to a little after it.
+function showOccurrence(r) {
+  const o = occurrences, at = t => Date.parse(`${String(t).slice(0, 16)}Z`), from = at(r.start), to = at(r.until);
+  const beside = Math.max((to - from) * 0.4, (r.candles ? (to - from) / r.candles : 3600000) * 48);
+  state.chartDataset = o.dataset;
+  state.pages = { ...state.pages, Chart: [...new Set([...layersOf('Chart'), o.kind, `level${r.level}`])] };
+  save(state);
+  zooms.set(`Chart/${o.dataset}`, { x: [new Date(from - beside).toISOString(), new Date(to + beside).toISOString()] });
+  if (currentPage === 'Chart') renderChartPage(); else location.hash = '#Chart';
 }
 
 // ---- Tour glossary ---------------------------------------------------------------------------------------------------
@@ -5520,6 +6027,14 @@ function candleAt(el, e) {
   const p = plotPoint(el, e), view = views.get(el.dataset.id);
   if (!p?.onPlot || !view) return null;
   const [from, to] = el._fullLayout.xaxis.range.map(axisTime), at = from + (to - from) * p.x / p.w;
+  // A whole dataset's chart has candles wherever its view is taken, not only where it opens.
+  const whole = view.all ? findExample(el.dataset.id) : null;
+  if (whole) {
+    const ms = timesOf(whole);
+    let lo = 0, hi = ms.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (ms[mid] < at) lo = mid + 1; else hi = mid; }
+    return lo > 0 && at - ms[lo - 1] < ms[lo] - at ? lo - 1 : lo;
+  }
   return view.from + view.t.reduce((best, v, i) => Math.abs(v - at) < Math.abs(view.t[best] - at) ? i : best, 0);
 }
 
@@ -5715,7 +6230,8 @@ function tourAction(action, el) {
   box.addEventListener('mousedown', e => stepFromInherited(e.target.closest('input[data-field]')));
   box.addEventListener('click', e => {
     // A chapter's name goes to it; a thing not told of yet is added; the rest are the contents' and the editor's buttons.
-    const add = e.target.closest('[data-add]'), jump = e.target.closest('a[data-chapter]');
+    const add = e.target.closest('[data-add]'), jump = e.target.closest('a[data-chapter]'), others = e.target.closest('[data-levels-up-to]');
+    if (others) return analysisLevelsUpTo(Number(others.dataset.levelsUpTo));
     if (add) return addThing(add.dataset.add);
     if (jump) {
       if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
@@ -5845,11 +6361,23 @@ function renderInterims() {
 // each of a type; STRATEGY_TYPES says what each type's fields are and how it reads, so a new type is added there and in
 // the server's Strategy.cs. The entry condition can be a chain: the steps of "after", in order, then "entry", each looked
 // for once the one before it is met, within its "within" candles of it when that is set.
-// A market structure step is read at a sawtooth level as a chart of the last STRUCTURE_WINDOW candles shows it (the
-// server's KnownStructure), so its levels are that chart's, up to STRUCTURE_LEVELS. Its direction is Up or Down, named as
+// A market structure step is read at a sawtooth level as known at each candle, from every candle to it (the server's
+// KnownStructure), so its levels are the dataset's then, up to STRUCTURE_LEVELS. Its direction is Up or Down, named as
 // the term names it: a Bullish or Bearish break, an Upswing or Downswing, an Uptrend or Downtrend.
-const STRUCTURE_WINDOW = 500, STRUCTURE_LEVELS = 4;
+const STRUCTURE_LEVELS = 16;
 const stepLevel = { key: 'level', label: 'Level', number: true, min: 1, max: STRUCTURE_LEVELS, step: 1 };
+// A step after a Range step can name its level by the Range the chain holds, so many levels finer than it, in place of a
+// level of its own; a kill cannot. A Range step at level 0 is met by a Range of any level, and can ask for one of a size.
+const stepFiner = { key: 'finer', label: 'Finer than the Range', number: true, min: 0, max: STRUCTURE_LEVELS, step: 1, blank: 'own level', chain: true };
+const rangeLevel = { ...stepLevel, min: 0, label: 'Level (0: any)' };
+const rangeSize = [{ key: 'minHeight', label: 'Height from %', number: true, min: 0, step: 0.5, blank: 'any' }, { key: 'maxHeight', label: 'Height to %', number: true, min: 0, step: 0.5, blank: 'any' },
+  { key: 'minCandles', label: 'Held (candles)', number: true, min: 0, step: 1, blank: 'any' }];
+const an = named => `${/^[aeiou]/i.test(named) ? 'an' : 'a'} ${named}`;
+const orderSays = e => e.finer == null ? `${orderOf(e.level)} ` : '';
+const finerSays = e => e.finer == null ? '' : e.finer === 0 ? ' of the Range\'s order' : e.finer === 1 ? ' one order finer than the Range' : ` ${e.finer} orders finer than the Range`;
+const levelShort = e => e.finer == null ? `L${e.level}` : `Range+${e.finer}`;
+const rangeSays = e => `${e.level ? `a ${orderOf(e.level)} Range` : 'a Range of any order'}${e.minHeight != null && e.maxHeight != null ? `, from ${e.minHeight}% to ${e.maxHeight}% high` : e.minHeight != null ? `, at least ${e.minHeight}% high` : e.maxHeight != null ? `, at most ${e.maxHeight}% high` : ''}${e.minCandles ? `, that has held for ${e.minCandles} candles or more` : ''}`;
+const rangeShort = e => e.level ? `L${e.level}` : 'Any';
 const stepDirection = (label, up, down) => ({ key: 'direction', label, options: [{ value: 'Up', label: up }, { value: 'Down', label: down }] });
 const STRATEGY_TYPES = {
   entry: {
@@ -5865,36 +6393,36 @@ const STRATEGY_TYPES = {
       label: 'Break of Structure',
       structure: true,
       defaults: { direction: 'Up', level: 2 },
-      fields: [stepDirection('BoS', 'Bullish', 'Bearish'), stepLevel],
-      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
-      short: e => `L${e.level} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
+      fields: [stepDirection('BoS', 'Bullish', 'Bearish'), stepLevel, stepFiner],
+      says: e => an(`${orderSays(e)}${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS${finerSays(e)}`),
+      short: e => `${levelShort(e)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} BoS`,
     },
     // Met at the close beyond the Swing Low or Swing High of a Confirmed Swing.
     MarketStructureBreak: {
       label: 'Market Structure Break',
       structure: true,
       defaults: { direction: 'Up', level: 2 },
-      fields: [stepDirection('MSB', 'Bullish', 'Bearish'), stepLevel],
-      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
-      short: e => `L${e.level} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
+      fields: [stepDirection('MSB', 'Bullish', 'Bearish'), stepLevel, stepFiner],
+      says: e => an(`${orderSays(e)}${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB${finerSays(e)}`),
+      short: e => `${levelShort(e)} ${e.direction === 'Down' ? 'Bearish' : 'Bullish'} MSB`,
     },
     // Met at the BoS that Confirms the Swing: any, or only a Strong one (no MSB inside it) or a Weak one.
     Swing: {
       label: 'Swing',
       structure: true,
       defaults: { direction: 'Up', level: 2, strength: 'Any' },
-      fields: [stepDirection('Swing', 'Upswing', 'Downswing'), stepLevel, { key: 'strength', label: 'Strength', options: ['Any', 'Strong', 'Weak'] }],
-      says: e => `a ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${orderOf(e.level)} ${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
-      short: e => `L${e.level} ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
+      fields: [stepDirection('Swing', 'Upswing', 'Downswing'), stepLevel, stepFiner, { key: 'strength', label: 'Strength', options: ['Any', 'Strong', 'Weak'] }],
+      says: e => an(`${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${orderSays(e)}${e.direction === 'Down' ? 'Downswing' : 'Upswing'}${finerSays(e)}`),
+      short: e => `${levelShort(e)} ${e.strength && e.strength !== 'Any' ? `${e.strength} ` : ''}${e.direction === 'Down' ? 'Downswing' : 'Upswing'}`,
     },
     // Met at the BoS that makes so many Swings in a row, once a Trend: two is the Trend being Confirmed.
     Trend: {
       label: 'Trend',
       structure: true,
       defaults: { direction: 'Up', level: 2, swings: 2 },
-      fields: [stepDirection('Trend', 'Uptrend', 'Downtrend'), stepLevel, { key: 'swings', label: 'Swings', number: true, min: 2, step: 1 }],
-      says: e => `a ${orderOf(e.level)} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} of ${e.swings} ${e.direction === 'Down' ? 'Downswings' : 'Upswings'}`,
-      short: e => `L${e.level} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} ×${e.swings}`,
+      fields: [stepDirection('Trend', 'Uptrend', 'Downtrend'), stepLevel, stepFiner, { key: 'swings', label: 'Swings', number: true, min: 2, step: 1 }],
+      says: e => an(`${orderSays(e)}${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} of ${e.swings} ${e.direction === 'Down' ? 'Downswings' : 'Upswings'}${finerSays(e)}`),
+      short: e => `${levelShort(e)} ${e.direction === 'Down' ? 'Downtrend' : 'Uptrend'} ×${e.swings}`,
     },
     // Met at the close of a candle that reaches into a zone of a Range holding at the level, read from the same chart: the
     // buy-low zone, from the lower band to the depth above the Range's low, or the sell-high zone, as far below its high
@@ -5903,11 +6431,11 @@ const STRATEGY_TYPES = {
       label: 'Range zone',
       structure: true,
       defaults: { zone: 'BuyLow', level: 1, depth: 25, retracement: 75, band: 20 },
-      fields: [{ key: 'zone', label: 'Zone', options: [{ value: 'BuyLow', label: 'Buy-low' }, { value: 'SellHigh', label: 'Sell-high' }] }, stepLevel,
+      fields: [{ key: 'zone', label: 'Zone', options: [{ value: 'BuyLow', label: 'Buy-low' }, { value: 'SellHigh', label: 'Sell-high' }] }, rangeLevel, ...rangeSize,
         { key: 'depth', label: 'Zone depth %', number: true, min: 1, max: 50, step: 5 }, { key: 'retracement', label: 'Retracement %', number: true, min: 1, max: 99, step: 5 },
         { key: 'band', label: 'Band %', number: true, min: 0, step: 5 }],
-      says: e => `a reach into the ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'} zone of a ${orderOf(e.level)} Range`,
-      short: e => `L${e.level} Range ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'}`,
+      says: e => `a reach into the ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'} zone of ${rangeSays(e)}`,
+      short: e => `${rangeShort(e)} Range ${e.zone === 'SellHigh' ? 'sell-high' : 'buy-low'}`,
     },
     // Met at the close of a candle that sweeps a Range holding at the level: its wick goes beyond the Range's low, or its
     // high, and it closes back at or inside the box. It holds the Range as a Range zone step does; the zone depth is that
@@ -5916,11 +6444,11 @@ const STRATEGY_TYPES = {
       label: 'Range liquidity sweep',
       structure: true,
       defaults: { zone: 'BuyLow', level: 1, depth: 25, retracement: 75, band: 20 },
-      fields: [{ key: 'zone', label: 'Sweeps', options: [{ value: 'BuyLow', label: 'The low' }, { value: 'SellHigh', label: 'The high' }] }, stepLevel,
+      fields: [{ key: 'zone', label: 'Sweeps', options: [{ value: 'BuyLow', label: 'The low' }, { value: 'SellHigh', label: 'The high' }] }, rangeLevel, ...rangeSize,
         { key: 'depth', label: 'Zone depth %', number: true, min: 1, max: 50, step: 5 }, { key: 'retracement', label: 'Retracement %', number: true, min: 1, max: 99, step: 5 },
         { key: 'band', label: 'Band %', number: true, min: 0, step: 5 }],
-      says: e => `a liquidity sweep of the ${e.zone === 'SellHigh' ? 'high' : 'low'} of a ${orderOf(e.level)} Range`,
-      short: e => `L${e.level} Range sweep ${e.zone === 'SellHigh' ? 'high' : 'low'}`,
+      says: e => `a liquidity sweep of the ${e.zone === 'SellHigh' ? 'high' : 'low'} of ${rangeSays(e)}`,
+      short: e => `${rangeShort(e)} Range sweep ${e.zone === 'SellHigh' ? 'high' : 'low'}`,
     },
   },
   target: {
@@ -6080,7 +6608,7 @@ function strategySays(s) {
   const costs = fee && slip ? ` Costs: ${fee}% fee a side and ${slip}% slippage on the entry and a Stop Loss.`
     : fee ? ` Costs: ${fee}% fee a side; no slippage is counted.`
     : slip ? ` Costs: ${slip}% slippage on the entry and a Stop Loss; no fees are counted.` : ' No fees or slippage are counted.';
-  const structure = strategySteps(s).some(e => STRATEGY_TYPES.entry[e?.type]?.structure) ? ` Market structure is read as a chart of the last ${STRUCTURE_WINDOW} candles shows it, so an order is that chart's.` : '';
+  const structure = strategySteps(s).some(e => STRATEGY_TYPES.entry[e?.type]?.structure) ? ` Market structure is read as known at each candle, from every candle to it, so an order is the one it has then.` : '';
   return `${long ? 'Buy' : 'Sell'} at the close of the candle that makes ${conditionSays(s)}.${structure} Take Profit ${where(s.takeProfit, long ? 'above' : 'below')}; Stop Loss ${where(s.stopLoss, long ? 'below' : 'above')}.${s.onePositionAtATime ? ' One trade at a time.' : ''}${costs}`;
 }
 
@@ -6248,13 +6776,13 @@ function renderStrategy() {
   // An option is its value, or { value, label } when the page names it otherwise than strategies.json keeps it.
   const input = (path, f, value) => f.options
     ? `<label>${esc(f.label)}<select data-path="${path}">${f.options.map(o => o.value ?? o).map((v, k) => `<option value="${esc(v)}" ${v === value ? 'selected' : ''}>${esc(f.options[k].label ?? v)}</option>`).join('')}</select></label>`
-    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number min="${f.min}" ${f.max != null ? `max="${f.max}" ` : ''}step="${f.step}" value="${esc(value)}"></label>${varyInputs(s, path, f.step)}`;
+    : `<label>${esc(f.label)}<input type="number" data-path="${path}" data-number ${f.blank ? `data-blank placeholder="${esc(f.blank)}" ` : ''}min="${f.min}" ${f.max != null ? `max="${f.max}" ` : ''}step="${f.step}" value="${esc(value ?? '')}"></label>${varyInputs(s, path, f.step)}`;
   const steps = strategySteps(s);
   // A step's kills, under its own fields: each a condition of a type with its numbers, and a button to add one. The entry
   // has none, as nothing is waited for after it.
   const killsHtml = (key, p) => `<div class="step-kills"><span class="step-kills-head" title="A kill ends the wait this step begins: met at a close after the step is met and before the trade is entered, the chain starts again">Killed by</span>
       ${(p.kill ?? []).map((kill, j) => `<span class="step-kill"><label>Type<select data-type="${key}.kill.${j}" data-kind="kill">${Object.entries(STRATEGY_TYPES.kill).filter(([, t]) => !t.of || t.of.includes(p.type)).map(([id, t]) => `<option value="${id}" ${id === kill.type ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
-        ${(STRATEGY_TYPES.kill[kill.type]?.fields ?? []).map(f => input(`${key}.kill.${j}.${f.key}`, f, kill[f.key])).join('')}
+        ${(STRATEGY_TYPES.kill[kill.type]?.fields ?? []).filter(f => !f.chain).map(f => input(`${key}.kill.${j}.${f.key}`, f, kill[f.key])).join('')}
         <button type="button" class="kill-remove" data-kill-remove="${key}.kill.${j}" title="Take this kill off the step" aria-label="Remove kill">×</button></span>`).join('')}
       <button type="button" class="kill-add" data-kill-add="${key}" title="Add a condition that ends the wait this step begins">+ Kill</button></div>`;
   const part = ({ key, title, kind }) => {
@@ -7031,23 +7559,26 @@ const tradeRow = t => ({ index: t.entryIndex, time: t.entryTime, trade: t });
 // The table's order: { key, dir } by a column, or none for the order the rows came in. A header clicked orders by its
 // column, rising; again, falling; a third time, back to as they came. Rows with nothing in the column go last either way.
 const nextTradeSort = (sort, key) => sort?.key !== key ? { key, dir: 1 } : sort.dir > 0 ? { key, dir: -1 } : null;
-function sortTradeRows(rows, sort) {
-  const by = sort && TRADE_COLUMNS[sort.key]?.sort;
+function sortTradeRows(rows, sort, defs = TRADE_COLUMNS) {
+  const by = sort && defs[sort.key]?.sort;
   if (!by) return rows;
   const blank = v => v == null || v === '';
   return rows.map((r, i) => ({ r, i, v: by(r) })).sort((a, b) => blank(a.v) - blank(b.v)
     || (blank(a.v) ? 0 : (a.v < b.v ? -1 : a.v > b.v ? 1 : 0) * sort.dir) || a.i - b.i).map(x => x.r);
 }
 
-function tradeTable(rows, { columns = TRADE_DEFAULT, actions = [], include = false, sort = null } = {}) {
-  const cols = columns.map(k => TRADE_COLUMNS[k]);
+// The table of trades, and of whatever else is listed the same way (defs, its columns by key; act, what a row's last
+// cell holds), as the Trends of Find similar are.
+function tradeTable(rows, { columns = TRADE_DEFAULT, actions = [], include = false, sort = null, defs = TRADE_COLUMNS, act = null } = {}) {
+  const cols = columns.map(k => defs[k]);
+  if (act) actions = ['act'];
   const toggle = r => !r.trade ? '' : `<button type="button" class="inc" data-include="${r.trade.entryIndex}" aria-pressed="${!r.out}"
     title="${r.out ? 'Left out of the totals: click to count it again' : 'Counted in the totals: click to leave it out'}">${r.out ? '○' : '●'}</button>`;
-  const buttons = r => actions.map(a => a === 'show' ? `<button type="button" data-show="${r.index}">Show on chart</button>`
-    : a === 'analyse' && r.trade && !r.current ? `<button type="button" data-trade-row="${r.trade.entryIndex}" title="An analysis of this trade: its entry, its exits and its outcome">Analyse</button>` : '').join('');
+  const buttons = act ?? (r => actions.map(a => a === 'show' ? `<button type="button" data-show="${r.index}">Show on chart</button>`
+    : a === 'analyse' && r.trade && !r.current ? `<button type="button" data-trade-row="${r.trade.entryIndex}" title="An analysis of this trade: its entry, its exits and its outcome">Analyse</button>` : '').join(''));
   return `<div class="strat-trades"><table>
     <thead><tr>${include ? '<th class="inc" title="Counted in the totals"></th>' : ''}${columns.map(k => {
-      const c = TRADE_COLUMNS[k], on = sort?.key === k, arrow = on ? (sort.dir > 0 ? ' ▲' : ' ▼') : '';
+      const c = defs[k], on = sort?.key === k, arrow = on ? (sort.dir > 0 ? ' ▲' : ' ▼') : '';
       return `<th${c.num ? ' class="num"' : ''}${on ? ` aria-sort="${sort.dir > 0 ? 'ascending' : 'descending'}"` : ''}><button type="button" class="sort" data-sort="${k}"
         title="Order by ${esc(c.head)}${on ? (sort.dir > 0 ? ', falling' : ', or back to as listed') : ''}">${c.head}${arrow}</button></th>`;
     }).join('')}${actions.length ? '<th></th>' : ''}</tr></thead>
@@ -7422,17 +7953,24 @@ function analysedTrade(dataset) {
 
 function drawStrategies(ex, traces) {
   const dataset = (ex.hindsight ?? ex).dataset, p = ex.prices;
-  if (!dataset || !p?.t?.length) return;
+  if (!p?.t?.length) return;
   const first = minuteOf(p.t[0]), last = minuteOf(p.t[p.t.length - 1]), up = css('--up'), down = css('--down');
+  // A chart of a window of candles (windowFrom, the time the window begins) marks where it begins: the candles before are its run-up.
+  if (ex.windowFrom && minuteOf(ex.windowFrom) >= first && minuteOf(ex.windowFrom) <= last)
+    traces.push({ type: 'scatter', mode: 'lines', name: 'Window', hoverinfo: 'skip', x: [ex.windowFrom, ex.windowFrom], y: [Math.min(...p.l), Math.max(...p.h)], line: { color: css('--muted'), width: 1, dash: 'dot' } });
+  // A chart can carry strategy runs of its own (ex.runs: a name, colour, strategy and trades each), as the Game's does once
+  // a round is told, drawn as the strategies on the charts are.
+  if (!dataset && !ex.runs) return;
   // A trade the chart has not reached the exit of is open: its exits run a few candles past the last candle shown, so
   // where they are can be seen from the candle it is entered on.
   const whole = (ex.hindsight ?? ex).prices, ahead = whole.t[Math.min(whole.t.length - 1, (ex.cursor ?? whole.t.length - 1) + 3)];
   // The strategies on, and an analysis's own Trade on its "trade" layer: the one trade it tells of, with the run it began.
-  const drawn = STRATEGY_SECTION.layers.filter(l => on(l.id)).map(l => ({ name: l.label, colour: css(l.colour), strategy: l.chartStrategy.strategy }));
-  const analysed = analysedTrade(dataset);
+  const drawn = ex.runs ? ex.runs.map(r => ({ name: r.name, colour: r.colour, strategy: r.strategy, own: r }))
+    : STRATEGY_SECTION.layers.filter(l => on(l.id)).map(l => ({ name: l.label, colour: css(l.colour), strategy: l.chartStrategy.strategy }));
+  const analysed = ex.runs ? null : analysedTrade(dataset);
   if (analysed) drawn.push({ name: 'Trade', colour: css('--text'), strategy: analysed.strategy, at: minuteOf(analysed.trade.entryTime) });
-  for (const { name, colour, strategy, at } of drawn) {
-    const run = chartTrades(dataset, strategy);
+  for (const { name, colour, strategy, at, own } of drawn) {
+    const run = own ?? chartTrades(dataset, strategy);
     if (!run) continue;
     // A tour's scene starts its story at its first candle, so a trade entered before it is not shown.
     const shown = run.trades.filter(t => (!at || minuteOf(t.entryTime) === at) && minuteOf(t.entryTime) <= last && minuteOf(t.exitTime) >= first && (!ex.tour || minuteOf(t.entryTime) >= first))
@@ -7486,7 +8024,7 @@ function drawStrategies(ex, traces) {
         `<br>${fmtProfit(s.t.profit)} · ${fmtPercent(s.t.profitPercent)}<extra></extra>`) });
   }
   // Find similar's candles: rings around the candles of the dataset that are on the chart.
-  if (similarMarks?.dataset === dataset) {
+  if (dataset && similarMarks?.dataset === dataset) {
     const at = new Map(p.t.map((t, i) => [minuteOf(t), i])), marked = similarMarks.times.map(t => at.get(minuteOf(t))).filter(i => i != null);
     if (marked.length) traces.push({ type: 'scatter', mode: 'markers', name: 'Similar', x: marked.map(i => p.t[i]), y: marked.map(i => (p.h[i] + p.l[i]) / 2),
       marker: { symbol: 'circle-open', size: 24, color: css('--accent'), line: { width: 2.5, color: css('--accent') } },
@@ -7946,6 +8484,130 @@ function renderData() {
     fetchData(m, months(m).filter(x => x.year === Number(year) && x.month === Number(month)));
   }));
 }
+// ---- Game ------------------------------------------------------------------------------------------------------------
+// Which strategy would have made you the most money? A round is a window of a market's candles, a day or two of them, and
+// three strategies from strategies.json dealt at random: read the chart and the strategies, pick one, and the round shows
+// every trade each would have made on a stake a trade (POST api/game/round, see StrategyGame). No fees or slippage yet; a
+// trade still open at the window's end is refunded. The score is kept in the browser with the page's other settings.
+const GAME_LENGTHS = [{ label: '24 hours', candles: 24 }, { label: '48 hours', candles: 48 }], GAME_STAKE = 1000, GAME_LETTERS = ['A', 'B', 'C'];
+const GAME_COLOURS = ['--accent', '--lv5', '--lv3'];
+const fmtMoney = v => `${v < 0 ? '−' : v > 0 ? '+' : ''}$${Math.abs(Math.round(v)).toLocaleString()}`;
+let game = null;
+
+const gameScore = () => state.game ??= { candles: 48, rounds: 0, right: 0, money: 0, best: 0 };
+
+// The trades table's columns for a round: a refunded trade says so in place of its outcome, and each has its money.
+const GAME_COLUMNS = { ...TRADE_COLUMNS,
+  outcome: { head: 'Outcome', cell: r => r.trade.refunded ? `<span title="Still open at the window's end: refunded">Refunded</span>` : OUTCOMES[r.trade.outcome] ?? esc(r.trade.outcome),
+    sort: r => r.trade.refunded ? 'Refunded' : r.trade.outcome },
+  money: { head: 'Money', num: true, cls: r => tradeSign(r.trade.money), cell: r => fmtMoney(r.trade.money), sort: r => r.trade.money },
+};
+
+async function renderGamePage() {
+  const main = document.getElementById('main');
+  currentPage = 'Game';
+  const head = `<section class="term-head"><h2>Game</h2>
+    <p>Which strategy would have made you the most money? A round is a day or two of a market and three strategies. Read the chart and the strategies, pick one, then see every trade each would have made.</p>
+    <p class="remarks">Each trade stakes $${GAME_STAKE.toLocaleString()}, with no fees or slippage. Trades are entered only in the window, though a strategy reads the candles before it;
+    a trade still open at the window's end is refunded, so it makes nothing either way. The strategies are three of those in strategies.json, dealt at random, and the window is
+    one all three trade in where one can be found.</p></section>`;
+  if (!serverOn) {
+    main.innerHTML = head + `<div class="empty" data-server-check>Checking for the local server…</div>`;
+    return checkLocalServer();
+  }
+  if (!strategies) {
+    main.innerHTML = head + '<div class="empty">Loading strategies…</div>';
+    try { await loadStrategies(); } catch (e) { main.innerHTML = head + `<div class="empty">strategies.json could not be read: ${esc(e.message)}.</div>`; return; }
+  }
+  await loadDatasets();
+  if (currentPage !== 'Game') return;
+  game ??= { round: null, picked: null, dealing: false, error: null, dataset: datasetList[0]?.id, ex: null, before: 0 };
+  main.innerHTML = head + '<div class="game"></div>';
+  renderGame();
+  if (!game.round && !game.dealing) dealGameRound();
+}
+
+// Deals a round: three strategies of the book at random, without their costs, on a window the server picks.
+async function dealGameRound() {
+  const book = strategies.book.strategies.filter(s => s.entry && s.takeProfit && s.stopLoss);
+  if (book.length < 2) {
+    game.error = 'The game needs at least two strategies in strategies.json.';
+    return renderGame();
+  }
+  const deck = [...book];
+  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  const dealt = deck.slice(0, 3).map(s => ({ ...s, countFees: false, countSlippage: false }));
+  Object.assign(game, { dealing: true, error: null, round: null, picked: null, ex: null });
+  renderGame();
+  const result = await postToServer('api/game/round', { dataset: game.dataset, strategies: dealt, candles: gameScore().candles, stake: GAME_STAKE }, 'the game');
+  game.dealing = false;
+  if (result.error) game.error = result.error;
+  else {
+    game.round = result.round;
+    game.before = result.before;
+    game.ex = { id: 'Game/round', title: 'Round', level: 1, prices: result.prices, expected: [], annotations: [], windowFrom: result.round.from };
+  }
+  if (currentPage === 'Game') renderGame();
+}
+
+function renderGame() {
+  const box = document.querySelector('.game');
+  if (!box) return;
+  const score = gameScore(), r = game.round, data = r && datasetList?.find(d => d.id === r.dataset);
+  const stat = (label, value, cls = '') => `<div><span>${label}</span><b class="${cls}">${value}</b></div>`;
+  const best = r ? Math.max(...r.contenders.map(c => c.total)) : 0;
+  box.innerHTML = `<div class="strat-card">
+      <div class="strat-stats game-score">${stat('Rounds', score.rounds)}${stat('Picked the best', score.rounds ? `${score.right} of ${score.rounds}` : '–')}
+        ${stat('Your money', fmtMoney(score.money), tradeSign(score.money))}${stat('Best possible', fmtMoney(score.best), tradeSign(score.best))}</div>
+      <div class="strat-fields">
+        <label>Market<select data-game-dataset>${(datasetList ?? []).map(d => `<option value="${esc(d.id)}" ${d.id === game.dataset ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></label>
+        <label>Window<select data-game-candles>${GAME_LENGTHS.map(w => `<option value="${w.candles}" ${w.candles === score.candles ? 'selected' : ''}>${w.label}</option>`).join('')}</select></label>
+      </div>
+      <div class="strat-run">
+        <button type="button" data-game-new ${game.dealing ? 'disabled' : ''}>${game.dealing ? 'Dealing…' : r ? 'Next round' : 'Deal a round'}</button>
+        <span class="strat-note${game.error ? ' bad' : ''}">${esc(game.error ?? (r && game.picked == null ? 'Pick the strategy you think made the most.' : ''))}</span>
+      </div></div>
+    ${r ? `<article class="example game-chart" id="ex-${esc(game.ex.id)}">
+      <header><h3>${esc(data?.name ?? r.dataset)}</h3><span class="id">${esc(fmtTime(r.from))} to ${esc(fmtTime(r.to))} UTC · ${r.candles} candles from the dotted line; the ${game.before} before are the run-up</span></header>
+      ${chartRow(game.ex)}</article>
+    <div class="game-cards">${r.contenders.map((c, k) => gameCard(c, k, best)).join('')}</div>` : ''}`;
+  box.querySelector('[data-game-dataset]').addEventListener('change', e => { game.dataset = e.target.value; });
+  box.querySelector('[data-game-candles]').addEventListener('change', e => { gameScore().candles = Number(e.target.value); save(state); });
+  box.querySelector('[data-game-new]').addEventListener('click', dealGameRound);
+  box.querySelectorAll('[data-game-pick]').forEach(b => b.addEventListener('click', () => pickGame(Number(b.dataset.gamePick))));
+  if (r) drawAll(currentPage);
+}
+
+// A strategy's card: its letter, name and words, and Pick; once picked, what it made, trade by trade.
+function gameCard(c, k, best) {
+  const letter = GAME_LETTERS[k] ?? String(k + 1), s = c.strategy, picked = game.picked;
+  const head = `<h3><span class="game-swatch" style="background:${css(GAME_COLOURS[k % GAME_COLOURS.length])}"></span>${letter}. ${esc(s.name || s.id)}</h3>
+    <p class="remarks">${esc(strategySays(s))}</p>`;
+  if (picked == null) return `<div class="strat-card game-card">${head}<div class="strat-run"><button type="button" data-game-pick="${k}">Pick ${letter}</button></div></div>`;
+  const won = c.trades.filter(t => !t.refunded && t.money > 0).length, lost = c.trades.filter(t => !t.refunded && t.money < 0).length;
+  const rows = c.trades.map(t => ({ index: t.trade.entryIndex, time: t.trade.entryTime, trade: { ...t.trade, money: t.money, refunded: t.refunded } }));
+  const tags = `${k === picked ? '<span class="game-tag">Your pick</span>' : ''}${c.total === best ? '<span class="game-tag best">Made the most</span>' : ''}`;
+  return `<div class="strat-card game-card${k === picked ? ' picked' : ''}${c.total === best ? ' best' : ''}">${head}
+    <div class="game-total"><b class="${tradeSign(c.total)}">${fmtMoney(c.total)}</b>${tags}</div>
+    <p class="remarks">${c.trades.length} trade${c.trades.length === 1 ? '' : 's'}: ${won} won, ${lost} lost${c.refunded ? `, ${c.refunded} refunded` : ''}.</p>
+    ${c.trades.length ? tradeTable(rows, { columns: ['entry', 'exit', 'outcome', 'money'], defs: GAME_COLUMNS }) : ''}</div>`;
+}
+
+// The pick: the score counts the round, and the chart draws every strategy's trades.
+function pickGame(k) {
+  const r = game.round, score = gameScore(), totals = r.contenders.map(c => c.total), best = Math.max(...totals);
+  if (!r || game.picked != null) return;
+  game.picked = k;
+  score.rounds++;
+  if (totals[k] === best) score.right++;
+  score.money += totals[k];
+  score.best += best;
+  save(state);
+  game.ex.runs = r.contenders.map((c, i) => ({ name: `${GAME_LETTERS[i] ?? i + 1}. ${c.strategy.name || c.strategy.id}`, colour: css(GAME_COLOURS[i % GAME_COLOURS.length]),
+    strategy: c.strategy, trades: c.trades.map(t => t.trade) }));
+  renderGame();
+}
+
 function route() {
   document.body.classList.remove('analysing');
   document.body.classList.toggle('embed', embedMode);
@@ -7953,7 +8615,14 @@ function route() {
   pauseTour();
   // An analysis has an address of its own: #Analysis?explain=Swing&dataset=...
   const [first, asked] = location.hash.slice(1).split('?');
-  document.body.classList.toggle('strategizing', first === 'Strategies' || first === 'Explore' || first === 'Data');
+  document.body.classList.toggle('strategizing', first === 'Strategies' || first === 'Explore' || first === 'Game' || first === 'Data');
+  if (first === 'Game') {
+    ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
+    renderNav('Game');
+    renderGamePage();
+    window.scrollTo(0, 0);
+    return;
+  }
   if (first === 'Data') {
     ['touring', 'video', 'editing'].forEach(c => document.body.classList.remove(c));
     renderNav('Data');

@@ -646,6 +646,45 @@ public sealed class StructureStore
         return ranges;
     }
 
+    /// <summary>
+    /// Every trend as it stood over each stretch of candles: from the candle that made it so to the one before the next
+    /// that changed it, or the last candle of all; in the order the trends were first found. The candles it was no trend
+    /// at are in no stretch.
+    /// </summary>
+    public IEnumerable<(StoredTrend Trend, int From, int To)> TrendStretches()
+    {
+        foreach (var held in _trends)
+        {
+            var trend = held.Item;
+            foreach (var (state, from, to) in Stretches(held.States))
+                yield return (new StoredTrend(trend.Id, trend.Direction, trend.First.Start, state.Confirmed, state.End, state.Swings, state.MarketStructureBreaks, state.Parts, state.Level), from, to);
+        }
+    }
+
+    /// <summary>
+    /// Every range as it stood over each stretch of candles, as <see cref="TrendStretches"/> gives the trends.
+    /// </summary>
+    public IEnumerable<(StoredRange Range, int From, int To)> RangeStretches()
+    {
+        foreach (var held in _ranges)
+        {
+            var range = held.Item;
+            foreach (var (state, from, to) in Stretches(held.States))
+                yield return (new StoredRange(range.Id, range.Direction, range.From, range.Low, range.High, range.Identified, range.Retracement, range.Band, state.End, state.Level), from, to);
+        }
+    }
+
+    // Each state an item had, with the candles it had it at.
+    private IEnumerable<(TState State, int From, int To)> Stretches<TState>(List<(int From, TState? State)> states) where TState : struct
+    {
+        for (var k = 0; k < states.Count; k++)
+        {
+            var to = k + 1 < states.Count ? states[k + 1].From - 1 : Candles - 1;
+            if (states[k].State is { } state && to >= states[k].From)
+                yield return (state, states[k].From, to);
+        }
+    }
+
     private int At(int? at) => Math.Clamp(at ?? Candles - 1, 0, Math.Max(0, Candles - 1));
 
     // The first of a list in order that a test holds for, and for all after it; the list's count when it holds for none.
